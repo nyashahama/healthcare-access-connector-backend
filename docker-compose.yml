@@ -1,0 +1,142 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hac_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: healthcare_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hac_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: hac_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hac_network
+
+  nats:
+    image: nats:2-alpine
+    container_name: hac_nats
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hac_network
+
+  # Mailpit - Email testing for appointment confirmations, notifications
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: hac_mailpit
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    environment:
+      MP_MAX_MESSAGES: 5000
+      MP_DATA_FILE: /data/mailpit.db
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    volumes:
+      - mailpit_data:/data
+    networks:
+      - hac_network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hac_api
+    depends_on:
+      - postgres
+      - redis
+      - nats
+      - mailpit
+    ports:
+      - "8080:8080"
+    environment:
+      # Database
+      DB_URL: postgres://postgres:admin@postgres:5432/healthcare_db?sslmode=disable
+      
+      # Security
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars-long-please-update-this}
+      
+      # Server
+      PORT: 8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TIMEOUT_SECONDS: 30
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      
+      # CORS & Rate Limiting
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-10}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-20}
+      
+      # JWT & Cache
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
+      CACHE_TTL_MINUTES: ${CACHE_TTL_MINUTES:-5}
+      
+      # Infrastructure
+      REDIS_URL: redis://redis:6379
+      NATS_URL: nats://nats:4222
+      
+      # Email Configuration
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
+      EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@healthcare-connector.local}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Healthcare Access Connector}
+      
+      # SMTP (Mailpit for local dev)
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
+      
+      # AWS SES (production)
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      
+      # Healthcare-specific
+      APPOINTMENT_REMINDER_HOURS: ${APPOINTMENT_REMINDER_HOURS:-24}
+      MAX_APPOINTMENTS_PER_DAY: ${MAX_APPOINTMENTS_PER_DAY:-10}
+      PROVIDER_SEARCH_RADIUS_KM: ${PROVIDER_SEARCH_RADIUS_KM:-50}
+      
+    restart: unless-stopped
+    networks:
+      - hac_network
+
+networks:
+  hac_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  mailpit_data:

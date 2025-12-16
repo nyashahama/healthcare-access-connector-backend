@@ -1,0 +1,35 @@
+
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+coverage.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Temp
+tmp/
+temp/
+*.log
+
+# Databases
+*.db
+*.sqlite*
+
+# Build artifacts
+dist/
+build/
+
+# Environment
+.env
+.env.*
