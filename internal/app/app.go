@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
@@ -14,6 +15,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 )
@@ -30,7 +32,7 @@ type App struct {
 func New(cfg *config.Config) (*App, error) {
 	logger := cfg.Logger()
 
-	// Initialize database connection pool
+	// Initialize database connection pool with proper configuration
 	pool, err := initDatabase(cfg.DBURL, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
@@ -102,19 +104,48 @@ func (a *App) Cleanup() {
 	}
 }
 
-// initDatabase initializes the database connection pool
+// initDatabase initializes the database connection pool with optimized settings
 func initDatabase(dbURL string, logger *zerolog.Logger) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(context.Background(), dbURL)
+	// Parse the database URL
+	config, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	// Test connection
-	if err := pool.Ping(context.Background()); err != nil {
+	// Configure connection pool settings
+	config.MaxConns = 25                       // Maximum number of connections
+	config.MinConns = 5                        // Minimum number of idle connections
+	config.MaxConnLifetime = 1 * time.Hour     // Max lifetime of a connection
+	config.MaxConnIdleTime = 30 * time.Minute  // Max time a connection can be idle
+	config.HealthCheckPeriod = 1 * time.Minute // How often to check connection health
+
+	// CRITICAL FIX: Disable prepared statement cache to prevent conflicts
+	// This is the root cause of the "prepared statement already exists" error
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	// Alternative: Use describe mode which is safer than exec mode
+	// config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeDescribeExec
+
+	// Create connection pool with configured settings
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+	}
+
+	// Test connection with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	logger.Info().Msg("Database connection established")
+	logger.Info().
+		Int32("max_conns", config.MaxConns).
+		Int32("min_conns", config.MinConns).
+		Str("query_mode", "simple_protocol").
+		Msg("Database connection pool established")
+
 	return pool, nil
 }

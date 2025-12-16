@@ -82,10 +82,10 @@ services:
       - "8080:8080"
     environment:
       # Database
-      DB_URL: postgres://postgres:admin@postgres:5432/healthcare_db?sslmode=disable
+      DB_URL: ${DB_URL} #postgres://postgres:admin@postgres:5432/healthcare_db?sslmode=disable
       
       # Security
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars-long-please-update-this}
+      JWT_SECRET: ${JWT_SECRET}
       
       # Server
       PORT: 8080
