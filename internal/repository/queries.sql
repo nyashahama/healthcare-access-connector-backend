@@ -450,3 +450,11 @@ WHERE clinic_id = $1
     AND ($2::VARCHAR IS NULL OR staff_role = $2)
     AND employment_status = 'active'
 ORDER BY first_name, last_name;
+
+
+-- name: UpdateClinicStaff :exec
+UPDATE clinic_staff
+SET professional_title = $2, specialization = $3, 
+    work_email = $4, work_phone = $5, bio = $6,
+    is_accepting_new_patients = $7
+WHERE id = $1;
