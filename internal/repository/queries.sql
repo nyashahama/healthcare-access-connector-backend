@@ -487,3 +487,8 @@ FROM professional_credentials
 WHERE staff_id = $1
 ORDER BY issue_date DESC;
 
+
+-- name: VerifyCredential :exec
+UPDATE professional_credentials
+SET status = 'verified', verified_by = $2, verification_date = NOW()
+WHERE id = $1;
