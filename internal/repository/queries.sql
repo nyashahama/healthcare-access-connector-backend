@@ -186,3 +186,11 @@ INSERT INTO patient_allergies (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id, patient_id, allergy_name, severity, status, created_at;
+
+-- name: GetPatientAllergies :many
+SELECT id, patient_id, allergy_name, severity, reaction_description,
+    first_identified_date, last_occurrence_date, status, notes, 
+    created_at, updated_at
+FROM patient_allergies
+WHERE patient_id = $1
+ORDER BY severity DESC, created_at DESC;
