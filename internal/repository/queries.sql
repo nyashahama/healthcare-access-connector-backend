@@ -28,3 +28,11 @@ SELECT id, email, phone, password_hash, role, status, is_verified,
     popia_consent_given, profile_completion_percentage, created_at, updated_at
 FROM users
 WHERE phone = $1 AND status != 'inactive';
+
+
+-- name: GetUserByID :one
+SELECT id, email, phone, role, status, is_verified, last_login, 
+    login_count, is_sms_only, profile_completion_percentage, 
+    created_at, updated_at
+FROM users
+WHERE id = $1 AND status != 'inactive';
