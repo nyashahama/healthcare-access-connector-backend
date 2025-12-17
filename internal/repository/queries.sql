@@ -117,3 +117,8 @@ SELECT id, user_id, first_name, last_name, preferred_name, date_of_birth,
     accepts_marketing_emails, created_at, updated_at
 FROM patient_profiles
 WHERE user_id = $1;   
+
+
+
+-- name: GetPatientProfileByID :one
+SELECT * FROM patient_profiles WHERE id = $1;
