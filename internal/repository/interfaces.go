@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 
+	"github.com/docker/distribution/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 
 	"github.com/jackc/pgx/v5"
@@ -13,11 +14,15 @@ import (
 type UserRepository interface {
 	CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (domain.User, string, error)
-	GetUserByID(ctx context.Context, id int32) (domain.User, error)
-	GetUserByUsername(ctx context.Context, username string) (domain.User, error)
+	GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error)
+	GetUserByPhone(ctx context.Context, phone string) (domain.User, error)
 	UpdateUser(ctx context.Context, user domain.User) error
-	DeleteUser(ctx context.Context, id int32) error
-	ListUsers(ctx context.Context, limit, offset int) ([]domain.User, error)
+	UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error
+	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
+	VerifyUser(ctx context.Context, id uuid.UUID) error
+	DeactivateUser(ctx context.Context, id uuid.UUID) error
+	ListUsers(ctx context.Context, role string, limit, offset int) ([]domain.User, error)
+	CountUsers(ctx context.Context, role string) (int64, error)
 }
 
 // TxManager handles database transactions

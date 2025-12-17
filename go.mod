@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.32.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.3
 	github.com/aws/aws-sdk-go-v2/service/ses v1.34.15
+	github.com/docker/distribution v2.8.3+incompatible
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/jackc/pgx/v5 v5.7.6
