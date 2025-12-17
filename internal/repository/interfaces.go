@@ -77,6 +77,22 @@ type ClinicRepository interface {
 	DeactivateClinicService(ctx context.Context, id uuid.UUID) error
 }
 
+// StaffRepository defines methods for clinic staff data access
+type StaffRepository interface {
+	CreateStaffMember(ctx context.Context, staff domain.ClinicStaff) (domain.ClinicStaff, error)
+	GetStaffByID(ctx context.Context, id uuid.UUID) (domain.ClinicStaff, error)
+	GetStaffByUserID(ctx context.Context, userID uuid.UUID) (domain.ClinicStaff, error)
+	GetClinicStaff(ctx context.Context, clinicID uuid.UUID, role string) ([]domain.ClinicStaff, error)
+	UpdateStaffMember(ctx context.Context, staff domain.ClinicStaff) error
+	UpdateStaffStatus(ctx context.Context, id uuid.UUID, status string) error
+
+	// Credentials
+	AddCredential(ctx context.Context, cred domain.ProfessionalCredential) (domain.ProfessionalCredential, error)
+	GetCredentials(ctx context.Context, staffID uuid.UUID) ([]domain.ProfessionalCredential, error)
+	VerifyCredential(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID) error
+	UpdateCredential(ctx context.Context, cred domain.ProfessionalCredential) error
+}
+
 // TxManager handles database transactions
 type TxManager interface {
 	WithTransaction(ctx context.Context, fn func(context.Context, pgx.Tx) error) error
