@@ -134,3 +134,14 @@ SET first_name = $2, last_name = $3, preferred_name = $4,
     has_medical_aid = $14, employment_status = $15, 
     last_profile_update = NOW()
 WHERE id = $1;
+
+
+-- name: SearchPatients :many
+SELECT id, user_id, first_name, last_name, city, province, 
+    preferred_communication_method, created_at
+FROM patient_profiles
+WHERE 
+    (first_name ILIKE '%' || $1 || '%' OR last_name ILIKE '%' || $1 || '%')
+    AND ($2::VARCHAR IS NULL OR province = $2)
+ORDER BY created_at DESC
+LIMIT $3 OFFSET $4;
