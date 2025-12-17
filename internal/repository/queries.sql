@@ -458,3 +458,9 @@ SET professional_title = $2, specialization = $3,
     work_email = $4, work_phone = $5, bio = $6,
     is_accepting_new_patients = $7
 WHERE id = $1;
+
+
+-- name: UpdateStaffStatus :exec
+UPDATE clinic_staff
+SET employment_status = $2, end_date = $3
+WHERE id = $1;
