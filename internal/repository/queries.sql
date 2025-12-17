@@ -437,3 +437,6 @@ RETURNING id, clinic_id, user_id, first_name, last_name,
 
 -- name: GetClinicStaffByID :one
 SELECT * FROM clinic_staff WHERE id = $1;
+
+-- name: GetClinicStaffByUserID :one
+SELECT * FROM clinic_staff WHERE user_id = $1;
