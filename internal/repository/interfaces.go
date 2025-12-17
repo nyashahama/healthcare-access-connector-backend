@@ -110,6 +110,15 @@ type ConsentRepository interface {
 	WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error
 }
 
+// AuditRepository defines methods for audit logging (POPIA compliance)
+type AuditRepository interface {
+	LogActivity(ctx context.Context, activity domain.UserActivity) error
+	GetUserActivities(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.UserActivity, error)
+
+	LogDataAccess(ctx context.Context, access domain.DataAccessLog) error
+	GetDataAccessLogs(ctx context.Context, accessedUserID uuid.UUID, limit, offset int) ([]domain.DataAccessLog, error)
+}
+
 // TxManager handles database transactions
 type TxManager interface {
 	WithTransaction(ctx context.Context, fn func(context.Context, pgx.Tx) error) error
