@@ -350,3 +350,16 @@ WHERE
     AND ($4::VARCHAR IS NULL OR verification_status = $4)
 ORDER BY rating DESC NULLS LAST, created_at DESC
 LIMIT $5 OFFSET $6;
+
+
+-- name: SearchClinics :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, rating, review_count
+FROM clinics
+WHERE 
+    clinic_name ILIKE '%' || $1 || '%'
+    AND ($2::VARCHAR IS NULL OR province = $2)
+    AND ($3::VARCHAR IS NULL OR city = $3)
+    AND verification_status = 'verified'
+ORDER BY rating DESC NULLS LAST
+LIMIT $4 OFFSET $5;
