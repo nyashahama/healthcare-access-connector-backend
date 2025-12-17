@@ -464,3 +464,17 @@ WHERE id = $1;
 UPDATE clinic_staff
 SET employment_status = $2, end_date = $3
 WHERE id = $1;
+
+
+-- ============================================
+-- Professional Credentials Queries
+-- ============================================
+
+-- name: AddProfessionalCredential :one
+INSERT INTO professional_credentials (
+    staff_id, credential_type, credential_number, issuing_authority,
+    issue_date, expiry_date, status, document_url
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, staff_id, credential_type, issuing_authority, 
+    status, created_at;
