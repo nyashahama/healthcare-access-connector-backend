@@ -201,3 +201,7 @@ UPDATE patient_allergies
 SET allergy_name = $2, severity = $3, reaction_description = $4,
     last_occurrence_date = $5, status = $6, notes = $7
 WHERE id = $1;
+
+
+-- name: DeletePatientAllergy :exec
+DELETE FROM patient_allergies WHERE id = $1;
