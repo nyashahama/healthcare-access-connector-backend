@@ -268,3 +268,17 @@ UPDATE patient_conditions
 SET condition_name = $2, severity = $3, status = $4, 
     notes = $5, last_flare_up = $6, next_checkup_date = $7
 WHERE id = $1;
+
+
+-- ============================================
+-- Patient Immunizations Queries
+-- ============================================
+
+-- name: AddPatientImmunization :one
+INSERT INTO patient_immunizations (
+    patient_id, vaccine_name, vaccine_type, administration_date, 
+    next_due_date, administered_by, clinic_name, lot_number, 
+    manufacturer, dose_number, total_doses, documented_by
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+RETURNING id, patient_id, vaccine_name, administration_date, next_due_date, created_at;
