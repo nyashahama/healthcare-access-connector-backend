@@ -194,3 +194,10 @@ SELECT id, patient_id, allergy_name, severity, reaction_description,
 FROM patient_allergies
 WHERE patient_id = $1
 ORDER BY severity DESC, created_at DESC;
+
+
+-- name: UpdatePatientAllergy :exec
+UPDATE patient_allergies
+SET allergy_name = $2, severity = $3, reaction_description = $4,
+    last_occurrence_date = $5, status = $6, notes = $7
+WHERE id = $1;
