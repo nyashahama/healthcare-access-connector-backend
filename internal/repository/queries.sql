@@ -617,3 +617,7 @@ INSERT INTO notification_preferences (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING id, user_id, created_at;
+
+
+-- name: GetNotificationPreferences :one
+SELECT * FROM notification_preferences WHERE user_id = $1;
