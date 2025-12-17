@@ -122,3 +122,15 @@ WHERE user_id = $1;
 
 -- name: GetPatientProfileByID :one
 SELECT * FROM patient_profiles WHERE id = $1;
+
+
+-- name: UpdatePatientProfile :exec
+UPDATE patient_profiles
+SET first_name = $2, last_name = $3, preferred_name = $4, 
+    date_of_birth = $5, gender = $6, primary_address = $7, 
+    city = $8, province = $9, postal_code = $10, 
+    preferred_communication_method = $11, 
+    medical_aid_number = $12, medical_aid_provider = $13, 
+    has_medical_aid = $14, employment_status = $15, 
+    last_profile_update = NOW()
+WHERE id = $1;
