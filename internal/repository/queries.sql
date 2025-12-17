@@ -532,3 +532,17 @@ DELETE FROM user_sessions WHERE user_id = $1;
 
 -- name: DeleteExpiredSessions :exec
 DELETE FROM user_sessions WHERE expires_at <= NOW();
+
+-- ============================================
+-- Privacy Consent Queries (POPIA Compliance)
+-- ============================================
+
+-- name: CreatePrivacyConsent :one
+INSERT INTO privacy_consents (
+    user_id, health_data_consent, health_data_consent_date,
+    health_data_consent_version, emergency_access_consent,
+    sms_communication_consent, email_communication_consent,
+    ip_address, user_agent
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, user_id, health_data_consent, created_at;
