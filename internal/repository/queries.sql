@@ -48,3 +48,10 @@ WHERE id = $1;
 UPDATE users
 SET status = $2
 WHERE id = $1;
+
+-- name: VerifyUser :exec
+UPDATE users
+SET is_verified = TRUE, verification_token = NULL, verification_expires = NULL
+WHERE id = $1;
+
+
