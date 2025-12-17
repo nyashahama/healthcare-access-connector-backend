@@ -103,3 +103,17 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $
 RETURNING id, user_id, first_name, last_name, preferred_name, 
     date_of_birth, gender, city, province, country, 
     preferred_communication_method, created_at, updated_at;
+
+
+-- name: GetPatientProfileByUserID :one
+SELECT id, user_id, first_name, last_name, preferred_name, date_of_birth, 
+    gender, preferred_gender_pronouns, primary_address, city, province, 
+    postal_code, country, language_preferences, home_language, 
+    requires_interpreter, preferred_communication_method, 
+    medical_aid_number, medical_aid_provider, has_medical_aid, 
+    national_id_number, employment_status, education_level, 
+    household_income_range, profile_picture_url, timezone, 
+    last_profile_update, referred_by, referral_code, 
+    accepts_marketing_emails, created_at, updated_at
+FROM patient_profiles
+WHERE user_id = $1;   
