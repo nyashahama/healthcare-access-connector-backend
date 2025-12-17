@@ -60,6 +60,23 @@ type PatientRepository interface {
 	GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]domain.PatientImmunization, error)
 }
 
+// ClinicRepository defines methods for clinic data access
+type ClinicRepository interface {
+	CreateClinic(ctx context.Context, clinic domain.Clinic) (domain.Clinic, error)
+	GetClinicByID(ctx context.Context, id uuid.UUID) (domain.Clinic, error)
+	UpdateClinic(ctx context.Context, clinic domain.Clinic) error
+	VerifyClinic(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID, notes string) error
+	ListClinics(ctx context.Context, filters domain.ClinicFilters, limit, offset int) ([]domain.Clinic, error)
+	SearchClinics(ctx context.Context, query string, province string, city string, limit, offset int) ([]domain.Clinic, error)
+	SearchClinicsByLocation(ctx context.Context, lat, lng float64, radiusKm float64) ([]domain.Clinic, error)
+
+	// Clinic Services
+	AddClinicService(ctx context.Context, service domain.ClinicService) (domain.ClinicService, error)
+	GetClinicServices(ctx context.Context, clinicID uuid.UUID) ([]domain.ClinicService, error)
+	UpdateClinicService(ctx context.Context, service domain.ClinicService) error
+	DeactivateClinicService(ctx context.Context, id uuid.UUID) error
+}
+
 // TxManager handles database transactions
 type TxManager interface {
 	WithTransaction(ctx context.Context, fn func(context.Context, pgx.Tx) error) error
