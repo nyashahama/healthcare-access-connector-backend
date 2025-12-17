@@ -336,3 +336,17 @@ SET is_verified = TRUE, verification_status = 'verified',
     verified_by = $2, verification_date = NOW(),
     verification_notes = $3
 WHERE id = $1;
+
+
+-- name: ListClinics :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, email, is_verified,
+    verification_status, rating, review_count, created_at
+FROM clinics
+WHERE 
+    ($1::VARCHAR IS NULL OR clinic_type = $1)
+    AND ($2::VARCHAR IS NULL OR province = $2)
+    AND ($3::VARCHAR IS NULL OR city = $3)
+    AND ($4::VARCHAR IS NULL OR verification_status = $4)
+ORDER BY rating DESC NULLS LAST, created_at DESC
+LIMIT $5 OFFSET $6;
