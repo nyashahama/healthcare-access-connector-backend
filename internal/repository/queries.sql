@@ -79,3 +79,8 @@ FROM users
 WHERE role = $1 AND status != 'inactive'
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3;
+
+
+-- name: CountUsersByRole :one
+SELECT COUNT(*) FROM users 
+WHERE role = $1 AND status != 'inactive';
