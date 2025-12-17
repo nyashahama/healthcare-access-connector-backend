@@ -413,3 +413,7 @@ UPDATE clinic_services
 SET service_name = $2, description = $3, cost = $4,
     is_active = $5, requires_appointment = $6
 WHERE id = $1;
+
+
+-- name: DeactivateClinicService :exec
+UPDATE clinic_services SET is_active = FALSE WHERE id = $1;
