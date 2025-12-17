@@ -282,3 +282,12 @@ INSERT INTO patient_immunizations (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING id, patient_id, vaccine_name, administration_date, next_due_date, created_at;
+
+
+-- name: GetPatientImmunizations :many
+SELECT id, patient_id, vaccine_name, vaccine_type, administration_date,
+    next_due_date, administered_by, clinic_name, dose_number, 
+    total_doses, notes, created_at
+FROM patient_immunizations
+WHERE patient_id = $1
+ORDER BY administration_date DESC;
