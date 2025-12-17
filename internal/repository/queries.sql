@@ -160,3 +160,7 @@ INSERT INTO patient_medical_info (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING id, patient_id, blood_type, overall_health_status, created_at, updated_at;
+
+
+-- name: GetPatientMedicalInfo :one
+SELECT * FROM patient_medical_info WHERE patient_id = $1;
