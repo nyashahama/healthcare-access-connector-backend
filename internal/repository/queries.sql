@@ -519,3 +519,12 @@ SELECT id, user_id, session_token, device_type, ip_address,
     user_agent, expires_at, created_at
 FROM user_sessions
 WHERE session_token = $1 AND expires_at > NOW();
+
+
+-- name: DeleteSession :exec
+DELETE FROM user_sessions WHERE session_token = $1;
+
+
+
+-- name: DeleteUserSessions :exec
+DELETE FROM user_sessions WHERE user_id = $1;
