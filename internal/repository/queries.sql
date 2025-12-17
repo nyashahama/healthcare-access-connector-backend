@@ -379,7 +379,11 @@ WHERE
     latitude IS NOT NULL 
     AND longitude IS NOT NULL
     AND verification_status = 'verified'
-HAVING distance_km <= $3
+    AND (6371 * acos(
+        cos(radians($1)) * cos(radians(latitude)) * 
+        cos(radians(longitude) - radians($2)) + 
+        sin(radians($1)) * sin(radians(latitude))
+    )) <= $3
 ORDER BY distance_km ASC;
 
 
