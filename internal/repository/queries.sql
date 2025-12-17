@@ -317,3 +317,8 @@ INSERT INTO clinics (
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING id, clinic_name, clinic_type, city, province, 
     verification_status, created_at, updated_at;
+
+-- name: GetClinicByID :one
+SELECT * FROM clinics WHERE id = $1;
+
+
