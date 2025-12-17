@@ -58,3 +58,9 @@ WHERE id = $1;
 UPDATE users
 SET verification_token = $2, verification_expires = $3
 WHERE id = $1;
+
+
+-- name: SetPasswordResetToken :exec
+UPDATE users
+SET reset_password_token = $2, reset_password_expires = $3
+WHERE id = $1;
