@@ -363,3 +363,21 @@ WHERE
     AND verification_status = 'verified'
 ORDER BY rating DESC NULLS LAST
 LIMIT $4 OFFSET $5;
+
+
+-- name: SearchClinicsByLocation :many
+SELECT id, clinic_name, clinic_type, physical_address, city, 
+    province, primary_phone, latitude, longitude, rating,
+    -- Calculate distance using Haversine formula (approximate)
+    (6371 * acos(
+        cos(radians($1)) * cos(radians(latitude)) * 
+        cos(radians(longitude) - radians($2)) + 
+        sin(radians($1)) * sin(radians(latitude))
+    )) AS distance_km
+FROM clinics
+WHERE 
+    latitude IS NOT NULL 
+    AND longitude IS NOT NULL
+    AND verification_status = 'verified'
+HAVING distance_km <= $3
+ORDER BY distance_km ASC;
