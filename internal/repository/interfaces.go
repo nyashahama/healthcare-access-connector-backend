@@ -126,6 +126,16 @@ type NotificationRepository interface {
 	UpdatePreferences(ctx context.Context, prefs domain.NotificationPreferences) error
 }
 
+// SMSRepository defines methods for SMS conversation tracking
+type SMSRepository interface {
+	CreateConversation(ctx context.Context, conv domain.SMSConversation) (domain.SMSConversation, error)
+	GetConversationByPhone(ctx context.Context, phone string) (domain.SMSConversation, error)
+	UpdateConversation(ctx context.Context, conv domain.SMSConversation) error
+
+	LogMessage(ctx context.Context, msg domain.SMSMessage) (domain.SMSMessage, error)
+	GetConversationMessages(ctx context.Context, conversationID uuid.UUID, limit, offset int) ([]domain.SMSMessage, error)
+}
+
 // TxManager handles database transactions
 type TxManager interface {
 	WithTransaction(ctx context.Context, fn func(context.Context, pgx.Tx) error) error
