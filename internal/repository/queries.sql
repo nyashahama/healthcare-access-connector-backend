@@ -492,3 +492,10 @@ ORDER BY issue_date DESC;
 UPDATE professional_credentials
 SET status = 'verified', verified_by = $2, verification_date = NOW()
 WHERE id = $1;
+
+
+-- name: UpdateCredential :exec
+UPDATE professional_credentials
+SET credential_number = $2, expiry_date = $3, 
+    status = $4, notes = $5
+WHERE id = $1;
