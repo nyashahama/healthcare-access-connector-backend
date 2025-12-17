@@ -641,3 +641,6 @@ INSERT INTO sms_conversations (
 )
 VALUES ($1, $2, $3, $4)
 RETURNING id, user_id, phone_number, created_at;
+
+-- name: GetSMSConversationByPhone :one
+SELECT * FROM sms_conversations WHERE phone_number = $1;
