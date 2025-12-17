@@ -564,3 +564,15 @@ UPDATE privacy_consents
 SET consent_withdrawn = TRUE, consent_withdrawn_date = NOW(),
     withdrawal_reason = $2
 WHERE user_id = $1;
+
+
+-- ============================================
+-- Audit Logging Queries (POPIA Compliance)
+-- ============================================
+
+-- name: LogUserActivity :exec
+INSERT INTO user_activities (
+    user_id, activity_type, activity_details, ip_address,
+    user_agent, device_type, device_id, resource_type, resource_id
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
