@@ -301,3 +301,19 @@ WHERE patient_id = $1
     AND next_due_date IS NOT NULL 
     AND next_due_date > NOW()
 ORDER BY next_due_date ASC;
+
+
+-- ============================================
+-- Clinic Queries
+-- ============================================
+
+-- name: CreateClinic :one
+INSERT INTO clinics (
+    clinic_name, clinic_type, registration_number, primary_phone, 
+    email, physical_address, city, province, postal_code, country,
+    latitude, longitude, description, ownership_type, 
+    accepts_medical_aid, verification_status
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+RETURNING id, clinic_name, clinic_type, city, province, 
+    verification_status, created_at, updated_at;
