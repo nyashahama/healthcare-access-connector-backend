@@ -499,3 +499,16 @@ UPDATE professional_credentials
 SET credential_number = $2, expiry_date = $3, 
     status = $4, notes = $5
 WHERE id = $1;
+
+
+-- ============================================
+-- Session Management Queries
+-- ============================================
+
+-- name: CreateSession :one
+INSERT INTO user_sessions (
+    user_id, session_token, device_type, device_id, 
+    ip_address, user_agent, expires_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, user_id, session_token, expires_at, created_at;
