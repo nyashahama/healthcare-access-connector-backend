@@ -70,3 +70,12 @@ WHERE id = $1;
 UPDATE users
 SET password_hash = $2, reset_password_token = NULL, reset_password_expires = NULL
 WHERE id = $1;
+
+
+-- name: ListUsersByRole :many
+SELECT id, email, phone, role, status, is_verified, last_login, 
+    profile_completion_percentage, created_at
+FROM users
+WHERE role = $1 AND status != 'inactive'
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3;
