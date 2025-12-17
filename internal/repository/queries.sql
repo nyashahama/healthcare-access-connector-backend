@@ -558,3 +558,9 @@ SET health_data_consent = $2, research_consent = $3,
     sms_communication_consent = $4, email_communication_consent = $5,
     data_sharing_consent = $6
 WHERE user_id = $1;
+
+-- name: WithdrawConsent :exec
+UPDATE privacy_consents
+SET consent_withdrawn = TRUE, consent_withdrawn_date = NOW(),
+    withdrawal_reason = $2
+WHERE user_id = $1;
