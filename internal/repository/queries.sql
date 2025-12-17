@@ -164,3 +164,12 @@ RETURNING id, patient_id, blood_type, overall_health_status, created_at, updated
 
 -- name: GetPatientMedicalInfo :one
 SELECT * FROM patient_medical_info WHERE patient_id = $1;
+
+
+-- name: UpdatePatientMedicalInfo :exec
+UPDATE patient_medical_info
+SET blood_type = $2, height_cm = $3, weight_kg = $4, bmi = $5,
+    overall_health_status = $6, health_summary = $7, 
+    primary_care_physician = $8, primary_clinic_id = $9,
+    last_measured_date = $10
+WHERE patient_id = $1;
