@@ -102,6 +102,14 @@ type SessionRepository interface {
 	DeleteExpiredSessions(ctx context.Context) error
 }
 
+// ConsentRepository defines methods for privacy consent management (POPIA compliance)
+type ConsentRepository interface {
+	CreateConsent(ctx context.Context, consent domain.PrivacyConsent) (domain.PrivacyConsent, error)
+	GetConsent(ctx context.Context, userID uuid.UUID) (domain.PrivacyConsent, error)
+	UpdateConsent(ctx context.Context, consent domain.PrivacyConsent) error
+	WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error
+}
+
 // TxManager handles database transactions
 type TxManager interface {
 	WithTransaction(ctx context.Context, fn func(context.Context, pgx.Tx) error) error
