@@ -652,3 +652,12 @@ SET current_menu = $2, conversation_state = $3,
     last_message_sent = $4, last_message_received = $5,
     last_interaction_at = NOW()
 WHERE id = $1;
+
+
+-- name: LogSMSMessage :one
+INSERT INTO sms_messages (
+    conversation_id, direction, message_body, twilio_message_id,
+    twilio_status, segments, cost, cost_currency
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, conversation_id, direction, created_at;
