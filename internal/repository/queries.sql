@@ -585,3 +585,12 @@ FROM user_activities
 WHERE user_id = $1
 ORDER BY performed_at DESC
 LIMIT $2 OFFSET $3;
+
+
+-- name: LogDataAccess :exec
+INSERT INTO data_access_logs (
+    accessed_by_user_id, accessed_by_role, accessed_user_id,
+    accessed_resource_type, accessed_resource_id, access_type,
+    access_reason, is_emergency_access, ip_address, user_agent
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
