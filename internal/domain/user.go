@@ -214,3 +214,12 @@ type Clinic struct {
 	CreatedAt              time.Time      `json:"created_at"`
 	UpdatedAt              time.Time      `json:"updated_at"`
 }
+
+// ClinicFilters represents filters for clinic search
+type ClinicFilters struct {
+	ClinicType         *string
+	Province           *string
+	City               *string
+	VerificationStatus *string
+	AcceptsMedicalAid  *bool
+}
