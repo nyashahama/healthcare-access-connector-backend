@@ -238,3 +238,16 @@ SET medication_name = $2, dosage = $3, frequency = $4,
     route = $5, end_date = $6, status = $7, 
     side_effects = $8, instructions = $9
 WHERE id = $1;
+
+
+-- ============================================
+-- Patient Conditions Queries
+-- ============================================
+
+-- name: AddPatientCondition :one
+INSERT INTO patient_conditions (
+    patient_id, condition_name, icd10_code, type, diagnosed_date, 
+    diagnosed_by, severity, status, notes
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, patient_id, condition_name, type, status, created_at;
