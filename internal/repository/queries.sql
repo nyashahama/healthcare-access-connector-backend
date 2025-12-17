@@ -173,3 +173,16 @@ SET blood_type = $2, height_cm = $3, weight_kg = $4, bmi = $5,
     primary_care_physician = $8, primary_clinic_id = $9,
     last_measured_date = $10
 WHERE patient_id = $1;
+
+
+-- ============================================
+-- Patient Allergies Queries
+-- ============================================
+
+-- name: AddPatientAllergy :one
+INSERT INTO patient_allergies (
+    patient_id, allergy_name, severity, reaction_description, 
+    first_identified_date, status, notes
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, patient_id, allergy_name, severity, status, created_at;
