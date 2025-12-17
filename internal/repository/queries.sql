@@ -205,3 +205,18 @@ WHERE id = $1;
 
 -- name: DeletePatientAllergy :exec
 DELETE FROM patient_allergies WHERE id = $1;
+
+
+
+-- ============================================
+-- Patient Medications Queries
+-- ============================================
+
+-- name: AddPatientMedication :one
+INSERT INTO patient_medications (
+    patient_id, medication_name, generic_name, dosage, frequency, 
+    route, prescribing_doctor, pharmacy_name, prescription_date, 
+    start_date, end_date, reason_for_medication, status, instructions
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING id, patient_id, medication_name, dosage, frequency, status, created_at;
