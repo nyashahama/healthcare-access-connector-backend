@@ -42,3 +42,9 @@ WHERE id = $1 AND status != 'inactive';
 UPDATE users
 SET last_login = NOW(), login_count = login_count + 1
 WHERE id = $1;
+
+
+-- name: UpdateUserStatus :exec
+UPDATE users
+SET status = $2
+WHERE id = $1;
