@@ -93,6 +93,15 @@ type StaffRepository interface {
 	UpdateCredential(ctx context.Context, cred domain.ProfessionalCredential) error
 }
 
+// SessionRepository defines methods for session management
+type SessionRepository interface {
+	CreateSession(ctx context.Context, session domain.UserSession) (domain.UserSession, error)
+	GetSession(ctx context.Context, sessionToken string) (domain.UserSession, error)
+	DeleteSession(ctx context.Context, sessionToken string) error
+	DeleteUserSessions(ctx context.Context, userID uuid.UUID) error
+	DeleteExpiredSessions(ctx context.Context) error
+}
+
 // TxManager handles database transactions
 type TxManager interface {
 	WithTransaction(ctx context.Context, fn func(context.Context, pgx.Tx) error) error
