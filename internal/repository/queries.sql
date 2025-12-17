@@ -291,3 +291,13 @@ SELECT id, patient_id, vaccine_name, vaccine_type, administration_date,
 FROM patient_immunizations
 WHERE patient_id = $1
 ORDER BY administration_date DESC;
+
+
+-- name: GetUpcomingImmunizations :many
+SELECT id, patient_id, vaccine_name, vaccine_type, next_due_date,
+    dose_number, total_doses
+FROM patient_immunizations
+WHERE patient_id = $1 
+    AND next_due_date IS NOT NULL 
+    AND next_due_date > NOW()
+ORDER BY next_due_date ASC;
