@@ -119,6 +119,13 @@ type AuditRepository interface {
 	GetDataAccessLogs(ctx context.Context, accessedUserID uuid.UUID, limit, offset int) ([]domain.DataAccessLog, error)
 }
 
+// NotificationRepository defines methods for notification preferences
+type NotificationRepository interface {
+	CreatePreferences(ctx context.Context, prefs domain.NotificationPreferences) (domain.NotificationPreferences, error)
+	GetPreferences(ctx context.Context, userID uuid.UUID) (domain.NotificationPreferences, error)
+	UpdatePreferences(ctx context.Context, prefs domain.NotificationPreferences) error
+}
+
 // TxManager handles database transactions
 type TxManager interface {
 	WithTransaction(ctx context.Context, fn func(context.Context, pgx.Tx) error) error
