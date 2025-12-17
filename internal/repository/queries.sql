@@ -440,3 +440,13 @@ SELECT * FROM clinic_staff WHERE id = $1;
 
 -- name: GetClinicStaffByUserID :one
 SELECT * FROM clinic_staff WHERE user_id = $1;
+
+-- name: ListClinicStaff :many
+SELECT id, clinic_id, user_id, title, first_name, last_name,
+    professional_title, specialization, staff_role, 
+    employment_status, is_accepting_new_patients, created_at
+FROM clinic_staff
+WHERE clinic_id = $1 
+    AND ($2::VARCHAR IS NULL OR staff_role = $2)
+    AND employment_status = 'active'
+ORDER BY first_name, last_name;
