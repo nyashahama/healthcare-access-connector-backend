@@ -433,3 +433,7 @@ INSERT INTO clinic_staff (
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING id, clinic_id, user_id, first_name, last_name, 
     staff_role, employment_status, created_at;
+
+
+-- name: GetClinicStaffByID :one
+SELECT * FROM clinic_staff WHERE id = $1;
