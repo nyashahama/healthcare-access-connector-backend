@@ -25,6 +25,41 @@ type UserRepository interface {
 	CountUsers(ctx context.Context, role string) (int64, error)
 }
 
+// PatientRepository defines methods for patient profile data access
+type PatientRepository interface {
+	CreatePatientProfile(ctx context.Context, profile domain.PatientProfile) (domain.PatientProfile, error)
+	GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (domain.PatientProfile, error)
+	GetPatientProfileByID(ctx context.Context, id uuid.UUID) (domain.PatientProfile, error)
+	UpdatePatientProfile(ctx context.Context, profile domain.PatientProfile) error
+	SearchPatients(ctx context.Context, query string, province string, limit, offset int) ([]domain.PatientProfile, error)
+
+	// Medical Information
+	CreateMedicalInfo(ctx context.Context, info domain.PatientMedicalInfo) error
+	GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (domain.PatientMedicalInfo, error)
+	UpdateMedicalInfo(ctx context.Context, info domain.PatientMedicalInfo) error
+
+	// Allergies
+	AddAllergy(ctx context.Context, allergy domain.PatientAllergy) (domain.PatientAllergy, error)
+	GetAllergies(ctx context.Context, patientID uuid.UUID) ([]domain.PatientAllergy, error)
+	UpdateAllergy(ctx context.Context, allergy domain.PatientAllergy) error
+	DeleteAllergy(ctx context.Context, id uuid.UUID) error
+
+	// Medications
+	AddMedication(ctx context.Context, med domain.PatientMedication) (domain.PatientMedication, error)
+	GetMedications(ctx context.Context, patientID uuid.UUID, status string) ([]domain.PatientMedication, error)
+	UpdateMedication(ctx context.Context, med domain.PatientMedication) error
+
+	// Conditions
+	AddCondition(ctx context.Context, condition domain.PatientCondition) (domain.PatientCondition, error)
+	GetConditions(ctx context.Context, patientID uuid.UUID, status string) ([]domain.PatientCondition, error)
+	UpdateCondition(ctx context.Context, condition domain.PatientCondition) error
+
+	// Immunizations
+	AddImmunization(ctx context.Context, imm domain.PatientImmunization) (domain.PatientImmunization, error)
+	GetImmunizations(ctx context.Context, patientID uuid.UUID) ([]domain.PatientImmunization, error)
+	GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]domain.PatientImmunization, error)
+}
+
 // TxManager handles database transactions
 type TxManager interface {
 	WithTransaction(ctx context.Context, fn func(context.Context, pgx.Tx) error) error
