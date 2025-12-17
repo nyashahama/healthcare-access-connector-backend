@@ -145,3 +145,18 @@ WHERE
     AND ($2::VARCHAR IS NULL OR province = $2)
 ORDER BY created_at DESC
 LIMIT $3 OFFSET $4;
+
+
+
+-- ============================================
+-- Patient Medical Info Queries
+-- ============================================
+
+-- name: CreatePatientMedicalInfo :one
+INSERT INTO patient_medical_info (
+    patient_id, blood_type, height_cm, weight_kg, bmi, 
+    overall_health_status, health_summary, primary_care_physician, 
+    primary_clinic_id, organ_donor, dnr_status
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, patient_id, blood_type, overall_health_status, created_at, updated_at;
