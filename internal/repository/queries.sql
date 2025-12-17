@@ -528,3 +528,7 @@ DELETE FROM user_sessions WHERE session_token = $1;
 
 -- name: DeleteUserSessions :exec
 DELETE FROM user_sessions WHERE user_id = $1;
+
+
+-- name: DeleteExpiredSessions :exec
+DELETE FROM user_sessions WHERE expires_at <= NOW();
