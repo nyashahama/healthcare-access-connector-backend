@@ -546,3 +546,7 @@ INSERT INTO privacy_consents (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING id, user_id, health_data_consent, created_at;
+
+
+-- name: GetPrivacyConsent :one
+SELECT * FROM privacy_consents WHERE user_id = $1;
