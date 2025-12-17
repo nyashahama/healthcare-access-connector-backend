@@ -629,3 +629,15 @@ SET sms_enabled = $2, email_enabled = $3, push_enabled = $4,
     appointment_reminders = $5, health_tips = $6,
     medication_reminders = $7, emergency_alerts = $8
 WHERE user_id = $1;
+
+
+-- ============================================
+-- SMS Conversation Queries
+-- ============================================
+
+-- name: CreateSMSConversation :one
+INSERT INTO sms_conversations (
+    user_id, phone_number, current_menu, conversation_state
+)
+VALUES ($1, $2, $3, $4)
+RETURNING id, user_id, phone_number, created_at;
