@@ -230,3 +230,11 @@ FROM patient_medications
 WHERE patient_id = $1 
     AND ($2::VARCHAR IS NULL OR status = $2)
 ORDER BY start_date DESC;
+
+
+-- name: UpdatePatientMedication :exec
+UPDATE patient_medications
+SET medication_name = $2, dosage = $3, frequency = $4, 
+    route = $5, end_date = $6, status = $7, 
+    side_effects = $8, instructions = $9
+WHERE id = $1;
