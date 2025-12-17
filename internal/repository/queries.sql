@@ -322,3 +322,9 @@ RETURNING id, clinic_name, clinic_type, city, province,
 SELECT * FROM clinics WHERE id = $1;
 
 
+-- name: UpdateClinic :exec
+UPDATE clinics
+SET clinic_name = $2, primary_phone = $3, email = $4, 
+    description = $5, operating_hours = $6, services = $7,
+    specialties = $8, accepts_medical_aid = $9
+WHERE id = $1;
