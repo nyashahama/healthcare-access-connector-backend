@@ -406,3 +406,10 @@ SELECT id, clinic_id, service_name, service_category, description,
 FROM clinic_services
 WHERE clinic_id = $1 AND is_active = TRUE
 ORDER BY popularity_score DESC, service_name ASC;
+
+
+-- name: UpdateClinicService :exec
+UPDATE clinic_services
+SET service_name = $2, description = $3, cost = $4,
+    is_active = $5, requires_appointment = $6
+WHERE id = $1;
