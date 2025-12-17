@@ -342,3 +342,19 @@ type PrivacyConsent struct {
 	CreatedAt                  time.Time      `json:"created_at"`
 	UpdatedAt                  time.Time      `json:"updated_at"`
 }
+
+// UserActivity represents user activity tracking
+type UserActivity struct {
+	ID              uuid.UUID      `json:"id"`
+	UserID          *uuid.UUID     `json:"user_id,omitempty"`
+	ActivityType    string         `json:"activity_type"`
+	ActivityDetails map[string]any `json:"activity_details,omitempty"`
+	IPAddress       *string        `json:"ip_address,omitempty"`
+	UserAgent       *string        `json:"user_agent,omitempty"`
+	DeviceType      *string        `json:"device_type,omitempty"`
+	DeviceID        *string        `json:"device_id,omitempty"`
+	Location        map[string]any `json:"location,omitempty"`
+	ResourceType    *string        `json:"resource_type,omitempty"`
+	ResourceID      *uuid.UUID     `json:"resource_id,omitempty"`
+	PerformedAt     time.Time      `json:"performed_at"`
+}
