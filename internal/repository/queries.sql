@@ -328,3 +328,11 @@ SET clinic_name = $2, primary_phone = $3, email = $4,
     description = $5, operating_hours = $6, services = $7,
     specialties = $8, accepts_medical_aid = $9
 WHERE id = $1;
+
+
+-- name: VerifyClinic :exec
+UPDATE clinics
+SET is_verified = TRUE, verification_status = 'verified',
+    verified_by = $2, verification_date = NOW(),
+    verification_notes = $3
+WHERE id = $1;
