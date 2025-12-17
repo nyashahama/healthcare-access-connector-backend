@@ -36,3 +36,9 @@ SELECT id, email, phone, role, status, is_verified, last_login,
     created_at, updated_at
 FROM users
 WHERE id = $1 AND status != 'inactive';
+
+
+-- name: UpdateUserLastLogin :exec
+UPDATE users
+SET last_login = NOW(), login_count = login_count + 1
+WHERE id = $1;
