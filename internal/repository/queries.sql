@@ -54,4 +54,7 @@ UPDATE users
 SET is_verified = TRUE, verification_token = NULL, verification_expires = NULL
 WHERE id = $1;
 
-
+-- name: SetVerificationToken :exec
+UPDATE users
+SET verification_token = $2, verification_expires = $3
+WHERE id = $1;
