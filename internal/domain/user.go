@@ -358,3 +358,20 @@ type UserActivity struct {
 	ResourceID      *uuid.UUID     `json:"resource_id,omitempty"`
 	PerformedAt     time.Time      `json:"performed_at"`
 }
+
+// DataAccessLog represents data access audit log for POPIA compliance
+type DataAccessLog struct {
+	ID                   uuid.UUID      `json:"id"`
+	AccessedByUserID     *uuid.UUID     `json:"accessed_by_user_id,omitempty"`
+	AccessedByRole       *string        `json:"accessed_by_role,omitempty"`
+	AccessedUserID       uuid.UUID      `json:"accessed_user_id"`
+	AccessedResourceType *string        `json:"accessed_resource_type,omitempty"`
+	AccessedResourceID   *uuid.UUID     `json:"accessed_resource_id,omitempty"`
+	AccessType           string         `json:"access_type"` // view, edit, export, delete
+	AccessReason         *string        `json:"access_reason,omitempty"`
+	IsEmergencyAccess    bool           `json:"is_emergency_access"`
+	IPAddress            *string        `json:"ip_address,omitempty"`
+	UserAgent            *string        `json:"user_agent,omitempty"`
+	Location             map[string]any `json:"location,omitempty"`
+	AccessedAt           time.Time      `json:"accessed_at"`
+}
