@@ -64,3 +64,9 @@ WHERE id = $1;
 UPDATE users
 SET reset_password_token = $2, reset_password_expires = $3
 WHERE id = $1;
+
+
+-- name: UpdateUserPassword :exec
+UPDATE users
+SET password_hash = $2, reset_password_token = NULL, reset_password_expires = NULL
+WHERE id = $1;
