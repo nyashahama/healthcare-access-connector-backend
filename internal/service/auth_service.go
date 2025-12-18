@@ -4,6 +4,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/docker/distribution/uuid"
@@ -204,4 +205,106 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 		Msg("User registered successfully")
 
 	return created, nil
+}
+
+// Login handles user login with email or phone
+func (s *authService) Login(ctx context.Context, identifier, password string) (string, time.Time, error) {
+	// Validate input
+	if identifier == "" || password == "" {
+		return "", time.Time{}, domain.NewAppError(domain.ErrValidation, "Identifier and password are required", 400)
+	}
+
+	// Determine if identifier is email or phone
+	var user domain.User
+	var passwordHash string
+	var err error
+
+	if strings.Contains(identifier, "@") {
+		// Treat as email
+		user, passwordHash, err = s.userRepo.GetUserByEmail(ctx, identifier)
+	} else {
+		// Treat as phone number
+		user, err = s.userRepo.GetUserByPhone(ctx, identifier)
+		if err == nil {
+			// For phone login, we need to get the password hash
+			_, passwordHash, err = s.userRepo.GetUserByEmail(ctx, *user.Email)
+		}
+	}
+
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			s.logger.Warn().Str("identifier", identifier).Msg("User not found")
+			return "", time.Time{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
+		}
+		s.logger.Error().Err(err).Msg("Failed to get user")
+		return "", time.Time{}, domain.NewAppError(err, "Login failed", 500)
+	}
+
+	// Check user status
+	if user.Status == "inactive" {
+		return "", time.Time{}, domain.NewAppError(domain.ErrUserInactive, "Account is inactive", 403)
+	}
+	if user.Status == "suspended" {
+		return "", time.Time{}, domain.NewAppError(domain.ErrUserSuspended, "Account is suspended", 403)
+	}
+
+	// Verify password
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)); err != nil {
+		s.logger.Warn().
+			Str("identifier", identifier).
+			Str("user_id", user.ID.String()).
+			Msg("Invalid password attempt")
+		return "", time.Time{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
+	}
+
+	// Check if user is verified (for email users)
+	if user.Email != nil && !user.IsVerified && *user.Email != "" {
+		return "", time.Time{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email", 403)
+	}
+
+	// Generate JWT token
+	expiresAt := time.Now().Add(s.jwtExpiry)
+	token, err := s.generateToken(user, expiresAt)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to generate token")
+		return "", time.Time{}, domain.NewAppError(err, "Token generation failed", 500)
+	}
+
+	// Update last login
+	if err := s.userRepo.UpdateLastLogin(ctx, user.ID); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to update last login")
+	}
+
+	// Create session record
+	session := domain.UserSession{
+		ID:           uuid.Generate(),
+		UserID:       user.ID,
+		SessionToken: token,
+		DeviceType:   &[]string{"web"}[0],
+		ExpiresAt:    expiresAt,
+		CreatedAt:    time.Now(),
+	}
+
+	if _, err := s.sessionRepo.CreateSession(ctx, session); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to create session record")
+	}
+
+	// Send login alert if email available
+	if user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
+		go func() {
+			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			if err := s.emailService.SendLoginAlertEmail(emailCtx, *user.Email, "User", "Unknown", "Unknown"); err != nil {
+				s.logger.Warn().Err(err).Msg("Failed to send login alert email")
+			}
+		}()
+	}
+
+	s.logger.Info().
+		Str("user_id", user.ID.String()).
+		Str("role", user.Role).
+		Msg("User logged in successfully")
+
+	return token, expiresAt, nil
 }
