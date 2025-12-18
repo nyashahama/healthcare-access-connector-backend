@@ -71,6 +71,14 @@ type ConsentService interface {
 	CheckHealthDataConsent(ctx context.Context, userID uuid.UUID) error
 }
 
+// AuditService handles audit logging for POPIA compliance
+type AuditService interface {
+	LogActivity(ctx context.Context, activity domain.UserActivity) error
+	LogDataAccess(ctx context.Context, access domain.DataAccessLog) error
+	GetUserActivities(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.UserActivity, error)
+	GetDataAccessLogs(ctx context.Context, accessedUserID uuid.UUID, limit, offset int) ([]domain.DataAccessLog, error)
+}
+
 // TokenClaims represents JWT token claims
 type TokenClaims struct {
 	UserID int32  `json:"user_id"`
