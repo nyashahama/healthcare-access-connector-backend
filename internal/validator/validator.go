@@ -55,8 +55,15 @@ func (v *Validator) ValidateEmail(field, email string) {
 	}
 }
 
+// ValidatePhone checks if a phone number is valid
 func (v *Validator) ValidatePhone(field, phone string) {
-	// implementation here
+	if phone == "" {
+		return
+	}
+	phoneRegex := regexp.MustCompile(`^\+?[1-9]\d{1,14}$`)
+	if !phoneRegex.MatchString(phone) {
+		v.AddError(field, "must be a valid phone number")
+	}
 }
 
 func (v *Validator) ValidateUsername(field, username string) {
@@ -77,13 +84,22 @@ func (v *Validator) ValidatePassword(field, password string) {
 }
 
 func (v *Validator) ValidateRole(field, role string) {
-	validRoles := map[string]bool{"user": true, "admin": true, "moderator": true}
+	allowedRoles := map[string]bool{
+		"patient":        true,
+		"caregiver":      true,
+		"provider_staff": true,
+		"clinic_admin":   true,
+		"system_admin":   true,
+		"ngo_partner":    true,
+	}
+
 	if role == "" {
-		role = "user" // default
+		// Empty role is allowed - service will default to "patient"
 		return
 	}
-	if !validRoles[role] {
-		v.AddError(field, "must be one of: user, admin, moderator")
+
+	if !allowedRoles[role] {
+		v.AddError(field, "must be one of: patient, caregiver, provider_staff, clinic_admin, system_admin, ngo_partner")
 	}
 }
 
