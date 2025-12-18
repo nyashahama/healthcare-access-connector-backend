@@ -448,3 +448,48 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 	// This would require adding GetUserByVerificationToken to repository
 	return errors.New("not implemented")
 }
+
+// RequestPasswordReset requests password reset
+func (s *authService) RequestPasswordReset(ctx context.Context, identifier string) error {
+	// Find user by email or phone
+	var user domain.User
+	var err error
+
+	if strings.Contains(identifier, "@") {
+		user, _, err = s.userRepo.GetUserByEmail(ctx, identifier)
+	} else {
+		user, err = s.userRepo.GetUserByPhone(ctx, identifier)
+	}
+
+	if err != nil {
+		// Don't reveal if user exists for security
+		s.logger.Info().Str("identifier", identifier).Msg("Password reset requested for non-existent user")
+		return nil // Return success even if user doesn't exist
+	}
+
+	// Generate reset token
+	resetToken := uuid.Generate().String()
+	tokenExpires := time.Now().Add(1 * time.Hour)
+
+	// Store reset token
+	if err := s.userRepo.SetPasswordResetToken(ctx, user.ID, resetToken, tokenExpires); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to set password reset token")
+		return domain.NewAppError(err, "Failed to initiate password reset", 500)
+	}
+
+	// Send reset email
+	if user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
+		go func() {
+			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			if err := s.emailService.SendPasswordResetEmail(emailCtx, *user.Email, resetToken); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send password reset email")
+			}
+		}()
+	}
+
+	s.logger.Info().Str("user_id", user.ID.String()).Msg("Password reset requested")
+
+	return nil
+}
