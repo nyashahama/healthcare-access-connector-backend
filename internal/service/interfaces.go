@@ -42,11 +42,12 @@ type AuthService interface {
 
 // UserService handles user operations
 type UserService interface {
-	GetProfile(ctx context.Context, userID int32) (domain.User, error)
-	GetUserByID(ctx context.Context, userID int32) (domain.User, error)
-	UpdateProfile(ctx context.Context, userID int32, updates map[string]interface{}) error
-	DeleteProfile(ctx context.Context, userID int32) error
-	ListUsers(ctx context.Context, limit, offset int) ([]domain.User, error)
+	GetProfile(ctx context.Context, userID uuid.UUID) (domain.User, error)
+	GetUserByID(ctx context.Context, userID uuid.UUID) (domain.User, error)
+	UpdateUserStatus(ctx context.Context, userID uuid.UUID, status string) error
+	DeactivateUser(ctx context.Context, userID uuid.UUID) error
+	ListUsers(ctx context.Context, role string, limit, offset int) ([]domain.User, error)
+	CountUsers(ctx context.Context, role string) (int64, error)
 }
 
 // TokenClaims represents JWT token claims
