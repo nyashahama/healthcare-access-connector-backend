@@ -17,8 +17,9 @@ type Config struct {
 	DBURL string
 
 	// Authentication
-	JWTSecret string
-	JWTExpiry time.Duration
+	JWTSecret  string
+	JWTExpiry  time.Duration
+	SMSEnabled bool // Add this
 
 	// Server
 	Port           string
@@ -35,6 +36,13 @@ type Config struct {
 	RedisURL string
 	NatsURL  string
 	CacheTTL time.Duration
+
+	// Email Configuration (add these)
+	EmailFrom     string
+	EmailHost     string
+	EmailPort     int
+	EmailUser     string
+	EmailPassword string
 }
 
 // Load loads configuration from environment variables
@@ -49,9 +57,15 @@ func Load() (*Config, error) {
 		RateLimitRPS:   getEnvAsInt("RATE_LIMIT_RPS", 10),
 		RateLimitBurst: getEnvAsInt("RATE_LIMIT_BURST", 20),
 		JWTExpiry:      getEnvAsDuration("JWT_EXPIRY_HOURS", 24*time.Hour),
+		SMSEnabled:     getEnvAsBool("SMS_ENABLED", false), // Add this
 		RedisURL:       getEnv("REDIS_URL", "redis://localhost:6379"),
 		NatsURL:        getEnv("NATS_URL", "nats://localhost:4222"),
 		CacheTTL:       getEnvAsDuration("CACHE_TTL_MINUTES", 5*time.Minute),
+		EmailFrom:      getEnv("EMAIL_FROM", ""),
+		EmailHost:      getEnv("EMAIL_HOST", ""),
+		EmailPort:      getEnvAsInt("EMAIL_PORT", 587),
+		EmailUser:      getEnv("EMAIL_USER", ""),
+		EmailPassword:  getEnv("EMAIL_PASSWORD", ""),
 	}
 
 	// Ensure port has colon prefix
@@ -190,4 +204,16 @@ func parseAllowedOrigins(originsStr string) []string {
 		}
 	}
 	return result
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+	value, err := strconv.ParseBool(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+	return value
 }

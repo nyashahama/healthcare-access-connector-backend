@@ -13,6 +13,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -58,6 +59,7 @@ func NewServer(
 	authHandler *handler.AuthHandler,
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
+	txManager repository.TxManager,
 ) *Server {
 	return &Server{
 		config:        cfg,
