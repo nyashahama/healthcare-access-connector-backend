@@ -7,8 +7,8 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     phone VARCHAR(20) UNIQUE,
     password_hash VARCHAR(255),
-    role VARCHAR(50) NOT NULL, -- 'patient', 'caregiver', 'provider_staff', 'clinic_admin', 'system_admin', 'ngo_partner'
-    status VARCHAR(20) DEFAULT 'active', -- 'active', 'inactive', 'pending_verification', 'suspended'
+    role VARCHAR(50) NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
     is_verified BOOLEAN DEFAULT false,
     verification_token VARCHAR(100),
     verification_expires TIMESTAMP,
@@ -26,14 +26,13 @@ CREATE TABLE users (
     consent_date TIMESTAMP,
     
     -- Profile completion tracking
-    profile_completion_percentage INTEGER DEFAULT 0,
-    
-    INDEX idx_user_email (email),
-    INDEX idx_user_phone (phone),
-    INDEX idx_user_role_status (role, status)
+    profile_completion_percentage INTEGER DEFAULT 0
 );
 
--- User sessions for web/mobile
+-- Create indexes separately
+CREATE INDEX idx_user_email ON users(email);
+CREATE INDEX idx_user_phone ON users(phone);
+CREATE INDEX idx_user_role_status ON users(role, status);-- User sessions for web/mobile
 CREATE TABLE user_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
