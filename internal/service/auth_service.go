@@ -19,33 +19,45 @@ import (
 )
 
 type authService struct {
-	repo         repository.UserRepository
+	userRepo     repository.UserRepository
+	patientRepo  repository.PatientRepository
+	sessionRepo  repository.SessionRepository
+	consentRepo  repository.ConsentRepository
 	cache        cache.Service
 	broker       messaging.Broker
 	emailService email.Service
 	logger       *zerolog.Logger
 	jwtSecret    string
 	jwtExpiry    time.Duration
+	smsEnabled   bool
 }
 
 // NewAuthService creates a new authentication service
 func NewAuthService(
-	repo repository.UserRepository,
+	userRepo repository.UserRepository,
+	patientRepo repository.PatientRepository,
+	sessionRepo repository.SessionRepository,
+	consentRepo repository.ConsentRepository,
 	cache cache.Service,
 	broker messaging.Broker,
 	emailService email.Service,
 	logger *zerolog.Logger,
 	jwtSecret string,
 	jwtExpiry time.Duration,
+	smsEnabled bool,
 ) AuthService {
 	return &authService{
-		repo:         repo,
+		userRepo:     userRepo,
+		patientRepo:  patientRepo,
+		sessionRepo:  sessionRepo,
+		consentRepo:  consentRepo,
 		cache:        cache,
 		broker:       broker,
 		emailService: emailService,
 		logger:       logger,
 		jwtSecret:    jwtSecret,
 		jwtExpiry:    jwtExpiry,
+		smsEnabled:   smsEnabled,
 	}
 }
 
