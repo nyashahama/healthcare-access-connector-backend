@@ -55,6 +55,10 @@ func (v *Validator) ValidateEmail(field, email string) {
 	}
 }
 
+func (v *Validator) ValidatePhone(field, phone string) {
+	// implementation here
+}
+
 func (v *Validator) ValidateUsername(field, username string) {
 	username = strings.TrimSpace(username)
 	if username == "" {

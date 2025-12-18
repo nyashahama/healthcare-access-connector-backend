@@ -114,9 +114,11 @@ func ToPatientProfileResponse(profile domain.PatientProfile) PatientProfileRespo
 }
 
 // ToProfileResponse converts user and profile to combined response
+
 func ToProfileResponse(user domain.User, profile domain.PatientProfile) ProfileResponse {
 	var profileResp *PatientProfileResponse
-	if profile.ID != uuid.Nil {
+
+	if profile.ID != (uuid.UUID{}) {
 		p := ToPatientProfileResponse(profile)
 		profileResp = &p
 	}

@@ -1,4 +1,4 @@
-// Package handler provides HTTP response utilities
+// Package handler provides HTTP response utilities for health project
 package handler
 
 import (
@@ -9,7 +9,6 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
-
 	"github.com/rs/zerolog"
 )
 
@@ -40,10 +39,12 @@ func respondError(w http.ResponseWriter, logger *zerolog.Logger, err error) {
 		response = dto.ErrorResponse{
 			Error:  message,
 			Fields: appErr.Fields,
+			Code:   domainErrorCode(err),
 		}
 	} else {
 		response = dto.ErrorResponse{
 			Error: message,
+			Code:  domainErrorCode(err),
 		}
 	}
 
@@ -60,7 +61,44 @@ func respondValidationError(w http.ResponseWriter, errors []validator.Validation
 	response := dto.ErrorResponse{
 		Error:  "validation failed",
 		Fields: fields,
+		Code:   "VALIDATION_ERROR",
 	}
 
 	respondJSON(w, http.StatusBadRequest, response)
+}
+
+// domainErrorCode extracts error code from domain error
+func domainErrorCode(err error) string {
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		return "NOT_FOUND"
+	case errors.Is(err, domain.ErrUnauthorized):
+		return "UNAUTHORIZED"
+	case errors.Is(err, domain.ErrForbidden):
+		return "FORBIDDEN"
+	case errors.Is(err, domain.ErrValidation):
+		return "VALIDATION_ERROR"
+	case errors.Is(err, domain.ErrDuplicateEmail):
+		return "DUPLICATE_EMAIL"
+	case errors.Is(err, domain.ErrDuplicatePhone):
+		return "DUPLICATE_PHONE"
+	case errors.Is(err, domain.ErrInvalidCredentials):
+		return "INVALID_CREDENTIALS"
+	case errors.Is(err, domain.ErrInvalidToken):
+		return "INVALID_TOKEN"
+	case errors.Is(err, domain.ErrExpiredToken):
+		return "EXPIRED_TOKEN"
+	case errors.Is(err, domain.ErrUserNotFound):
+		return "USER_NOT_FOUND"
+	case errors.Is(err, domain.ErrUserNotVerified):
+		return "USER_NOT_VERIFIED"
+	case errors.Is(err, domain.ErrUserInactive):
+		return "USER_INACTIVE"
+	case errors.Is(err, domain.ErrUserSuspended):
+		return "USER_SUSPENDED"
+	case errors.Is(err, domain.ErrConsentRequired):
+		return "CONSENT_REQUIRED"
+	default:
+		return "INTERNAL_ERROR"
+	}
 }
