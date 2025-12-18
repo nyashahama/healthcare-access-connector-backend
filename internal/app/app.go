@@ -54,12 +54,25 @@ func New(cfg *config.Config) (*App, error) {
 	// Initialize email service (optional)
 	var emailService email.Service
 	if cfg.EmailFrom != "" && cfg.EmailHost != "" {
-		emailService, err = email.NewSMTPEmail(cfg.EmailHost, cfg.EmailPort, cfg.EmailUser, cfg.EmailPassword, cfg.EmailFrom, logger)
+		// Create email config from app config
+		emailCfg := &email.Config{
+			Provider:     "smtp", // Default to SMTP for local development
+			FromAddress:  cfg.EmailFrom,
+			FromName:     "Healthcare Access Connector", // You might want to make this configurable
+			SMTPHost:     cfg.EmailHost,
+			SMTPPort:     cfg.EmailPort,
+			SMTPUsername: cfg.EmailUser,
+			SMTPPassword: cfg.EmailPassword,
+			SMTPUseTLS:   cfg.EmailPort == 587 || cfg.EmailPort == 465, // Use TLS for standard email ports
+		}
+
+		emailService, err = email.NewEmailService(emailCfg, logger)
 		if err != nil {
 			logger.Warn().Err(err).Msg("Email service initialization failed, continuing without email")
 			emailService = nil
 		}
 	} else {
+		// Try to load email config from environment
 		emailService, _ = email.NewFromEnv(logger)
 	}
 
