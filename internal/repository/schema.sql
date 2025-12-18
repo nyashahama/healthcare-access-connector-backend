@@ -32,7 +32,9 @@ CREATE TABLE users (
 -- Create indexes separately
 CREATE INDEX idx_user_email ON users(email);
 CREATE INDEX idx_user_phone ON users(phone);
-CREATE INDEX idx_user_role_status ON users(role, status);-- User sessions for web/mobile
+CREATE INDEX idx_user_role_status ON users(role, status);
+
+-- User sessions for web/mobile
 CREATE TABLE user_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -42,11 +44,12 @@ CREATE TABLE user_sessions (
     ip_address INET,
     user_agent TEXT,
     expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     
-    INDEX idx_user_sessions_token (session_token),
-    INDEX idx_user_sessions_user (user_id)
 );
+CREATE INDEX idx_user_sessions_token (session_token);
+CREATE INDEX idx_user_sessions_user (user_id);
+
 
 -- ============================================
 -- Patient/Caregiver Specific Tables
@@ -101,9 +104,11 @@ CREATE TABLE patient_profiles (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_patient_user (user_id),
-    INDEX idx_patient_location (province, city)
+    
 );
+
+CREATE INDEX idx_patient_user (user_id);
+CREATE INDEX idx_patient_location (province, city);
 
 
 -- Patient medical information
@@ -134,8 +139,9 @@ CREATE TABLE patient_medical_info (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_medical_patient (patient_id)
-);
+    );
+CREATE INDEX idx_medical_patient (patient_id);
+
 
 -- Allergies
 CREATE TABLE patient_allergies (
@@ -152,9 +158,11 @@ CREATE TABLE patient_allergies (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_allergy_patient (patient_id),
-    INDEX idx_allergy_status (status)
-);
+    );
+
+CREATE INDEX idx_allergy_patient (patient_id);
+CREATE INDEX idx_allergy_status (status);
+
 
 
 -- Medications
@@ -179,9 +187,10 @@ CREATE TABLE patient_medications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_medication_patient (patient_id),
-    INDEX idx_medication_status (status)
-);
+    );
+CREATE INDEX idx_medication_patient (patient_id);
+CREATE INDEX idx_medication_status (status);
+
 
 
 -- Medical conditions
@@ -202,9 +211,10 @@ CREATE TABLE patient_conditions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_condition_patient (patient_id),
-    INDEX idx_condition_status (status)
-);
+    );
+CREATE INDEX idx_condition_patient (patient_id);
+CREATE INDEX idx_condition_status (status);
+
 
 
 -- Surgical history
@@ -223,9 +233,11 @@ CREATE TABLE patient_surgeries (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_surgery_patient (patient_id),
-    INDEX idx_surgery_date (procedure_date)
-);
+    );
+
+CREATE INDEX idx_surgery_date (procedure_date);
+CREATE INDEX idx_surgery_patient (patient_id);
+
 
 
 -- Immunization records
@@ -248,9 +260,11 @@ CREATE TABLE patient_immunizations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_immunization_patient (patient_id),
-    INDEX idx_immunization_dates (administration_date, next_due_date)
+    
 );
+
+CREATE INDEX idx_immunization_patient (patient_id);
+CREATE INDEX idx_immunization_dates (administration_date, next_due_date);
 
 
 -- Family medical history
@@ -266,8 +280,9 @@ CREATE TABLE patient_family_history (
     age_at_death INTEGER,
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_family_patient (patient_id)
-);
+    );
+CREATE INDEX idx_family_patient (patient_id);
+
 
 
 -- Dependents (Children)
@@ -305,9 +320,10 @@ CREATE TABLE patient_dependents (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_dependent_patient (patient_id),
-    INDEX idx_dependent_birthdate (date_of_birth)
+    
 );
+CREATE INDEX idx_dependent_patient (patient_id);
+CREATE INDEX idx_dependent_birthdate (date_of_birth);
 
 
 -- Dependent-specific health records
@@ -328,9 +344,8 @@ CREATE TABLE dependent_health_records (
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_dependent_records (dependent_id, record_date)
 );
-
+CREATE INDEX idx_dependent_records (dependent_id, record_date);
 
 -- ============================================
 -- Emergency Contacts & Consent Management
@@ -353,9 +368,10 @@ CREATE TABLE emergency_contacts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_emergency_patient (patient_id),
-    INDEX idx_emergency_primary (patient_id, is_primary)
-);
+    );
+CREATE INDEX idx_emergency_patient (patient_id);
+CREATE INDEX idx_emergency_primary (patient_id, is_primary);
+
 
 
 -- Privacy consents (POPIA compliance)
@@ -392,8 +408,8 @@ CREATE TABLE privacy_consents (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_consent_user (user_id)
 );
+CREATE INDEX idx_consent_user (user_id);
 
 
 -- ============================================
@@ -472,10 +488,11 @@ CREATE TABLE clinics (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_clinic_location (province, city),
-    INDEX idx_clinic_type_status (clinic_type, verification_status),
-    INDEX idx_clinic_coordinates (latitude, longitude)
-);
+    );
+CREATE INDEX idx_clinic_location (province, city);
+CREATE INDEX idx_clinic_type_status (clinic_type, verification_status);
+CREATE INDEX idx_clinic_coordinates (latitude, longitude);
+
 
 
 
@@ -526,10 +543,11 @@ CREATE TABLE clinic_staff (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_staff_clinic (clinic_id),
-    INDEX idx_staff_role (staff_role, employment_status),
-    INDEX idx_staff_hpcs (hpcs_number)
-);
+    );
+CREATE INDEX idx_staff_clinic (clinic_id);
+CREATE INDEX idx_staff_role (staff_role, employment_status);
+CREATE INDEX idx_staff_hpcs (hpcs_number);
+
 
 
 -- Professional credentials
@@ -550,9 +568,10 @@ CREATE TABLE professional_credentials (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_credentials_staff (staff_id),
-    INDEX idx_credentials_status (status, expiry_date)
-);
+    );
+CREATE INDEX idx_credentials_status (status, expiry_date);
+CREATE INDEX idx_credentials_staff (staff_id);
+
 
 
 
@@ -600,9 +619,10 @@ CREATE TABLE clinic_services (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_services_clinic (clinic_id, is_active),
-    INDEX idx_services_category (service_category)
+    
 );
+CREATE INDEX idx_services_clinic (clinic_id, is_active);
+CREATE INDEX idx_services_category (service_category);
 
 
 -- ============================================
@@ -633,8 +653,9 @@ CREATE TABLE system_admins (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_admin_level (admin_level)
+    
 );
+CREATE INDEX idx_admin_level (admin_level);
 
 
 
@@ -682,9 +703,10 @@ CREATE TABLE ngo_partners (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_ngo_status (partnership_status),
-    INDEX idx_ngo_regions (operating_regions)
-);
+    );
+CREATE INDEX idx_ngo_status (partnership_status);
+CREATE INDEX idx_ngo_regions (operating_regions);
+
 
 
 -- ============================================
@@ -712,9 +734,10 @@ CREATE TABLE user_activities (
     -- Timestamps
     performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_activity_user (user_id, performed_at),
-    INDEX idx_activity_type (activity_type, performed_at)
-);
+    );
+CREATE INDEX idx_activity_user (user_id, performed_at);
+CREATE INDEX idx_activity_type (activity_type, performed_at);
+
 
 
 -- Data access audit log (POPIA compliance)
@@ -742,9 +765,10 @@ CREATE TABLE data_access_logs (
     
     accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_access_log_accessed (accessed_user_id, accessed_at),
-    INDEX idx_access_log_accessor (accessed_by_user_id, accessed_at)
-);
+    );
+CREATE INDEX idx_access_log_accessed (accessed_user_id, accessed_at);
+CREATE INDEX idx_access_log_accessor (accessed_by_user_id, accessed_at);
+
 
 
 
@@ -789,8 +813,8 @@ CREATE TABLE notification_preferences (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_notif_pref_user (user_id)
 );
+CREATE INDEX idx_notif_pref_user (user_id);
 
 
 -- ============================================
@@ -819,9 +843,10 @@ CREATE TABLE sms_conversations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_sms_phone (phone_number),
-    INDEX idx_sms_user (user_id)
-);
+    );
+CREATE INDEX idx_sms_phone (phone_number);
+CREATE INDEX idx_sms_user (user_id);
+
 
 
 
@@ -845,9 +870,10 @@ CREATE TABLE sms_messages (
     
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
-    INDEX idx_sms_conversation (conversation_id, created_at),
-    INDEX idx_sms_twilio_id (twilio_message_id)
+    
 );
+CREATE INDEX idx_sms_conversation (conversation_id, created_at);
+CREATE INDEX idx_sms_twilio_id (twilio_message_id);
 
 
 
