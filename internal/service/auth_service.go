@@ -4,10 +4,12 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/docker/distribution/uuid"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
@@ -307,4 +309,59 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 		Msg("User logged in successfully")
 
 	return token, expiresAt, nil
+}
+
+// ValidateToken validates JWT token
+func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*TokenClaims, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(s.jwtSecret), nil
+	})
+	if err != nil {
+		return nil, domain.NewAppError(domain.ErrInvalidToken, "Invalid token", 401)
+	}
+
+	if !token.Valid {
+		return nil, domain.NewAppError(domain.ErrInvalidToken, "Invalid token", 401)
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, domain.NewAppError(domain.ErrInvalidToken, "Invalid token claims", 401)
+	}
+
+	// Extract user ID (UUID)
+	userIDStr, ok := claims["user_id"].(string)
+	if !ok {
+		return nil, domain.NewAppError(domain.ErrInvalidToken, "Invalid user ID in token", 401)
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return nil, domain.NewAppError(domain.ErrInvalidToken, "Invalid user ID format", 401)
+	}
+
+	// Check expiration
+	if exp, ok := claims["exp"].(float64); ok {
+		if time.Now().Unix() > int64(exp) {
+			return nil, domain.NewAppError(domain.ErrExpiredToken, "Token expired", 401)
+		}
+	}
+
+	// Check if session exists
+	session, err := s.sessionRepo.GetSession(ctx, tokenString)
+	if err != nil || session.ExpiresAt.Before(time.Now()) {
+		return nil, domain.NewAppError(domain.ErrInvalidSession, "Session expired or invalid", 401)
+	}
+
+	role, _ := claims["role"].(string)
+	email, _ := claims["email"].(string)
+
+	return &TokenClaims{
+		UserID: userID,
+		Role:   role,
+		Email:  email,
+	}, nil
 }
