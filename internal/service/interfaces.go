@@ -81,7 +81,11 @@ type AuditService interface {
 
 // TokenClaims represents JWT token claims
 type TokenClaims struct {
-	UserID int32  `json:"user_id"`
-	Role   string `json:"role"`
-	Email  string `json:"email"`
+	UserID               uuid.UUID `json:"user_id"`
+	Email                string    `json:"email,omitempty"`
+	Phone                string    `json:"phone,omitempty"`
+	Role                 string    `json:"role"`
+	IsSMSOnly            bool      `json:"is_sms_only"`
+	IsVerified           bool      `json:"is_verified"`
+	ProfileCompletionPct int       `json:"profile_completion_pct"`
 }
