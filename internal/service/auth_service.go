@@ -4,18 +4,17 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
+	"github.com/docker/distribution/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
-
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/rs/zerolog"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/rs/zerolog"
 )
 
 type authService struct {
@@ -61,208 +60,148 @@ func NewAuthService(
 	}
 }
 
-func (s *authService) Register(ctx context.Context, username, email, password, role string) (domain.User, error) {
-	// Validate password
+// Register handles user registration with email or phone
+func (s *authService) Register(ctx context.Context, email, phone, password, role string) (domain.User, error) {
+	// Validate input
+	if email == "" && phone == "" {
+		return domain.User{}, domain.NewAppError(domain.ErrValidation, "Email or phone is required", 400)
+	}
 	if password == "" {
-		return domain.User{}, domain.ErrValidation
+		return domain.User{}, domain.NewAppError(domain.ErrValidation, "Password is required", 400)
+	}
+	if role == "" {
+		role = "patient" // Default role
 	}
 
-	// Default role
-	if role == "" {
-		role = "user"
+	// Validate role
+	validRoles := map[string]bool{
+		"patient":        true,
+		"caregiver":      true,
+		"provider_staff": true,
+		"clinic_admin":   true,
+		"system_admin":   true,
+		"ngo_partner":    true,
+	}
+	if !validRoles[role] {
+		return domain.User{}, domain.NewAppError(domain.ErrValidation, "Invalid role", 400)
 	}
 
 	// Hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to hash password")
-		return domain.User{}, fmt.Errorf("password hashing failed: %w", err)
+		return domain.User{}, domain.NewAppError(err, "Password hashing failed", 500)
 	}
 
-	// Create user
+	// Create user domain object
 	user := domain.User{
-		Username: username,
-		Email:    email,
-		Role:     role,
+		Email:                &email,
+		Phone:                &phone,
+		Role:                 role,
+		Status:               "pending_verification",
+		IsVerified:           false,
+		IsSMSOnly:            phone != "" && email == "",
+		SMSConsentGiven:      s.smsEnabled && phone != "",
+		POPIAConsentGiven:    true, // Default to true, can be updated later
+		ConsentDate:          &[]time.Time{time.Now()}[0],
+		ProfileCompletionPct: 10, // Basic registration completion
+		CreatedAt:            time.Now(),
+		UpdatedAt:            time.Now(),
 	}
 
-	created, err := s.repo.CreateUser(ctx, user, string(hash))
+	// Create user in repository
+	created, err := s.userRepo.CreateUser(ctx, user, string(hash))
 	if err != nil {
 		if errors.Is(err, domain.ErrDuplicateEmail) {
-			return domain.User{}, domain.ErrDuplicateEmail
+			return domain.User{}, domain.NewAppError(err, "Email already exists", 409)
+		}
+		if errors.Is(err, domain.ErrDuplicatePhone) {
+			return domain.User{}, domain.NewAppError(err, "Phone number already exists", 409)
 		}
 		s.logger.Error().Err(err).Msg("Failed to create user")
-		return domain.User{}, fmt.Errorf("user creation failed: %w", err)
+		return domain.User{}, domain.NewAppError(err, "User creation failed", 500)
 	}
 
-	// Send welcome email asynchronously
-	if s.emailService != nil && s.emailService.IsAvailable() {
+	// Create default consent record
+	consent := domain.PrivacyConsent{
+		UserID:                     created.ID,
+		HealthDataConsent:          true,
+		HealthDataConsentDate:      &created.CreatedAt,
+		HealthDataConsentVersion:   &[]string{"1.0"}[0],
+		ResearchConsent:            false,
+		EmergencyAccessConsent:     true,
+		EmergencyAccessConsentDate: &created.CreatedAt,
+		SMSCommunicationConsent:    s.smsEnabled && phone != "",
+		EmailCommunicationConsent:  email != "",
+		ConsentWithdrawn:           false,
+		CreatedAt:                  created.CreatedAt,
+		UpdatedAt:                  created.CreatedAt,
+	}
+
+	if _, err := s.consentRepo.CreateConsent(ctx, consent); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to create consent record")
+	}
+
+	// For patients, create empty patient profile
+	if role == "patient" {
+		patientProfile := domain.PatientProfile{
+			ID:                           uuid.Generate(),
+			UserID:                       created.ID,
+			Country:                      "South Africa", // Default
+			LanguagePreferences:          []string{"en", "af", "zu"},
+			PreferredCommunicationMethod: "sms", // Default for South Africa
+			Timezone:                     "Africa/Johannesburg",
+			AcceptsMarketingEmails:       false,
+			CreatedAt:                    created.CreatedAt,
+			UpdatedAt:                    created.CreatedAt,
+		}
+
+		if _, err := s.patientRepo.CreatePatientProfile(ctx, patientProfile); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to create patient profile")
+		}
+	}
+
+	// Send verification email if email provided
+	if email != "" && s.emailService != nil && s.emailService.IsAvailable() {
 		go func() {
 			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			if err := s.emailService.SendWelcomeEmail(emailCtx, created.Email, created.Username); err != nil {
-				s.logger.Error().Err(err).Str("email", created.Email).Msg("Failed to send welcome email")
-			} else {
-				s.logger.Info().Str("email", created.Email).Msg("Welcome email sent")
+			// Generate verification token
+			verificationToken := uuid.Generate().String()
+			tokenExpires := time.Now().Add(24 * time.Hour)
+
+			// Store verification token
+			if err := s.userRepo.SetVerificationToken(emailCtx, created.ID, verificationToken, tokenExpires); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to set verification token")
+				return
+			}
+
+			// Send verification email
+			if err := s.emailService.SendVerificationEmail(emailCtx, email, verificationToken); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send verification email")
 			}
 		}()
 	}
 
-	// Publish user registration event
+	// Publish registration event
 	if s.broker != nil && s.broker.IsAvailable() {
 		event := map[string]interface{}{
 			"user_id":   created.ID,
-			"email":     created.Email,
-			"username":  created.Username,
+			"email":     email,
+			"phone":     phone,
+			"role":      role,
 			"timestamp": time.Now().UTC(),
 		}
 		if err := s.broker.PublishJSON("user.registered", event); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to publish registration event")
+			s.logger.Warn().Err(err).Msg("Failed to publish registration event")
 		}
 	}
 
 	s.logger.Info().
-		Int32("user_id", created.ID).
-		Str("email", email).
+		Str("user_id", created.ID.String()).
+		Str("role", role).
 		Msg("User registered successfully")
 
 	return created, nil
-}
-
-func (s *authService) Login(ctx context.Context, email, password string) (string, time.Time, error) {
-	// Get user by email
-	user, hash, err := s.repo.GetUserByEmail(ctx, email)
-	if err != nil {
-		if errors.Is(err, domain.ErrUserNotFound) {
-			return "", time.Time{}, domain.ErrInvalidCredentials
-		}
-		s.logger.Error().Err(err).Msg("Failed to get user")
-		return "", time.Time{}, fmt.Errorf("login failed: %w", err)
-	}
-
-	// Verify password
-	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
-		s.logger.Warn().
-			Str("email", email).
-			Msg("Invalid password attempt")
-		return "", time.Time{}, domain.ErrInvalidCredentials
-	}
-
-	// Generate JWT token
-	expiresAt := time.Now().Add(s.jwtExpiry)
-	token, err := s.generateToken(user, expiresAt)
-	if err != nil {
-		s.logger.Error().Err(err).Msg("Failed to generate token")
-		return "", time.Time{}, fmt.Errorf("token generation failed: %w", err)
-	}
-
-	// Send login alert email asynchronously (optional security feature)
-	if s.emailService != nil && s.emailService.IsAvailable() {
-		go func() {
-			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			// You could extract IP and location from context if available
-			ipAddress := "Unknown"
-			location := "Unknown"
-
-			if err := s.emailService.SendLoginAlertEmail(emailCtx, user.Email, user.Username, ipAddress, location); err != nil {
-				s.logger.Warn().Err(err).Msg("Failed to send login alert email")
-			}
-		}()
-	}
-
-	s.logger.Info().
-		Int32("user_id", user.ID).
-		Str("email", email).
-		Msg("User logged in successfully")
-
-	return token, expiresAt, nil
-}
-
-func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*TokenClaims, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Verify signing method
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(s.jwtSecret), nil
-	})
-	if err != nil {
-		return nil, domain.ErrInvalidToken
-	}
-
-	if !token.Valid {
-		return nil, domain.ErrInvalidToken
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, domain.ErrInvalidToken
-	}
-
-	// Extract claims
-	userID, ok := claims["user_id"].(float64)
-	if !ok {
-		return nil, domain.ErrInvalidToken
-	}
-
-	role, _ := claims["role"].(string)
-	email, _ := claims["email"].(string)
-
-	// Check expiration
-	if exp, ok := claims["exp"].(float64); ok {
-		if time.Now().Unix() > int64(exp) {
-			return nil, domain.ErrExpiredToken
-		}
-	}
-
-	return &TokenClaims{
-		UserID: int32(userID),
-		Role:   role,
-		Email:  email,
-	}, nil
-}
-
-func (s *authService) RefreshToken(ctx context.Context, tokenString string) (string, time.Time, error) {
-	// Validate existing token
-	claims, err := s.ValidateToken(ctx, tokenString)
-	if err != nil && !errors.Is(err, domain.ErrExpiredToken) {
-		return "", time.Time{}, err
-	}
-
-	// Get user to ensure they still exist
-	user, err := s.repo.GetUserByID(ctx, claims.UserID)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-
-	// Generate new token
-	expiresAt := time.Now().Add(s.jwtExpiry)
-	newToken, err := s.generateToken(user, expiresAt)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-
-	return newToken, expiresAt, nil
-}
-
-// generateToken creates a JWT token for a user
-func (s *authService) generateToken(user domain.User, expiresAt time.Time) (string, error) {
-	claims := jwt.MapClaims{
-		"user_id": user.ID,
-		"email":   user.Email,
-		"role":    user.Role,
-		"exp":     expiresAt.Unix(),
-		"iat":     time.Now().Unix(),
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(s.jwtSecret))
-	if err != nil {
-		return "", fmt.Errorf("failed to sign token: %w", err)
-	}
-
-	return signedToken, nil
 }
