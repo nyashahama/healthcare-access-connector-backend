@@ -85,3 +85,29 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (domain.
 
 	return user, patientProfile, nil
 }
+
+// GetUserByID gets user by ID
+func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (domain.User, error) {
+	cacheKey := fmt.Sprintf("user:%s", userID.String())
+
+	// Try cache first
+	var user domain.User
+	if err := s.cache.Get(ctx, cacheKey, &user); err == nil {
+		s.logger.Debug().Str("user_id", userID.String()).Msg("User retrieved from cache")
+		return user, nil
+	}
+
+	// Fetch from database
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
+		return domain.User{}, domain.NewAppError(err, "User not found", 404)
+	}
+
+	// Cache the result
+	if err := s.cache.Set(ctx, cacheKey, user, 10*time.Minute); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to cache user")
+	}
+
+	return user, nil
+}
