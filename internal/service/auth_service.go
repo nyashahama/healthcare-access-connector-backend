@@ -441,3 +441,10 @@ func (s *authService) generateToken(user domain.User, expiresAt time.Time) (stri
 
 	return signedToken, nil
 }
+
+// VerifyEmail verifies user email with token
+func (s *authService) VerifyEmail(ctx context.Context, token string) error {
+	// Get user by verification token
+	// This would require adding GetUserByVerificationToken to repository
+	return errors.New("not implemented")
+}
