@@ -365,3 +365,54 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*T
 		Email:  email,
 	}, nil
 }
+
+// RefreshToken refreshes JWT token
+func (s *authService) RefreshToken(ctx context.Context, tokenString string) (string, time.Time, error) {
+	// Validate existing token
+	claims, err := s.ValidateToken(ctx, tokenString)
+	if err != nil && !errors.Is(err, domain.ErrExpiredToken) {
+		return "", time.Time{}, err
+	}
+
+	// Get user to ensure they still exist
+	user, err := s.userRepo.GetUserByID(ctx, claims.UserID)
+	if err != nil {
+		return "", time.Time{}, domain.NewAppError(err, "User not found", 404)
+	}
+
+	// Generate new token
+	expiresAt := time.Now().Add(s.jwtExpiry)
+	newToken, err := s.generateToken(user, expiresAt)
+	if err != nil {
+		return "", time.Time{}, domain.NewAppError(err, "Failed to generate new token", 500)
+	}
+
+	// Update session
+	session, err := s.sessionRepo.GetSession(ctx, tokenString)
+	if err == nil {
+		session.SessionToken = newToken
+		session.ExpiresAt = expiresAt
+		// Update session in repository (you might need to add an UpdateSession method)
+	}
+
+	// Delete old session
+	if err := s.sessionRepo.DeleteSession(ctx, tokenString); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to delete old session")
+	}
+
+	// Create new session
+	newSession := domain.UserSession{
+		ID:           uuid.Generate(),
+		UserID:       user.ID,
+		SessionToken: newToken,
+		DeviceType:   &[]string{"web"}[0],
+		ExpiresAt:    expiresAt,
+		CreatedAt:    time.Now(),
+	}
+
+	if _, err := s.sessionRepo.CreateSession(ctx, newSession); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to create new session record")
+	}
+
+	return newToken, expiresAt, nil
+}
