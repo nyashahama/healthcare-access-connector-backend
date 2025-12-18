@@ -50,6 +50,18 @@ type UserService interface {
 	CountUsers(ctx context.Context, role string) (int64, error)
 }
 
+// PatientService handles patient profile operations
+type PatientService interface {
+	CreateProfile(ctx context.Context, userID uuid.UUID, profile domain.PatientProfile) (domain.PatientProfile, error)
+	GetProfile(ctx context.Context, userID uuid.UUID) (domain.PatientProfile, error)
+	UpdateProfile(ctx context.Context, profile domain.PatientProfile) error
+	SearchPatients(ctx context.Context, query string, province string, limit, offset int) ([]domain.PatientProfile, error)
+
+	// Medical information
+	UpdateMedicalInfo(ctx context.Context, info domain.PatientMedicalInfo) error
+	GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (domain.PatientMedicalInfo, error)
+}
+
 // TokenClaims represents JWT token claims
 type TokenClaims struct {
 	UserID int32  `json:"user_id"`
