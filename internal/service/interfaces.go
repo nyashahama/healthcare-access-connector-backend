@@ -62,6 +62,15 @@ type PatientService interface {
 	GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (domain.PatientMedicalInfo, error)
 }
 
+// ConsentService handles POPIA consent operations
+type ConsentService interface {
+	CreateConsent(ctx context.Context, userID uuid.UUID, consent domain.PrivacyConsent) (domain.PrivacyConsent, error)
+	GetConsent(ctx context.Context, userID uuid.UUID) (domain.PrivacyConsent, error)
+	UpdateConsent(ctx context.Context, consent domain.PrivacyConsent) error
+	WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error
+	CheckHealthDataConsent(ctx context.Context, userID uuid.UUID) error
+}
+
 // TokenClaims represents JWT token claims
 type TokenClaims struct {
 	UserID int32  `json:"user_id"`
