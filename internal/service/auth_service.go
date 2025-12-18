@@ -416,3 +416,28 @@ func (s *authService) RefreshToken(ctx context.Context, tokenString string) (str
 
 	return newToken, expiresAt, nil
 }
+
+// generateToken creates a JWT token for a user
+func (s *authService) generateToken(user domain.User, expiresAt time.Time) (string, error) {
+	email := ""
+	if user.Email != nil {
+		email = *user.Email
+	}
+
+	claims := jwt.MapClaims{
+		"user_id": user.ID.String(),
+		"email":   email,
+		"role":    user.Role,
+		"exp":     expiresAt.Unix(),
+		"iat":     time.Now().Unix(),
+		"iss":     "healthcare-access-connector",
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(s.jwtSecret))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign token: %w", err)
+	}
+
+	return signedToken, nil
+}
