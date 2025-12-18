@@ -493,3 +493,9 @@ func (s *authService) RequestPasswordReset(ctx context.Context, identifier strin
 
 	return nil
 }
+
+// ResetPassword resets password with token
+func (s *authService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	// This would require adding GetUserByPasswordResetToken to repository
+	return errors.New("not implemented")
+}
