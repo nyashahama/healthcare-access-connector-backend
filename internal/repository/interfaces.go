@@ -3,6 +3,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/docker/distribution/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
@@ -20,6 +21,9 @@ type UserRepository interface {
 	UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
 	VerifyUser(ctx context.Context, id uuid.UUID) error
+	SetVerificationToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
+	SetPasswordResetToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
+	UpdateUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
 	ListUsers(ctx context.Context, role string, limit, offset int) ([]domain.User, error)
 	CountUsers(ctx context.Context, role string) (int64, error)

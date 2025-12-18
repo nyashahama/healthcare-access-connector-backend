@@ -224,6 +224,68 @@ func (r *userRepository) VerifyUser(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// SetVerificationToken sets verification token for a user
+func (r *userRepository) SetVerificationToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.db.SetVerificationToken(ctx, sqlc.SetVerificationTokenParams{
+		ID:                  uuidToPgtypeUUID(id),
+		VerificationToken:   pgtype.Text{String: token, Valid: true},
+		VerificationExpires: pgtype.Timestamp{Time: expires, Valid: true},
+	})
+	if err != nil {
+		dbQueryTotal.WithLabelValues("set_verification_token", "error").Inc()
+		return r.handleError(err, "set verification token")
+	}
+
+	dbQueryTotal.WithLabelValues("set_verification_token", "success").Inc()
+	return nil
+}
+
+// SetPasswordResetToken sets password reset token for a user
+func (r *userRepository) SetPasswordResetToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.db.SetPasswordResetToken(ctx, sqlc.SetPasswordResetTokenParams{
+		ID:                   uuidToPgtypeUUID(id),
+		ResetPasswordToken:   pgtype.Text{String: token, Valid: true},
+		ResetPasswordExpires: pgtype.Timestamp{Time: expires, Valid: true},
+	})
+	if err != nil {
+		dbQueryTotal.WithLabelValues("set_password_reset_token", "error").Inc()
+		return r.handleError(err, "set password reset token")
+	}
+
+	dbQueryTotal.WithLabelValues("set_password_reset_token", "success").Inc()
+	return nil
+}
+
+// UpdateUserPassword updates user password and clears reset token
+func (r *userRepository) UpdateUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.db.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
+		ID:           uuidToPgtypeUUID(id),
+		PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
+	})
+	if err != nil {
+		dbQueryTotal.WithLabelValues("update_user_password", "error").Inc()
+		return r.handleError(err, "update user password")
+	}
+
+	dbQueryTotal.WithLabelValues("update_user_password", "success").Inc()
+	return nil
+}
+
 func (r *userRepository) DeactivateUser(ctx context.Context, id uuid.UUID) error {
 	start := time.Now()
 	defer func() {
