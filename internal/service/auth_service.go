@@ -26,7 +26,6 @@ type authService struct {
 	logger       *zerolog.Logger
 	jwtSecret    string
 	jwtExpiry    time.Duration
-	bcryptCost   int // Make bcrypt cost configurable
 }
 
 // NewAuthService creates a new authentication service
@@ -39,14 +38,6 @@ func NewAuthService(
 	jwtSecret string,
 	jwtExpiry time.Duration,
 ) AuthService {
-	// Use bcrypt.DefaultCost (10) for production
-	// Consider bcrypt.MinCost (4) for development/testing
-	// Each +1 to cost doubles the time
-	bcryptCost := bcrypt.DefaultCost
-	if jwtExpiry < 24*time.Hour { // Quick heuristic for dev environment
-		bcryptCost = 10 // Balanced for dev
-	}
-
 	return &authService{
 		repo:         repo,
 		cache:        cache,
@@ -55,13 +46,10 @@ func NewAuthService(
 		logger:       logger,
 		jwtSecret:    jwtSecret,
 		jwtExpiry:    jwtExpiry,
-		bcryptCost:   bcryptCost,
 	}
 }
 
 func (s *authService) Register(ctx context.Context, username, email, password, role string) (domain.User, error) {
-	start := time.Now()
-
 	// Validate password
 	if password == "" {
 		return domain.User{}, domain.ErrValidation
@@ -72,17 +60,12 @@ func (s *authService) Register(ctx context.Context, username, email, password, r
 		role = "user"
 	}
 
-	// Hash password with configured cost
-	hashStart := time.Now()
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
+	// Hash password
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to hash password")
 		return domain.User{}, fmt.Errorf("password hashing failed: %w", err)
 	}
-	s.logger.Debug().
-		Dur("hash_duration_ms", time.Since(hashStart)).
-		Int("bcrypt_cost", s.bcryptCost).
-		Msg("Password hashed")
 
 	// Create user
 	user := domain.User{
@@ -91,7 +74,6 @@ func (s *authService) Register(ctx context.Context, username, email, password, r
 		Role:     role,
 	}
 
-	dbStart := time.Now()
 	created, err := s.repo.CreateUser(ctx, user, string(hash))
 	if err != nil {
 		if errors.Is(err, domain.ErrDuplicateEmail) {
@@ -100,11 +82,8 @@ func (s *authService) Register(ctx context.Context, username, email, password, r
 		s.logger.Error().Err(err).Msg("Failed to create user")
 		return domain.User{}, fmt.Errorf("user creation failed: %w", err)
 	}
-	s.logger.Debug().
-		Dur("db_duration_ms", time.Since(dbStart)).
-		Msg("User created in database")
 
-	// Send welcome email asynchronously (non-blocking)
+	// Send welcome email asynchronously
 	if s.emailService != nil && s.emailService.IsAvailable() {
 		go func() {
 			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -118,96 +97,61 @@ func (s *authService) Register(ctx context.Context, username, email, password, r
 		}()
 	}
 
-	// Publish user registration event (non-blocking)
+	// Publish user registration event
 	if s.broker != nil && s.broker.IsAvailable() {
-		go func() {
-			event := map[string]interface{}{
-				"user_id":   created.ID,
-				"email":     created.Email,
-				"username":  created.Username,
-				"timestamp": time.Now().UTC(),
-			}
-			if err := s.broker.PublishJSON("user.registered", event); err != nil {
-				s.logger.Error().Err(err).Msg("Failed to publish registration event")
-			}
-		}()
+		event := map[string]interface{}{
+			"user_id":   created.ID,
+			"email":     created.Email,
+			"username":  created.Username,
+			"timestamp": time.Now().UTC(),
+		}
+		if err := s.broker.PublishJSON("user.registered", event); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to publish registration event")
+		}
 	}
 
 	s.logger.Info().
 		Int32("user_id", created.ID).
 		Str("email", email).
-		Dur("total_duration_ms", time.Since(start)).
 		Msg("User registered successfully")
 
 	return created, nil
 }
 
 func (s *authService) Login(ctx context.Context, email, password string) (string, time.Time, error) {
-	start := time.Now()
-
-	// Try to get cached failed login attempts to prevent brute force
-	cacheKey := fmt.Sprintf("login_attempts:%s", email)
-	var attempts int
-	if err := s.cache.Get(ctx, cacheKey, &attempts); err == nil {
-		if attempts >= 5 {
-			s.logger.Warn().Str("email", email).Msg("Too many login attempts")
-			return "", time.Time{}, fmt.Errorf("too many login attempts, try again later")
-		}
-	}
-
 	// Get user by email
-	dbStart := time.Now()
 	user, hash, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			// Increment failed attempts
-			s.cache.Set(ctx, cacheKey, attempts+1, 15*time.Minute)
 			return "", time.Time{}, domain.ErrInvalidCredentials
 		}
 		s.logger.Error().Err(err).Msg("Failed to get user")
 		return "", time.Time{}, fmt.Errorf("login failed: %w", err)
 	}
-	s.logger.Debug().
-		Dur("db_duration_ms", time.Since(dbStart)).
-		Msg("User fetched from database")
 
 	// Verify password
-	bcryptStart := time.Now()
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
 		s.logger.Warn().
 			Str("email", email).
-			Dur("bcrypt_duration_ms", time.Since(bcryptStart)).
 			Msg("Invalid password attempt")
-
-		// Increment failed attempts
-		s.cache.Set(ctx, cacheKey, attempts+1, 15*time.Minute)
 		return "", time.Time{}, domain.ErrInvalidCredentials
 	}
-	s.logger.Debug().
-		Dur("bcrypt_duration_ms", time.Since(bcryptStart)).
-		Msg("Password verified")
-
-	// Clear failed attempts on successful login
-	s.cache.Delete(ctx, cacheKey)
 
 	// Generate JWT token
-	tokenStart := time.Now()
 	expiresAt := time.Now().Add(s.jwtExpiry)
 	token, err := s.generateToken(user, expiresAt)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to generate token")
 		return "", time.Time{}, fmt.Errorf("token generation failed: %w", err)
 	}
-	s.logger.Debug().
-		Dur("token_duration_ms", time.Since(tokenStart)).
-		Msg("JWT token generated")
 
-	// Send login alert email asynchronously (non-blocking)
+	// Send login alert email asynchronously (optional security feature)
 	if s.emailService != nil && s.emailService.IsAvailable() {
 		go func() {
 			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
+			// You could extract IP and location from context if available
 			ipAddress := "Unknown"
 			location := "Unknown"
 
@@ -220,21 +164,14 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	s.logger.Info().
 		Int32("user_id", user.ID).
 		Str("email", email).
-		Dur("total_duration_ms", time.Since(start)).
 		Msg("User logged in successfully")
 
 	return token, expiresAt, nil
 }
 
 func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*TokenClaims, error) {
-	// Try cache first
-	cacheKey := fmt.Sprintf("token:%s", tokenString)
-	var cached TokenClaims
-	if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
-		return &cached, nil
-	}
-
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Verify signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
@@ -253,6 +190,7 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*T
 		return nil, domain.ErrInvalidToken
 	}
 
+	// Extract claims
 	userID, ok := claims["user_id"].(float64)
 	if !ok {
 		return nil, domain.ErrInvalidToken
@@ -262,30 +200,17 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*T
 	email, _ := claims["email"].(string)
 
 	// Check expiration
-	var exp int64
-	if expFloat, ok := claims["exp"].(float64); ok {
-		exp = int64(expFloat)
-		if time.Now().Unix() > exp {
+	if exp, ok := claims["exp"].(float64); ok {
+		if time.Now().Unix() > int64(exp) {
 			return nil, domain.ErrExpiredToken
 		}
 	}
 
-	result := &TokenClaims{
+	return &TokenClaims{
 		UserID: int32(userID),
 		Role:   role,
 		Email:  email,
-	}
-
-	// Cache valid token (cache for remaining lifetime or max 5 minutes)
-	ttl := time.Until(time.Unix(exp, 0))
-	if ttl > 5*time.Minute {
-		ttl = 5 * time.Minute
-	}
-	if ttl > 0 {
-		s.cache.Set(ctx, cacheKey, result, ttl)
-	}
-
-	return result, nil
+	}, nil
 }
 
 func (s *authService) RefreshToken(ctx context.Context, tokenString string) (string, time.Time, error) {

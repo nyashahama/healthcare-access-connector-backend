@@ -1,4 +1,4 @@
-// Package service defines service interfaces
+// Package service defines service interfaces for health project
 package service
 
 import (
@@ -9,83 +9,46 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 )
 
-// AuthService handles authentication operations
+// AuthService handles authentication operations for health project
 type AuthService interface {
-	// Registration
-	RegisterWithEmail(ctx context.Context, email, password, role string) (domain.User, error)
-	RegisterWithPhone(ctx context.Context, phone, password, role string) (domain.User, error)
-	RegisterSMSOnly(ctx context.Context, phone, role string) (domain.User, error)
-
-	// Login
-	LoginWithEmail(ctx context.Context, email, password string) (string, time.Time, error)
-	LoginWithPhone(ctx context.Context, phone, password string) (string, time.Time, error)
-
-	// Token management
+	Register(ctx context.Context, email, phone, password, role string) (domain.User, error)
+	Login(ctx context.Context, identifier, password string) (string, time.Time, error)
 	ValidateToken(ctx context.Context, token string) (*TokenClaims, error)
 	RefreshToken(ctx context.Context, token string) (string, time.Time, error)
-
-	// Verification
-	SendVerificationEmail(ctx context.Context, userID uuid.UUID) error
-	SendVerificationSMS(ctx context.Context, userID uuid.UUID) error
+	RequestPasswordReset(ctx context.Context, identifier string) error
 	VerifyEmail(ctx context.Context, token string) error
-	VerifyPhone(ctx context.Context, token string) error
-
-	// Password reset
-	RequestPasswordReset(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
-	ChangePassword(ctx context.Context, userID uuid.UUID, oldPassword, newPassword string) error
-
-	// Session management
-	Logout(ctx context.Context, sessionToken string) error
-	LogoutAllSessions(ctx context.Context, userID uuid.UUID) error
 }
 
-// UserService handles user operations
+// UserService handles user operations for health project
 type UserService interface {
-	GetProfile(ctx context.Context, userID uuid.UUID) (domain.User, error)
+	GetProfile(ctx context.Context, userID uuid.UUID) (domain.User, domain.PatientProfile, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (domain.User, error)
-	UpdateUserStatus(ctx context.Context, userID uuid.UUID, status string) error
-	DeactivateUser(ctx context.Context, userID uuid.UUID) error
+	UpdateProfile(ctx context.Context, userID uuid.UUID, updates map[string]interface{}) error
+	UpdatePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error
+	DeleteProfile(ctx context.Context, userID uuid.UUID) error
 	ListUsers(ctx context.Context, role string, limit, offset int) ([]domain.User, error)
-	CountUsers(ctx context.Context, role string) (int64, error)
-}
-
-// PatientService handles patient profile operations
-type PatientService interface {
-	CreateProfile(ctx context.Context, userID uuid.UUID, profile domain.PatientProfile) (domain.PatientProfile, error)
-	GetProfile(ctx context.Context, userID uuid.UUID) (domain.PatientProfile, error)
-	UpdateProfile(ctx context.Context, profile domain.PatientProfile) error
-	SearchPatients(ctx context.Context, query string, province string, limit, offset int) ([]domain.PatientProfile, error)
-
-	// Medical information
-	UpdateMedicalInfo(ctx context.Context, info domain.PatientMedicalInfo) error
-	GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (domain.PatientMedicalInfo, error)
-}
-
-// ConsentService handles POPIA consent operations
-type ConsentService interface {
-	CreateConsent(ctx context.Context, userID uuid.UUID, consent domain.PrivacyConsent) (domain.PrivacyConsent, error)
 	GetConsent(ctx context.Context, userID uuid.UUID) (domain.PrivacyConsent, error)
-	UpdateConsent(ctx context.Context, consent domain.PrivacyConsent) error
-	WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error
-	CheckHealthDataConsent(ctx context.Context, userID uuid.UUID) error
+	UpdateConsent(ctx context.Context, userID uuid.UUID, consent domain.PrivacyConsent) error
 }
 
-// AuditService handles audit logging for POPIA compliance
-type AuditService interface {
-	LogActivity(ctx context.Context, activity domain.UserActivity) error
-	LogDataAccess(ctx context.Context, access domain.DataAccessLog) error
-	GetUserActivities(ctx context.Context, userID uuid.UUID, limit, offset int) ([]domain.UserActivity, error)
-	GetDataAccessLogs(ctx context.Context, accessedUserID uuid.UUID, limit, offset int) ([]domain.DataAccessLog, error)
+// PatientService handles patient operations
+type PatientService interface {
+	CreateMedicalInfo(ctx context.Context, patientID uuid.UUID, info domain.PatientMedicalInfo) error
+	GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (domain.PatientMedicalInfo, error)
+	AddAllergy(ctx context.Context, allergy domain.PatientAllergy) error
+	GetAllergies(ctx context.Context, patientID uuid.UUID) ([]domain.PatientAllergy, error)
+	AddMedication(ctx context.Context, medication domain.PatientMedication) error
+	GetMedications(ctx context.Context, patientID uuid.UUID) ([]domain.PatientMedication, error)
+	AddCondition(ctx context.Context, condition domain.PatientCondition) error
+	GetConditions(ctx context.Context, patientID uuid.UUID) ([]domain.PatientCondition, error)
+	AddImmunization(ctx context.Context, immunization domain.PatientImmunization) error
+	GetImmunizations(ctx context.Context, patientID uuid.UUID) ([]domain.PatientImmunization, error)
 }
 
-// TokenClaims represents JWT token claims
+// TokenClaims represents JWT token claims for health project
 type TokenClaims struct {
-	UserID               uuid.UUID `json:"user_id"`
-	Email                string    `json:"email,omitempty"`
-	Phone                string    `json:"phone,omitempty"`
-	Role                 string    `json:"role"`
-	IsSMSOnly            bool      `json:"is_sms_only"`
-	IsVerified           bool      `json:"is_verified"`
-	ProfileCompletionPct int       `json:"profile_completion_pct"`
+	UserID uuid.UUID `json:"user_id"`
+	Role   string    `json:"role"`
+	Email  string    `json:"email"`
 }
