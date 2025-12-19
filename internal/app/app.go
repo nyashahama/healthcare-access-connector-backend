@@ -16,6 +16,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 )
@@ -156,7 +157,17 @@ func (a *App) Cleanup() {
 
 // initDatabase initializes the database connection pool
 func initDatabase(dbURL string, logger *zerolog.Logger) (*pgxpool.Pool, error) {
-	pool, err := pgxpool.New(context.Background(), dbURL)
+	// Parse the connection string
+	config, err := pgxpool.ParseConfig(dbURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse database URL: %w", err)
+	}
+
+	// Disable prepared statement caching to avoid conflicts
+	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+
+	// Create pool with config
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
 	}

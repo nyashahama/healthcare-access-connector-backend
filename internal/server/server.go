@@ -150,6 +150,7 @@ func (s *Server) setupRoutes() http.Handler {
 		r.Get("/verify-email", s.authHandler.VerifyEmail) // ?token=xxx
 		r.Post("/password/reset-request", s.authHandler.RequestPasswordReset)
 		r.Post("/password/reset", s.authHandler.ResetPassword)
+		r.Post("/auth/resend-verification", s.authHandler.ResendVerificationEmail)
 
 		// Protected routes - require authentication
 		r.Group(func(r chi.Router) {

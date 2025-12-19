@@ -132,9 +132,30 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user profile for response
-	claims, _ := h.authService.ValidateToken(ctx, token)
-	user, _ := h.userService.GetUserByID(ctx, claims.UserID)
+	// Get user profile for response - with proper error handling
+	claims, err := h.authService.ValidateToken(ctx, token)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to validate token after login")
+		// Still return the token even if we can't get the user profile
+		respondJSON(w, http.StatusOK, dto.LoginResponse{
+			Token:     token,
+			ExpiresAt: expiresAt,
+			User:      dto.UserResponse{}, // Empty user response
+		})
+		return
+	}
+
+	user, err := h.userService.GetUserByID(ctx, claims.UserID)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("Failed to get user after login")
+		// Still return the token even if we can't get the user profile
+		respondJSON(w, http.StatusOK, dto.LoginResponse{
+			Token:     token,
+			ExpiresAt: expiresAt,
+			User:      dto.UserResponse{}, // Empty user response
+		})
+		return
+	}
 
 	response := dto.LoginResponse{
 		Token:     token,
@@ -353,6 +374,49 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 	// Always return success for security (don't reveal if user exists)
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "If your account exists, you will receive reset instructions",
+	})
+}
+
+// ResendVerificationEmail resends verification email
+// @Summary Resend verification email
+// @Description Resend verification email to user
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body dto.ResendVerificationRequest true "Email address"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} dto.ErrorResponse
+// @Failure 500 {object} dto.ErrorResponse
+// @Router /api/v1/auth/resend-verification [post]
+func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	var req dto.ResendVerificationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateEmail("email", req.Email)
+
+	if !v.Valid() {
+		respondValidationError(w, v.Errors())
+		return
+	}
+
+	// Resend verification email
+	if err := h.authService.ResendVerificationEmail(ctx, req.Email); err != nil {
+		respondError(w, h.logger, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "If your account exists, a verification email has been sent",
 	})
 }
 

@@ -227,18 +227,6 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 	} else {
 		// Treat as phone number
 		user, passwordHash, err = s.userRepo.GetUserByPhoneWithHash(ctx, identifier)
-		if err != nil {
-			s.logger.Warn().Str("identifier", identifier).Msg("User not found by phone")
-			return "", time.Time{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
-		}
-
-		// For phone login, get the user by ID to get password hash
-		// This is more reliable than trying to get by email
-		_, passwordHash, err = s.userRepo.GetUserByEmail(ctx, identifier)
-		if err != nil && user.Email != nil && *user.Email != "" {
-			// Try with the user's email if they have one
-			_, passwordHash, err = s.userRepo.GetUserByEmail(ctx, *user.Email)
-		}
 	}
 
 	if err != nil {
@@ -268,12 +256,8 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 	}
 
 	// Check if user is verified (for email users)
-	if !user.IsVerified {
-		// For phone-only users, they might not need email verification
-		if user.Email != nil && *user.Email != "" {
-			return "", time.Time{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email", 403)
-		}
-		// Phone-only users might need SMS verification instead
+	if !user.IsVerified && user.Email != nil && *user.Email != "" {
+		return "", time.Time{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email first", 403)
 	}
 
 	// Generate JWT token
@@ -304,7 +288,7 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 	}
 
 	// Send login alert if email available
-	if user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
+	if user.Email != nil && *user.Email != "" && s.emailService != nil && s.emailService.IsAvailable() {
 		go func() {
 			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -613,5 +597,48 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	s.logger.Info().Str("user_id", user.ID.String()).Msg("Password reset successfully")
+	return nil
+}
+
+// ResendVerificationEmail resends verification email
+func (s *authService) ResendVerificationEmail(ctx context.Context, email string) error {
+	// Get user by email
+	user, _, err := s.userRepo.GetUserByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			// Don't reveal if user exists for security
+			s.logger.Info().Str("email", email).Msg("Verification resend requested for non-existent user")
+			return nil // Return success even if user doesn't exist
+		}
+		s.logger.Error().Err(err).Msg("Failed to get user by email")
+		return domain.NewAppError(err, "Failed to resend verification", 500)
+	}
+
+	// Check if already verified
+	if user.IsVerified {
+		return domain.NewAppError(domain.ErrValidation, "Email already verified", 400)
+	}
+
+	// Generate new verification token
+	verificationToken := uuid.Generate().String()
+	tokenExpires := time.Now().Add(24 * time.Hour)
+
+	// Store verification token
+	if err := s.userRepo.SetVerificationToken(ctx, user.ID, verificationToken, tokenExpires); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to set verification token")
+		return domain.NewAppError(err, "Failed to resend verification", 500)
+	}
+
+	// Send verification email
+	if s.emailService != nil && s.emailService.IsAvailable() {
+		if err := s.emailService.SendVerificationEmail(ctx, email, verificationToken); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to send verification email")
+			return domain.NewAppError(err, "Failed to send verification email", 500)
+		}
+	} else {
+		return domain.NewAppError(nil, "Email service unavailable", 503)
+	}
+
+	s.logger.Info().Str("user_id", user.ID.String()).Msg("Verification email resent")
 	return nil
 }

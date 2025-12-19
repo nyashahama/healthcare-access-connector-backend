@@ -152,6 +152,10 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"new_password"`
 }
 
+type ResendVerificationRequest struct {
+	Email string `json:"email"`
+}
+
 // ConsentResponse represents consent settings
 type ConsentResponse struct {
 	HealthDataConsent         bool       `json:"health_data_consent"`

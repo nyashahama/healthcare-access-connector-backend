@@ -199,8 +199,7 @@ func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// For now, as a workaround, you can:
-	u, err := r.db.GetUserByPhone(ctx, pgtype.Text{String: phone, Valid: true})
+	u, err := r.db.GetUserByPhoneWithHash(ctx, pgtype.Text{String: phone, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "not_found").Inc()
@@ -212,20 +211,13 @@ func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 
 	dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "success").Inc()
 
-	// Extract password hash - This is the issue! GetUserByPhone doesn't return password_hash
-	// You need to modify the SQL query to include password_hash
-
-	// Temporary workaround: get by email if available
+	// Extract password hash
 	passwordHash := ""
-	if u.Email != "" {
-		userByEmail, hash, err := r.GetUserByEmail(ctx, u.Email)
-		fmt.Println(userByEmail)
-		if err == nil {
-			passwordHash = hash
-		}
+	if u.PasswordHash.Valid {
+		passwordHash = u.PasswordHash.String
 	}
 
-	return r.mapToUserFromGetByPhone(u), passwordHash, nil
+	return r.mapToUserFromGetByPhoneWithHash(u), passwordHash, nil
 }
 
 func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error) {
@@ -561,6 +553,25 @@ func (r *userRepository) mapToUserFromGetByPasswordResetToken(u sqlc.GetUserByPa
 		IsVerified:           pgtypeBoolToBool(u.IsVerified),
 		ResetPasswordToken:   pgtypeTextToStringPtr(u.ResetPasswordToken),
 		ResetPasswordExpires: pgtypeTimestampToTimePtr(u.ResetPasswordExpires),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
+		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromGetByPhoneWithHash(u sqlc.GetUserByPhoneWithHashRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
 		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
 		LoginCount:           int(u.LoginCount.Int32),
 		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
