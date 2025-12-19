@@ -21,6 +21,15 @@ WHERE verification_token = $1
     AND verification_expires > NOW() 
     AND status != 'inactive';
 
+-- name: GetUserByPasswordResetToken :one
+SELECT id, email, phone, password_hash, role, status, is_verified, 
+    reset_password_token, reset_password_expires, last_login, login_count, 
+    is_sms_only, sms_consent_given, popia_consent_given, 
+    profile_completion_percentage, created_at, updated_at
+FROM users
+WHERE reset_password_token = $1 
+    AND reset_password_expires > NOW() 
+    AND status != 'inactive';
 
 -- name: GetUserByEmail :one
 SELECT id, email, phone, password_hash, role, status, is_verified, 
