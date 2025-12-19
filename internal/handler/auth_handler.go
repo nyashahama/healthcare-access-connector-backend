@@ -256,6 +256,29 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, response)
 }
 
+// VerifyEmail handles email verification
+func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Verification token is required",
+		})
+		return
+	}
+
+	if err := h.authService.VerifyEmail(ctx, token); err != nil {
+		respondError(w, h.logger, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "Email verified successfully",
+	})
+}
+
 // RequestPasswordReset requests password reset
 // @Summary Request password reset
 // @Description Send password reset link to email or SMS to phone
