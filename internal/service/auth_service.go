@@ -404,6 +404,17 @@ func (s *authService) RefreshToken(ctx context.Context, tokenString string) (str
 	return newToken, expiresAt, nil
 }
 
+// Logout handles user logout
+func (s *authService) Logout(ctx context.Context, tokenString string, userID uuid.UUID) error {
+	if err := s.sessionRepo.DeleteSession(ctx, tokenString); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to delete session")
+		return domain.NewAppError(err, "Logout failed", 500)
+	}
+
+	s.logger.Info().Str("user_id", userID.String()).Msg("User logged out successfully")
+	return nil
+}
+
 // generateToken creates a JWT token for a user
 func (s *authService) generateToken(user domain.User, expiresAt time.Time) (string, error) {
 	email := ""
