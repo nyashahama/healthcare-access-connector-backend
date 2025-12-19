@@ -144,22 +144,35 @@ func (s *Server) setupRoutes() http.Handler {
 
 	// API routes
 	r.Route("/api/v1", func(r chi.Router) {
-		// Public routes
-		r.Post("/register", s.authHandler.Register)
-		r.Post("/login", s.authHandler.Login)
+		// Public authentication routes
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/register", s.authHandler.Register)
+			r.Post("/login", s.authHandler.Login)
+			r.Get("/verify-email", s.authHandler.VerifyEmail) // ?token=xxx
+			r.Post("/password/reset-request", s.authHandler.RequestPasswordReset)
+			r.Post("/password/reset", s.authHandler.ResetPassword)
+		})
 
-		// Protected routes
+		// Protected routes - require authentication
 		r.Group(func(r chi.Router) {
-			// Require authentication
 			r.Use(middleware.AuthMiddleware(s.authService, s.logger))
 
-			// User routes
-			r.Get("/users/{id}", s.authHandler.GetProfile)
-			r.Post("/auth/refresh", s.authHandler.RefreshToken)
+			// Auth management (authenticated)
+			r.Route("/auth", func(r chi.Router) {
+				r.Post("/refresh", s.authHandler.RefreshToken)
+				r.Post("/logout", s.authHandler.Logout)
+			})
+
+			// User profile routes
+			r.Route("/users/{id}", func(r chi.Router) {
+				r.Get("/", s.authHandler.GetProfile)
+				r.Put("/password", s.authHandler.UpdatePassword)
+				r.Get("/consent", s.authHandler.GetConsent)
+			})
 
 			// Admin routes
 			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireRole("admin"))
+				r.Use(middleware.RequireRole("system_admin"))
 				// Add admin-only routes here
 			})
 		})
