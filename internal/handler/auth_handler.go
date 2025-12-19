@@ -4,7 +4,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -373,12 +372,10 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 // @Router /api/v1/users/{id}/password [put]
 func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-	fmt.Println(ctx)
 	defer cancel()
 
 	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
-	fmt.Print(userID)
 	if err != nil {
 		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid user ID format",
@@ -394,7 +391,6 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate input
 	v := validator.New()
 	v.ValidateRequired("current_password", req.CurrentPassword)
 	v.ValidateRequired("new_password", req.NewPassword)
@@ -405,14 +401,11 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update password
-	// Note: You'll need to add UpdatePassword method to UserService interface
-	// For now, we'll call auth service
-	// err = h.userService.UpdatePassword(ctx, userID, req.CurrentPassword, req.NewPassword)
-	// if err != nil {
-	//     respondError(w, h.logger, err)
-	//     return
-	// }
+	err = h.userService.UpdatePassword(ctx, userID, req.CurrentPassword, req.NewPassword)
+	if err != nil {
+		respondError(w, h.logger, err)
+		return
+	}
 
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "Password updated successfully",
