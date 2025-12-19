@@ -13,20 +13,29 @@ import (
 
 // UserRepository defines methods for user data access
 type UserRepository interface {
+	// Basic CRUD
 	CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error)
-	GetUserByVerificationToken(ctx context.Context, token string) (domain.User, string, error)
-	GetUserByPasswordResetToken(ctx context.Context, token string) (domain.User, string, error)
-	GetUserByEmail(ctx context.Context, email string) (domain.User, string, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error)
+	GetUserByEmail(ctx context.Context, email string) (domain.User, string, error)
 	GetUserByPhone(ctx context.Context, phone string) (domain.User, error)
 	UpdateUser(ctx context.Context, user domain.User) error
-	UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error
-	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
-	VerifyUser(ctx context.Context, id uuid.UUID) error
+	DeactivateUser(ctx context.Context, id uuid.UUID) error
+
+	// Authentication & Verification
+	GetUserByVerificationToken(ctx context.Context, token string) (domain.User, string, error)
+	GetUserByPasswordResetToken(ctx context.Context, token string) (domain.User, string, error)
 	SetVerificationToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
 	SetPasswordResetToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
+	VerifyUser(ctx context.Context, id uuid.UUID) error
+
+	// Password Management
 	UpdateUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
-	DeactivateUser(ctx context.Context, id uuid.UUID) error
+
+	// Status Management
+	UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error
+	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
+
+	// Listing
 	ListUsers(ctx context.Context, role string, limit, offset int) ([]domain.User, error)
 	CountUsers(ctx context.Context, role string) (int64, error)
 }
