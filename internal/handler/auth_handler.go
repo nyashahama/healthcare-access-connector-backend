@@ -279,6 +279,39 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ResetPassword resets password with token
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	var req dto.ResetPasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	v := validator.New()
+	v.ValidateRequired("token", req.Token)
+	v.ValidateRequired("new_password", req.NewPassword)
+	v.ValidatePassword("new_password", req.NewPassword)
+
+	if !v.Valid() {
+		respondValidationError(w, v.Errors())
+		return
+	}
+
+	if err := h.authService.ResetPassword(ctx, req.Token, req.NewPassword); err != nil {
+		respondError(w, h.logger, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "Password reset successfully",
+	})
+}
+
 // RequestPasswordReset requests password reset
 // @Summary Request password reset
 // @Description Send password reset link to email or SMS to phone
@@ -443,41 +476,6 @@ func (h *AuthHandler) GetConsent(w http.ResponseWriter, r *http.Request) {
 // @Failure 401 {object} dto.ErrorResponse
 // @Failure 500 {object} dto.ErrorResponse
 // @Router /api/v1/auth/logout [post]
-func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-	defer cancel()
-
-	// Get token from Authorization header
-	tokenString := extractToken(r)
-	if tokenString == "" {
-		respondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "Missing authorization token",
-		})
-		return
-	}
-
-	// Validate token to get user ID
-	claims, err := h.authService.ValidateToken(ctx, tokenString)
-	fmt.Println(claims)
-	if err != nil {
-		// Token might already be invalid, still return success
-		respondJSON(w, http.StatusOK, map[string]string{
-			"message": "Logged out successfully",
-		})
-		return
-	}
-
-	// Delete session (you'll need to add DeleteSession method to auth service)
-	// For now, just return success
-	// if err := h.authService.Logout(ctx, tokenString, claims.UserID); err != nil {
-	//     respondError(w, h.logger, err)
-	//     return
-	// }
-
-	respondJSON(w, http.StatusOK, map[string]string{
-		"message": "Logged out successfully",
-	})
-}
 
 // extractToken extracts JWT token from Authorization header
 func extractToken(r *http.Request) string {

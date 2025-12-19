@@ -147,6 +147,11 @@ type PasswordUpdateRequest struct {
 	NewPassword     string `json:"new_password"`
 }
 
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
+}
+
 // ConsentResponse represents consent settings
 type ConsentResponse struct {
 	HealthDataConsent         bool       `json:"health_data_consent"`
