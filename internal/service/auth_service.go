@@ -562,6 +562,44 @@ func (s *authService) RequestPasswordReset(ctx context.Context, identifier strin
 
 // ResetPassword resets password with token
 func (s *authService) ResetPassword(ctx context.Context, token, newPassword string) error {
-	// This would require adding GetUserByPasswordResetToken to repository
-	return errors.New("not implemented")
+	user, _, err := s.userRepo.GetUserByPasswordResetToken(ctx, token)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return domain.NewAppError(domain.ErrInvalidToken, "Invalid or expired reset token", 400)
+		}
+		s.logger.Error().Err(err).Msg("Failed to get user by reset token")
+		return domain.NewAppError(err, "Password reset failed", 500)
+	}
+
+	// Hash new password
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to hash new password")
+		return domain.NewAppError(err, "Password reset failed", 500)
+	}
+
+	// Update password
+	if err := s.userRepo.UpdateUserPassword(ctx, user.ID, string(hash)); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to update password")
+		return domain.NewAppError(err, "Password reset failed", 500)
+	}
+
+	// Delete all user sessions
+	if err := s.sessionRepo.DeleteUserSessions(ctx, user.ID); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to delete user sessions")
+	}
+
+	// Send password changed notification
+	if user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
+		go func() {
+			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			// You'll need to implement SendPasswordChangedEmail
+			_ = emailCtx
+		}()
+	}
+
+	s.logger.Info().Str("user_id", user.ID.String()).Msg("Password reset successfully")
+	return nil
 }
