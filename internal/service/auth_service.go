@@ -443,8 +443,76 @@ func (s *authService) generateToken(user domain.User, expiresAt time.Time) (stri
 // VerifyEmail verifies user email with token
 func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 	// Get user by verification token
-	// This would require adding GetUserByVerificationToken to repository
-	return errors.New("not implemented")
+	user, _, err := s.userRepo.GetUserByVerificationToken(ctx, token)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return domain.NewAppError(domain.ErrInvalidToken, "Invalid or expired verification token", 400)
+		}
+		s.logger.Error().Err(err).Msg("Failed to get user by verification token")
+		return domain.NewAppError(err, "Verification failed", 500)
+	}
+
+	// Check if token is expired
+	if user.VerificationExpires != nil && user.VerificationExpires.Before(time.Now()) {
+		return domain.NewAppError(domain.ErrInvalidToken, "Verification token has expired", 400)
+	}
+
+	// Check if already verified
+	if user.IsVerified {
+		return domain.NewAppError(domain.ErrValidation, "Email already verified", 400)
+	}
+
+	// Verify user
+	if err := s.userRepo.VerifyUser(ctx, user.ID); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to verify user")
+		return domain.NewAppError(err, "Verification failed", 500)
+	}
+
+	// Update user status to active
+	if err := s.userRepo.UpdateUserStatus(ctx, user.ID, "active"); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to update user status")
+	}
+
+	// Send welcome email
+	if user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
+		go func() {
+			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			// Extract username from email or use a default
+			username := "User"
+			if user.Email != nil && *user.Email != "" {
+				parts := strings.Split(*user.Email, "@")
+				if len(parts) > 0 && parts[0] != "" {
+					username = parts[0]
+				}
+			}
+
+			if err := s.emailService.SendWelcomeEmail(emailCtx, *user.Email, username); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send welcome email")
+			}
+		}()
+	}
+
+	// Publish email verified event
+	if s.broker != nil && s.broker.IsAvailable() {
+		event := map[string]interface{}{
+			"user_id":   user.ID.String(),
+			"email":     user.Email,
+			"role":      user.Role,
+			"timestamp": time.Now().UTC(),
+		}
+		if err := s.broker.PublishJSON("user.email_verified", event); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to publish email verified event")
+		}
+	}
+
+	s.logger.Info().
+		Str("user_id", user.ID.String()).
+		Str("email", *user.Email).
+		Msg("Email verified successfully")
+
+	return nil
 }
 
 // RequestPasswordReset requests password reset
