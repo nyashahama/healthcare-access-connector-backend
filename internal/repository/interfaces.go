@@ -15,6 +15,7 @@ import (
 type UserRepository interface {
 	CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error)
 	GetUserByVerificationToken(ctx context.Context, token string) (domain.User, string, error)
+	GetUserByPasswordResetToken(ctx context.Context, token string) (domain.User, string, error)
 	GetUserByEmail(ctx context.Context, email string) (domain.User, string, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error)
 	GetUserByPhone(ctx context.Context, phone string) (domain.User, error)
