@@ -133,7 +133,7 @@ The Team`, resetURL)
 
 // RenderVerification generates email verification email
 func (tm *TemplateManager) RenderVerification(verificationToken string) (subject, text, html string) {
-	verifyURL := fmt.Sprintf("https://yourdomain.com/verify-email?token=%s", verificationToken)
+	verifyURL := fmt.Sprintf("https://healthcare-access-connector-web.vercel.app/verify-email?token=%s", verificationToken)
 
 	subject = "Please Verify Your Email Address"
 

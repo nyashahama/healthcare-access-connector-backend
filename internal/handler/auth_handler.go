@@ -65,21 +65,13 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	// Validate input
 	v := validator.New()
 
-	// Check at least email or phone is provided
-	if req.Email == "" && req.Phone == "" {
-		v.AddError("email", "Email or phone is required")
-		v.AddError("phone", "Email or phone is required")
-	} else {
-		if req.Email != "" {
-			v.ValidateEmail("email", req.Email)
-		}
-		if req.Phone != "" {
-			v.ValidatePhone("phone", req.Phone)
-		}
+	if req.Email != "" {
+		v.ValidateEmail("email", req.Email)
 	}
-
+	if req.Phone != "" {
+		v.ValidatePhone("phone", req.Phone)
+	}
 	v.ValidatePassword("password", req.Password)
-
 	if req.Role != "" {
 		v.ValidateRole("role", req.Role)
 	}

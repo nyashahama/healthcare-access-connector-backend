@@ -47,7 +47,7 @@ func (v *Validator) Errors() []ValidationError {
 func (v *Validator) ValidateEmail(field, email string) {
 	email = strings.TrimSpace(email)
 	if email == "" {
-		// Email is optional (can use phone instead), so don't add error if empty
+		v.AddError(field, "is required")
 		return
 	}
 	if _, err := mail.ParseAddress(email); err != nil {
@@ -55,17 +55,14 @@ func (v *Validator) ValidateEmail(field, email string) {
 	}
 }
 
+// ValidatePhone checks if a phone number is valid
 func (v *Validator) ValidatePhone(field, phone string) {
-	phone = strings.TrimSpace(phone)
 	if phone == "" {
-		// Phone is optional (can use email instead), so don't add error if empty
 		return
 	}
-	// Basic phone validation - you might want to adjust this for your needs
-	// This regex allows international format: + followed by 1-15 digits
 	phoneRegex := regexp.MustCompile(`^\+?[1-9]\d{1,14}$`)
 	if !phoneRegex.MatchString(phone) {
-		v.AddError(field, "is not a valid phone number")
+		v.AddError(field, "must be a valid phone number")
 	}
 }
 
@@ -87,8 +84,7 @@ func (v *Validator) ValidatePassword(field, password string) {
 }
 
 func (v *Validator) ValidateRole(field, role string) {
-	// Updated to match your application's roles from auth_service.go
-	validRoles := map[string]bool{
+	allowedRoles := map[string]bool{
 		"patient":        true,
 		"caregiver":      true,
 		"provider_staff": true,
@@ -101,7 +97,8 @@ func (v *Validator) ValidateRole(field, role string) {
 		// Empty role is allowed - service will default to "patient"
 		return
 	}
-	if !validRoles[role] {
+
+	if !allowedRoles[role] {
 		v.AddError(field, "must be one of: patient, caregiver, provider_staff, clinic_admin, system_admin, ngo_partner")
 	}
 }
