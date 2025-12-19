@@ -89,6 +89,34 @@ func (r *userRepository) CreateUser(ctx context.Context, user domain.User, passw
 	return r.mapToUserFromCreate(created), nil
 }
 
+// GetUserByVerificationToken gets user by verification token
+func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token string) (domain.User, string, error) {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	u, err := r.db.GetUserByVerificationToken(ctx, pgtype.Text{String: token, Valid: true})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			dbQueryTotal.WithLabelValues("get_user_by_verification_token", "not_found").Inc()
+			return domain.User{}, "", domain.ErrUserNotFound
+		}
+		dbQueryTotal.WithLabelValues("get_user_by_verification_token", "error").Inc()
+		return domain.User{}, "", r.handleError(err, "get user by verification token")
+	}
+
+	dbQueryTotal.WithLabelValues("get_user_by_verification_token", "success").Inc()
+
+	// Extract password hash
+	passwordHash := ""
+	if u.PasswordHash.Valid {
+		passwordHash = u.PasswordHash.String
+	}
+
+	return r.mapToUserFromGetByVerificationToken(u), passwordHash, nil
+}
+
 func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (domain.User, string, error) {
 	start := time.Now()
 	defer func() {
@@ -436,6 +464,27 @@ func (r *userRepository) mapToUserFromList(u sqlc.ListUsersByRoleRow) domain.Use
 		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
 		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
 		CreatedAt:            u.CreatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromGetByVerificationToken(u sqlc.GetUserByVerificationTokenRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		VerificationToken:    pgtypeTextToStringPtr(u.VerificationToken),
+		VerificationExpires:  pgtypeTimestampToTimePtr(u.VerificationExpires),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
+		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
 	}
 }
 
