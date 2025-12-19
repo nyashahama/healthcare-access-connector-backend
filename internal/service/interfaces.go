@@ -13,6 +13,7 @@ import (
 type AuthService interface {
 	Register(ctx context.Context, email, phone, password, role string) (domain.User, error)
 	Login(ctx context.Context, identifier, password string) (string, time.Time, error)
+	Logout(ctx context.Context, tokenString string, userID uuid.UUID) error
 	ValidateToken(ctx context.Context, token string) (*TokenClaims, error)
 	RefreshToken(ctx context.Context, token string) (string, time.Time, error)
 	RequestPasswordReset(ctx context.Context, identifier string) error

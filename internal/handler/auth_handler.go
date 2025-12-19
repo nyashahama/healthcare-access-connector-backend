@@ -146,6 +146,37 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, response)
 }
 
+// Logout handles user logout
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	tokenString := extractToken(r)
+	if tokenString == "" {
+		respondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
+			Error: "Missing authorization token",
+		})
+		return
+	}
+
+	claims, err := h.authService.ValidateToken(ctx, tokenString)
+	if err != nil {
+		respondJSON(w, http.StatusOK, map[string]string{
+			"message": "Logged out successfully",
+		})
+		return
+	}
+
+	if err := h.authService.Logout(ctx, tokenString, claims.UserID); err != nil {
+		respondError(w, h.logger, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "Logged out successfully",
+	})
+}
+
 // GetProfile retrieves user's profile
 // @Summary Get user profile
 // @Description Get user profile with patient information if applicable
