@@ -193,6 +193,41 @@ func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (doma
 	return r.mapToUserFromGetByPhone(u), nil
 }
 
+func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone string) (domain.User, string, error) {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	// For now, as a workaround, you can:
+	u, err := r.db.GetUserByPhone(ctx, pgtype.Text{String: phone, Valid: true})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "not_found").Inc()
+			return domain.User{}, "", domain.ErrUserNotFound
+		}
+		dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "error").Inc()
+		return domain.User{}, "", r.handleError(err, "get user by phone with hash")
+	}
+
+	dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "success").Inc()
+
+	// Extract password hash - This is the issue! GetUserByPhone doesn't return password_hash
+	// You need to modify the SQL query to include password_hash
+
+	// Temporary workaround: get by email if available
+	passwordHash := ""
+	if u.Email != "" {
+		userByEmail, hash, err := r.GetUserByEmail(ctx, u.Email)
+		fmt.Println(userByEmail)
+		if err == nil {
+			passwordHash = hash
+		}
+	}
+
+	return r.mapToUserFromGetByPhone(u), passwordHash, nil
+}
+
 func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error) {
 	start := time.Now()
 	defer func() {

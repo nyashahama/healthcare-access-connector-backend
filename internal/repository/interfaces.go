@@ -18,6 +18,7 @@ type UserRepository interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error)
 	GetUserByEmail(ctx context.Context, email string) (domain.User, string, error)
 	GetUserByPhone(ctx context.Context, phone string) (domain.User, error)
+	GetUserByPhoneWithHash(ctx context.Context, phone string) (domain.User, string, error)
 	UpdateUser(ctx context.Context, user domain.User) error
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
 

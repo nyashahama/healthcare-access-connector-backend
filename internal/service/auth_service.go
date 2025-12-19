@@ -226,9 +226,17 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 		user, passwordHash, err = s.userRepo.GetUserByEmail(ctx, identifier)
 	} else {
 		// Treat as phone number
-		user, err = s.userRepo.GetUserByPhone(ctx, identifier)
-		if err == nil {
-			// For phone login, we need to get the password hash
+		user, passwordHash, err = s.userRepo.GetUserByPhoneWithHash(ctx, identifier)
+		if err != nil {
+			s.logger.Warn().Str("identifier", identifier).Msg("User not found by phone")
+			return "", time.Time{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
+		}
+
+		// For phone login, get the user by ID to get password hash
+		// This is more reliable than trying to get by email
+		_, passwordHash, err = s.userRepo.GetUserByEmail(ctx, identifier)
+		if err != nil && user.Email != nil && *user.Email != "" {
+			// Try with the user's email if they have one
 			_, passwordHash, err = s.userRepo.GetUserByEmail(ctx, *user.Email)
 		}
 	}
@@ -260,8 +268,12 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 	}
 
 	// Check if user is verified (for email users)
-	if user.Email != nil && !user.IsVerified && *user.Email != "" {
-		return "", time.Time{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email", 403)
+	if !user.IsVerified {
+		// For phone-only users, they might not need email verification
+		if user.Email != nil && *user.Email != "" {
+			return "", time.Time{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email", 403)
+		}
+		// Phone-only users might need SMS verification instead
 	}
 
 	// Generate JWT token

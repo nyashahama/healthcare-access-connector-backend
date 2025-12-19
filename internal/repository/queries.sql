@@ -48,6 +48,14 @@ SELECT id, email, phone, password_hash, role, status, is_verified,
 FROM users
 WHERE phone = $1 AND status != 'inactive';
 
+-- name: GetUserByPhoneWithHash :one
+SELECT id, email, phone, password_hash, role, status, is_verified, 
+    last_login, login_count, is_sms_only, sms_consent_given, 
+    popia_consent_given, profile_completion_percentage, 
+    created_at, updated_at
+FROM users
+WHERE phone = $1 AND status != 'inactive';
+
 
 -- name: GetUserByID :one
 SELECT id, email, phone, role, status, is_verified, last_login, 
