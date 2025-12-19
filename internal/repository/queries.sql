@@ -62,6 +62,10 @@ UPDATE users
 SET last_login = NOW(), login_count = login_count + 1
 WHERE id = $1;
 
+-- name: UpdateSessionToken :exec
+UPDATE user_sessions
+SET session_token = $2, expires_at = $3
+WHERE id = $1;
 
 -- name: UpdateUserStatus :exec
 UPDATE users
