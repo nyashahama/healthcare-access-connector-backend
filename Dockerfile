@@ -2,17 +2,18 @@
 FROM golang:1.24-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache git make
+RUN apk add --no-cache git make ca-certificates
 
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files first (better caching)
 COPY go.mod go.sum ./
 RUN go mod download
 RUN go mod verify
 
-# Copy source code
-COPY . .
+# Copy internal directory structure
+COPY internal/ ./internal/
+COPY cmd/ ./cmd/
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
@@ -20,6 +21,9 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -a -installsuffix cgo \
     -o /app/api \
     ./cmd/api/main.go
+
+# Verify the binary was created
+RUN ls -lh /app/api
 
 # Runtime stage
 FROM debian:12-slim
@@ -39,6 +43,9 @@ WORKDIR /home/appuser
 
 # Copy binary from builder
 COPY --from=builder --chown=appuser:appuser /app/api ./api
+
+# Verify binary is executable
+RUN ls -lh ./api
 
 # Switch to non-root user
 USER appuser

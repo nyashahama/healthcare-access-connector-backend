@@ -128,6 +128,41 @@ docker-exec: ## Execute command in API container (usage: make docker-exec cmd="l
 docker-shell: ## Open shell in API container
 	docker-compose exec api sh
 
+docker-rebuild: ## Force rebuild Docker image without cache
+	@echo "${YELLOW}Removing old images...${RESET}"
+	docker-compose down
+	docker-compose rm -f api || true
+	docker rmi $(APP_NAME)-api || true
+	docker rmi $(DOCKER_IMAGE) || true
+	@echo "${GREEN}Building fresh image (no cache)...${RESET}"
+	docker-compose build --no-cache api
+	@echo "${GREEN}Starting services...${RESET}"
+	docker-compose up -d
+	@echo "${GREEN}Waiting for services to start...${RESET}"
+	sleep 5
+	@echo "${GREEN}Testing health endpoint...${RESET}"
+	curl http://localhost:8080/health || echo "Health check failed"
+
+docker-clean: ## Clean all Docker resources for this project
+	@echo "${YELLOW}Warning: This will remove all containers, images, and volumes${RESET}"
+	docker-compose down -v --remove-orphans
+	docker-compose rm -f
+	docker rmi $(APP_NAME)-api || true
+	docker rmi $(DOCKER_IMAGE) || true
+	docker volume prune -f
+	@echo "${GREEN}Cleaned!${RESET}"
+
+docker-verify: ## Verify Docker is running the correct code
+	@echo "${GREEN}Checking what version is running...${RESET}"
+	@echo "1. Health check:"
+	@curl -s http://localhost:8080/health | jq . || echo "Failed"
+	@echo "\n2. Container logs (last 20 lines):"
+	@docker-compose logs --tail=20 api
+	@echo "\n3. Binary info inside container:"
+	@docker-compose exec api ls -lh /home/appuser/api
+	@echo "\n4. Container created time:"
+	@docker-compose ps api
+
 ## Code Quality
 
 lint: ## Run linter
