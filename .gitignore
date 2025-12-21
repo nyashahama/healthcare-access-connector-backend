@@ -1,26 +1,22 @@
 # Binaries
+bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
 # Test binary, built with `go test -c`
 *.test
-
 # Output of the go coverage tool
 *.out
 coverage.html
 coverage.out
-
 # Go workspace file
 go.work
-
 # Environment variables
 .env
 .env.local
 .env.*.local
-
 # IDEs
 .vscode/
 .idea/
@@ -28,27 +24,19 @@ go.work
 *.swo
 *~
 .DS_Store
-
 # Temporary files
 tmp/
 temp/
 *.log
-
 # Database
 *.db
 *.sqlite
 *.sqlite3
-
-# Generated files
-internal/repository/sqlc/
-
 # Docker volumes
 postgres_data/
 redis_data/
-
 # Build artifacts
 dist/
 build/
-
 # Air (hot reload)
 tmp/
