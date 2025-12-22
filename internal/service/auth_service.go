@@ -585,14 +585,25 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 		s.logger.Warn().Err(err).Msg("Failed to delete user sessions")
 	}
 
+	// Invalidate all caches for this user
+	if s.cache != nil {
+		if user.Email != nil {
+			s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+		}
+		if user.Phone != nil {
+			s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone))
+		}
+	}
+
 	// Send password changed notification
 	if user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
 		go func() {
 			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			// You'll need to implement SendPasswordChangedEmail
-			_ = emailCtx
+			if err := s.emailService.SendPasswordChangedEmail(emailCtx, *user.Email, *user.Email); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to reset password ")
+			}
 		}()
 	}
 
