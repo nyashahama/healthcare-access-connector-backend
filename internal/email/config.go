@@ -10,7 +10,7 @@ import (
 func ConfigFromEnv() *Config {
 	cfg := &Config{
 		Provider:    getEnv("EMAIL_PROVIDER", "ses"),
-		FromAddress: getEnv("EMAIL_FROM_ADDRESS", "noreply@yourdomain.com"),
+		FromAddress: getEnv("EMAIL_FROM_ADDRESS", "noreply@hac.com"),
 		FromName:    getEnv("EMAIL_FROM_NAME", "Your App"),
 
 		// AWS SES
@@ -24,6 +24,9 @@ func ConfigFromEnv() *Config {
 		SMTPUsername: getEnv("SMTP_USERNAME", ""),
 		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
 		SMTPUseTLS:   getEnvAsBool("SMTP_USE_TLS", false),
+
+		// Resend
+		ResendAPIKey: getEnv("RESEND_API_KEY", ""),
 	}
 
 	return cfg

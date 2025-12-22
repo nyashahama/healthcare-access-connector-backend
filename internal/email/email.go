@@ -64,6 +64,7 @@ type Config struct {
 	SMTPUsername string
 	SMTPPassword string
 	SMTPUseTLS   bool
+	ResendAPIKey string
 }
 
 // Validate validates email configuration
