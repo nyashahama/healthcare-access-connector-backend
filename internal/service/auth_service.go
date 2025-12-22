@@ -363,21 +363,21 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*T
 }
 
 // RefreshToken refreshes JWT token
-func (s *authService) RefreshToken(ctx context.Context, tokenString string) (string, time.Time, error) {
+func (s *authService) RefreshToken(ctx context.Context, tokenString string) (string, time.Time, domain.User, error) {
 	claims, err := s.ValidateToken(ctx, tokenString)
 	if err != nil && !errors.Is(err, domain.ErrExpiredToken) {
-		return "", time.Time{}, err
+		return "", time.Time{}, domain.User{}, err
 	}
 
 	user, err := s.userRepo.GetUserByID(ctx, claims.UserID)
 	if err != nil {
-		return "", time.Time{}, domain.NewAppError(err, "User not found", 404)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(err, "User not found", 404)
 	}
 
 	expiresAt := time.Now().Add(s.jwtExpiry)
 	newToken, err := s.generateToken(user, expiresAt)
 	if err != nil {
-		return "", time.Time{}, domain.NewAppError(err, "Failed to generate new token", 500)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(err, "Failed to generate new token", 500)
 	}
 
 	if err := s.sessionRepo.DeleteSession(ctx, tokenString); err != nil {
@@ -397,7 +397,7 @@ func (s *authService) RefreshToken(ctx context.Context, tokenString string) (str
 		s.logger.Warn().Err(err).Msg("Failed to create new session record")
 	}
 
-	return newToken, expiresAt, nil
+	return newToken, expiresAt, user, nil
 }
 
 // Logout handles user logout

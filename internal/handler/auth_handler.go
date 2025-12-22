@@ -132,31 +132,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user profile for response - with proper error handling
-	// claims, err := h.authService.ValidateToken(ctx, token)
-	// if err != nil {
-	// 	h.logger.Error().Err(err).Msg("Failed to validate token after login")
-	// 	// Still return the token even if we can't get the user profile
-	// 	respondJSON(w, http.StatusOK, dto.LoginResponse{
-	// 		Token:     token,
-	// 		ExpiresAt: expiresAt,
-	// 		User:      dto.UserResponse{}, // Empty user response
-	// 	})
-	// 	return
-	// }
-
-	// user, err := h.userService.GetUserByID(ctx, claims.UserID)
-	// if err != nil {
-	// 	h.logger.Error().Err(err).Msg("Failed to get user after login")
-	// 	// Still return the token even if we can't get the user profile
-	// 	respondJSON(w, http.StatusOK, dto.LoginResponse{
-	// 		Token:     token,
-	// 		ExpiresAt: expiresAt,
-	// 		User:      dto.UserResponse{}, // Empty user response
-	// 	})
-	// 	return
-	// }
-
 	response := dto.LoginResponse{
 		Token:     token,
 		ExpiresAt: expiresAt,
@@ -257,15 +232,11 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Refresh token
-	newToken, expiresAt, err := h.authService.RefreshToken(ctx, tokenString)
+	newToken, expiresAt, user, err := h.authService.RefreshToken(ctx, tokenString)
 	if err != nil {
 		respondError(w, h.logger, err)
 		return
 	}
-
-	// Get user claims
-	claims, _ := h.authService.ValidateToken(ctx, newToken)
-	user, _ := h.userService.GetUserByID(ctx, claims.UserID)
 
 	response := dto.LoginResponse{
 		Token:     newToken,

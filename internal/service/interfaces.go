@@ -15,7 +15,7 @@ type AuthService interface {
 	Login(ctx context.Context, identifier, password string) (string, time.Time, domain.User, error)
 	Logout(ctx context.Context, tokenString string, userID uuid.UUID) error
 	ValidateToken(ctx context.Context, token string) (*TokenClaims, error)
-	RefreshToken(ctx context.Context, token string) (string, time.Time, error)
+	RefreshToken(ctx context.Context, tokenString string) (string, time.Time, domain.User, error)
 	RequestPasswordReset(ctx context.Context, identifier string) error
 	VerifyEmail(ctx context.Context, token string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
