@@ -104,6 +104,10 @@ func (c *redisCache) Ping(ctx context.Context) error {
 	return nil
 }
 
+func (c *redisCache) IsAvailable() bool {
+	return c.redis != nil && c.useRedis
+}
+
 // getFromRedis retrieves value from Redis
 func (c *redisCache) getFromRedis(ctx context.Context, key string, dest interface{}) error {
 	val, err := c.redis.Get(ctx, key).Result()

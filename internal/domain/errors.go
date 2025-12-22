@@ -84,6 +84,8 @@ var (
 	// Notification errors
 	ErrNotificationFailed  = errors.New("notification delivery failed")
 	ErrPreferencesNotFound = errors.New("notification preferences not found")
+
+	ErrRateLimited = errors.New("rate limited")
 )
 
 // AppError represents an application-specific error with additional context
@@ -221,6 +223,9 @@ func HTTPStatusCode(err error) int {
 		errors.Is(err, ErrNotificationFailed):
 		return http.StatusServiceUnavailable
 
+	case errors.Is(err, ErrRateLimited):
+		return http.StatusTooManyRequests
+
 	// 500 Internal Server Error (default)
 	default:
 		return http.StatusInternalServerError
@@ -329,6 +334,9 @@ func ErrorMessage(err error) string {
 		return "Resource not found"
 	case errors.Is(err, ErrUnauthorized):
 		return "Authentication required"
+
+	case errors.Is(err, ErrRateLimited):
+		return "Too many requests. Please try again later"
 
 	// Default
 	default:

@@ -103,6 +103,7 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.JWTSecret,
 		cfg.JWTExpiry,
 		cfg.SMSEnabled,
+		cfg.BcryptCost,
 	)
 
 	userService := service.NewUserService(

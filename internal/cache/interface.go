@@ -30,4 +30,7 @@ type Service interface {
 
 	// Ping checks if the cache is available
 	Ping(ctx context.Context) error
+
+	// IsAvailable checks if the cache service is available
+	IsAvailable() bool
 }
