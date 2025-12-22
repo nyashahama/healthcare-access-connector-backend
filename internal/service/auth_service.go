@@ -210,10 +210,10 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 }
 
 // Login handles user login with email or phone
-func (s *authService) Login(ctx context.Context, identifier, password string) (string, time.Time, error) {
+func (s *authService) Login(ctx context.Context, identifier, password string) (string, time.Time, domain.User, error) {
 	// Validate input
 	if identifier == "" || password == "" {
-		return "", time.Time{}, domain.NewAppError(domain.ErrValidation, "Identifier and password are required", 400)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrValidation, "Identifier and password are required", 400)
 	}
 
 	// Determine if identifier is email or phone
@@ -232,18 +232,18 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			s.logger.Warn().Str("identifier", identifier).Msg("User not found")
-			return "", time.Time{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
 		}
+		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
 		s.logger.Error().Err(err).Msg("Failed to get user")
-		return "", time.Time{}, domain.NewAppError(err, "Login failed", 500)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(err, "Login failed", 500)
 	}
 
 	// Check user status
 	if user.Status == "inactive" {
-		return "", time.Time{}, domain.NewAppError(domain.ErrUserInactive, "Account is inactive", 403)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrUserInactive, "Account is inactive", 403)
 	}
 	if user.Status == "suspended" {
-		return "", time.Time{}, domain.NewAppError(domain.ErrUserSuspended, "Account is suspended", 403)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrUserSuspended, "Account is suspended", 403)
 	}
 
 	// Verify password
@@ -252,12 +252,12 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 			Str("identifier", identifier).
 			Str("user_id", user.ID.String()).
 			Msg("Invalid password attempt")
-		return "", time.Time{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
 	}
 
 	// Check if user is verified (for email users)
 	if !user.IsVerified && user.Email != nil && *user.Email != "" {
-		return "", time.Time{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email first", 403)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email first", 403)
 	}
 
 	// Generate JWT token
@@ -265,7 +265,7 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 	token, err := s.generateToken(user, expiresAt)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to generate token")
-		return "", time.Time{}, domain.NewAppError(err, "Token generation failed", 500)
+		return "", time.Time{}, domain.User{}, domain.NewAppError(err, "Token generation failed", 500)
 	}
 
 	// Update last login
@@ -304,7 +304,7 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 		Str("role", user.Role).
 		Msg("User logged in successfully")
 
-	return token, expiresAt, nil
+	return token, expiresAt, user, nil
 }
 
 // ValidateToken validates JWT token

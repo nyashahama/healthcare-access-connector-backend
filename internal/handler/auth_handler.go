@@ -126,36 +126,36 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Authenticate user
-	token, expiresAt, err := h.authService.Login(ctx, req.Identifier, req.Password)
+	token, expiresAt, user, err := h.authService.Login(ctx, req.Identifier, req.Password)
 	if err != nil {
 		respondError(w, h.logger, err)
 		return
 	}
 
 	// Get user profile for response - with proper error handling
-	claims, err := h.authService.ValidateToken(ctx, token)
-	if err != nil {
-		h.logger.Error().Err(err).Msg("Failed to validate token after login")
-		// Still return the token even if we can't get the user profile
-		respondJSON(w, http.StatusOK, dto.LoginResponse{
-			Token:     token,
-			ExpiresAt: expiresAt,
-			User:      dto.UserResponse{}, // Empty user response
-		})
-		return
-	}
+	// claims, err := h.authService.ValidateToken(ctx, token)
+	// if err != nil {
+	// 	h.logger.Error().Err(err).Msg("Failed to validate token after login")
+	// 	// Still return the token even if we can't get the user profile
+	// 	respondJSON(w, http.StatusOK, dto.LoginResponse{
+	// 		Token:     token,
+	// 		ExpiresAt: expiresAt,
+	// 		User:      dto.UserResponse{}, // Empty user response
+	// 	})
+	// 	return
+	// }
 
-	user, err := h.userService.GetUserByID(ctx, claims.UserID)
-	if err != nil {
-		h.logger.Error().Err(err).Msg("Failed to get user after login")
-		// Still return the token even if we can't get the user profile
-		respondJSON(w, http.StatusOK, dto.LoginResponse{
-			Token:     token,
-			ExpiresAt: expiresAt,
-			User:      dto.UserResponse{}, // Empty user response
-		})
-		return
-	}
+	// user, err := h.userService.GetUserByID(ctx, claims.UserID)
+	// if err != nil {
+	// 	h.logger.Error().Err(err).Msg("Failed to get user after login")
+	// 	// Still return the token even if we can't get the user profile
+	// 	respondJSON(w, http.StatusOK, dto.LoginResponse{
+	// 		Token:     token,
+	// 		ExpiresAt: expiresAt,
+	// 		User:      dto.UserResponse{}, // Empty user response
+	// 	})
+	// 	return
+	// }
 
 	response := dto.LoginResponse{
 		Token:     token,
