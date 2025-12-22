@@ -18,6 +18,8 @@ func NewEmailService(cfg *Config, logger *zerolog.Logger) (Service, error) {
 		return NewSESService(cfg, logger)
 	case "smtp":
 		return NewSMTPService(cfg, logger)
+	case "resend":
+		return NewResendService(cfg, logger)
 	default:
 		return nil, fmt.Errorf("unsupported email provider: %s", cfg.Provider)
 	}
