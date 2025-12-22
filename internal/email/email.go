@@ -89,8 +89,12 @@ func (c *Config) Validate() error {
 		if c.SMTPPort == 0 {
 			c.SMTPPort = 587
 		}
+	case "resend":
+		if c.ResendAPIKey == "" {
+			return fmt.Errorf("Resend API key is required")
+		}
 	default:
-		return fmt.Errorf("invalid email provider: %s (must be 'ses' or 'smtp')", c.Provider)
+		return fmt.Errorf("invalid email provider: %s (must be 'ses', 'smtp', or 'resend')", c.Provider)
 	}
 
 	return nil
