@@ -546,6 +546,26 @@ func (r *userRepository) DeleteUserOTPs(ctx context.Context, userID uuid.UUID, o
 	return nil
 }
 
+// GetOTPAttemptCount gets the number of OTP attempts in the last hour
+func (r *userRepository) GetOTPAttemptCount(ctx context.Context, userID uuid.UUID, otpType string) (int64, error) {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	count, err := r.db.GetOTPAttemptCount(ctx, sqlc.GetOTPAttemptCountParams{
+		UserID: uuidToPgtypeUUID(userID),
+		Type:   otpType,
+	})
+	if err != nil {
+		dbQueryTotal.WithLabelValues("get_otp_attempt_count", "error").Inc()
+		return 0, r.handleError(err, "get OTP attempt count")
+	}
+
+	dbQueryTotal.WithLabelValues("get_otp_attempt_count", "success").Inc()
+	return count, nil
+}
+
 // Helper functions for mapping
 
 func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
