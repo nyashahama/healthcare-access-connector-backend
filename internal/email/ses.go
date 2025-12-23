@@ -176,25 +176,13 @@ func (s *sesService) SendWelcomeEmail(ctx context.Context, to, username string) 
 }
 
 func (s *sesService) SendOTPEmail(ctx context.Context, email, otp, userID string) error {
-	subject := "Your Password Reset Code"
-	body := fmt.Sprintf(`
-Hello,
-
-Your password reset verification code is: %s
-
-This code will expire in 10 minutes.
-
-If you didn't request this code, please ignore this email or contact support immediately.
-
-Best regards,
-Healthcare Access Connector Team
-    `, otp)
+	subject, text, html := s.templates.RenderOTP(email, otp, "")
 
 	return s.SendEmail(ctx, &Message{
 		To:       []string{email},
 		Subject:  subject,
-		Body:     body,
-		HTMLBody: body,
+		Body:     text,
+		HTMLBody: html,
 	})
 }
 
