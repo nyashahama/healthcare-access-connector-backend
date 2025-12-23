@@ -988,26 +988,34 @@ func (s *authService) VerifyOTP(ctx context.Context, identifier, otp string) (st
 	}
 
 	if err != nil {
-		return "", domain.NewAppError(domain.ErrUserNotFound, "User not found", 404)
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return "", domain.NewAppError(domain.ErrInvalidOTP, "Invalid OTP code", 400)
+		}
+		return "", domain.NewAppError(err, "OTP verification failed", 500)
 	}
 
 	// Get OTP record
 	otpRecord, err := s.userRepo.GetOTP(ctx, user.ID, otp, "password_reset")
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
+			s.logger.Warn().
+				Str("user_id", user.ID.String()).
+				Str("identifier", maskIdentifier(identifier)).
+				Msg("Invalid OTP attempt")
 			return "", domain.NewAppError(domain.ErrInvalidOTP, "Invalid OTP code", 400)
 		}
+		s.logger.Error().Err(err).Msg("Failed to get OTP")
 		return "", domain.NewAppError(err, "OTP verification failed", 500)
 	}
 
-	// Check if OTP is expired
+	// Check if OTP is expired (redundant but explicit)
 	if time.Now().After(otpRecord.ExpiresAt) {
 		return "", domain.NewAppError(domain.ErrOTPExpired, "OTP has expired", 400)
 	}
 
 	// Check if OTP already used
 	if otpRecord.UsedAt != nil {
-		return "", domain.NewAppError(domain.ErrOTPAlreadyUsed, "OTP already used", 400)
+		return "", domain.NewAppError(domain.ErrOTPAlreadyUsed, "OTP has already been used", 400)
 	}
 
 	// Mark OTP as used
@@ -1020,16 +1028,10 @@ func (s *authService) VerifyOTP(ctx context.Context, identifier, otp string) (st
 	resetToken := s.generateSecureToken()
 	tokenExpires := time.Now().Add(1 * time.Hour)
 
-	// Store reset token (using existing method)
+	// Store reset token
 	if err := s.userRepo.SetPasswordResetToken(ctx, user.ID, resetToken, tokenExpires); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to set password reset token")
 		return "", domain.NewAppError(err, "Failed to process reset", 500)
-	}
-
-	// Clear OTP attempts
-	if s.cache != nil {
-		cacheKey := fmt.Sprintf("otp:attempts:%s", identifier)
-		s.cache.Delete(ctx, cacheKey)
 	}
 
 	s.logger.Info().
