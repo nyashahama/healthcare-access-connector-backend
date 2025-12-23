@@ -1097,3 +1097,36 @@ func (s *authService) generateNumericOTP(length int) string {
 	}
 	return string(b)
 }
+
+// sendOTPEmail sends OTP via email (helper function)
+func (s *authService) sendOTPEmail(ctx context.Context, email, otp, userID string) {
+	emailCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	subject := "Your Password Reset Code"
+	body := fmt.Sprintf(`
+Hello,
+
+Your password reset verification code is: %s
+
+This code will expire in 10 minutes.
+
+If you didn't request this code, please ignore this email or contact support immediately.
+
+Best regards,
+Healthcare Access Connector Team
+    `, otp)
+
+	msg := &email.Message{
+		To:      []string{email},
+		Subject: subject,
+		Body:    body,
+	}
+
+	if err := s.emailService.SendEmail(emailCtx, msg); err != nil {
+		s.logger.Error().
+			Err(err).
+			Str("user_id", userID).
+			Msg("Failed to send OTP email")
+	}
+}
