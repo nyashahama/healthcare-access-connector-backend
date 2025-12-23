@@ -175,8 +175,6 @@ func (s *sesService) SendWelcomeEmail(ctx context.Context, to, username string) 
 	})
 }
 
-// ses.go - Add this method to the sesService struct
-
 func (s *sesService) SendOTPEmail(ctx context.Context, email, otp, userID string) error {
 	subject := "Your Password Reset Code"
 	body := fmt.Sprintf(`
