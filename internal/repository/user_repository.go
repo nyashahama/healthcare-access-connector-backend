@@ -526,6 +526,26 @@ func (r *userRepository) DeleteExpiredOTPs(ctx context.Context) error {
 	return nil
 }
 
+// DeleteUserOTPs deletes all OTPs for a user and type
+func (r *userRepository) DeleteUserOTPs(ctx context.Context, userID uuid.UUID, otpType string) error {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.db.DeleteUserOTPs(ctx, sqlc.DeleteUserOTPsParams{
+		UserID: uuidToPgtypeUUID(userID),
+		Type:   otpType,
+	})
+	if err != nil {
+		dbQueryTotal.WithLabelValues("delete_user_otps", "error").Inc()
+		return r.handleError(err, "delete user OTPs")
+	}
+
+	dbQueryTotal.WithLabelValues("delete_user_otps", "success").Inc()
+	return nil
+}
+
 // Helper functions for mapping
 
 func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
