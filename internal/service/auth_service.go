@@ -1041,10 +1041,10 @@ func (s *authService) VerifyOTP(ctx context.Context, identifier, otp string) (st
 	return resetToken, nil
 }
 
-// RequestPasswordResetWithOTP combines OTP generation and sending
-func (s *authService) RequestPasswordResetWithOTP(ctx context.Context, identifier string) error {
-	return s.GenerateOTP(ctx, identifier)
-}
+// // RequestPasswordResetWithOTP combines OTP generation and sending
+// func (s *authService) RequestPasswordResetWithOTP(ctx context.Context, identifier string) error {
+// 	return s.GenerateOTP(ctx, identifier)
+// }
 
 // ResetPasswordWithOTP combines OTP verification and password reset in one call
 func (s *authService) ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error {

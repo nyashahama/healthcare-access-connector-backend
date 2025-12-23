@@ -108,3 +108,39 @@ func (v *Validator) ValidateRequired(field, value string) {
 		v.AddError(field, "is required")
 	}
 }
+
+// ValidateLength validates string length
+func (v *Validator) ValidateLength(field, value string, min, max int) {
+	length := len(strings.TrimSpace(value))
+	if length < min || length > max {
+		if min == max {
+			v.AddError(field, fmt.Sprintf("must be exactly %d characters", min))
+		} else {
+			v.AddError(field, fmt.Sprintf("must be between %d and %d characters", min, max))
+		}
+	}
+}
+
+// ValidateNumeric validates that string contains only digits
+func (v *Validator) ValidateNumeric(field, value string) {
+	numericRegex := regexp.MustCompile(`^[0-9]+$`)
+	if !numericRegex.MatchString(value) {
+		v.AddError(field, "must contain only numbers")
+	}
+}
+
+// ValidateOTP validates OTP format
+func (v *Validator) ValidateOTP(field, otp string) {
+	otp = strings.TrimSpace(otp)
+	if otp == "" {
+		v.AddError(field, "is required")
+		return
+	}
+
+	if len(otp) != 6 {
+		v.AddError(field, "must be exactly 6 digits")
+		return
+	}
+
+	v.ValidateNumeric(field, otp)
+}
