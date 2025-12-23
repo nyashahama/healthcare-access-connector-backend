@@ -39,6 +39,12 @@ type UserRepository interface {
 	// Listing
 	ListUsers(ctx context.Context, role string, limit, offset int) ([]domain.User, error)
 	CountUsers(ctx context.Context, role string) (int64, error)
+
+	// OTP
+	SaveOTP(ctx context.Context, otp domain.OTPVerification) error
+	GetOTP(ctx context.Context, userID uuid.UUID, otp, otpType string) (domain.OTPVerification, error)
+	MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedAt *time.Time) error
+	DeleteExpiredOTPs(ctx context.Context) error
 }
 
 // PatientRepository defines methods for patient profile data access

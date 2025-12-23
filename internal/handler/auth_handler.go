@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/docker/distribution/uuid"
@@ -494,16 +495,163 @@ func (h *AuthHandler) GetConsent(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, response)
 }
 
-// Logout handles user logout
-// @Summary Logout user
-// @Description Invalidate user session
+// GenerateOTP generates and sends OTP to user
+// @Summary Generate OTP for password reset
+// @Description Generate and send 6-digit OTP via email/SMS
 // @Tags auth
+// @Accept json
 // @Produce json
-// @Security BearerAuth
+// @Param request body dto.OTPRequest true "OTP request"
+// @Success 200 {object} dto.OTPResponse
+// @Failure 400 {object} dto.ErrorResponse
+// @Failure 429 {object} dto.ErrorResponse
+// @Failure 500 {object} dto.ErrorResponse
+// @Router /api/v1/auth/otp/generate [post]
+func (h *AuthHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	var req dto.OTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("identifier", req.Identifier)
+
+	if !v.Valid() {
+		respondValidationError(w, v.Errors())
+		return
+	}
+
+	// Generate OTP
+	err := h.authService.GenerateOTP(ctx, req.Identifier)
+	if err != nil {
+		respondError(w, h.logger, err)
+		return
+	}
+
+	// Always return success message for security
+	response := dto.OTPResponse{
+		Message:   "If your account exists, a verification code has been sent",
+		ExpiresIn: 10, // 10 minutes
+	}
+
+	// Determine channel for user feedback
+	if strings.Contains(req.Identifier, "@") {
+		response.Channel = "email"
+	} else {
+		response.Channel = "sms"
+	}
+
+	respondJSON(w, http.StatusOK, response)
+}
+
+// VerifyOTP verifies OTP and returns reset token
+// @Summary Verify OTP code
+// @Description Verify 6-digit OTP code for password reset
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body dto.OTPVerifyRequest true "OTP verification"
 // @Success 200 {object} map[string]string
+// @Failure 400 {object} dto.ErrorResponse
+// @Failure 401 {object} dto.ErrorResponse
+// @Failure 404 {object} dto.ErrorResponse
+// @Failure 500 {object} dto.ErrorResponse
+// @Router /api/v1/auth/otp/verify [post]
+func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	var req dto.OTPVerifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("identifier", req.Identifier)
+	v.ValidateRequired("otp", req.OTP)
+	v.ValidateLength("otp", req.OTP, 6, 6)
+	v.ValidateNumeric("otp", req.OTP)
+
+	if !v.Valid() {
+		respondValidationError(w, v.Errors())
+		return
+	}
+
+	// Verify OTP
+	resetToken, err := h.authService.VerifyOTP(ctx, req.Identifier, req.OTP)
+	if err != nil {
+		respondError(w, h.logger, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message":  "OTP verified successfully",
+		"token":    resetToken, // For backward compatibility
+		"verified": "true",
+	})
+}
+
+// ResetPasswordWithOTP resets password using OTP verification
+// @Summary Reset password with OTP
+// @Description Reset password using OTP verification (two-step process)
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body dto.PasswordResetWithOTPRequest true "Reset with OTP"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} dto.ErrorResponse
 // @Failure 401 {object} dto.ErrorResponse
 // @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/logout [post]
+// @Router /api/v1/auth/password/reset-with-otp [post]
+func (h *AuthHandler) ResetPasswordWithOTP(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	var req dto.PasswordResetWithOTPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("identifier", req.Identifier)
+	v.ValidateRequired("otp", req.OTP)
+	v.ValidateRequired("new_password", req.NewPassword)
+	v.ValidateLength("otp", req.OTP, 6, 6)
+	v.ValidateNumeric("otp", req.OTP)
+	v.ValidatePassword("new_password", req.NewPassword)
+
+	if !v.Valid() {
+		respondValidationError(w, v.Errors())
+		return
+	}
+
+	// Reset password with OTP
+	// This uses the new combined method (or you can call VerifyOTP then ResetPassword)
+	err := h.authService.ResetPasswordWithOTP(ctx, req.Identifier, req.OTP, req.NewPassword)
+	if err != nil {
+		respondError(w, h.logger, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "Password reset successfully",
+	})
+}
 
 // extractToken extracts JWT token from Authorization header
 func extractToken(r *http.Request) string {

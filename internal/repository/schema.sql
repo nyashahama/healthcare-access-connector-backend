@@ -847,6 +847,39 @@ CREATE TABLE sms_messages (
 CREATE INDEX idx_sms_conversation ON sms_messages(conversation_id, created_at);
 CREATE INDEX idx_sms_twilio_id ON sms_messages(twilio_message_id);
 
+-- ============================================
+-- OTP Verification Table
+-- ============================================
+
+CREATE TABLE otp_verifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    otp VARCHAR(6) NOT NULL,
+    type VARCHAR(50) NOT NULL, -- 'password_reset', 'email_verification'
+    channel VARCHAR(20) NOT NULL, -- 'email', 'sms'
+    expires_at TIMESTAMP NOT NULL,
+    used_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT otp_length_check CHECK (length(otp) = 6),
+    CONSTRAINT otp_type_check CHECK (type IN ('password_reset', 'email_verification', 'phone_verification')),
+    CONSTRAINT otp_channel_check CHECK (channel IN ('email', 'sms'))
+);
+
+CREATE INDEX idx_otp_user ON otp_verifications(user_id);
+CREATE INDEX idx_otp_expires ON otp_verifications(expires_at);
+CREATE INDEX idx_otp_used ON otp_verifications(used_at);
+CREATE INDEX idx_otp_lookup ON otp_verifications(user_id, otp, type) WHERE used_at IS NULL;
+
+-- Add cleanup function for expired OTPs
+CREATE OR REPLACE FUNCTION cleanup_expired_otps()
+RETURNS void AS $$
+BEGIN
+    DELETE FROM otp_verifications
+    WHERE expires_at < NOW() OR created_at < NOW() - INTERVAL '24 hours';
+END;
+$$ LANGUAGE plpgsql;
+
 
 -- ============================================
 -- Indexes for Performance
@@ -862,6 +895,7 @@ CREATE INDEX idx_staff_search ON clinic_staff(first_name, last_name, specializat
 -- Full-text search indexes
 CREATE INDEX idx_patients_ftsearch ON patient_profiles USING GIN(to_tsvector('english', first_name || ' ' || last_name || ' ' || primary_address));
 CREATE INDEX idx_clinics_ftsearch ON clinics USING GIN(to_tsvector('english', clinic_name || ' ' || description || ' ' || physical_address));
+
 
 
 -- ============================================

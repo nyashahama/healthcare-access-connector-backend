@@ -152,6 +152,11 @@ func (s *Server) setupRoutes() http.Handler {
 		r.Post("/password/reset", s.authHandler.ResetPassword)
 		r.Post("/auth/resend-verification", s.authHandler.ResendVerificationEmail)
 
+		// OTP-based authentication routes
+		r.Post("/auth/otp/generate", s.authHandler.GenerateOTP)
+		r.Post("/auth/otp/verify", s.authHandler.VerifyOTP)
+		r.Post("/auth/password/reset-with-otp", s.authHandler.ResetPasswordWithOTP)
+
 		// Protected routes - require authentication
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(s.authService, s.logger))

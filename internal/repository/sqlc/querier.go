@@ -73,9 +73,11 @@ type Querier interface {
 	// ============================================
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateClinicService(ctx context.Context, id pgtype.UUID) error
+	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error
 	DeleteSession(ctx context.Context, sessionToken string) error
+	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
 	GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, error)
 	GetClinicServices(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicServicesRow, error)
@@ -84,6 +86,8 @@ type Querier interface {
 	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error)
 	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]GetDataAccessLogsRow, error)
 	GetNotificationPreferences(ctx context.Context, userID pgtype.UUID) (NotificationPreference, error)
+	GetOTP(ctx context.Context, arg GetOTPParams) (OtpVerification, error)
+	GetOTPAttemptCount(ctx context.Context, arg GetOTPAttemptCountParams) (int64, error)
 	GetPatientAllergies(ctx context.Context, patientID pgtype.UUID) ([]PatientAllergy, error)
 	GetPatientConditions(ctx context.Context, arg GetPatientConditionsParams) ([]PatientCondition, error)
 	GetPatientImmunizations(ctx context.Context, patientID pgtype.UUID) ([]GetPatientImmunizationsRow, error)
@@ -112,6 +116,11 @@ type Querier interface {
 	// Audit Logging Queries (POPIA Compliance)
 	// ============================================
 	LogUserActivity(ctx context.Context, arg LogUserActivityParams) error
+	MarkOTPUsed(ctx context.Context, arg MarkOTPUsedParams) error
+	// ============================================
+	// OTP Verification Queries
+	// ============================================
+	SaveOTP(ctx context.Context, arg SaveOTPParams) (OtpVerification, error)
 	SearchClinics(ctx context.Context, arg SearchClinicsParams) ([]SearchClinicsRow, error)
 	SearchClinicsByLocation(ctx context.Context, arg SearchClinicsByLocationParams) ([]SearchClinicsByLocationRow, error)
 	SearchPatients(ctx context.Context, arg SearchPatientsParams) ([]SearchPatientsRow, error)

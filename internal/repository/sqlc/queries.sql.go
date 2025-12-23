@@ -985,6 +985,16 @@ func (q *Queries) DeactivateClinicService(ctx context.Context, id pgtype.UUID) e
 	return err
 }
 
+const deleteExpiredOTPs = `-- name: DeleteExpiredOTPs :exec
+DELETE FROM otp_verifications
+WHERE expires_at < NOW() OR created_at < NOW() - INTERVAL '24 hours'
+`
+
+func (q *Queries) DeleteExpiredOTPs(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteExpiredOTPs)
+	return err
+}
+
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
 DELETE FROM user_sessions WHERE expires_at <= NOW()
 `
@@ -1009,6 +1019,21 @@ DELETE FROM user_sessions WHERE session_token = $1
 
 func (q *Queries) DeleteSession(ctx context.Context, sessionToken string) error {
 	_, err := q.db.Exec(ctx, deleteSession, sessionToken)
+	return err
+}
+
+const deleteUserOTPs = `-- name: DeleteUserOTPs :exec
+DELETE FROM otp_verifications
+WHERE user_id = $1 AND type = $2
+`
+
+type DeleteUserOTPsParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Type   string      `json:"type"`
+}
+
+func (q *Queries) DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error {
+	_, err := q.db.Exec(ctx, deleteUserOTPs, arg.UserID, arg.Type)
 	return err
 }
 
@@ -1370,6 +1395,60 @@ func (q *Queries) GetNotificationPreferences(ctx context.Context, userID pgtype.
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getOTP = `-- name: GetOTP :one
+SELECT id, user_id, otp, type, channel, expires_at, used_at, created_at
+FROM otp_verifications
+WHERE user_id = $1 
+    AND otp = $2 
+    AND type = $3 
+    AND used_at IS NULL
+    AND expires_at > NOW()
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type GetOTPParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Otp    string      `json:"otp"`
+	Type   string      `json:"type"`
+}
+
+func (q *Queries) GetOTP(ctx context.Context, arg GetOTPParams) (OtpVerification, error) {
+	row := q.db.QueryRow(ctx, getOTP, arg.UserID, arg.Otp, arg.Type)
+	var i OtpVerification
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Otp,
+		&i.Type,
+		&i.Channel,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getOTPAttemptCount = `-- name: GetOTPAttemptCount :one
+SELECT COUNT(*) 
+FROM otp_verifications
+WHERE user_id = $1 
+    AND type = $2 
+    AND created_at > NOW() - INTERVAL '1 hour'
+`
+
+type GetOTPAttemptCountParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Type   string      `json:"type"`
+}
+
+func (q *Queries) GetOTPAttemptCount(ctx context.Context, arg GetOTPAttemptCountParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getOTPAttemptCount, arg.UserID, arg.Type)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const getPatientAllergies = `-- name: GetPatientAllergies :many
@@ -2602,6 +2681,64 @@ func (q *Queries) LogUserActivity(ctx context.Context, arg LogUserActivityParams
 		arg.ResourceID,
 	)
 	return err
+}
+
+const markOTPUsed = `-- name: MarkOTPUsed :exec
+UPDATE otp_verifications
+SET used_at = $2
+WHERE id = $1
+`
+
+type MarkOTPUsedParams struct {
+	ID     pgtype.UUID      `json:"id"`
+	UsedAt pgtype.Timestamp `json:"used_at"`
+}
+
+func (q *Queries) MarkOTPUsed(ctx context.Context, arg MarkOTPUsedParams) error {
+	_, err := q.db.Exec(ctx, markOTPUsed, arg.ID, arg.UsedAt)
+	return err
+}
+
+const saveOTP = `-- name: SaveOTP :one
+
+INSERT INTO otp_verifications (id, user_id, otp, type, channel, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, user_id, otp, type, channel, expires_at, used_at, created_at
+`
+
+type SaveOTPParams struct {
+	ID        pgtype.UUID      `json:"id"`
+	UserID    pgtype.UUID      `json:"user_id"`
+	Otp       string           `json:"otp"`
+	Type      string           `json:"type"`
+	Channel   string           `json:"channel"`
+	ExpiresAt pgtype.Timestamp `json:"expires_at"`
+}
+
+// ============================================
+// OTP Verification Queries
+// ============================================
+func (q *Queries) SaveOTP(ctx context.Context, arg SaveOTPParams) (OtpVerification, error) {
+	row := q.db.QueryRow(ctx, saveOTP,
+		arg.ID,
+		arg.UserID,
+		arg.Otp,
+		arg.Type,
+		arg.Channel,
+		arg.ExpiresAt,
+	)
+	var i OtpVerification
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Otp,
+		&i.Type,
+		&i.Channel,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const searchClinics = `-- name: SearchClinics :many

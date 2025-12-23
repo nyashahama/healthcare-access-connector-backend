@@ -168,3 +168,29 @@ type ConsentResponse struct {
 	CreatedAt                 time.Time  `json:"created_at"`
 	UpdatedAt                 time.Time  `json:"updated_at"`
 }
+
+// OTPRequest represents OTP generation request
+type OTPRequest struct {
+	Identifier string `json:"identifier"`        // Email or phone
+	Purpose    string `json:"purpose,omitempty"` // "password_reset", "verify_email"
+}
+
+// OTPVerifyRequest represents OTP verification request
+type OTPVerifyRequest struct {
+	Identifier string `json:"identifier"`
+	OTP        string `json:"otp"`
+}
+
+// OTPResponse represents OTP response
+type OTPResponse struct {
+	Message   string `json:"message"`
+	Channel   string `json:"channel,omitempty"`    // "email", "sms"
+	ExpiresIn int    `json:"expires_in,omitempty"` // in minutes
+}
+
+// PasswordResetWithOTPRequest combines OTP and new password
+type PasswordResetWithOTPRequest struct {
+	Identifier  string `json:"identifier"`
+	OTP         string `json:"otp"`
+	NewPassword string `json:"new_password"`
+}

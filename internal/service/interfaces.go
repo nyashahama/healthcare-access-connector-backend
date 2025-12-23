@@ -20,6 +20,9 @@ type AuthService interface {
 	VerifyEmail(ctx context.Context, token string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	ResendVerificationEmail(ctx context.Context, email string) error
+	GenerateOTP(ctx context.Context, identifier string) error
+	VerifyOTP(ctx context.Context, identifier, otp string) (string, error) // Returns reset token
+	RequestPasswordResetWithOTP(ctx context.Context, identifier string) error
 }
 
 // UserService handles user operations for health project

@@ -891,6 +891,188 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, email string)
 	return nil
 }
 
+// GenerateOTP generates and sends OTP to user
+func (s *authService) GenerateOTP(ctx context.Context, identifier string) error {
+	// Rate limiting check
+	cacheKey := fmt.Sprintf("otp:attempts:%s", identifier)
+	var attempts int
+	if s.cache != nil && s.cache.IsAvailable() {
+		s.cache.Get(ctx, cacheKey, &attempts)
+		if attempts >= 5 {
+			return domain.NewAppError(domain.ErrOTPRateLimited, "Too many OTP requests. Please try again later.", 429)
+		}
+	}
+
+	// Find user by email or phone
+	var user domain.User
+	var err error
+	channel := "email"
+
+	if strings.Contains(identifier, "@") {
+		user, _, err = s.userRepo.GetUserByEmail(ctx, strings.ToLower(identifier))
+	} else {
+		user, err = s.userRepo.GetUserByPhone(ctx, identifier)
+		channel = "sms"
+	}
+
+	if err != nil {
+		// Don't reveal if user exists for security
+		s.logger.Info().Str("identifier", maskIdentifier(identifier)).Msg("OTP requested")
+		return nil // Return success even if user doesn't exist
+	}
+
+	// Check if user can receive OTP
+	if channel == "email" && (user.Email == nil || !user.EmailCommunicationConsent) {
+		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive email OTP")
+		return nil
+	}
+
+	// Generate 6-digit OTP
+	otp := s.generateNumericOTP(6)
+	expiresAt := time.Now().Add(10 * time.Minute) // OTP valid for 10 minutes
+
+	// Store OTP in database
+	otpRecord := domain.OTPVerification{
+		ID:        uuid.Generate(),
+		UserID:    user.ID,
+		OTP:       otp,
+		Type:      "password_reset",
+		Channel:   channel,
+		ExpiresAt: expiresAt,
+		CreatedAt: time.Now(),
+	}
+
+	// Save OTP to repository (you'll need to create this repository method)
+	if err := s.userRepo.SaveOTP(ctx, otpRecord); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to save OTP")
+		return domain.NewAppError(err, "Failed to generate OTP", 500)
+	}
+
+	// Increment attempts counter
+	if s.cache != nil && s.cache.IsAvailable() {
+		s.cache.Set(ctx, cacheKey, attempts+1, 5*time.Minute)
+	}
+
+	// Send OTP via email or SMS
+	if channel == "email" && user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
+		go func(email, otp string) {
+			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			// Use existing email service with OTP template
+			subject := "Your Password Reset Code"
+			body := fmt.Sprintf(`
+                Your password reset code is: %s
+                
+                This code will expire in 10 minutes.
+                
+                If you didn't request this reset, please ignore this email or contact support.
+            `, otp)
+
+			msg := &email.Message{
+				To:      []string{email},
+				Subject: subject,
+				Body:    body,
+			}
+
+			if err := s.emailService.SendEmail(emailCtx, msg); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send OTP email")
+			}
+		}(*user.Email, otp)
+	} else if channel == "sms" && user.Phone != nil && s.smsEnabled {
+		// TODO: Implement SMS sending for OTP
+		s.logger.Info().Str("phone", *user.Phone).Str("otp", otp).Msg("OTP generated for SMS")
+	}
+
+	s.logger.Info().
+		Str("user_id", user.ID.String()).
+		Str("channel", channel).
+		Msg("OTP generated and sent")
+
+	return nil
+}
+
+// VerifyOTP verifies OTP and returns reset token
+func (s *authService) VerifyOTP(ctx context.Context, identifier, otp string) (string, error) {
+	// Find user
+	var user domain.User
+	var err error
+
+	if strings.Contains(identifier, "@") {
+		user, _, err = s.userRepo.GetUserByEmail(ctx, strings.ToLower(identifier))
+	} else {
+		user, err = s.userRepo.GetUserByPhone(ctx, identifier)
+	}
+
+	if err != nil {
+		return "", domain.NewAppError(domain.ErrUserNotFound, "User not found", 404)
+	}
+
+	// Get OTP record
+	otpRecord, err := s.userRepo.GetOTP(ctx, user.ID, otp, "password_reset")
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return "", domain.NewAppError(domain.ErrInvalidOTP, "Invalid OTP code", 400)
+		}
+		return "", domain.NewAppError(err, "OTP verification failed", 500)
+	}
+
+	// Check if OTP is expired
+	if time.Now().After(otpRecord.ExpiresAt) {
+		return "", domain.NewAppError(domain.ErrOTPExpired, "OTP has expired", 400)
+	}
+
+	// Check if OTP already used
+	if otpRecord.UsedAt != nil {
+		return "", domain.NewAppError(domain.ErrOTPAlreadyUsed, "OTP already used", 400)
+	}
+
+	// Mark OTP as used
+	now := time.Now()
+	if err := s.userRepo.MarkOTPUsed(ctx, otpRecord.ID, &now); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to mark OTP as used")
+	}
+
+	// Generate password reset token (for backward compatibility with existing flow)
+	resetToken := s.generateSecureToken()
+	tokenExpires := time.Now().Add(1 * time.Hour)
+
+	// Store reset token (using existing method)
+	if err := s.userRepo.SetPasswordResetToken(ctx, user.ID, resetToken, tokenExpires); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to set password reset token")
+		return "", domain.NewAppError(err, "Failed to process reset", 500)
+	}
+
+	// Clear OTP attempts
+	if s.cache != nil {
+		cacheKey := fmt.Sprintf("otp:attempts:%s", identifier)
+		s.cache.Delete(ctx, cacheKey)
+	}
+
+	s.logger.Info().
+		Str("user_id", user.ID.String()).
+		Msg("OTP verified successfully")
+
+	return resetToken, nil
+}
+
+// RequestPasswordResetWithOTP combines OTP generation and sending
+func (s *authService) RequestPasswordResetWithOTP(ctx context.Context, identifier string) error {
+	return s.GenerateOTP(ctx, identifier)
+}
+
+// Update ResetPassword to work with OTP verification
+func (s *authService) ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error {
+	// Verify OTP first
+	resetToken, err := s.VerifyOTP(ctx, identifier, otp)
+	if err != nil {
+		return err
+	}
+
+	// Now reset password using the token
+	return s.ResetPassword(ctx, resetToken, newPassword)
+}
+
 // Helper functions
 func stringPtr(s string) *string {
 	if s == "" {
@@ -920,4 +1102,15 @@ func maskIdentifier(identifier string) string {
 		return "***"
 	}
 	return "***" + identifier[len(identifier)-4:]
+}
+
+// generateNumericOTP generates a 6-digit OTP
+func (s *authService) generateNumericOTP(length int) string {
+	const digits = "0123456789"
+	b := make([]byte, length)
+	rand.Read(b) // fill with random bytes
+	for i := range b {
+		b[i] = digits[int(b[i])%len(digits)]
+	}
+	return string(b)
 }

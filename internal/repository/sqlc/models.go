@@ -228,6 +228,17 @@ type NotificationPreference struct {
 	UpdatedAt                      pgtype.Timestamp `json:"updated_at"`
 }
 
+type OtpVerification struct {
+	ID        pgtype.UUID      `json:"id"`
+	UserID    pgtype.UUID      `json:"user_id"`
+	Otp       string           `json:"otp"`
+	Type      string           `json:"type"`
+	Channel   string           `json:"channel"`
+	ExpiresAt pgtype.Timestamp `json:"expires_at"`
+	UsedAt    pgtype.Timestamp `json:"used_at"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+}
+
 type PatientAllergy struct {
 	ID                  pgtype.UUID      `json:"id"`
 	PatientID           pgtype.UUID      `json:"patient_id"`
