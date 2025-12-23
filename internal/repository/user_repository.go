@@ -454,6 +454,41 @@ func (r *userRepository) SaveOTP(ctx context.Context, otp domain.OTPVerification
 	return nil
 }
 
+// GetOTP retrieves an OTP verification record
+func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpType string) (domain.OTPVerification, error) {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	record, err := r.db.GetOTP(ctx, sqlc.GetOTPParams{
+		UserID: uuidToPgtypeUUID(userID),
+		Otp:    otp,
+		Type:   otpType,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			dbQueryTotal.WithLabelValues("get_otp", "not_found").Inc()
+			return domain.OTPVerification{}, domain.ErrNotFound
+		}
+		dbQueryTotal.WithLabelValues("get_otp", "error").Inc()
+		return domain.OTPVerification{}, r.handleError(err, "get OTP")
+	}
+
+	dbQueryTotal.WithLabelValues("get_otp", "success").Inc()
+
+	return domain.OTPVerification{
+		ID:        pgtypeUUIDToUUID(record.ID),
+		UserID:    pgtypeUUIDToUUID(record.UserID),
+		OTP:       record.Otp,
+		Type:      record.Type,
+		Channel:   record.Channel,
+		ExpiresAt: record.ExpiresAt.Time,
+		UsedAt:    pgtypeTimestampToTimePtr(record.UsedAt),
+		CreatedAt: record.CreatedAt.Time,
+	}, nil
+}
+
 // Helper functions for mapping
 
 func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
