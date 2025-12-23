@@ -489,6 +489,26 @@ func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpT
 	}, nil
 }
 
+// MarkOTPUsed marks an OTP as used
+func (r *userRepository) MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedAt *time.Time) error {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.db.MarkOTPUsed(ctx, sqlc.MarkOTPUsedParams{
+		ID:     uuidToPgtypeUUID(otpID),
+		UsedAt: timePtrToPgtypeTimestamp(usedAt),
+	})
+	if err != nil {
+		dbQueryTotal.WithLabelValues("mark_otp_used", "error").Inc()
+		return r.handleError(err, "mark OTP used")
+	}
+
+	dbQueryTotal.WithLabelValues("mark_otp_used", "success").Inc()
+	return nil
+}
+
 // Helper functions for mapping
 
 func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
