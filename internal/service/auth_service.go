@@ -893,16 +893,6 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, email string)
 
 // GenerateOTP generates and sends OTP to user
 func (s *authService) GenerateOTP(ctx context.Context, identifier string) error {
-	// Rate limiting check
-	cacheKey := fmt.Sprintf("otp:attempts:%s", identifier)
-	var attempts int
-	if s.cache != nil && s.cache.IsAvailable() {
-		s.cache.Get(ctx, cacheKey, &attempts)
-		if attempts >= 5 {
-			return domain.NewAppError(domain.ErrOTPRateLimited, "Too many OTP requests. Please try again later.", 429)
-		}
-	}
-
 	// Find user by email or phone
 	var user domain.User
 	var err error
@@ -917,8 +907,17 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 
 	if err != nil {
 		// Don't reveal if user exists for security
-		s.logger.Info().Str("identifier", maskIdentifier(identifier)).Msg("OTP requested")
+		s.logger.Info().Str("identifier", maskIdentifier(identifier)).Msg("OTP requested for non-existent user")
 		return nil // Return success even if user doesn't exist
+	}
+
+	// Check OTP attempt count (rate limiting)
+	attempts, err := s.userRepo.GetOTPAttemptCount(ctx, user.ID, "password_reset")
+	if err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to get OTP attempt count")
+	}
+	if attempts >= 5 {
+		return domain.NewAppError(domain.ErrOTPRateLimited, "Too many OTP requests. Please try again later.", 429)
 	}
 
 	// Check if user can receive OTP
@@ -926,12 +925,21 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive email OTP")
 		return nil
 	}
+	if channel == "sms" && (user.Phone == nil || !user.SMSConsentGiven) {
+		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive SMS OTP")
+		return nil
+	}
 
 	// Generate 6-digit OTP
 	otp := s.generateNumericOTP(6)
-	expiresAt := time.Now().Add(10 * time.Minute) // OTP valid for 10 minutes
+	expiresAt := time.Now().Add(10 * time.Minute)
 
-	// Store OTP in database
+	// Delete any existing unused OTPs for this user
+	if err := s.userRepo.DeleteUserOTPs(ctx, user.ID, "password_reset"); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to delete old OTPs")
+	}
+
+	// Create OTP record
 	otpRecord := domain.OTPVerification{
 		ID:        uuid.Generate(),
 		UserID:    user.ID,
@@ -942,46 +950,21 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 		CreatedAt: time.Now(),
 	}
 
-	// Save OTP to repository (you'll need to create this repository method)
+	// Save OTP to repository
 	if err := s.userRepo.SaveOTP(ctx, otpRecord); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to save OTP")
 		return domain.NewAppError(err, "Failed to generate OTP", 500)
 	}
 
-	// Increment attempts counter
-	if s.cache != nil && s.cache.IsAvailable() {
-		s.cache.Set(ctx, cacheKey, attempts+1, 5*time.Minute)
-	}
-
 	// Send OTP via email or SMS
 	if channel == "email" && user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
-		go func(email, otp string) {
-			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			// Use existing email service with OTP template
-			subject := "Your Password Reset Code"
-			body := fmt.Sprintf(`
-                Your password reset code is: %s
-                
-                This code will expire in 10 minutes.
-                
-                If you didn't request this reset, please ignore this email or contact support.
-            `, otp)
-
-			msg := &email.Message{
-				To:      []string{email},
-				Subject: subject,
-				Body:    body,
-			}
-
-			if err := s.emailService.SendEmail(emailCtx, msg); err != nil {
-				s.logger.Error().Err(err).Msg("Failed to send OTP email")
-			}
-		}(*user.Email, otp)
+		go s.sendOTPEmail(context.Background(), *user.Email, otp, user.ID.String())
 	} else if channel == "sms" && user.Phone != nil && s.smsEnabled {
 		// TODO: Implement SMS sending for OTP
-		s.logger.Info().Str("phone", *user.Phone).Str("otp", otp).Msg("OTP generated for SMS")
+		s.logger.Info().
+			Str("phone", maskIdentifier(*user.Phone)).
+			Str("otp", otp).
+			Msg("OTP generated for SMS (SMS service not implemented)")
 	}
 
 	s.logger.Info().
