@@ -509,6 +509,23 @@ func (r *userRepository) MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedA
 	return nil
 }
 
+// DeleteExpiredOTPs deletes expired OTP records
+func (r *userRepository) DeleteExpiredOTPs(ctx context.Context) error {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.db.DeleteExpiredOTPs(ctx)
+	if err != nil {
+		dbQueryTotal.WithLabelValues("delete_expired_otps", "error").Inc()
+		return r.handleError(err, "delete expired OTPs")
+	}
+
+	dbQueryTotal.WithLabelValues("delete_expired_otps", "success").Inc()
+	return nil
+}
+
 // Helper functions for mapping
 
 func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
