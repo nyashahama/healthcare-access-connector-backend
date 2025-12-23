@@ -922,7 +922,7 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 
 	// Check if user can receive OTP
 
-	if channel == "email" && (user.Email == nil || !user.EmailConsentGiven) {
+	if channel == "email" && (user.Email == nil) {
 		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive email OTP")
 		return nil
 	}
