@@ -1102,17 +1102,6 @@ func maskIdentifier(identifier string) string {
 	return "***" + identifier[len(identifier)-4:]
 }
 
-// generateNumericOTP generates a 6-digit OTP
-func (s *authService) generateNumericOTP(length int) string {
-	const digits = "0123456789"
-	b := make([]byte, length)
-	rand.Read(b) // fill with random bytes
-	for i := range b {
-		b[i] = digits[int(b[i])%len(digits)]
-	}
-	return string(b)
-}
-
 // sendOTPEmail sends OTP via email (helper function)
 func (s *authService) sendOTPEmail(ctx context.Context, email, otp, userID string) {
 	emailCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
