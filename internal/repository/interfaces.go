@@ -45,6 +45,8 @@ type UserRepository interface {
 	GetOTP(ctx context.Context, userID uuid.UUID, otp, otpType string) (domain.OTPVerification, error)
 	MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedAt *time.Time) error
 	DeleteExpiredOTPs(ctx context.Context) error
+	DeleteUserOTPs(ctx context.Context, userID uuid.UUID, otpType string) error
+	GetOTPAttemptCount(ctx context.Context, userID uuid.UUID, otpType string) (int64, error)
 }
 
 // PatientRepository defines methods for patient profile data access

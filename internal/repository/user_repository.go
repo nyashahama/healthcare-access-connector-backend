@@ -430,6 +430,30 @@ func (r *userRepository) CountUsers(ctx context.Context, role string) (int64, er
 	return count, nil
 }
 
+// SaveOTP saves an OTP verification record
+func (r *userRepository) SaveOTP(ctx context.Context, otp domain.OTPVerification) error {
+	start := time.Now()
+	defer func() {
+		dbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	_, err := r.db.SaveOTP(ctx, sqlc.SaveOTPParams{
+		ID:        uuidToPgtypeUUID(otp.ID),
+		UserID:    uuidToPgtypeUUID(otp.UserID),
+		Otp:       otp.OTP,
+		Type:      otp.Type,
+		Channel:   otp.Channel,
+		ExpiresAt: timeToPgtypeTimestamp(otp.ExpiresAt),
+	})
+	if err != nil {
+		dbQueryTotal.WithLabelValues("save_otp", "error").Inc()
+		return r.handleError(err, "save OTP")
+	}
+
+	dbQueryTotal.WithLabelValues("save_otp", "success").Inc()
+	return nil
+}
+
 // Helper functions for mapping
 
 func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
