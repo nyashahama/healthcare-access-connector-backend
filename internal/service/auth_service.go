@@ -1046,7 +1046,7 @@ func (s *authService) RequestPasswordResetWithOTP(ctx context.Context, identifie
 	return s.GenerateOTP(ctx, identifier)
 }
 
-// Update ResetPassword to work with OTP verification
+// ResetPasswordWithOTP combines OTP verification and password reset in one call
 func (s *authService) ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error {
 	// Verify OTP first
 	resetToken, err := s.VerifyOTP(ctx, identifier, otp)
@@ -1056,6 +1056,19 @@ func (s *authService) ResetPasswordWithOTP(ctx context.Context, identifier, otp,
 
 	// Now reset password using the token
 	return s.ResetPassword(ctx, resetToken, newPassword)
+}
+
+// generateNumericOTP generates a secure numeric OTP
+func (s *authService) generateNumericOTP(length int) string {
+	const digits = "0123456789"
+	b := make([]byte, length)
+	rand.Read(b)
+
+	for i := range b {
+		b[i] = digits[int(b[i])%len(digits)]
+	}
+
+	return string(b)
 }
 
 // Helper functions
