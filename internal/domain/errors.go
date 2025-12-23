@@ -86,6 +86,12 @@ var (
 	ErrPreferencesNotFound = errors.New("notification preferences not found")
 
 	ErrRateLimited = errors.New("rate limited")
+
+	// OTP errors
+	ErrInvalidOTP     = errors.New("invalid OTP")
+	ErrOTPExpired     = errors.New("OTP has expired")
+	ErrOTPAlreadyUsed = errors.New("OTP has already been used")
+	ErrOTPRateLimited = errors.New("too many OTP attempts")
 )
 
 // AppError represents an application-specific error with additional context

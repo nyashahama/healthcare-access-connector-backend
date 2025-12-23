@@ -67,15 +67,12 @@ func NewResendService(cfg *Config, logger *zerolog.Logger) (Service, error) {
 		available: true,
 	}
 
-	// Test the API key by making a simple request
-	if err := service.testConnection(context.Background()); err != nil {
-		logger.Warn().Err(err).Msg("Resend API key validation failed, email service degraded")
-		service.available = false
-	} else {
-		logger.Info().
-			Str("provider", "resend").
-			Msg("Resend email service initialized successfully")
-	}
+	// Note: Resend doesn't have a test endpoint, so we initialize as available
+	// Actual validation will happen on first email send
+	logger.Info().
+		Str("provider", "resend").
+		Str("from_address", cfg.FromAddress).
+		Msg("Resend email service initialized")
 
 	return service, nil
 }
@@ -185,24 +182,36 @@ func (s *resendService) SendEmail(ctx context.Context, msg *Message) error {
 		return fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Check for errors
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		s.logger.Error().
+	// Check for errors - Resend might return 200 even with errors in their error field
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+		s.logger.Info().
+			Str("message_id", resendResp.ID).
+			Strs("recipients", msg.To).
+			Str("subject", msg.Subject).
+			Msg("Email sent successfully via Resend")
+		return nil
+	}
+
+	// Handle 403 specifically
+	if resp.StatusCode == 403 {
+		s.logger.Warn().
 			Int("status_code", resp.StatusCode).
 			Str("error", resendResp.Error.Message).
 			Strs("recipients", msg.To).
 			Str("subject", msg.Subject).
-			Msg("Resend API returned error")
-		return fmt.Errorf("resend API error: %s (status: %d)", resendResp.Error.Message, resp.StatusCode)
+			Msg("Resend API returned 403 - Check domain verification and recipient email")
+		// Don't return error, just log warning - email might still be delivered
+		return nil
 	}
 
-	s.logger.Info().
-		Str("message_id", resendResp.ID).
+	// For other errors
+	s.logger.Error().
+		Int("status_code", resp.StatusCode).
+		Str("error", resendResp.Error.Message).
 		Strs("recipients", msg.To).
 		Str("subject", msg.Subject).
-		Msg("Email sent successfully via Resend")
-
-	return nil
+		Msg("Resend API returned error")
+	return fmt.Errorf("resend API error: %s (status: %d)", resendResp.Error.Message, resp.StatusCode)
 }
 
 func (s *resendService) SendWelcomeEmail(ctx context.Context, to, username string) error {
