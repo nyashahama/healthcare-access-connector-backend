@@ -921,7 +921,8 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 	}
 
 	// Check if user can receive OTP
-	if channel == "email" && (user.Email == nil || !user.EmailCommunicationConsent) {
+
+	if channel == "email" && (user.Email == nil || !user.EmailConsentGiven) {
 		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive email OTP")
 		return nil
 	}
@@ -958,7 +959,10 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 
 	// Send OTP via email or SMS
 	if channel == "email" && user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
-		go s.sendOTPEmail(context.Background(), *user.Email, otp, user.ID.String())
+		if err := s.emailService.SendOTPEmail(context.Background(), *user.Email, otp, user.ID.String()); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to send verification email")
+			return domain.NewAppError(err, "Failed to send verification email", 500)
+		}
 	} else if channel == "sms" && user.Phone != nil && s.smsEnabled {
 		// TODO: Implement SMS sending for OTP
 		s.logger.Info().
@@ -1100,37 +1104,4 @@ func maskIdentifier(identifier string) string {
 		return "***"
 	}
 	return "***" + identifier[len(identifier)-4:]
-}
-
-// sendOTPEmail sends OTP via email (helper function)
-func (s *authService) sendOTPEmail(ctx context.Context, email, otp, userID string) {
-	emailCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	subject := "Your Password Reset Code"
-	body := fmt.Sprintf(`
-Hello,
-
-Your password reset verification code is: %s
-
-This code will expire in 10 minutes.
-
-If you didn't request this code, please ignore this email or contact support immediately.
-
-Best regards,
-Healthcare Access Connector Team
-    `, otp)
-
-	msg := &email.Message{
-		To:      []string{email},
-		Subject: subject,
-		Body:    body,
-	}
-
-	if err := s.emailService.SendEmail(emailCtx, msg); err != nil {
-		s.logger.Error().
-			Err(err).
-			Str("user_id", userID).
-			Msg("Failed to send OTP email")
-	}
 }

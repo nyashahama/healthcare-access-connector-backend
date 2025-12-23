@@ -24,6 +24,7 @@ type User struct {
 	IsSMSOnly            bool       `json:"is_sms_only"`
 	SMSConsentGiven      bool       `json:"sms_consent_given"`
 	POPIAConsentGiven    bool       `json:"popia_consent_given"`
+	EmailConsentGiven    bool       `json:"email_consent_given"`
 	ConsentDate          *time.Time `json:"consent_date,omitempty"`
 	ProfileCompletionPct int        `json:"profile_completion_percentage"`
 	CreatedAt            time.Time  `json:"created_at"`

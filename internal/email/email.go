@@ -13,6 +13,7 @@ type Service interface {
 	SendVerificationEmail(ctx context.Context, to, verificationToken string) error
 	SendPasswordChangedEmail(ctx context.Context, to, username string) error
 	SendLoginAlertEmail(ctx context.Context, to, username, ipAddress, location string) error
+	SendOTPEmail(ctx context.Context, email, otp, userID string) error
 	SendEmail(ctx context.Context, msg *Message) error
 	IsAvailable() bool
 }
