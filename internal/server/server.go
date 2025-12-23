@@ -155,7 +155,7 @@ func (s *Server) setupRoutes() http.Handler {
 		// OTP-based authentication routes
 		r.Post("/auth/otp/generate", s.authHandler.GenerateOTP)
 		r.Post("/auth/otp/verify", s.authHandler.VerifyOTP)
-		r.Post("/auth/password/reset-with-otp", s.authHandler.ResetPasswordWithOTP)
+		// r.Post("/auth/password/reset-with-otp", s.authHandler.ResetPasswordWithOTP) //(some issues here still thinking to only go with password/reset)
 
 		// Protected routes - require authentication
 		r.Group(func(r chi.Router) {
