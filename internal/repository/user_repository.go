@@ -11,6 +11,7 @@ import (
 
 	"github.com/docker/distribution/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository/pgutils"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository/sqlc"
 
 	"github.com/jackc/pgx/v5"
@@ -566,159 +567,6 @@ func (r *userRepository) GetOTPAttemptCount(ctx context.Context, userID uuid.UUI
 	return count, nil
 }
 
-// Helper functions for mapping
-
-func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
-	return domain.User{
-		ID:                   pgtypeUUIDToUUID(u.ID),
-		Email:                stringToStringPtr(u.Email),
-		Phone:                pgtypeTextToStringPtr(u.Phone),
-		Role:                 u.Role,
-		Status:               pgtypeTextToString(u.Status),
-		IsVerified:           pgtypeBoolToBool(u.IsVerified),
-		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
-		LoginCount:           int(u.LoginCount.Int32),
-		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
-		SMSConsentGiven:      false, // Not returned in CreateUser
-		POPIAConsentGiven:    false, // Not returned in CreateUser
-		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
-		CreatedAt:            u.CreatedAt.Time,
-		UpdatedAt:            u.UpdatedAt.Time,
-	}
-}
-
-func (r *userRepository) mapToUserFromGetByEmail(u sqlc.GetUserByEmailRow) domain.User {
-	return domain.User{
-		ID:                   pgtypeUUIDToUUID(u.ID),
-		Email:                stringToStringPtr(u.Email),
-		Phone:                pgtypeTextToStringPtr(u.Phone),
-		Role:                 u.Role,
-		Status:               pgtypeTextToString(u.Status),
-		IsVerified:           pgtypeBoolToBool(u.IsVerified),
-		VerificationToken:    pgtypeTextToStringPtr(u.VerificationToken),
-		VerificationExpires:  pgtypeTimestampToTimePtr(u.VerificationExpires),
-		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
-		LoginCount:           int(u.LoginCount.Int32),
-		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
-		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
-		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
-		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
-		CreatedAt:            u.CreatedAt.Time,
-		UpdatedAt:            u.UpdatedAt.Time,
-	}
-}
-
-func (r *userRepository) mapToUserFromGetByPhone(u sqlc.GetUserByPhoneRow) domain.User {
-	return domain.User{
-		ID:                   pgtypeUUIDToUUID(u.ID),
-		Email:                stringToStringPtr(u.Email),
-		Phone:                pgtypeTextToStringPtr(u.Phone),
-		Role:                 u.Role,
-		Status:               pgtypeTextToString(u.Status),
-		IsVerified:           pgtypeBoolToBool(u.IsVerified),
-		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
-		LoginCount:           int(u.LoginCount.Int32),
-		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
-		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
-		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
-		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
-		CreatedAt:            u.CreatedAt.Time,
-		UpdatedAt:            u.UpdatedAt.Time,
-	}
-}
-
-func (r *userRepository) mapToUserFromGetByID(u sqlc.GetUserByIDRow) domain.User {
-	return domain.User{
-		ID:                   pgtypeUUIDToUUID(u.ID),
-		Email:                stringToStringPtr(u.Email),
-		Phone:                pgtypeTextToStringPtr(u.Phone),
-		Role:                 u.Role,
-		Status:               pgtypeTextToString(u.Status),
-		IsVerified:           pgtypeBoolToBool(u.IsVerified),
-		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
-		LoginCount:           int(u.LoginCount.Int32),
-		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
-		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
-		CreatedAt:            u.CreatedAt.Time,
-		UpdatedAt:            u.UpdatedAt.Time,
-	}
-}
-
-func (r *userRepository) mapToUserFromList(u sqlc.ListUsersByRoleRow) domain.User {
-	return domain.User{
-		ID:                   pgtypeUUIDToUUID(u.ID),
-		Email:                stringToStringPtr(u.Email),
-		Phone:                pgtypeTextToStringPtr(u.Phone),
-		Role:                 u.Role,
-		Status:               pgtypeTextToString(u.Status),
-		IsVerified:           pgtypeBoolToBool(u.IsVerified),
-		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
-		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
-		CreatedAt:            u.CreatedAt.Time,
-	}
-}
-
-func (r *userRepository) mapToUserFromGetByVerificationToken(u sqlc.GetUserByVerificationTokenRow) domain.User {
-	return domain.User{
-		ID:                   pgtypeUUIDToUUID(u.ID),
-		Email:                stringToStringPtr(u.Email),
-		Phone:                pgtypeTextToStringPtr(u.Phone),
-		Role:                 u.Role,
-		Status:               pgtypeTextToString(u.Status),
-		IsVerified:           pgtypeBoolToBool(u.IsVerified),
-		VerificationToken:    pgtypeTextToStringPtr(u.VerificationToken),
-		VerificationExpires:  pgtypeTimestampToTimePtr(u.VerificationExpires),
-		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
-		LoginCount:           int(u.LoginCount.Int32),
-		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
-		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
-		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
-		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
-		CreatedAt:            u.CreatedAt.Time,
-		UpdatedAt:            u.UpdatedAt.Time,
-	}
-}
-
-func (r *userRepository) mapToUserFromGetByPasswordResetToken(u sqlc.GetUserByPasswordResetTokenRow) domain.User {
-	return domain.User{
-		ID:                   pgtypeUUIDToUUID(u.ID),
-		Email:                stringToStringPtr(u.Email),
-		Phone:                pgtypeTextToStringPtr(u.Phone),
-		Role:                 u.Role,
-		Status:               pgtypeTextToString(u.Status),
-		IsVerified:           pgtypeBoolToBool(u.IsVerified),
-		ResetPasswordToken:   pgtypeTextToStringPtr(u.ResetPasswordToken),
-		ResetPasswordExpires: pgtypeTimestampToTimePtr(u.ResetPasswordExpires),
-		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
-		LoginCount:           int(u.LoginCount.Int32),
-		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
-		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
-		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
-		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
-		CreatedAt:            u.CreatedAt.Time,
-		UpdatedAt:            u.UpdatedAt.Time,
-	}
-}
-
-func (r *userRepository) mapToUserFromGetByPhoneWithHash(u sqlc.GetUserByPhoneWithHashRow) domain.User {
-	return domain.User{
-		ID:                   pgtypeUUIDToUUID(u.ID),
-		Email:                stringToStringPtr(u.Email),
-		Phone:                pgtypeTextToStringPtr(u.Phone),
-		Role:                 u.Role,
-		Status:               pgtypeTextToString(u.Status),
-		IsVerified:           pgtypeBoolToBool(u.IsVerified),
-		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
-		LoginCount:           int(u.LoginCount.Int32),
-		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
-		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
-		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
-		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
-		CreatedAt:            u.CreatedAt.Time,
-		UpdatedAt:            u.UpdatedAt.Time,
-	}
-}
-
 // handleError converts database errors to domain errors
 func (r *userRepository) handleError(err error, operation string) error {
 	var pgErr *pgconn.PgError
@@ -743,154 +591,107 @@ func (r *userRepository) handleError(err error, operation string) error {
 }
 
 // ========================================
-// Utility functions for conversions
+// SINGLE mapping function using userRow
 // ========================================
 
-// String conversions (for VARCHAR that sqlc maps to string)
-func stringToStringPtr(s string) *string {
-	if s == "" {
+// userRow is an intermediate struct that normalizes all sqlc row types
+// This allows us to have ONE mapping function instead of 8+
+type userRow struct {
+	ID                          interface{}
+	Email                       interface{}
+	Phone                       interface{}
+	Role                        string
+	Status                      interface{}
+	IsVerified                  interface{}
+	VerificationToken           interface{}
+	VerificationExpires         interface{}
+	ResetPasswordToken          interface{}
+	ResetPasswordExpires        interface{}
+	LastLogin                   interface{}
+	LoginCount                  interface{}
+	IsSmsOnly                   interface{}
+	SmsConsentGiven             interface{}
+	PopiaConsentGiven           interface{}
+	ProfileCompletionPercentage interface{}
+	CreatedAt                   interface{}
+	UpdatedAt                   interface{}
+}
+
+func (r *userRepository) mapUser(row userRow) domain.User {
+	return domain.User{
+		ID:                   pgutils.UUIDTo(row.ID.(pgtype.UUID)),
+		Email:                pgutils.StringToPtr(row.Email.(string)),
+		Phone:                pgutils.TextToPtr(row.Phone.(pgtype.Text)),
+		Role:                 row.Role,
+		Status:               pgutils.TextToString(row.Status.(pgtype.Text)),
+		IsVerified:           pgutils.BoolTo(row.IsVerified.(pgtype.Bool)),
+		VerificationToken:    r.optionalTextToPtr(row.VerificationToken),
+		VerificationExpires:  r.optionalTimestampToPtr(row.VerificationExpires),
+		ResetPasswordToken:   r.optionalTextToPtr(row.ResetPasswordToken),
+		ResetPasswordExpires: r.optionalTimestampToPtr(row.ResetPasswordExpires),
+		LastLogin:            r.optionalTimestampToPtr(row.LastLogin),
+		LoginCount:           r.optionalInt32ToInt(row.LoginCount),
+		IsSMSOnly:            r.optionalBool(row.IsSmsOnly),
+		SMSConsentGiven:      r.optionalBool(row.SmsConsentGiven),
+		POPIAConsentGiven:    r.optionalBool(row.PopiaConsentGiven),
+		ProfileCompletionPct: r.optionalInt32ToInt(row.ProfileCompletionPercentage),
+		CreatedAt:            r.requiredTimestamp(row.CreatedAt),
+		UpdatedAt:            r.optionalTimestamp(row.UpdatedAt),
+	}
+}
+
+// Helper methods for handling optional fields in the mapping
+
+func (r *userRepository) optionalTextToPtr(v interface{}) *string {
+	if v == nil {
 		return nil
 	}
-	return &s
+	return pgutils.TextToPtr(v.(pgtype.Text))
 }
 
-// pgtype.Text conversions
-func pgtypeTextToString(t pgtype.Text) string {
-	if !t.Valid {
-		return ""
-	}
-	return t.String
-}
-
-func pgtypeTextToStringPtr(t pgtype.Text) *string {
-	if !t.Valid {
+func (r *userRepository) optionalTimestampToPtr(v interface{}) *time.Time {
+	if v == nil {
 		return nil
 	}
-	return &t.String
+	return pgutils.TimestampToPtr(v.(pgtype.Timestamp))
 }
 
-func stringToPgtypeText(s string) pgtype.Text {
-	if s == "" {
-		return pgtype.Text{Valid: false}
+func (r *userRepository) optionalTimestamp(v interface{}) time.Time {
+	if v == nil {
+		return time.Time{}
 	}
-	return pgtype.Text{String: s, Valid: true}
+	return pgutils.TimestampTo(v.(pgtype.Timestamp))
 }
 
-func stringPtrToPgtypeText(s *string) pgtype.Text {
-	if s == nil {
-		return pgtype.Text{Valid: false}
+func (r *userRepository) requiredTimestamp(v interface{}) time.Time {
+	// This should never be nil for CreatedAt, but we handle it just in case
+	if v == nil {
+		return time.Time{}
 	}
-	return pgtype.Text{String: *s, Valid: true}
+	return pgutils.TimestampTo(v.(pgtype.Timestamp))
 }
 
-// UUID conversions (pgtype.UUID <-> uuid.UUID)
-func pgtypeUUIDToUUID(u pgtype.UUID) uuid.UUID {
-	return uuid.UUID(u.Bytes)
-}
-
-func uuidToPgtypeUUID(u uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: [16]byte(u), Valid: true}
-}
-
-func pgtypeUUIDToUUIDPtr(u pgtype.UUID) *uuid.UUID {
-	if !u.Valid {
-		return nil
+func (r *userRepository) optionalInt32ToInt(v interface{}) int {
+	if v == nil {
+		return 0
 	}
-	uid := uuid.UUID(u.Bytes)
-	return &uid
-}
-
-func uuidPtrToPgtypeUUID(u *uuid.UUID) pgtype.UUID {
-	if u == nil {
-		return pgtype.UUID{Valid: false}
+	pgInt4, ok := v.(pgtype.Int4)
+	if ok {
+		return int(pgutils.Int4To(pgInt4))
 	}
-	return pgtype.UUID{Bytes: [16]byte(*u), Valid: true}
+
+	// Some might be pgtype.Int8, try that too
+	pgInt8, ok := v.(pgtype.Int8)
+	if ok {
+		return int(pgutils.Int8To(pgInt8))
+	}
+
+	return 0
 }
 
-// Bool conversions
-func pgtypeBoolToBool(b pgtype.Bool) bool {
-	if !b.Valid {
+func (r *userRepository) optionalBool(v interface{}) bool {
+	if v == nil {
 		return false
 	}
-	return b.Bool
-}
-
-func boolToPgtypeBool(b bool) pgtype.Bool {
-	return pgtype.Bool{Bool: b, Valid: true}
-}
-
-func boolPtrToPgtypeBool(b *bool) pgtype.Bool {
-	if b == nil {
-		return pgtype.Bool{Valid: false}
-	}
-	return pgtype.Bool{Bool: *b, Valid: true}
-}
-
-// Timestamp conversions
-func pgtypeTimestampToTimePtr(t pgtype.Timestamp) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	return &t.Time
-}
-
-func timeToPgtypeTimestamp(t time.Time) pgtype.Timestamp {
-	return pgtype.Timestamp{Time: t, Valid: true}
-}
-
-func timePtrToPgtypeTimestamp(t *time.Time) pgtype.Timestamp {
-	if t == nil {
-		return pgtype.Timestamp{Valid: false}
-	}
-	return pgtype.Timestamp{Time: *t, Valid: true}
-}
-
-// Int4 conversions
-func pgtypeInt4ToInt32(i pgtype.Int4) int32 {
-	if !i.Valid {
-		return 0
-	}
-	return i.Int32
-}
-
-func int32ToPgtypeInt4(i int32) pgtype.Int4 {
-	return pgtype.Int4{Int32: i, Valid: true}
-}
-
-func int32PtrToPgtypeInt4(i *int32) pgtype.Int4 {
-	if i == nil {
-		return pgtype.Int4{Valid: false}
-	}
-	return pgtype.Int4{Int32: *i, Valid: true}
-}
-
-// Int8 conversions
-func pgtypeInt8ToInt64(i pgtype.Int8) int64 {
-	if !i.Valid {
-		return 0
-	}
-	return i.Int64
-}
-
-func int64ToPgtypeInt8(i int64) pgtype.Int8 {
-	return pgtype.Int8{Int64: i, Valid: true}
-}
-
-// Float8 conversions
-func pgtypeFloat8ToFloat64(f pgtype.Float8) float64 {
-	if !f.Valid {
-		return 0
-	}
-	return f.Float64
-}
-
-func float64ToPgtypeFloat8(f float64) pgtype.Float8 {
-	return pgtype.Float8{Float64: f, Valid: true}
-}
-
-func float64PtrToPgtypeFloat8(f *float64) pgtype.Float8 {
-	if f == nil {
-		return pgtype.Float8{Valid: false}
-	}
-	return pgtype.Float8{Float64: *f, Valid: true}
+	return pgutils.BoolTo(v.(pgtype.Bool))
 }
