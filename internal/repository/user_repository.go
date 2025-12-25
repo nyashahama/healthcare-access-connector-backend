@@ -325,8 +325,8 @@ func (r *userRepository) UpdateUserStatus(ctx context.Context, id uuid.UUID, sta
 	}()
 
 	err := r.db.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
-		ID:     uuidToPgtypeUUID(id),
-		Status: pgtype.Text{String: status, Valid: true},
+		ID:     pgutils.UUIDFrom(id),
+		Status: pgutils.TextFrom(status),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("update_user_status", "error").Inc()
@@ -343,7 +343,7 @@ func (r *userRepository) UpdateLastLogin(ctx context.Context, id uuid.UUID) erro
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.UpdateUserLastLogin(ctx, uuidToPgtypeUUID(id))
+	err := r.db.UpdateUserLastLogin(ctx, pgutils.UUIDFrom(id))
 	if err != nil {
 		dbQueryTotal.WithLabelValues("update_last_login", "error").Inc()
 		return r.handleError(err, "update last login")
@@ -359,7 +359,7 @@ func (r *userRepository) VerifyUser(ctx context.Context, id uuid.UUID) error {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.VerifyUser(ctx, uuidToPgtypeUUID(id))
+	err := r.db.VerifyUser(ctx, pgutils.UUIDFrom(id))
 	if err != nil {
 		dbQueryTotal.WithLabelValues("verify_user", "error").Inc()
 		return r.handleError(err, "verify user")
@@ -377,9 +377,9 @@ func (r *userRepository) SetVerificationToken(ctx context.Context, id uuid.UUID,
 	}()
 
 	err := r.db.SetVerificationToken(ctx, sqlc.SetVerificationTokenParams{
-		ID:                  uuidToPgtypeUUID(id),
-		VerificationToken:   pgtype.Text{String: token, Valid: true},
-		VerificationExpires: pgtype.Timestamp{Time: expires, Valid: true},
+		ID:                  pgutils.UUIDFrom(id),
+		VerificationToken:   pgutils.TextFrom(token),
+		VerificationExpires: pgutils.TimestampFrom(expires),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("set_verification_token", "error").Inc()
@@ -398,9 +398,9 @@ func (r *userRepository) SetPasswordResetToken(ctx context.Context, id uuid.UUID
 	}()
 
 	err := r.db.SetPasswordResetToken(ctx, sqlc.SetPasswordResetTokenParams{
-		ID:                   uuidToPgtypeUUID(id),
-		ResetPasswordToken:   pgtype.Text{String: token, Valid: true},
-		ResetPasswordExpires: pgtype.Timestamp{Time: expires, Valid: true},
+		ID:                   pgutils.UUIDFrom(id),
+		ResetPasswordToken:   pgutils.TextFrom(token),
+		ResetPasswordExpires: pgutils.TimestampFrom(expires),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("set_password_reset_token", "error").Inc()
@@ -419,8 +419,8 @@ func (r *userRepository) UpdateUserPassword(ctx context.Context, id uuid.UUID, p
 	}()
 
 	err := r.db.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
-		ID:           uuidToPgtypeUUID(id),
-		PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
+		ID:           pgutils.UUIDFrom(id),
+		PasswordHash: pgutils.TextFrom(passwordHash),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("update_user_password", "error").Inc()
@@ -438,8 +438,8 @@ func (r *userRepository) DeactivateUser(ctx context.Context, id uuid.UUID) error
 	}()
 
 	err := r.db.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
-		ID:     uuidToPgtypeUUID(id),
-		Status: pgtype.Text{String: "inactive", Valid: true},
+		ID:     pgutils.UUIDFrom(id),
+		Status: pgutils.TextFrom("inactive"),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("deactivate_user", "error").Inc()
@@ -470,7 +470,17 @@ func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offs
 
 	result := make([]domain.User, len(users))
 	for i, u := range users {
-		result[i] = r.mapToUserFromList(u)
+		result[i] = r.mapUser(userRow{
+			ID:                          u.ID,
+			Email:                       u.Email,
+			Phone:                       u.Phone,
+			Role:                        u.Role,
+			Status:                      u.Status,
+			IsVerified:                  u.IsVerified,
+			LastLogin:                   u.LastLogin,
+			ProfileCompletionPercentage: u.ProfileCompletionPercentage,
+			CreatedAt:                   u.CreatedAt,
+		})
 	}
 
 	return result, nil
