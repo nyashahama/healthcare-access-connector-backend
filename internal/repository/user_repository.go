@@ -510,12 +510,12 @@ func (r *userRepository) SaveOTP(ctx context.Context, otp domain.OTPVerification
 	}()
 
 	_, err := r.db.SaveOTP(ctx, sqlc.SaveOTPParams{
-		ID:        uuidToPgtypeUUID(otp.ID),
-		UserID:    uuidToPgtypeUUID(otp.UserID),
+		ID:        pgutils.UUIDFrom(otp.ID),
+		UserID:    pgutils.UUIDFrom(otp.UserID),
 		Otp:       otp.OTP,
 		Type:      otp.Type,
 		Channel:   otp.Channel,
-		ExpiresAt: timeToPgtypeTimestamp(otp.ExpiresAt),
+		ExpiresAt: pgutils.TimestampFrom(otp.ExpiresAt),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("save_otp", "error").Inc()
@@ -534,7 +534,7 @@ func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpT
 	}()
 
 	record, err := r.db.GetOTP(ctx, sqlc.GetOTPParams{
-		UserID: uuidToPgtypeUUID(userID),
+		UserID: pgutils.UUIDFrom(userID),
 		Otp:    otp,
 		Type:   otpType,
 	})
@@ -550,14 +550,14 @@ func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpT
 	dbQueryTotal.WithLabelValues("get_otp", "success").Inc()
 
 	return domain.OTPVerification{
-		ID:        pgtypeUUIDToUUID(record.ID),
-		UserID:    pgtypeUUIDToUUID(record.UserID),
+		ID:        pgutils.UUIDTo(record.ID),
+		UserID:    pgutils.UUIDTo(record.UserID),
 		OTP:       record.Otp,
 		Type:      record.Type,
 		Channel:   record.Channel,
-		ExpiresAt: record.ExpiresAt.Time,
-		UsedAt:    pgtypeTimestampToTimePtr(record.UsedAt),
-		CreatedAt: record.CreatedAt.Time,
+		ExpiresAt: pgutils.TimestampTo(record.ExpiresAt),
+		UsedAt:    pgutils.TimestampToPtr(record.UsedAt),
+		CreatedAt: pgutils.TimestampTo(record.CreatedAt),
 	}, nil
 }
 
@@ -569,8 +569,8 @@ func (r *userRepository) MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedA
 	}()
 
 	err := r.db.MarkOTPUsed(ctx, sqlc.MarkOTPUsedParams{
-		ID:     uuidToPgtypeUUID(otpID),
-		UsedAt: timePtrToPgtypeTimestamp(usedAt),
+		ID:     pgutils.UUIDFrom(otpID),
+		UsedAt: pgutils.TimestampFromPtr(usedAt),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("mark_otp_used", "error").Inc()
@@ -606,7 +606,7 @@ func (r *userRepository) DeleteUserOTPs(ctx context.Context, userID uuid.UUID, o
 	}()
 
 	err := r.db.DeleteUserOTPs(ctx, sqlc.DeleteUserOTPsParams{
-		UserID: uuidToPgtypeUUID(userID),
+		UserID: pgutils.UUIDFrom(userID),
 		Type:   otpType,
 	})
 	if err != nil {
@@ -626,7 +626,7 @@ func (r *userRepository) GetOTPAttemptCount(ctx context.Context, userID uuid.UUI
 	}()
 
 	count, err := r.db.GetOTPAttemptCount(ctx, sqlc.GetOTPAttemptCountParams{
-		UserID: uuidToPgtypeUUID(userID),
+		UserID: pgutils.UUIDFrom(userID),
 		Type:   otpType,
 	})
 	if err != nil {
