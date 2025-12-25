@@ -183,14 +183,24 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (doma
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_email", "success").Inc()
-
-	// Extract password hash
-	passwordHash := ""
-	if u.PasswordHash.Valid {
-		passwordHash = u.PasswordHash.String
-	}
-
-	return r.mapToUserFromGetByEmail(u), passwordHash, nil
+	return r.mapUser(userRow{
+		ID:                          u.ID,
+		Email:                       u.Email,
+		Phone:                       u.Phone,
+		Role:                        u.Role,
+		Status:                      u.Status,
+		IsVerified:                  u.IsVerified,
+		VerificationToken:           u.VerificationToken,
+		VerificationExpires:         u.VerificationExpires,
+		LastLogin:                   u.LastLogin,
+		LoginCount:                  u.LoginCount,
+		IsSmsOnly:                   u.IsSmsOnly,
+		SmsConsentGiven:             u.SmsConsentGiven,
+		PopiaConsentGiven:           u.PopiaConsentGiven,
+		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
+		CreatedAt:                   u.CreatedAt,
+		UpdatedAt:                   u.UpdatedAt,
+	}), pgutils.TextToString(u.PasswordHash), nil
 }
 
 func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (domain.User, error) {
