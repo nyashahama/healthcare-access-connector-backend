@@ -279,10 +279,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// Convert uuid.UUID to pgtype.UUID
-	pgID := uuidToPgtypeUUID(id)
-
-	u, err := r.db.GetUserByID(ctx, pgID)
+	u, err := r.db.GetUserByID(ctx, pgutils.UUIDFrom(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_id", "not_found").Inc()
@@ -293,8 +290,20 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_id", "success").Inc()
-
-	return r.mapToUserFromGetByID(u), nil
+	return r.mapUser(userRow{
+		ID:                          u.ID,
+		Email:                       u.Email,
+		Phone:                       u.Phone,
+		Role:                        u.Role,
+		Status:                      u.Status,
+		IsVerified:                  u.IsVerified,
+		LastLogin:                   u.LastLogin,
+		LoginCount:                  u.LoginCount,
+		IsSmsOnly:                   u.IsSmsOnly,
+		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
+		CreatedAt:                   u.CreatedAt,
+		UpdatedAt:                   u.UpdatedAt,
+	}), nil
 }
 
 func (r *userRepository) UpdateUser(ctx context.Context, user domain.User) error {
