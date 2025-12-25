@@ -57,28 +57,16 @@ func (r *userRepository) CreateUser(ctx context.Context, user domain.User, passw
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// Convert email pointer to string for sqlc
-	var email string
-	if user.Email != nil {
-		email = *user.Email
-	}
-
-	// Convert phone pointer to pgtype.Text for sqlc
-	var phone pgtype.Text
-	if user.Phone != nil {
-		phone = pgtype.Text{String: *user.Phone, Valid: true}
-	}
-
 	created, err := r.db.CreateUser(ctx, sqlc.CreateUserParams{
-		Email:             email,
-		Phone:             phone,
-		PasswordHash:      pgtype.Text{String: passwordHash, Valid: true},
+		Email:             pgutils.StringFromPtr(user.Email),
+		Phone:             pgutils.TextFromPtr(user.Phone),
+		PasswordHash:      pgutils.TextFrom(passwordHash),
 		Role:              user.Role,
-		Status:            pgtype.Text{String: user.Status, Valid: true},
-		IsSmsOnly:         pgtype.Bool{Bool: user.IsSMSOnly, Valid: true},
-		SmsConsentGiven:   pgtype.Bool{Bool: user.SMSConsentGiven, Valid: true},
-		PopiaConsentGiven: pgtype.Bool{Bool: user.POPIAConsentGiven, Valid: true},
-		ConsentDate:       timePtrToPgtypeTimestamp(user.ConsentDate),
+		Status:            pgutils.TextFrom(user.Status),
+		IsSmsOnly:         pgutils.BoolFrom(user.IsSMSOnly),
+		SmsConsentGiven:   pgutils.BoolFrom(user.SMSConsentGiven),
+		PopiaConsentGiven: pgutils.BoolFrom(user.POPIAConsentGiven),
+		ConsentDate:       pgutils.TimestampFromPtr(user.ConsentDate),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("create_user", "error").Inc()
@@ -86,8 +74,20 @@ func (r *userRepository) CreateUser(ctx context.Context, user domain.User, passw
 	}
 
 	dbQueryTotal.WithLabelValues("create_user", "success").Inc()
-
-	return r.mapToUserFromCreate(created), nil
+	return r.mapUser(userRow{
+		ID:                          created.ID,
+		Email:                       created.Email,
+		Phone:                       created.Phone,
+		Role:                        created.Role,
+		Status:                      created.Status,
+		IsVerified:                  created.IsVerified,
+		LastLogin:                   created.LastLogin,
+		LoginCount:                  created.LoginCount,
+		IsSmsOnly:                   created.IsSmsOnly,
+		ProfileCompletionPercentage: created.ProfileCompletionPercentage,
+		CreatedAt:                   created.CreatedAt,
+		UpdatedAt:                   created.UpdatedAt,
+	}), nil
 }
 
 // GetUserByVerificationToken gets user by verification token
