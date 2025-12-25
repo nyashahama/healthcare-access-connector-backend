@@ -135,7 +135,7 @@ func (r *userRepository) GetUserByPasswordResetToken(ctx context.Context, token 
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPasswordResetToken(ctx, pgtype.Text{String: token, Valid: true})
+	u, err := r.db.GetUserByPasswordResetToken(ctx, pgutils.TextFrom(token))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "not_found").Inc()
@@ -146,14 +146,24 @@ func (r *userRepository) GetUserByPasswordResetToken(ctx context.Context, token 
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "success").Inc()
-
-	// Extract password hash
-	passwordHash := ""
-	if u.PasswordHash.Valid {
-		passwordHash = u.PasswordHash.String
-	}
-
-	return r.mapToUserFromGetByPasswordResetToken(u), passwordHash, nil
+	return r.mapUser(userRow{
+		ID:                          u.ID,
+		Email:                       u.Email,
+		Phone:                       u.Phone,
+		Role:                        u.Role,
+		Status:                      u.Status,
+		IsVerified:                  u.IsVerified,
+		ResetPasswordToken:          u.ResetPasswordToken,
+		ResetPasswordExpires:        u.ResetPasswordExpires,
+		LastLogin:                   u.LastLogin,
+		LoginCount:                  u.LoginCount,
+		IsSmsOnly:                   u.IsSmsOnly,
+		SmsConsentGiven:             u.SmsConsentGiven,
+		PopiaConsentGiven:           u.PopiaConsentGiven,
+		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
+		CreatedAt:                   u.CreatedAt,
+		UpdatedAt:                   u.UpdatedAt,
+	}), pgutils.TextToString(u.PasswordHash), nil
 }
 
 func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (domain.User, string, error) {
