@@ -209,7 +209,7 @@ func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (doma
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPhone(ctx, pgtype.Text{String: phone, Valid: true})
+	u, err := r.db.GetUserByPhone(ctx, pgutils.TextFrom(phone))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_phone", "not_found").Inc()
@@ -220,8 +220,22 @@ func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (doma
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_phone", "success").Inc()
-
-	return r.mapToUserFromGetByPhone(u), nil
+	return r.mapUser(userRow{
+		ID:                          u.ID,
+		Email:                       u.Email,
+		Phone:                       u.Phone,
+		Role:                        u.Role,
+		Status:                      u.Status,
+		IsVerified:                  u.IsVerified,
+		LastLogin:                   u.LastLogin,
+		LoginCount:                  u.LoginCount,
+		IsSmsOnly:                   u.IsSmsOnly,
+		SmsConsentGiven:             u.SmsConsentGiven,
+		PopiaConsentGiven:           u.PopiaConsentGiven,
+		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
+		CreatedAt:                   u.CreatedAt,
+		UpdatedAt:                   u.UpdatedAt,
+	}), nil
 }
 
 func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone string) (domain.User, string, error) {
