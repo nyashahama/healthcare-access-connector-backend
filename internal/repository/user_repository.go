@@ -244,7 +244,7 @@ func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPhoneWithHash(ctx, pgtype.Text{String: phone, Valid: true})
+	u, err := r.db.GetUserByPhoneWithHash(ctx, pgutils.TextFrom(phone))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "not_found").Inc()
@@ -255,14 +255,22 @@ func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "success").Inc()
-
-	// Extract password hash
-	passwordHash := ""
-	if u.PasswordHash.Valid {
-		passwordHash = u.PasswordHash.String
-	}
-
-	return r.mapToUserFromGetByPhoneWithHash(u), passwordHash, nil
+	return r.mapUser(userRow{
+		ID:                          u.ID,
+		Email:                       u.Email,
+		Phone:                       u.Phone,
+		Role:                        u.Role,
+		Status:                      u.Status,
+		IsVerified:                  u.IsVerified,
+		LastLogin:                   u.LastLogin,
+		LoginCount:                  u.LoginCount,
+		IsSmsOnly:                   u.IsSmsOnly,
+		SmsConsentGiven:             u.SmsConsentGiven,
+		PopiaConsentGiven:           u.PopiaConsentGiven,
+		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
+		CreatedAt:                   u.CreatedAt,
+		UpdatedAt:                   u.UpdatedAt,
+	}), pgutils.TextToString(u.PasswordHash), nil
 }
 
 func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error) {
