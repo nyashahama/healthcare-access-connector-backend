@@ -97,7 +97,7 @@ func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token s
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByVerificationToken(ctx, pgtype.Text{String: token, Valid: true})
+	u, err := r.db.GetUserByVerificationToken(ctx, pgutils.TextFrom(token))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_verification_token", "not_found").Inc()
@@ -108,14 +108,24 @@ func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token s
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_verification_token", "success").Inc()
-
-	// Extract password hash
-	passwordHash := ""
-	if u.PasswordHash.Valid {
-		passwordHash = u.PasswordHash.String
-	}
-
-	return r.mapToUserFromGetByVerificationToken(u), passwordHash, nil
+	return r.mapUser(userRow{
+		ID:                          u.ID,
+		Email:                       u.Email,
+		Phone:                       u.Phone,
+		Role:                        u.Role,
+		Status:                      u.Status,
+		IsVerified:                  u.IsVerified,
+		VerificationToken:           u.VerificationToken,
+		VerificationExpires:         u.VerificationExpires,
+		LastLogin:                   u.LastLogin,
+		LoginCount:                  u.LoginCount,
+		IsSmsOnly:                   u.IsSmsOnly,
+		SmsConsentGiven:             u.SmsConsentGiven,
+		PopiaConsentGiven:           u.PopiaConsentGiven,
+		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
+		CreatedAt:                   u.CreatedAt,
+		UpdatedAt:                   u.UpdatedAt,
+	}), pgutils.TextToString(u.PasswordHash), nil
 }
 
 // GetUserByPasswordResetToken gets user by password reset token
