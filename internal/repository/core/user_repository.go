@@ -1,4 +1,4 @@
-// internal/repository/core/user_repository.go
+// Package repository implements data access layer
 package core
 
 import (
@@ -13,7 +13,6 @@ import (
 	sqlc "github.com/nyashahama/healthcare-access-connector-backend/internal/db"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository/pgutils"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -41,9 +40,6 @@ var (
 	)
 )
 
-var _ repository.UserRepository = (*userRepository)(nil)
-
-
 type userRepository struct {
 	db *sqlc.Queries
 }
@@ -61,16 +57,28 @@ func (r *userRepository) CreateUser(ctx context.Context, user domain.User, passw
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
+	// Convert email pointer to string for sqlc
+	var email string
+	if user.Email != nil {
+		email = *user.Email
+	}
+
+	// Convert phone pointer to pgtype.Text for sqlc
+	var phone pgtype.Text
+	if user.Phone != nil {
+		phone = pgtype.Text{String: *user.Phone, Valid: true}
+	}
+
 	created, err := r.db.CreateUser(ctx, sqlc.CreateUserParams{
-		Email:             pgutils.StringFromPtr(user.Email),
-		Phone:             pgutils.TextFromPtr(user.Phone),
-		PasswordHash:      pgutils.TextFrom(passwordHash),
+		Email:             email,
+		Phone:             phone,
+		PasswordHash:      pgtype.Text{String: passwordHash, Valid: true},
 		Role:              user.Role,
-		Status:            pgutils.TextFrom(user.Status),
-		IsSmsOnly:         pgutils.BoolFrom(user.IsSMSOnly),
-		SmsConsentGiven:   pgutils.BoolFrom(user.SMSConsentGiven),
-		PopiaConsentGiven: pgutils.BoolFrom(user.POPIAConsentGiven),
-		ConsentDate:       pgutils.TimestampFromPtr(user.ConsentDate),
+		Status:            pgtype.Text{String: user.Status, Valid: true},
+		IsSmsOnly:         pgtype.Bool{Bool: user.IsSMSOnly, Valid: true},
+		SmsConsentGiven:   pgtype.Bool{Bool: user.SMSConsentGiven, Valid: true},
+		PopiaConsentGiven: pgtype.Bool{Bool: user.POPIAConsentGiven, Valid: true},
+		ConsentDate:       timePtrToPgtypeTimestamp(user.ConsentDate),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("create_user", "error").Inc()
@@ -78,20 +86,8 @@ func (r *userRepository) CreateUser(ctx context.Context, user domain.User, passw
 	}
 
 	dbQueryTotal.WithLabelValues("create_user", "success").Inc()
-	return r.mapUser(userRow{
-		ID:                          created.ID,
-		Email:                       created.Email,
-		Phone:                       created.Phone,
-		Role:                        created.Role,
-		Status:                      created.Status,
-		IsVerified:                  created.IsVerified,
-		LastLogin:                   created.LastLogin,
-		LoginCount:                  created.LoginCount,
-		IsSmsOnly:                   created.IsSmsOnly,
-		ProfileCompletionPercentage: created.ProfileCompletionPercentage,
-		CreatedAt:                   created.CreatedAt,
-		UpdatedAt:                   created.UpdatedAt,
-	}), nil
+
+	return r.mapToUserFromCreate(created), nil
 }
 
 // GetUserByVerificationToken gets user by verification token
@@ -101,7 +97,7 @@ func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token s
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByVerificationToken(ctx, pgutils.TextFrom(token))
+	u, err := r.db.GetUserByVerificationToken(ctx, pgtype.Text{String: token, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_verification_token", "not_found").Inc()
@@ -112,24 +108,14 @@ func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token s
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_verification_token", "success").Inc()
-	return r.mapUser(userRow{
-		ID:                          u.ID,
-		Email:                       u.Email,
-		Phone:                       u.Phone,
-		Role:                        u.Role,
-		Status:                      u.Status,
-		IsVerified:                  u.IsVerified,
-		VerificationToken:           u.VerificationToken,
-		VerificationExpires:         u.VerificationExpires,
-		LastLogin:                   u.LastLogin,
-		LoginCount:                  u.LoginCount,
-		IsSmsOnly:                   u.IsSmsOnly,
-		SmsConsentGiven:             u.SmsConsentGiven,
-		PopiaConsentGiven:           u.PopiaConsentGiven,
-		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
-		CreatedAt:                   u.CreatedAt,
-		UpdatedAt:                   u.UpdatedAt,
-	}), pgutils.TextToString(u.PasswordHash), nil
+
+	// Extract password hash
+	passwordHash := ""
+	if u.PasswordHash.Valid {
+		passwordHash = u.PasswordHash.String
+	}
+
+	return r.mapToUserFromGetByVerificationToken(u), passwordHash, nil
 }
 
 // GetUserByPasswordResetToken gets user by password reset token
@@ -139,7 +125,7 @@ func (r *userRepository) GetUserByPasswordResetToken(ctx context.Context, token 
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPasswordResetToken(ctx, pgutils.TextFrom(token))
+	u, err := r.db.GetUserByPasswordResetToken(ctx, pgtype.Text{String: token, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "not_found").Inc()
@@ -150,24 +136,14 @@ func (r *userRepository) GetUserByPasswordResetToken(ctx context.Context, token 
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "success").Inc()
-	return r.mapUser(userRow{
-		ID:                          u.ID,
-		Email:                       u.Email,
-		Phone:                       u.Phone,
-		Role:                        u.Role,
-		Status:                      u.Status,
-		IsVerified:                  u.IsVerified,
-		ResetPasswordToken:          u.ResetPasswordToken,
-		ResetPasswordExpires:        u.ResetPasswordExpires,
-		LastLogin:                   u.LastLogin,
-		LoginCount:                  u.LoginCount,
-		IsSmsOnly:                   u.IsSmsOnly,
-		SmsConsentGiven:             u.SmsConsentGiven,
-		PopiaConsentGiven:           u.PopiaConsentGiven,
-		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
-		CreatedAt:                   u.CreatedAt,
-		UpdatedAt:                   u.UpdatedAt,
-	}), pgutils.TextToString(u.PasswordHash), nil
+
+	// Extract password hash
+	passwordHash := ""
+	if u.PasswordHash.Valid {
+		passwordHash = u.PasswordHash.String
+	}
+
+	return r.mapToUserFromGetByPasswordResetToken(u), passwordHash, nil
 }
 
 func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (domain.User, string, error) {
@@ -187,24 +163,14 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (doma
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_email", "success").Inc()
-	return r.mapUser(userRow{
-		ID:                          u.ID,
-		Email:                       u.Email,
-		Phone:                       u.Phone,
-		Role:                        u.Role,
-		Status:                      u.Status,
-		IsVerified:                  u.IsVerified,
-		VerificationToken:           u.VerificationToken,
-		VerificationExpires:         u.VerificationExpires,
-		LastLogin:                   u.LastLogin,
-		LoginCount:                  u.LoginCount,
-		IsSmsOnly:                   u.IsSmsOnly,
-		SmsConsentGiven:             u.SmsConsentGiven,
-		PopiaConsentGiven:           u.PopiaConsentGiven,
-		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
-		CreatedAt:                   u.CreatedAt,
-		UpdatedAt:                   u.UpdatedAt,
-	}), pgutils.TextToString(u.PasswordHash), nil
+
+	// Extract password hash
+	passwordHash := ""
+	if u.PasswordHash.Valid {
+		passwordHash = u.PasswordHash.String
+	}
+
+	return r.mapToUserFromGetByEmail(u), passwordHash, nil
 }
 
 func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (domain.User, error) {
@@ -213,7 +179,7 @@ func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (doma
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPhone(ctx, pgutils.TextFrom(phone))
+	u, err := r.db.GetUserByPhone(ctx, pgtype.Text{String: phone, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_phone", "not_found").Inc()
@@ -224,22 +190,8 @@ func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (doma
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_phone", "success").Inc()
-	return r.mapUser(userRow{
-		ID:                          u.ID,
-		Email:                       u.Email,
-		Phone:                       u.Phone,
-		Role:                        u.Role,
-		Status:                      u.Status,
-		IsVerified:                  u.IsVerified,
-		LastLogin:                   u.LastLogin,
-		LoginCount:                  u.LoginCount,
-		IsSmsOnly:                   u.IsSmsOnly,
-		SmsConsentGiven:             u.SmsConsentGiven,
-		PopiaConsentGiven:           u.PopiaConsentGiven,
-		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
-		CreatedAt:                   u.CreatedAt,
-		UpdatedAt:                   u.UpdatedAt,
-	}), nil
+
+	return r.mapToUserFromGetByPhone(u), nil
 }
 
 func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone string) (domain.User, string, error) {
@@ -248,7 +200,7 @@ func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPhoneWithHash(ctx, pgutils.TextFrom(phone))
+	u, err := r.db.GetUserByPhoneWithHash(ctx, pgtype.Text{String: phone, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "not_found").Inc()
@@ -259,22 +211,14 @@ func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "success").Inc()
-	return r.mapUser(userRow{
-		ID:                          u.ID,
-		Email:                       u.Email,
-		Phone:                       u.Phone,
-		Role:                        u.Role,
-		Status:                      u.Status,
-		IsVerified:                  u.IsVerified,
-		LastLogin:                   u.LastLogin,
-		LoginCount:                  u.LoginCount,
-		IsSmsOnly:                   u.IsSmsOnly,
-		SmsConsentGiven:             u.SmsConsentGiven,
-		PopiaConsentGiven:           u.PopiaConsentGiven,
-		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
-		CreatedAt:                   u.CreatedAt,
-		UpdatedAt:                   u.UpdatedAt,
-	}), pgutils.TextToString(u.PasswordHash), nil
+
+	// Extract password hash
+	passwordHash := ""
+	if u.PasswordHash.Valid {
+		passwordHash = u.PasswordHash.String
+	}
+
+	return r.mapToUserFromGetByPhoneWithHash(u), passwordHash, nil
 }
 
 func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error) {
@@ -283,7 +227,10 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByID(ctx, pgutils.UUIDFrom(id))
+	// Convert uuid.UUID to pgtype.UUID
+	pgID := uuidToPgtypeUUID(id)
+
+	u, err := r.db.GetUserByID(ctx, pgID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_id", "not_found").Inc()
@@ -294,20 +241,8 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_id", "success").Inc()
-	return r.mapUser(userRow{
-		ID:                          u.ID,
-		Email:                       u.Email,
-		Phone:                       u.Phone,
-		Role:                        u.Role,
-		Status:                      u.Status,
-		IsVerified:                  u.IsVerified,
-		LastLogin:                   u.LastLogin,
-		LoginCount:                  u.LoginCount,
-		IsSmsOnly:                   u.IsSmsOnly,
-		ProfileCompletionPercentage: u.ProfileCompletionPercentage,
-		CreatedAt:                   u.CreatedAt,
-		UpdatedAt:                   u.UpdatedAt,
-	}), nil
+
+	return r.mapToUserFromGetByID(u), nil
 }
 
 func (r *userRepository) UpdateUser(ctx context.Context, user domain.User) error {
@@ -329,8 +264,8 @@ func (r *userRepository) UpdateUserStatus(ctx context.Context, id uuid.UUID, sta
 	}()
 
 	err := r.db.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
-		ID:     pgutils.UUIDFrom(id),
-		Status: pgutils.TextFrom(status),
+		ID:     uuidToPgtypeUUID(id),
+		Status: pgtype.Text{String: status, Valid: true},
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("update_user_status", "error").Inc()
@@ -347,7 +282,7 @@ func (r *userRepository) UpdateLastLogin(ctx context.Context, id uuid.UUID) erro
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.UpdateUserLastLogin(ctx, pgutils.UUIDFrom(id))
+	err := r.db.UpdateUserLastLogin(ctx, uuidToPgtypeUUID(id))
 	if err != nil {
 		dbQueryTotal.WithLabelValues("update_last_login", "error").Inc()
 		return r.handleError(err, "update last login")
@@ -363,7 +298,7 @@ func (r *userRepository) VerifyUser(ctx context.Context, id uuid.UUID) error {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.VerifyUser(ctx, pgutils.UUIDFrom(id))
+	err := r.db.VerifyUser(ctx, uuidToPgtypeUUID(id))
 	if err != nil {
 		dbQueryTotal.WithLabelValues("verify_user", "error").Inc()
 		return r.handleError(err, "verify user")
@@ -381,9 +316,9 @@ func (r *userRepository) SetVerificationToken(ctx context.Context, id uuid.UUID,
 	}()
 
 	err := r.db.SetVerificationToken(ctx, sqlc.SetVerificationTokenParams{
-		ID:                  pgutils.UUIDFrom(id),
-		VerificationToken:   pgutils.TextFrom(token),
-		VerificationExpires: pgutils.TimestampFrom(expires),
+		ID:                  uuidToPgtypeUUID(id),
+		VerificationToken:   pgtype.Text{String: token, Valid: true},
+		VerificationExpires: pgtype.Timestamp{Time: expires, Valid: true},
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("set_verification_token", "error").Inc()
@@ -402,9 +337,9 @@ func (r *userRepository) SetPasswordResetToken(ctx context.Context, id uuid.UUID
 	}()
 
 	err := r.db.SetPasswordResetToken(ctx, sqlc.SetPasswordResetTokenParams{
-		ID:                   pgutils.UUIDFrom(id),
-		ResetPasswordToken:   pgutils.TextFrom(token),
-		ResetPasswordExpires: pgutils.TimestampFrom(expires),
+		ID:                   uuidToPgtypeUUID(id),
+		ResetPasswordToken:   pgtype.Text{String: token, Valid: true},
+		ResetPasswordExpires: pgtype.Timestamp{Time: expires, Valid: true},
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("set_password_reset_token", "error").Inc()
@@ -423,8 +358,8 @@ func (r *userRepository) UpdateUserPassword(ctx context.Context, id uuid.UUID, p
 	}()
 
 	err := r.db.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
-		ID:           pgutils.UUIDFrom(id),
-		PasswordHash: pgutils.TextFrom(passwordHash),
+		ID:           uuidToPgtypeUUID(id),
+		PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("update_user_password", "error").Inc()
@@ -442,8 +377,8 @@ func (r *userRepository) DeactivateUser(ctx context.Context, id uuid.UUID) error
 	}()
 
 	err := r.db.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
-		ID:     pgutils.UUIDFrom(id),
-		Status: pgutils.TextFrom("inactive"),
+		ID:     uuidToPgtypeUUID(id),
+		Status: pgtype.Text{String: "inactive", Valid: true},
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("deactivate_user", "error").Inc()
@@ -474,17 +409,7 @@ func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offs
 
 	result := make([]domain.User, len(users))
 	for i, u := range users {
-		result[i] = r.mapUser(userRow{
-			ID:                          u.ID,
-			Email:                       u.Email,
-			Phone:                       u.Phone,
-			Role:                        u.Role,
-			Status:                      u.Status,
-			IsVerified:                  u.IsVerified,
-			LastLogin:                   u.LastLogin,
-			ProfileCompletionPercentage: u.ProfileCompletionPercentage,
-			CreatedAt:                   u.CreatedAt,
-		})
+		result[i] = r.mapToUserFromList(u)
 	}
 
 	return result, nil
@@ -514,12 +439,12 @@ func (r *userRepository) SaveOTP(ctx context.Context, otp domain.OTPVerification
 	}()
 
 	_, err := r.db.SaveOTP(ctx, sqlc.SaveOTPParams{
-		ID:        pgutils.UUIDFrom(otp.ID),
-		UserID:    pgutils.UUIDFrom(otp.UserID),
+		ID:        uuidToPgtypeUUID(otp.ID),
+		UserID:    uuidToPgtypeUUID(otp.UserID),
 		Otp:       otp.OTP,
 		Type:      otp.Type,
 		Channel:   otp.Channel,
-		ExpiresAt: pgutils.TimestampFrom(otp.ExpiresAt),
+		ExpiresAt: timeToPgtypeTimestamp(otp.ExpiresAt),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("save_otp", "error").Inc()
@@ -538,7 +463,7 @@ func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpT
 	}()
 
 	record, err := r.db.GetOTP(ctx, sqlc.GetOTPParams{
-		UserID: pgutils.UUIDFrom(userID),
+		UserID: uuidToPgtypeUUID(userID),
 		Otp:    otp,
 		Type:   otpType,
 	})
@@ -554,14 +479,14 @@ func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpT
 	dbQueryTotal.WithLabelValues("get_otp", "success").Inc()
 
 	return domain.OTPVerification{
-		ID:        pgutils.UUIDTo(record.ID),
-		UserID:    pgutils.UUIDTo(record.UserID),
+		ID:        pgtypeUUIDToUUID(record.ID),
+		UserID:    pgtypeUUIDToUUID(record.UserID),
 		OTP:       record.Otp,
 		Type:      record.Type,
 		Channel:   record.Channel,
-		ExpiresAt: pgutils.TimestampTo(record.ExpiresAt),
-		UsedAt:    pgutils.TimestampToPtr(record.UsedAt),
-		CreatedAt: pgutils.TimestampTo(record.CreatedAt),
+		ExpiresAt: record.ExpiresAt.Time,
+		UsedAt:    pgtypeTimestampToTimePtr(record.UsedAt),
+		CreatedAt: record.CreatedAt.Time,
 	}, nil
 }
 
@@ -573,8 +498,8 @@ func (r *userRepository) MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedA
 	}()
 
 	err := r.db.MarkOTPUsed(ctx, sqlc.MarkOTPUsedParams{
-		ID:     pgutils.UUIDFrom(otpID),
-		UsedAt: pgutils.TimestampFromPtr(usedAt),
+		ID:     uuidToPgtypeUUID(otpID),
+		UsedAt: timePtrToPgtypeTimestamp(usedAt),
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("mark_otp_used", "error").Inc()
@@ -610,7 +535,7 @@ func (r *userRepository) DeleteUserOTPs(ctx context.Context, userID uuid.UUID, o
 	}()
 
 	err := r.db.DeleteUserOTPs(ctx, sqlc.DeleteUserOTPsParams{
-		UserID: pgutils.UUIDFrom(userID),
+		UserID: uuidToPgtypeUUID(userID),
 		Type:   otpType,
 	})
 	if err != nil {
@@ -630,7 +555,7 @@ func (r *userRepository) GetOTPAttemptCount(ctx context.Context, userID uuid.UUI
 	}()
 
 	count, err := r.db.GetOTPAttemptCount(ctx, sqlc.GetOTPAttemptCountParams{
-		UserID: pgutils.UUIDFrom(userID),
+		UserID: uuidToPgtypeUUID(userID),
 		Type:   otpType,
 	})
 	if err != nil {
@@ -640,6 +565,159 @@ func (r *userRepository) GetOTPAttemptCount(ctx context.Context, userID uuid.UUI
 
 	dbQueryTotal.WithLabelValues("get_otp_attempt_count", "success").Inc()
 	return count, nil
+}
+
+// Helper functions for mapping
+
+func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		SMSConsentGiven:      false, // Not returned in CreateUser
+		POPIAConsentGiven:    false, // Not returned in CreateUser
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromGetByEmail(u sqlc.GetUserByEmailRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		VerificationToken:    pgtypeTextToStringPtr(u.VerificationToken),
+		VerificationExpires:  pgtypeTimestampToTimePtr(u.VerificationExpires),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
+		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromGetByPhone(u sqlc.GetUserByPhoneRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
+		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromGetByID(u sqlc.GetUserByIDRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromList(u sqlc.ListUsersByRoleRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromGetByVerificationToken(u sqlc.GetUserByVerificationTokenRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		VerificationToken:    pgtypeTextToStringPtr(u.VerificationToken),
+		VerificationExpires:  pgtypeTimestampToTimePtr(u.VerificationExpires),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
+		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromGetByPasswordResetToken(u sqlc.GetUserByPasswordResetTokenRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		ResetPasswordToken:   pgtypeTextToStringPtr(u.ResetPasswordToken),
+		ResetPasswordExpires: pgtypeTimestampToTimePtr(u.ResetPasswordExpires),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
+		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
+	}
+}
+
+func (r *userRepository) mapToUserFromGetByPhoneWithHash(u sqlc.GetUserByPhoneWithHashRow) domain.User {
+	return domain.User{
+		ID:                   pgtypeUUIDToUUID(u.ID),
+		Email:                stringToStringPtr(u.Email),
+		Phone:                pgtypeTextToStringPtr(u.Phone),
+		Role:                 u.Role,
+		Status:               pgtypeTextToString(u.Status),
+		IsVerified:           pgtypeBoolToBool(u.IsVerified),
+		LastLogin:            pgtypeTimestampToTimePtr(u.LastLogin),
+		LoginCount:           int(u.LoginCount.Int32),
+		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
+		SMSConsentGiven:      pgtypeBoolToBool(u.SmsConsentGiven),
+		POPIAConsentGiven:    pgtypeBoolToBool(u.PopiaConsentGiven),
+		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		CreatedAt:            u.CreatedAt.Time,
+		UpdatedAt:            u.UpdatedAt.Time,
+	}
 }
 
 // handleError converts database errors to domain errors
@@ -666,107 +744,154 @@ func (r *userRepository) handleError(err error, operation string) error {
 }
 
 // ========================================
-// SINGLE mapping function using userRow
+// Utility functions for conversions
 // ========================================
 
-// userRow is an intermediate struct that normalizes all sqlc row types
-// This allows us to have ONE mapping function instead of 8+
-type userRow struct {
-	ID                          interface{}
-	Email                       interface{}
-	Phone                       interface{}
-	Role                        string
-	Status                      interface{}
-	IsVerified                  interface{}
-	VerificationToken           interface{}
-	VerificationExpires         interface{}
-	ResetPasswordToken          interface{}
-	ResetPasswordExpires        interface{}
-	LastLogin                   interface{}
-	LoginCount                  interface{}
-	IsSmsOnly                   interface{}
-	SmsConsentGiven             interface{}
-	PopiaConsentGiven           interface{}
-	ProfileCompletionPercentage interface{}
-	CreatedAt                   interface{}
-	UpdatedAt                   interface{}
-}
-
-func (r *userRepository) mapUser(row userRow) domain.User {
-	return domain.User{
-		ID:                   pgutils.UUIDTo(row.ID.(pgtype.UUID)),
-		Email:                pgutils.StringToPtr(row.Email.(string)),
-		Phone:                pgutils.TextToPtr(row.Phone.(pgtype.Text)),
-		Role:                 row.Role,
-		Status:               pgutils.TextToString(row.Status.(pgtype.Text)),
-		IsVerified:           pgutils.BoolTo(row.IsVerified.(pgtype.Bool)),
-		VerificationToken:    r.optionalTextToPtr(row.VerificationToken),
-		VerificationExpires:  r.optionalTimestampToPtr(row.VerificationExpires),
-		ResetPasswordToken:   r.optionalTextToPtr(row.ResetPasswordToken),
-		ResetPasswordExpires: r.optionalTimestampToPtr(row.ResetPasswordExpires),
-		LastLogin:            r.optionalTimestampToPtr(row.LastLogin),
-		LoginCount:           r.optionalInt32ToInt(row.LoginCount),
-		IsSMSOnly:            r.optionalBool(row.IsSmsOnly),
-		SMSConsentGiven:      r.optionalBool(row.SmsConsentGiven),
-		POPIAConsentGiven:    r.optionalBool(row.PopiaConsentGiven),
-		ProfileCompletionPct: r.optionalInt32ToInt(row.ProfileCompletionPercentage),
-		CreatedAt:            r.requiredTimestamp(row.CreatedAt),
-		UpdatedAt:            r.optionalTimestamp(row.UpdatedAt),
-	}
-}
-
-// Helper methods for handling optional fields in the mapping
-
-func (r *userRepository) optionalTextToPtr(v interface{}) *string {
-	if v == nil {
+// String conversions (for VARCHAR that sqlc maps to string)
+func stringToStringPtr(s string) *string {
+	if s == "" {
 		return nil
 	}
-	return pgutils.TextToPtr(v.(pgtype.Text))
+	return &s
 }
 
-func (r *userRepository) optionalTimestampToPtr(v interface{}) *time.Time {
-	if v == nil {
+// pgtype.Text conversions
+func pgtypeTextToString(t pgtype.Text) string {
+	if !t.Valid {
+		return ""
+	}
+	return t.String
+}
+
+func pgtypeTextToStringPtr(t pgtype.Text) *string {
+	if !t.Valid {
 		return nil
 	}
-	return pgutils.TimestampToPtr(v.(pgtype.Timestamp))
+	return &t.String
 }
 
-func (r *userRepository) optionalTimestamp(v interface{}) time.Time {
-	if v == nil {
-		return time.Time{}
+func stringToPgtypeText(s string) pgtype.Text {
+	if s == "" {
+		return pgtype.Text{Valid: false}
 	}
-	return pgutils.TimestampTo(v.(pgtype.Timestamp))
+	return pgtype.Text{String: s, Valid: true}
 }
 
-func (r *userRepository) requiredTimestamp(v interface{}) time.Time {
-	// This should never be nil for CreatedAt, but we handle it just in case
-	if v == nil {
-		return time.Time{}
+func stringPtrToPgtypeText(s *string) pgtype.Text {
+	if s == nil {
+		return pgtype.Text{Valid: false}
 	}
-	return pgutils.TimestampTo(v.(pgtype.Timestamp))
+	return pgtype.Text{String: *s, Valid: true}
 }
 
-func (r *userRepository) optionalInt32ToInt(v interface{}) int {
-	if v == nil {
-		return 0
-	}
-	pgInt4, ok := v.(pgtype.Int4)
-	if ok {
-		return int(pgutils.Int4To(pgInt4))
-	}
-
-	// Some might be pgtype.Int8, try that too
-	pgInt8, ok := v.(pgtype.Int8)
-	if ok {
-		return int(pgutils.Int8To(pgInt8))
-	}
-
-	return 0
+// UUID conversions (pgtype.UUID <-> uuid.UUID)
+func pgtypeUUIDToUUID(u pgtype.UUID) uuid.UUID {
+	return uuid.UUID(u.Bytes)
 }
 
-func (r *userRepository) optionalBool(v interface{}) bool {
-	if v == nil {
+func uuidToPgtypeUUID(u uuid.UUID) pgtype.UUID {
+	return pgtype.UUID{Bytes: [16]byte(u), Valid: true}
+}
+
+func pgtypeUUIDToUUIDPtr(u pgtype.UUID) *uuid.UUID {
+	if !u.Valid {
+		return nil
+	}
+	uid := uuid.UUID(u.Bytes)
+	return &uid
+}
+
+func uuidPtrToPgtypeUUID(u *uuid.UUID) pgtype.UUID {
+	if u == nil {
+		return pgtype.UUID{Valid: false}
+	}
+	return pgtype.UUID{Bytes: [16]byte(*u), Valid: true}
+}
+
+// Bool conversions
+func pgtypeBoolToBool(b pgtype.Bool) bool {
+	if !b.Valid {
 		return false
 	}
-	return pgutils.BoolTo(v.(pgtype.Bool))
+	return b.Bool
+}
+
+func boolToPgtypeBool(b bool) pgtype.Bool {
+	return pgtype.Bool{Bool: b, Valid: true}
+}
+
+func boolPtrToPgtypeBool(b *bool) pgtype.Bool {
+	if b == nil {
+		return pgtype.Bool{Valid: false}
+	}
+	return pgtype.Bool{Bool: *b, Valid: true}
+}
+
+// Timestamp conversions
+func pgtypeTimestampToTimePtr(t pgtype.Timestamp) *time.Time {
+	if !t.Valid {
+		return nil
+	}
+	return &t.Time
+}
+
+func timeToPgtypeTimestamp(t time.Time) pgtype.Timestamp {
+	return pgtype.Timestamp{Time: t, Valid: true}
+}
+
+func timePtrToPgtypeTimestamp(t *time.Time) pgtype.Timestamp {
+	if t == nil {
+		return pgtype.Timestamp{Valid: false}
+	}
+	return pgtype.Timestamp{Time: *t, Valid: true}
+}
+
+// Int4 conversions
+func pgtypeInt4ToInt32(i pgtype.Int4) int32 {
+	if !i.Valid {
+		return 0
+	}
+	return i.Int32
+}
+
+func int32ToPgtypeInt4(i int32) pgtype.Int4 {
+	return pgtype.Int4{Int32: i, Valid: true}
+}
+
+func int32PtrToPgtypeInt4(i *int32) pgtype.Int4 {
+	if i == nil {
+		return pgtype.Int4{Valid: false}
+	}
+	return pgtype.Int4{Int32: *i, Valid: true}
+}
+
+// Int8 conversions
+func pgtypeInt8ToInt64(i pgtype.Int8) int64 {
+	if !i.Valid {
+		return 0
+	}
+	return i.Int64
+}
+
+func int64ToPgtypeInt8(i int64) pgtype.Int8 {
+	return pgtype.Int8{Int64: i, Valid: true}
+}
+
+// Float8 conversions
+func pgtypeFloat8ToFloat64(f pgtype.Float8) float64 {
+	if !f.Valid {
+		return 0
+	}
+	return f.Float64
+}
+
+func float64ToPgtypeFloat8(f float64) pgtype.Float8 {
+	return pgtype.Float8{Float64: f, Valid: true}
+}
+
+func float64PtrToPgtypeFloat8(f *float64) pgtype.Float8 {
+	if f == nil {
+		return pgtype.Float8{Valid: false}
+	}
+	return pgtype.Float8{Float64: *f, Valid: true}
 }
