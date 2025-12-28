@@ -1,5 +1,5 @@
-// Package repository implements data access layer
-package repository
+// internal/repository/core/user_repository.go
+package core
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/docker/distribution/uuid"
 	sqlc "github.com/nyashahama/healthcare-access-connector-backend/internal/db"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository/pgutils"
 
 	"github.com/jackc/pgx/v5"
@@ -40,12 +41,15 @@ var (
 	)
 )
 
+var _ repository.UserRepository = (*userRepository)(nil)
+
+
 type userRepository struct {
 	db *sqlc.Queries
 }
 
 // NewUserRepository creates a new user repository
-func NewUserRepository(pool *pgxpool.Pool) UserRepository {
+func NewUserRepository(pool *pgxpool.Pool) repository.UserRepository {
 	return &userRepository{
 		db: sqlc.New(pool),
 	}

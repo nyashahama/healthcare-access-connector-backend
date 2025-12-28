@@ -14,6 +14,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 
@@ -81,7 +82,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	// Initialize ONLY the repositories that are implemented
-	userRepo := repository.NewUserRepository(pool)
+	userRepo := core.NewUserRepository(pool)
 
 	// Initialize stubs for required but not yet implemented repositories
 	// These will be replaced with actual implementations later
