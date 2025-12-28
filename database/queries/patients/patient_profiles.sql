@@ -1,0 +1,60 @@
+-- ============================================
+-- Patient Profile Queries
+-- ============================================
+
+-- name: CreatePatientProfile :one
+INSERT INTO patient_profiles (
+    user_id, first_name, last_name, preferred_name, date_of_birth, 
+    gender, preferred_gender_pronouns, primary_address, city, province, 
+    postal_code, country, language_preferences, home_language, 
+    requires_interpreter, preferred_communication_method, 
+    medical_aid_number, medical_aid_provider, has_medical_aid, 
+    national_id_number, timezone
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+RETURNING id, user_id, first_name, last_name, preferred_name, 
+    date_of_birth, gender, city, province, country, 
+    preferred_communication_method, created_at, updated_at;
+
+
+-- name: GetPatientProfileByUserID :one
+SELECT id, user_id, first_name, last_name, preferred_name, date_of_birth, 
+    gender, preferred_gender_pronouns, primary_address, city, province, 
+    postal_code, country, language_preferences, home_language, 
+    requires_interpreter, preferred_communication_method, 
+    medical_aid_number, medical_aid_provider, has_medical_aid, 
+    national_id_number, employment_status, education_level, 
+    household_income_range, profile_picture_url, timezone, 
+    last_profile_update, referred_by, referral_code, 
+    accepts_marketing_emails, created_at, updated_at
+FROM patient_profiles
+WHERE user_id = $1;   
+
+
+
+-- name: GetPatientProfileByID :one
+SELECT * FROM patient_profiles WHERE id = $1;
+
+
+-- name: UpdatePatientProfile :exec
+UPDATE patient_profiles
+SET first_name = $2, last_name = $3, preferred_name = $4, 
+    date_of_birth = $5, gender = $6, primary_address = $7, 
+    city = $8, province = $9, postal_code = $10, 
+    preferred_communication_method = $11, 
+    medical_aid_number = $12, medical_aid_provider = $13, 
+    has_medical_aid = $14, employment_status = $15, 
+    last_profile_update = NOW()
+WHERE id = $1;
+
+
+-- name: SearchPatients :many
+SELECT id, user_id, first_name, last_name, city, province, 
+    preferred_communication_method, created_at
+FROM patient_profiles
+WHERE 
+    (first_name ILIKE '%' || $1 || '%' OR last_name ILIKE '%' || $1 || '%')
+    AND ($2::VARCHAR IS NULL OR province = $2)
+ORDER BY created_at DESC
+LIMIT $3 OFFSET $4;
+

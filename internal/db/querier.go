@@ -64,13 +64,9 @@ type Querier interface {
 	// SMS Conversation Queries
 	// ============================================
 	CreateSMSConversation(ctx context.Context, arg CreateSMSConversationParams) (CreateSMSConversationRow, error)
-	// ============================================
 	// Session Management Queries
-	// ============================================
 	CreateSession(ctx context.Context, arg CreateSessionParams) (CreateSessionRow, error)
-	// ============================================
 	// User Management Queries
-	// ============================================
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateClinicService(ctx context.Context, id pgtype.UUID) error
 	DeleteExpiredOTPs(ctx context.Context) error
@@ -117,9 +113,7 @@ type Querier interface {
 	// ============================================
 	LogUserActivity(ctx context.Context, arg LogUserActivityParams) error
 	MarkOTPUsed(ctx context.Context, arg MarkOTPUsedParams) error
-	// ============================================
 	// OTP Verification Queries
-	// ============================================
 	SaveOTP(ctx context.Context, arg SaveOTPParams) (OtpVerification, error)
 	SearchClinics(ctx context.Context, arg SearchClinicsParams) ([]SearchClinicsRow, error)
 	SearchClinicsByLocation(ctx context.Context, arg SearchClinicsByLocationParams) ([]SearchClinicsByLocationRow, error)

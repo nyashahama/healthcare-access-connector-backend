@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/docker/distribution/uuid"
+	sqlc "github.com/nyashahama/healthcare-access-connector-backend/internal/db"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository/pgutils"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository/sqlc"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
