@@ -1,4 +1,4 @@
-package dto
+package core
 
 import (
 	"time"

@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core/dto"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
@@ -54,9 +54,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req dto.RegisterRequest
+	var req core.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -88,7 +88,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, dto.ToUserResponse(user))
+	handler.RespondJSON(w, http.StatusCreated, core.ToUserResponse(user))
 }
 
 // Login handles user login
@@ -108,9 +108,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req dto.LoginRequest
+	var req core.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -133,10 +133,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.LoginResponse{
+	response := core.LoginResponse{
 		Token:     token,
 		ExpiresAt: expiresAt,
-		User:      dto.ToUserResponse(user),
+		User:      core.ToUserResponse(user),
 	}
 
 	handler.RespondJSON(w, http.StatusOK, response)
@@ -149,7 +149,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	tokenString := extractToken(r)
 	if tokenString == "" {
-		handler.RespondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, core.ErrorResponse{
 			Error: "Missing authorization token",
 		})
 		return
@@ -193,7 +193,7 @@ func (h *AuthHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid user ID format",
 		})
 		return
@@ -206,7 +206,7 @@ func (h *AuthHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, dto.ToProfileResponse(user, patientProfile))
+	handler.RespondJSON(w, http.StatusOK, core.ToProfileResponse(user, patientProfile))
 }
 
 // RefreshToken refreshes an access token
@@ -226,7 +226,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	// Get token from Authorization header
 	tokenString := extractToken(r)
 	if tokenString == "" {
-		handler.RespondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, core.ErrorResponse{
 			Error: "Missing authorization token",
 		})
 		return
@@ -239,10 +239,10 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.LoginResponse{
+	response := core.LoginResponse{
 		Token:     newToken,
 		ExpiresAt: expiresAt,
-		User:      dto.ToUserResponse(user),
+		User:      core.ToUserResponse(user),
 	}
 
 	handler.RespondJSON(w, http.StatusOK, response)
@@ -255,7 +255,7 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	token := r.URL.Query().Get("token")
 	if token == "" {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Verification token is required",
 		})
 		return
@@ -276,9 +276,9 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req dto.ResetPasswordRequest
+	var req core.ResetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -319,9 +319,9 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req dto.PasswordResetRequest
+	var req core.PasswordResetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -364,9 +364,9 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req dto.ResendVerificationRequest
+	var req core.ResendVerificationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -413,15 +413,15 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid user ID format",
 		})
 		return
 	}
 
-	var req dto.PasswordUpdateRequest
+	var req core.PasswordUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -467,7 +467,7 @@ func (h *AuthHandler) GetConsent(w http.ResponseWriter, r *http.Request) {
 	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid user ID format",
 		})
 		return
@@ -480,7 +480,7 @@ func (h *AuthHandler) GetConsent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := dto.ConsentResponse{
+	response := core.ConsentResponse{
 		HealthDataConsent:         consent.HealthDataConsent,
 		ResearchConsent:           consent.ResearchConsent,
 		EmergencyAccessConsent:    consent.EmergencyAccessConsent,
@@ -511,9 +511,9 @@ func (h *AuthHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req dto.OTPRequest
+	var req core.OTPRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -536,7 +536,7 @@ func (h *AuthHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Always return success message for security
-	response := dto.OTPResponse{
+	response := core.OTPResponse{
 		Message:   "If your account exists, a verification code has been sent",
 		ExpiresIn: 10, // 10 minutes
 	}
@@ -568,9 +568,9 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req dto.OTPVerifyRequest
+	var req core.OTPVerifyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -618,9 +618,9 @@ func (h *AuthHandler) ResetPasswordWithOTP(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req dto.PasswordResetWithOTPRequest
+	var req core.PasswordResetWithOTPRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return

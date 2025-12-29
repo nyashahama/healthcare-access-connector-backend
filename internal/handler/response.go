@@ -6,7 +6,8 @@ import (
 	"net/http"
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core/dto"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/core"
+
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
 )
@@ -32,16 +33,16 @@ func RespondError(w http.ResponseWriter, logger *zerolog.Logger, err error) {
 	}
 
 	var appErr *domain.AppError
-	var response dto.ErrorResponse
+	var response core.ErrorResponse
 
 	if errors.As(err, &appErr) && len(appErr.Fields) > 0 {
-		response = dto.ErrorResponse{
+		response = core.ErrorResponse{
 			Error:  message,
 			Fields: appErr.Fields,
 			Code:   domainErrorCode(err),
 		}
 	} else {
-		response = dto.ErrorResponse{
+		response = core.ErrorResponse{
 			Error: message,
 			Code:  domainErrorCode(err),
 		}
@@ -57,7 +58,7 @@ func RespondValidationError(w http.ResponseWriter, errors []validator.Validation
 		fields[err.Field] = err.Message
 	}
 
-	response := dto.ErrorResponse{
+	response := core.ErrorResponse{
 		Error:  "validation failed",
 		Fields: fields,
 		Code:   "VALIDATION_ERROR",
