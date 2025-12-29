@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/docker/distribution/uuid"
+	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
@@ -123,7 +123,7 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, updat
 	}
 
 	// Invalidate cache
-	s.invalidateUserCache(ctx, userID) // Fixed: added ctx parameter
+	s.invalidateUserCache(ctx, userID)
 
 	// This is a simplified update - in reality, you'd have specific update methods
 	// For now, we'll update the user object based on the updates map
@@ -149,7 +149,7 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, updat
 }
 
 // UpdatePassword updates user password
-func (s *userService) UpdatePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error { // Fixed: changed receiver to userService
+func (s *userService) UpdatePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {
 	// Get user with password hash
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
@@ -268,7 +268,7 @@ func (s *userService) UpdateConsent(ctx context.Context, userID uuid.UUID, conse
 }
 
 // Helper methods
-func (s *userService) invalidateUserCache(ctx context.Context, userID uuid.UUID) { // Fixed: added ctx parameter
+func (s *userService) invalidateUserCache(ctx context.Context, userID uuid.UUID) {
 	cacheKeys := []string{
 		fmt.Sprintf("user:%s", userID.String()),
 		fmt.Sprintf("user:profile:%s", userID.String()),

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docker/distribution/uuid"
+	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"

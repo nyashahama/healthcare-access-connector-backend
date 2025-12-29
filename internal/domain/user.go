@@ -4,7 +4,7 @@ package domain
 import (
 	"time"
 
-	"github.com/docker/distribution/uuid"
+	"github.com/google/uuid"
 )
 
 // User represents a system user with role-based access

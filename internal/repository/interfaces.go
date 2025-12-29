@@ -5,7 +5,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/docker/distribution/uuid"
+	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 
 	"github.com/jackc/pgx/v5"

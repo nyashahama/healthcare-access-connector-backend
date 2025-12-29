@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/distribution/uuid"
+	"github.com/google/uuid"
 	sqlc "github.com/nyashahama/healthcare-access-connector-backend/internal/db"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
@@ -786,11 +786,14 @@ func stringPtrToPgtypeText(s *string) pgtype.Text {
 
 // UUID conversions (pgtype.UUID <-> uuid.UUID)
 func pgtypeUUIDToUUID(u pgtype.UUID) uuid.UUID {
-	return uuid.UUID(u.Bytes)
+	if !u.Valid {
+		return uuid.Nil
+	}
+	return u.Bytes
 }
 
 func uuidToPgtypeUUID(u uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: [16]byte(u), Valid: true}
+	return pgtype.UUID{Bytes: u, Valid: true}
 }
 
 func pgtypeUUIDToUUIDPtr(u pgtype.UUID) *uuid.UUID {
@@ -805,7 +808,7 @@ func uuidPtrToPgtypeUUID(u *uuid.UUID) pgtype.UUID {
 	if u == nil {
 		return pgtype.UUID{Valid: false}
 	}
-	return pgtype.UUID{Bytes: [16]byte(*u), Valid: true}
+	return pgtype.UUID{Bytes: *u, Valid: true}
 }
 
 // Bool conversions

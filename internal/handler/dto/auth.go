@@ -4,7 +4,7 @@ package dto
 import (
 	"time"
 
-	"github.com/docker/distribution/uuid"
+	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 )
 
@@ -118,7 +118,7 @@ func ToPatientProfileResponse(profile domain.PatientProfile) PatientProfileRespo
 func ToProfileResponse(user domain.User, profile domain.PatientProfile) ProfileResponse {
 	var profileResp *PatientProfileResponse
 
-	if profile.ID != (uuid.UUID{}) {
+	if profile.ID != uuid.Nil {
 		p := ToPatientProfileResponse(profile)
 		profileResp = &p
 	}

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/distribution/uuid"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"

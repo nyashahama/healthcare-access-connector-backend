@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/distribution/uuid"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
@@ -228,7 +228,7 @@ func (s *authService) handlePostRegistration(user domain.User, email, phone, rol
 	// For patients, create empty patient profile
 	if role == "patient" {
 		patientProfile := domain.PatientProfile{
-			ID:                           uuid.Generate(),
+			ID:                           uuid.New(),
 			UserID:                       user.ID,
 			Country:                      "South Africa",
 			LanguagePreferences:          []string{"en", "af", "zu"},
@@ -388,7 +388,7 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 
 	// CRITICAL: Create session SYNCHRONOUSLY before returning
 	session := domain.UserSession{
-		ID:           uuid.Generate(),
+		ID:           uuid.New(),
 		UserID:       user.ID,
 		SessionToken: token,
 		DeviceType:   stringPtr("web"),
@@ -601,7 +601,7 @@ func (s *authService) RefreshToken(ctx context.Context, tokenString string) (str
 
 	// Create new session
 	newSession := domain.UserSession{
-		ID:           uuid.Generate(),
+		ID:           uuid.New(),
 		UserID:       user.ID,
 		SessionToken: newToken,
 		DeviceType:   stringPtr("web"),
@@ -951,7 +951,7 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 
 	// Create OTP record
 	otpRecord := domain.OTPVerification{
-		ID:        uuid.Generate(),
+		ID:        uuid.New(),
 		UserID:    user.ID,
 		OTP:       otp,
 		Type:      "password_reset",
@@ -1053,11 +1053,6 @@ func (s *authService) VerifyOTP(ctx context.Context, identifier, otp string) (st
 
 	return resetToken, nil
 }
-
-// // RequestPasswordResetWithOTP combines OTP generation and sending
-// func (s *authService) RequestPasswordResetWithOTP(ctx context.Context, identifier string) error {
-// 	return s.GenerateOTP(ctx, identifier)
-// }
 
 // ResetPasswordWithOTP combines OTP verification and password reset in one call
 func (s *authService) ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error {
