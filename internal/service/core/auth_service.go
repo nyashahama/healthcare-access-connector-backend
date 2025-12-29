@@ -1,5 +1,4 @@
-// Package service implements business logic
-package service
+package core
 
 import (
 	"context"
@@ -15,9 +14,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/rs/zerolog"
@@ -65,7 +67,7 @@ func NewAuthService(
 	jwtExpiry time.Duration,
 	smsEnabled bool,
 	bcryptCost int,
-) AuthService {
+) service.AuthService {
 	// Validate bcrypt cost
 	if bcryptCost < bcrypt.MinCost {
 		logger.Warn().
@@ -117,7 +119,7 @@ func NewAuthService(
 }
 
 // Register handles user registration with email or phone
-func (s *authService) Register(ctx context.Context, email, phone, password, role string) (domain.User, error) {
+func (s *authService) Register(ctx context.Context, email, phone, password, role string) (core.User, error) {
 	start := time.Now()
 	defer func() {
 		s.logger.Debug().
@@ -129,10 +131,10 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 
 	// Validate input
 	if email == "" && phone == "" {
-		return domain.User{}, domain.NewAppError(domain.ErrValidation, "Email or phone is required", 400)
+		return core.User{}, domain.NewAppError(domain.ErrValidation, "Email or phone is required", 400)
 	}
 	if password == "" {
-		return domain.User{}, domain.NewAppError(domain.ErrValidation, "Password is required", 400)
+		return core.User{}, domain.NewAppError(domain.ErrValidation, "Password is required", 400)
 	}
 	if role == "" {
 		role = "patient" // Default role
@@ -148,19 +150,19 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 		"ngo_partner":    true,
 	}
 	if !validRoles[role] {
-		return domain.User{}, domain.NewAppError(domain.ErrValidation, "Invalid role", 400)
+		return core.User{}, domain.NewAppError(domain.ErrValidation, "Invalid role", 400)
 	}
 
 	// Hash password with configured cost
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.bcryptCost)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to hash password")
-		return domain.User{}, domain.NewAppError(err, "Password hashing failed", 500)
+		return core.User{}, domain.NewAppError(err, "Password hashing failed", 500)
 	}
 
 	// Create user domain object
 	now := time.Now()
-	user := domain.User{
+	user := core.User{
 		Email:                stringPtr(email),
 		Phone:                stringPtr(phone),
 		Role:                 role,
@@ -179,13 +181,13 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 	created, err := s.userRepo.CreateUser(ctx, user, string(hash))
 	if err != nil {
 		if errors.Is(err, domain.ErrDuplicateEmail) {
-			return domain.User{}, domain.NewAppError(err, "Email already exists", 409)
+			return core.User{}, domain.NewAppError(err, "Email already exists", 409)
 		}
 		if errors.Is(err, domain.ErrDuplicatePhone) {
-			return domain.User{}, domain.NewAppError(err, "Phone number already exists", 409)
+			return core.User{}, domain.NewAppError(err, "Phone number already exists", 409)
 		}
 		s.logger.Error().Err(err).Msg("Failed to create user")
-		return domain.User{}, domain.NewAppError(err, "User creation failed", 500)
+		return core.User{}, domain.NewAppError(err, "User creation failed", 500)
 	}
 
 	// Handle post-registration tasks asynchronously
@@ -201,12 +203,12 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 }
 
 // handlePostRegistration handles all async post-registration tasks
-func (s *authService) handlePostRegistration(user domain.User, email, phone, role string) {
+func (s *authService) handlePostRegistration(user core.User, email, phone, role string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Create default consent record
-	consent := domain.PrivacyConsent{
+	consent := core.PrivacyConsent{
 		UserID:                     user.ID,
 		HealthDataConsent:          true,
 		HealthDataConsentDate:      &user.CreatedAt,
@@ -227,7 +229,7 @@ func (s *authService) handlePostRegistration(user domain.User, email, phone, rol
 
 	// For patients, create empty patient profile
 	if role == "patient" {
-		patientProfile := domain.PatientProfile{
+		patientProfile := patients.PatientProfile{
 			ID:                           uuid.New(),
 			UserID:                       user.ID,
 			Country:                      "South Africa",
@@ -275,7 +277,7 @@ func (s *authService) handlePostRegistration(user domain.User, email, phone, rol
 }
 
 // Login handles user login with email or phone
-func (s *authService) Login(ctx context.Context, identifier, password string) (string, time.Time, domain.User, error) {
+func (s *authService) Login(ctx context.Context, identifier, password string) (string, time.Time, core.User, error) {
 	start := time.Now()
 	defer func() {
 		s.logger.Debug().
@@ -286,23 +288,23 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 
 	// Validate input
 	if identifier == "" || password == "" {
-		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrValidation, "Identifier and password are required", 400)
+		return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrValidation, "Identifier and password are required", 400)
 	}
 
 	// Check rate limiting
 	if s.isLoginLocked(identifier) {
-		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrRateLimited, "Too many login attempts. Please try again later", 429)
+		return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrRateLimited, "Too many login attempts. Please try again later", 429)
 	}
 
 	// Try cache first for user lookup
 	cacheKey := fmt.Sprintf("user:login:%s", identifier)
 
 	type cachedUserData struct {
-		User domain.User
+		User core.User
 		Hash string
 	}
 
-	var user domain.User
+	var user core.User
 	var passwordHash string
 	var err error
 	cacheHit := false
@@ -330,10 +332,10 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 			if errors.Is(err, domain.ErrUserNotFound) {
 				s.logger.Warn().Str("identifier", maskIdentifier(identifier)).Msg("User not found")
 				s.recordFailedLogin(identifier)
-				return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
+				return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
 			}
 			s.logger.Error().Err(err).Msg("Failed to get user")
-			return "", time.Time{}, domain.User{}, domain.NewAppError(err, "Login failed", 500)
+			return "", time.Time{}, core.User{}, domain.NewAppError(err, "Login failed", 500)
 		}
 
 		// Cache user data for subsequent logins (short TTL)
@@ -347,10 +349,10 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 
 	// Check user status BEFORE expensive password verification
 	if user.Status == "inactive" {
-		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrUserInactive, "Account is inactive", 403)
+		return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrUserInactive, "Account is inactive", 403)
 	}
 	if user.Status == "suspended" {
-		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrUserSuspended, "Account is suspended", 403)
+		return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrUserSuspended, "Account is suspended", 403)
 	}
 
 	// Verify password (expensive operation)
@@ -367,12 +369,12 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 			s.cache.Delete(ctx, cacheKey)
 		}
 
-		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
+		return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
 	}
 
 	// Check if user is verified (for email users)
 	if !user.IsVerified && user.Email != nil && *user.Email != "" {
-		return "", time.Time{}, domain.User{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email first", 403)
+		return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrUserNotVerified, "Please verify your email first", 403)
 	}
 
 	// Reset login attempts on successful login
@@ -383,11 +385,11 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 	token, err := s.generateToken(user, expiresAt)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to generate token")
-		return "", time.Time{}, domain.User{}, domain.NewAppError(err, "Token generation failed", 500)
+		return "", time.Time{}, core.User{}, domain.NewAppError(err, "Token generation failed", 500)
 	}
 
 	// CRITICAL: Create session SYNCHRONOUSLY before returning
-	session := domain.UserSession{
+	session := core.UserSession{
 		ID:           uuid.New(),
 		UserID:       user.ID,
 		SessionToken: token,
@@ -398,7 +400,7 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 
 	if _, err := s.sessionRepo.CreateSession(ctx, session); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to create session record")
-		return "", time.Time{}, domain.User{}, domain.NewAppError(err, "Session creation failed", 500)
+		return "", time.Time{}, core.User{}, domain.NewAppError(err, "Session creation failed", 500)
 	}
 
 	// OPTIMIZATION: Update last login asynchronously (don't block response)
@@ -504,12 +506,12 @@ func (s *authService) cleanupLoginAttempts() {
 }
 
 // ValidateToken validates JWT token
-func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*TokenClaims, error) {
+func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*service.TokenClaims, error) {
 	// Try cache first for token validation
 	cacheKey := fmt.Sprintf("token:valid:%s", tokenString)
 
 	if s.cache != nil && s.cache.IsAvailable() {
-		var claims TokenClaims
+		var claims service.TokenClaims
 		if err := s.cache.Get(ctx, cacheKey, &claims); err == nil {
 			s.logger.Debug().Msg("Cache hit for token validation")
 			return &claims, nil
@@ -562,7 +564,7 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*T
 	role, _ := claims["role"].(string)
 	email, _ := claims["email"].(string)
 
-	tokenClaims := &TokenClaims{
+	tokenClaims := &service.TokenClaims{
 		UserID: userID,
 		Role:   role,
 		Email:  email,
@@ -577,21 +579,21 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*T
 }
 
 // RefreshToken refreshes JWT token
-func (s *authService) RefreshToken(ctx context.Context, tokenString string) (string, time.Time, domain.User, error) {
+func (s *authService) RefreshToken(ctx context.Context, tokenString string) (string, time.Time, core.User, error) {
 	claims, err := s.ValidateToken(ctx, tokenString)
 	if err != nil && !errors.Is(err, domain.ErrExpiredToken) {
-		return "", time.Time{}, domain.User{}, err
+		return "", time.Time{}, core.User{}, err
 	}
 
 	user, err := s.userRepo.GetUserByID(ctx, claims.UserID)
 	if err != nil {
-		return "", time.Time{}, domain.User{}, domain.NewAppError(err, "User not found", 404)
+		return "", time.Time{}, core.User{}, domain.NewAppError(err, "User not found", 404)
 	}
 
 	expiresAt := time.Now().Add(s.jwtExpiry)
 	newToken, err := s.generateToken(user, expiresAt)
 	if err != nil {
-		return "", time.Time{}, domain.User{}, domain.NewAppError(err, "Failed to generate new token", 500)
+		return "", time.Time{}, core.User{}, domain.NewAppError(err, "Failed to generate new token", 500)
 	}
 
 	// Delete old session
@@ -600,7 +602,7 @@ func (s *authService) RefreshToken(ctx context.Context, tokenString string) (str
 	}
 
 	// Create new session
-	newSession := domain.UserSession{
+	newSession := core.UserSession{
 		ID:           uuid.New(),
 		UserID:       user.ID,
 		SessionToken: newToken,
@@ -638,7 +640,7 @@ func (s *authService) Logout(ctx context.Context, tokenString string, userID uui
 }
 
 // generateToken creates a JWT token for a user
-func (s *authService) generateToken(user domain.User, expiresAt time.Time) (string, error) {
+func (s *authService) generateToken(user core.User, expiresAt time.Time) (string, error) {
 	email := ""
 	if user.Email != nil {
 		email = *user.Email
@@ -755,7 +757,7 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 // RequestPasswordReset requests password reset
 func (s *authService) RequestPasswordReset(ctx context.Context, identifier string) error {
 	// Find user by email or phone
-	var user domain.User
+	var user core.User
 	var err error
 
 	if strings.Contains(identifier, "@") {
@@ -903,7 +905,7 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, email string)
 // GenerateOTP generates and sends OTP to user
 func (s *authService) GenerateOTP(ctx context.Context, identifier string) error {
 	// Find user by email or phone
-	var user domain.User
+	var user core.User
 	var err error
 	channel := "email"
 
@@ -950,7 +952,7 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 	}
 
 	// Create OTP record
-	otpRecord := domain.OTPVerification{
+	otpRecord := core.OTPVerification{
 		ID:        uuid.New(),
 		UserID:    user.ID,
 		OTP:       otp,
@@ -991,7 +993,7 @@ func (s *authService) GenerateOTP(ctx context.Context, identifier string) error 
 // VerifyOTP verifies OTP and returns reset token
 func (s *authService) VerifyOTP(ctx context.Context, identifier, otp string) (string, error) {
 	// Find user
-	var user domain.User
+	var user core.User
 	var err error
 
 	if strings.Contains(identifier, "@") {

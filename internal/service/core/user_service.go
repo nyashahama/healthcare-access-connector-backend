@@ -1,4 +1,4 @@
-package service
+package core
 
 import (
 	"context"
@@ -9,7 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/rs/zerolog"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -33,7 +36,7 @@ func NewUserService(
 	sessionRepo repository.SessionRepository, // Added this
 	cache cache.Service,
 	logger *zerolog.Logger,
-) UserService {
+) service.UserService {
 	return &userService{
 		userRepo:         userRepo,
 		patientRepo:      patientRepo,
@@ -46,13 +49,13 @@ func NewUserService(
 }
 
 // GetProfile gets user profile with additional info
-func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (domain.User, domain.PatientProfile, error) {
+func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error) {
 	cacheKey := fmt.Sprintf("user:profile:%s", userID.String())
 
 	// Try cache first
 	type CachedProfile struct {
-		User    domain.User           `json:"user"`
-		Profile domain.PatientProfile `json:"profile"`
+		User    core.User           `json:"user"`
+		Profile patients.PatientProfile `json:"profile"`
 	}
 	var cached CachedProfile
 	if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
@@ -64,11 +67,11 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (domain.
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
-		return domain.User{}, domain.PatientProfile{}, domain.NewAppError(err, "User not found", 404)
+		return core.User{}, patients.PatientProfile{}, domain.NewAppError(err, "User not found", 404)
 	}
 
 	// Get patient profile if user is a patient
-	var patientProfile domain.PatientProfile
+	var patientProfile patients.PatientProfile
 	if user.Role == "patient" {
 		patientProfile, err = s.patientRepo.GetPatientProfileByUserID(ctx, userID)
 		if err != nil && !errors.Is(err, domain.ErrPatientNotFound) {
@@ -89,11 +92,11 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (domain.
 }
 
 // GetUserByID gets user by ID
-func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (domain.User, error) {
+func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (core.User, error) {
 	cacheKey := fmt.Sprintf("user:%s", userID.String())
 
 	// Try cache first
-	var user domain.User
+	var user core.User
 	if err := s.cache.Get(ctx, cacheKey, &user); err == nil {
 		s.logger.Debug().Str("user_id", userID.String()).Msg("User retrieved from cache")
 		return user, nil
@@ -103,7 +106,7 @@ func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (domain
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
-		return domain.User{}, domain.NewAppError(err, "User not found", 404)
+		return core.User{}, domain.NewAppError(err, "User not found", 404)
 	}
 
 	// Cache the result
@@ -222,7 +225,7 @@ func (s *userService) DeleteProfile(ctx context.Context, userID uuid.UUID) error
 }
 
 // ListUsers lists users with filtering
-func (s *userService) ListUsers(ctx context.Context, role string, limit, offset int) ([]domain.User, error) {
+func (s *userService) ListUsers(ctx context.Context, role string, limit, offset int) ([]core.User, error) {
 	users, err := s.userRepo.ListUsers(ctx, role, limit, offset)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to list users")
@@ -233,18 +236,18 @@ func (s *userService) ListUsers(ctx context.Context, role string, limit, offset 
 }
 
 // GetConsent gets user consent settings
-func (s *userService) GetConsent(ctx context.Context, userID uuid.UUID) (domain.PrivacyConsent, error) {
+func (s *userService) GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error) {
 	consent, err := s.consentRepo.GetConsent(ctx, userID)
 	if err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get consent")
-		return domain.PrivacyConsent{}, domain.NewAppError(err, "Failed to get consent", 500)
+		return core.PrivacyConsent{}, domain.NewAppError(err, "Failed to get consent", 500)
 	}
 
 	return consent, nil
 }
 
 // UpdateConsent updates user consent settings
-func (s *userService) UpdateConsent(ctx context.Context, userID uuid.UUID, consent domain.PrivacyConsent) error {
+func (s *userService) UpdateConsent(ctx context.Context, userID uuid.UUID, consent core.PrivacyConsent) error {
 	if err := s.consentRepo.UpdateConsent(ctx, consent); err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to update consent")
 		return domain.NewAppError(err, "Failed to update consent", 500)
@@ -281,7 +284,7 @@ func (s *userService) invalidateUserCache(ctx context.Context, userID uuid.UUID)
 	}
 }
 
-func (s *userService) updatePatientProfileFromMap(profile *domain.PatientProfile, updates map[string]interface{}) {
+func (s *userService) updatePatientProfileFromMap(profile *patients.PatientProfile, updates map[string]interface{}) {
 	// Simplified update - in reality, you'd need proper type assertions and validation
 	if firstName, ok := updates["first_name"].(string); ok {
 		profile.FirstName = firstName

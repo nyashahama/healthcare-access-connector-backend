@@ -12,6 +12,7 @@ import (
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
+	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -47,7 +48,7 @@ type Server struct {
 	httpServer    *http.Server
 	config        *config.Config
 	logger        *zerolog.Logger
-	authHandler   *handler.AuthHandler
+	authHandler   *handlercore.AuthHandler
 	healthHandler *handler.HealthHandler
 	authService   service.AuthService
 }
@@ -56,7 +57,7 @@ type Server struct {
 func NewServer(
 	cfg *config.Config,
 	logger *zerolog.Logger,
-	authHandler *handler.AuthHandler,
+	authHandler *handlercore.AuthHandler,
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
 	txManager repository.TxManager,

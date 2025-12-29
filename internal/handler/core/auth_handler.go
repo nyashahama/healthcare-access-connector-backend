@@ -1,5 +1,4 @@
-// Package handler implements HTTP handlers for health project
-package handler
+package core
 
 import (
 	"context"
@@ -10,7 +9,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core/dto"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
@@ -56,7 +56,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	var req dto.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -77,18 +77,18 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
 	// Register user
 	user, err := h.authService.Register(ctx, req.Email, req.Phone, req.Password, req.Role)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusCreated, dto.ToUserResponse(user))
+	handler.RespondJSON(w, http.StatusCreated, dto.ToUserResponse(user))
 }
 
 // Login handles user login
@@ -110,7 +110,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	var req dto.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -122,14 +122,14 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	v.ValidateRequired("password", req.Password)
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
 	// Authenticate user
 	token, expiresAt, user, err := h.authService.Login(ctx, req.Identifier, req.Password)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		User:      dto.ToUserResponse(user),
 	}
 
-	respondJSON(w, http.StatusOK, response)
+	handler.RespondJSON(w, http.StatusOK, response)
 }
 
 // Logout handles user logout
@@ -149,7 +149,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	tokenString := extractToken(r)
 	if tokenString == "" {
-		respondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
 			Error: "Missing authorization token",
 		})
 		return
@@ -157,18 +157,18 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.authService.ValidateToken(ctx, tokenString)
 	if err != nil {
-		respondJSON(w, http.StatusOK, map[string]string{
+		handler.RespondJSON(w, http.StatusOK, map[string]string{
 			"message": "Logged out successfully",
 		})
 		return
 	}
 
 	if err := h.authService.Logout(ctx, tokenString, claims.UserID); err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "Logged out successfully",
 	})
 }
@@ -193,7 +193,7 @@ func (h *AuthHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid user ID format",
 		})
 		return
@@ -202,11 +202,11 @@ func (h *AuthHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	// Get user profile using user service
 	user, patientProfile, err := h.userService.GetProfile(ctx, userID)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, dto.ToProfileResponse(user, patientProfile))
+	handler.RespondJSON(w, http.StatusOK, dto.ToProfileResponse(user, patientProfile))
 }
 
 // RefreshToken refreshes an access token
@@ -226,7 +226,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	// Get token from Authorization header
 	tokenString := extractToken(r)
 	if tokenString == "" {
-		respondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
 			Error: "Missing authorization token",
 		})
 		return
@@ -235,7 +235,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	// Refresh token
 	newToken, expiresAt, user, err := h.authService.RefreshToken(ctx, tokenString)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
@@ -245,7 +245,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		User:      dto.ToUserResponse(user),
 	}
 
-	respondJSON(w, http.StatusOK, response)
+	handler.RespondJSON(w, http.StatusOK, response)
 }
 
 // VerifyEmail handles email verification
@@ -255,18 +255,18 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	token := r.URL.Query().Get("token")
 	if token == "" {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Verification token is required",
 		})
 		return
 	}
 
 	if err := h.authService.VerifyEmail(ctx, token); err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "Email verified successfully",
 	})
 }
@@ -278,7 +278,7 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	var req dto.ResetPasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -290,16 +290,16 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	v.ValidatePassword("new_password", req.NewPassword)
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
 	if err := h.authService.ResetPassword(ctx, req.Token, req.NewPassword); err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "Password reset successfully",
 	})
 }
@@ -321,7 +321,7 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 
 	var req dto.PasswordResetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -332,19 +332,19 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 	v.ValidateRequired("identifier", req.Identifier)
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
 	// Request password reset
 	err := h.authService.RequestPasswordReset(ctx, req.Identifier)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
 	// Always return success for security (don't reveal if user exists)
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "If your account exists, you will receive reset instructions",
 	})
 }
@@ -366,7 +366,7 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 
 	var req dto.ResendVerificationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -377,17 +377,17 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 	v.ValidateEmail("email", req.Email)
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
 	// Resend verification email
 	if err := h.authService.ResendVerificationEmail(ctx, req.Email); err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "If your account exists, a verification email has been sent",
 	})
 }
@@ -413,7 +413,7 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid user ID format",
 		})
 		return
@@ -421,7 +421,7 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 
 	var req dto.PasswordUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -433,17 +433,17 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	v.ValidatePassword("new_password", req.NewPassword)
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
 	err = h.userService.UpdatePassword(ctx, userID, req.CurrentPassword, req.NewPassword)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "Password updated successfully",
 	})
 }
@@ -467,7 +467,7 @@ func (h *AuthHandler) GetConsent(w http.ResponseWriter, r *http.Request) {
 	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid user ID format",
 		})
 		return
@@ -476,7 +476,7 @@ func (h *AuthHandler) GetConsent(w http.ResponseWriter, r *http.Request) {
 	// Get consent
 	consent, err := h.userService.GetConsent(ctx, userID)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
@@ -492,7 +492,7 @@ func (h *AuthHandler) GetConsent(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:                 consent.UpdatedAt,
 	}
 
-	respondJSON(w, http.StatusOK, response)
+	handler.RespondJSON(w, http.StatusOK, response)
 }
 
 // GenerateOTP generates and sends OTP to user
@@ -513,7 +513,7 @@ func (h *AuthHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
 
 	var req dto.OTPRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -524,14 +524,14 @@ func (h *AuthHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
 	v.ValidateRequired("identifier", req.Identifier)
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
 	// Generate OTP
 	err := h.authService.GenerateOTP(ctx, req.Identifier)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
@@ -548,7 +548,7 @@ func (h *AuthHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
 		response.Channel = "sms"
 	}
 
-	respondJSON(w, http.StatusOK, response)
+	handler.RespondJSON(w, http.StatusOK, response)
 }
 
 // VerifyOTP verifies OTP and returns reset token
@@ -570,7 +570,7 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 
 	var req dto.OTPVerifyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -584,18 +584,18 @@ func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	v.ValidateNumeric("otp", req.OTP)
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
 	// Verify OTP
 	resetToken, err := h.authService.VerifyOTP(ctx, req.Identifier, req.OTP)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message":  "OTP verified successfully",
 		"token":    resetToken, // For backward compatibility
 		"verified": "true",
@@ -620,7 +620,7 @@ func (h *AuthHandler) ResetPasswordWithOTP(w http.ResponseWriter, r *http.Reques
 
 	var req dto.PasswordResetWithOTPRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -636,7 +636,7 @@ func (h *AuthHandler) ResetPasswordWithOTP(w http.ResponseWriter, r *http.Reques
 	v.ValidatePassword("new_password", req.NewPassword)
 
 	if !v.Valid() {
-		respondValidationError(w, v.Errors())
+		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
@@ -644,11 +644,11 @@ func (h *AuthHandler) ResetPasswordWithOTP(w http.ResponseWriter, r *http.Reques
 	// This uses the new combined method (or you can call VerifyOTP then ResetPassword)
 	err := h.authService.ResetPasswordWithOTP(ctx, req.Identifier, req.OTP, req.NewPassword)
 	if err != nil {
-		respondError(w, h.logger, err)
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "Password reset successfully",
 	})
 }

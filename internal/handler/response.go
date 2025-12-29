@@ -1,4 +1,3 @@
-// Package handler provides HTTP response utilities for health project
 package handler
 
 import (
@@ -7,13 +6,13 @@ import (
 	"net/http"
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core/dto"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
 )
 
 // respondJSON sends a JSON response
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
+func RespondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if data != nil {
@@ -22,7 +21,7 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 }
 
 // respondError sends an error response
-func respondError(w http.ResponseWriter, logger *zerolog.Logger, err error) {
+func RespondError(w http.ResponseWriter, logger *zerolog.Logger, err error) {
 	statusCode := domain.HTTPStatusCode(err)
 	message := domain.ErrorMessage(err)
 
@@ -48,11 +47,11 @@ func respondError(w http.ResponseWriter, logger *zerolog.Logger, err error) {
 		}
 	}
 
-	respondJSON(w, statusCode, response)
+	RespondJSON(w, statusCode, response)
 }
 
 // respondValidationError sends a validation error response
-func respondValidationError(w http.ResponseWriter, errors []validator.ValidationError) {
+func RespondValidationError(w http.ResponseWriter, errors []validator.ValidationError) {
 	fields := make(map[string]string, len(errors))
 	for _, err := range errors {
 		fields[err.Field] = err.Message
@@ -64,7 +63,7 @@ func respondValidationError(w http.ResponseWriter, errors []validator.Validation
 		Code:   "VALIDATION_ERROR",
 	}
 
-	respondJSON(w, http.StatusBadRequest, response)
+	RespondJSON(w, http.StatusBadRequest, response)
 }
 
 // domainErrorCode extracts error code from domain error

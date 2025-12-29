@@ -7,19 +7,20 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
+	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
+	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
+	servicecore "github.com/nyashahama/healthcare-access-connector-backend/internal/service/core"
 	"github.com/rs/zerolog"
 )
 
@@ -82,7 +83,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	// Initialize ONLY the repositories that are implemented
-	userRepo := core.NewUserRepository(pool)
+	userRepo := repocore.NewUserRepository(pool)
 
 	// Initialize stubs for required but not yet implemented repositories
 	// These will be replaced with actual implementations later
@@ -95,7 +96,7 @@ func New(cfg *config.Config) (*App, error) {
 	txManager := repository.NewTxManager(pool)
 
 	// Initialize services with stubs where needed
-	authService := service.NewAuthService(
+	authService := servicecore.NewAuthService(
 		userRepo,
 		patientRepo,
 		sessionRepo,
@@ -110,7 +111,7 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.BcryptCost,
 	)
 
-	userService := service.NewUserService(
+	userService := servicecore.NewUserService(
 		userRepo,
 		patientRepo,
 		consentRepo,
@@ -121,7 +122,7 @@ func New(cfg *config.Config) (*App, error) {
 	)
 
 	// Initialize handlers
-	authHandler := handler.NewAuthHandler(authService, userService, logger, cfg.Timeout)
+	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
 	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService)
 
 	// Initialize server with only implemented handlers
@@ -194,47 +195,47 @@ func initDatabase(dbURL string, logger *zerolog.Logger) (*pgxpool.Pool, error) {
 
 type stubPatientRepository struct{}
 
-func (s *stubPatientRepository) CreatePatientProfile(ctx context.Context, profile domain.PatientProfile) (domain.PatientProfile, error) {
+func (s *stubPatientRepository) CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error) {
 	return profile, nil
 }
 
-func (s *stubPatientRepository) GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (domain.PatientProfile, error) {
-	return domain.PatientProfile{}, nil
+func (s *stubPatientRepository) GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error) {
+	return patients.PatientProfile{}, nil
 }
 
-func (s *stubPatientRepository) GetPatientProfileByID(ctx context.Context, id uuid.UUID) (domain.PatientProfile, error) {
-	return domain.PatientProfile{}, nil
+func (s *stubPatientRepository) GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error) {
+	return patients.PatientProfile{}, nil
 }
 
-func (s *stubPatientRepository) UpdatePatientProfile(ctx context.Context, profile domain.PatientProfile) error {
+func (s *stubPatientRepository) UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error {
 	return nil
 }
 
-func (s *stubPatientRepository) SearchPatients(ctx context.Context, query string, province string, limit, offset int) ([]domain.PatientProfile, error) {
-	return []domain.PatientProfile{}, nil
+func (s *stubPatientRepository) SearchPatients(ctx context.Context, query string, province string, limit, offset int) ([]patients.PatientProfile, error) {
+	return []patients.PatientProfile{}, nil
 }
 
-func (s *stubPatientRepository) CreateMedicalInfo(ctx context.Context, info domain.PatientMedicalInfo) error {
+func (s *stubPatientRepository) CreateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) error {
 	return nil
 }
 
-func (s *stubPatientRepository) GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (domain.PatientMedicalInfo, error) {
-	return domain.PatientMedicalInfo{}, nil
+func (s *stubPatientRepository) GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (patients.PatientMedicalInfo, error) {
+	return patients.PatientMedicalInfo{}, nil
 }
 
-func (s *stubPatientRepository) UpdateMedicalInfo(ctx context.Context, info domain.PatientMedicalInfo) error {
+func (s *stubPatientRepository) UpdateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) error {
 	return nil
 }
 
-func (s *stubPatientRepository) AddAllergy(ctx context.Context, allergy domain.PatientAllergy) (domain.PatientAllergy, error) {
-	return domain.PatientAllergy{}, nil
+func (s *stubPatientRepository) AddAllergy(ctx context.Context, allergy patients.PatientAllergy) (patients.PatientAllergy, error) {
+	return patients.PatientAllergy{}, nil
 }
 
-func (s *stubPatientRepository) GetAllergies(ctx context.Context, patientID uuid.UUID) ([]domain.PatientAllergy, error) {
-	return []domain.PatientAllergy{}, nil
+func (s *stubPatientRepository) GetAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error) {
+	return []patients.PatientAllergy{}, nil
 }
 
-func (s *stubPatientRepository) UpdateAllergy(ctx context.Context, allergy domain.PatientAllergy) error {
+func (s *stubPatientRepository) UpdateAllergy(ctx context.Context, allergy patients.PatientAllergy) error {
 	return nil
 }
 
@@ -242,50 +243,50 @@ func (s *stubPatientRepository) DeleteAllergy(ctx context.Context, id uuid.UUID)
 	return nil
 }
 
-func (s *stubPatientRepository) AddMedication(ctx context.Context, med domain.PatientMedication) (domain.PatientMedication, error) {
-	return domain.PatientMedication{}, nil
+func (s *stubPatientRepository) AddMedication(ctx context.Context, med patients.PatientMedication) (patients.PatientMedication, error) {
+	return patients.PatientMedication{}, nil
 }
 
-func (s *stubPatientRepository) GetMedications(ctx context.Context, patientID uuid.UUID, status string) ([]domain.PatientMedication, error) {
-	return []domain.PatientMedication{}, nil
+func (s *stubPatientRepository) GetMedications(ctx context.Context, patientID uuid.UUID, status string) ([]patients.PatientMedication, error) {
+	return []patients.PatientMedication{}, nil
 }
 
-func (s *stubPatientRepository) UpdateMedication(ctx context.Context, med domain.PatientMedication) error {
+func (s *stubPatientRepository) UpdateMedication(ctx context.Context, med patients.PatientMedication) error {
 	return nil
 }
 
-func (s *stubPatientRepository) AddCondition(ctx context.Context, condition domain.PatientCondition) (domain.PatientCondition, error) {
-	return domain.PatientCondition{}, nil
+func (s *stubPatientRepository) AddCondition(ctx context.Context, condition patients.PatientCondition) (patients.PatientCondition, error) {
+	return patients.PatientCondition{}, nil
 }
 
-func (s *stubPatientRepository) GetConditions(ctx context.Context, patientID uuid.UUID, status string) ([]domain.PatientCondition, error) {
-	return []domain.PatientCondition{}, nil
+func (s *stubPatientRepository) GetConditions(ctx context.Context, patientID uuid.UUID, status string) ([]patients.PatientCondition, error) {
+	return []patients.PatientCondition{}, nil
 }
 
-func (s *stubPatientRepository) UpdateCondition(ctx context.Context, condition domain.PatientCondition) error {
+func (s *stubPatientRepository) UpdateCondition(ctx context.Context, condition patients.PatientCondition) error {
 	return nil
 }
 
-func (s *stubPatientRepository) AddImmunization(ctx context.Context, imm domain.PatientImmunization) (domain.PatientImmunization, error) {
-	return domain.PatientImmunization{}, nil
+func (s *stubPatientRepository) AddImmunization(ctx context.Context, imm patients.PatientImmunization) (patients.PatientImmunization, error) {
+	return patients.PatientImmunization{}, nil
 }
 
-func (s *stubPatientRepository) GetImmunizations(ctx context.Context, patientID uuid.UUID) ([]domain.PatientImmunization, error) {
-	return []domain.PatientImmunization{}, nil
+func (s *stubPatientRepository) GetImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
+	return []patients.PatientImmunization{}, nil
 }
 
-func (s *stubPatientRepository) GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]domain.PatientImmunization, error) {
-	return []domain.PatientImmunization{}, nil
+func (s *stubPatientRepository) GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
+	return []patients.PatientImmunization{}, nil
 }
 
 type stubSessionRepository struct{}
 
-func (s *stubSessionRepository) CreateSession(ctx context.Context, session domain.UserSession) (domain.UserSession, error) {
+func (s *stubSessionRepository) CreateSession(ctx context.Context, session core.UserSession) (core.UserSession, error) {
 	return session, nil
 }
 
-func (s *stubSessionRepository) GetSession(ctx context.Context, sessionToken string) (domain.UserSession, error) {
-	return domain.UserSession{}, nil
+func (s *stubSessionRepository) GetSession(ctx context.Context, sessionToken string) (core.UserSession, error) {
+	return core.UserSession{}, nil
 }
 
 func (s *stubSessionRepository) DeleteSession(ctx context.Context, sessionToken string) error {
@@ -302,15 +303,15 @@ func (s *stubSessionRepository) DeleteExpiredSessions(ctx context.Context) error
 
 type stubConsentRepository struct{}
 
-func (s *stubConsentRepository) CreateConsent(ctx context.Context, consent domain.PrivacyConsent) (domain.PrivacyConsent, error) {
+func (s *stubConsentRepository) CreateConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error) {
 	return consent, nil
 }
 
-func (s *stubConsentRepository) GetConsent(ctx context.Context, userID uuid.UUID) (domain.PrivacyConsent, error) {
-	return domain.PrivacyConsent{}, nil
+func (s *stubConsentRepository) GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error) {
+	return core.PrivacyConsent{}, nil
 }
 
-func (s *stubConsentRepository) UpdateConsent(ctx context.Context, consent domain.PrivacyConsent) error {
+func (s *stubConsentRepository) UpdateConsent(ctx context.Context, consent core.PrivacyConsent) error {
 	return nil
 }
 
@@ -320,14 +321,14 @@ func (s *stubConsentRepository) WithdrawConsent(ctx context.Context, userID uuid
 
 type stubNotificationRepository struct{}
 
-func (s *stubNotificationRepository) CreatePreferences(ctx context.Context, prefs domain.NotificationPreferences) (domain.NotificationPreferences, error) {
+func (s *stubNotificationRepository) CreatePreferences(ctx context.Context, prefs core.NotificationPreferences) (core.NotificationPreferences, error) {
 	return prefs, nil
 }
 
-func (s *stubNotificationRepository) GetPreferences(ctx context.Context, userID uuid.UUID) (domain.NotificationPreferences, error) {
-	return domain.NotificationPreferences{}, nil
+func (s *stubNotificationRepository) GetPreferences(ctx context.Context, userID uuid.UUID) (core.NotificationPreferences, error) {
+	return core.NotificationPreferences{}, nil
 }
 
-func (s *stubNotificationRepository) UpdatePreferences(ctx context.Context, prefs domain.NotificationPreferences) error {
+func (s *stubNotificationRepository) UpdatePreferences(ctx context.Context, prefs core.NotificationPreferences) error {
 	return nil
 }

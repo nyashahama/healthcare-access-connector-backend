@@ -1,11 +1,11 @@
-// Package dto defines data transfer objects for health project
 package dto
 
 import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 )
 
 // RegisterRequest represents a user registration request
@@ -73,7 +73,7 @@ type ProfileResponse struct {
 }
 
 // ToUserResponse converts domain.User to UserResponse
-func ToUserResponse(user domain.User) UserResponse {
+func ToUserResponse(user core.User) UserResponse {
 	return UserResponse{
 		ID:                   user.ID,
 		Email:                user.Email,
@@ -88,7 +88,7 @@ func ToUserResponse(user domain.User) UserResponse {
 }
 
 // ToPatientProfileResponse converts domain.PatientProfile to PatientProfileResponse
-func ToPatientProfileResponse(profile domain.PatientProfile) PatientProfileResponse {
+func ToPatientProfileResponse(profile patients.PatientProfile) PatientProfileResponse {
 	return PatientProfileResponse{
 		ID:                           profile.ID,
 		UserID:                       profile.UserID,
@@ -114,8 +114,7 @@ func ToPatientProfileResponse(profile domain.PatientProfile) PatientProfileRespo
 }
 
 // ToProfileResponse converts user and profile to combined response
-
-func ToProfileResponse(user domain.User, profile domain.PatientProfile) ProfileResponse {
+func ToProfileResponse(user core.User, profile patients.PatientProfile) ProfileResponse {
 	var profileResp *PatientProfileResponse
 
 	if profile.ID != uuid.Nil {

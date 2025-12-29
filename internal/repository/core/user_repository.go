@@ -1,4 +1,3 @@
-// Package repository implements data access layer
 package core
 
 import (
@@ -12,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	sqlc "github.com/nyashahama/healthcare-access-connector-backend/internal/db"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 
 	"github.com/jackc/pgx/v5"
@@ -51,7 +51,7 @@ func NewUserRepository(pool *pgxpool.Pool) repository.UserRepository {
 	}
 }
 
-func (r *userRepository) CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error) {
+func (r *userRepository) CreateUser(ctx context.Context, user core.User, passwordHash string) (core.User, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -82,7 +82,7 @@ func (r *userRepository) CreateUser(ctx context.Context, user domain.User, passw
 	})
 	if err != nil {
 		dbQueryTotal.WithLabelValues("create_user", "error").Inc()
-		return domain.User{}, r.handleError(err, "create user")
+		return core.User{}, r.handleError(err, "create user")
 	}
 
 	dbQueryTotal.WithLabelValues("create_user", "success").Inc()
@@ -91,7 +91,7 @@ func (r *userRepository) CreateUser(ctx context.Context, user domain.User, passw
 }
 
 // GetUserByVerificationToken gets user by verification token
-func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token string) (domain.User, string, error) {
+func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token string) (core.User, string, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -101,10 +101,10 @@ func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token s
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_verification_token", "not_found").Inc()
-			return domain.User{}, "", domain.ErrUserNotFound
+			return core.User{}, "", domain.ErrUserNotFound
 		}
 		dbQueryTotal.WithLabelValues("get_user_by_verification_token", "error").Inc()
-		return domain.User{}, "", r.handleError(err, "get user by verification token")
+		return core.User{}, "", r.handleError(err, "get user by verification token")
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_verification_token", "success").Inc()
@@ -119,7 +119,7 @@ func (r *userRepository) GetUserByVerificationToken(ctx context.Context, token s
 }
 
 // GetUserByPasswordResetToken gets user by password reset token
-func (r *userRepository) GetUserByPasswordResetToken(ctx context.Context, token string) (domain.User, string, error) {
+func (r *userRepository) GetUserByPasswordResetToken(ctx context.Context, token string) (core.User, string, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -129,10 +129,10 @@ func (r *userRepository) GetUserByPasswordResetToken(ctx context.Context, token 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "not_found").Inc()
-			return domain.User{}, "", domain.ErrUserNotFound
+			return core.User{}, "", domain.ErrUserNotFound
 		}
 		dbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "error").Inc()
-		return domain.User{}, "", r.handleError(err, "get user by password reset token")
+		return core.User{}, "", r.handleError(err, "get user by password reset token")
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "success").Inc()
@@ -146,7 +146,7 @@ func (r *userRepository) GetUserByPasswordResetToken(ctx context.Context, token 
 	return r.mapToUserFromGetByPasswordResetToken(u), passwordHash, nil
 }
 
-func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (domain.User, string, error) {
+func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (core.User, string, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -156,10 +156,10 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (doma
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_email", "not_found").Inc()
-			return domain.User{}, "", domain.ErrUserNotFound
+			return core.User{}, "", domain.ErrUserNotFound
 		}
 		dbQueryTotal.WithLabelValues("get_user_by_email", "error").Inc()
-		return domain.User{}, "", r.handleError(err, "get user by email")
+		return core.User{}, "", r.handleError(err, "get user by email")
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_email", "success").Inc()
@@ -173,7 +173,7 @@ func (r *userRepository) GetUserByEmail(ctx context.Context, email string) (doma
 	return r.mapToUserFromGetByEmail(u), passwordHash, nil
 }
 
-func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (domain.User, error) {
+func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (core.User, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -183,10 +183,10 @@ func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (doma
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_phone", "not_found").Inc()
-			return domain.User{}, domain.ErrUserNotFound
+			return core.User{}, domain.ErrUserNotFound
 		}
 		dbQueryTotal.WithLabelValues("get_user_by_phone", "error").Inc()
-		return domain.User{}, r.handleError(err, "get user by phone")
+		return core.User{}, r.handleError(err, "get user by phone")
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_phone", "success").Inc()
@@ -194,7 +194,7 @@ func (r *userRepository) GetUserByPhone(ctx context.Context, phone string) (doma
 	return r.mapToUserFromGetByPhone(u), nil
 }
 
-func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone string) (domain.User, string, error) {
+func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone string) (core.User, string, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -204,10 +204,10 @@ func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "not_found").Inc()
-			return domain.User{}, "", domain.ErrUserNotFound
+			return core.User{}, "", domain.ErrUserNotFound
 		}
 		dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "error").Inc()
-		return domain.User{}, "", r.handleError(err, "get user by phone with hash")
+		return core.User{}, "", r.handleError(err, "get user by phone with hash")
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "success").Inc()
@@ -221,7 +221,7 @@ func (r *userRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 	return r.mapToUserFromGetByPhoneWithHash(u), passwordHash, nil
 }
 
-func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.User, error) {
+func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (core.User, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -234,10 +234,10 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_user_by_id", "not_found").Inc()
-			return domain.User{}, domain.ErrUserNotFound
+			return core.User{}, domain.ErrUserNotFound
 		}
 		dbQueryTotal.WithLabelValues("get_user_by_id", "error").Inc()
-		return domain.User{}, r.handleError(err, "get user by id")
+		return core.User{}, r.handleError(err, "get user by id")
 	}
 
 	dbQueryTotal.WithLabelValues("get_user_by_id", "success").Inc()
@@ -245,7 +245,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (domain.
 	return r.mapToUserFromGetByID(u), nil
 }
 
-func (r *userRepository) UpdateUser(ctx context.Context, user domain.User) error {
+func (r *userRepository) UpdateUser(ctx context.Context, user core.User) error {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -389,7 +389,7 @@ func (r *userRepository) DeactivateUser(ctx context.Context, id uuid.UUID) error
 	return nil
 }
 
-func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offset int) ([]domain.User, error) {
+func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offset int) ([]core.User, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -407,7 +407,7 @@ func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offs
 
 	dbQueryTotal.WithLabelValues("list_users", "success").Inc()
 
-	result := make([]domain.User, len(users))
+	result := make([]core.User, len(users))
 	for i, u := range users {
 		result[i] = r.mapToUserFromList(u)
 	}
@@ -432,7 +432,7 @@ func (r *userRepository) CountUsers(ctx context.Context, role string) (int64, er
 }
 
 // SaveOTP saves an OTP verification record
-func (r *userRepository) SaveOTP(ctx context.Context, otp domain.OTPVerification) error {
+func (r *userRepository) SaveOTP(ctx context.Context, otp core.OTPVerification) error {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -456,7 +456,7 @@ func (r *userRepository) SaveOTP(ctx context.Context, otp domain.OTPVerification
 }
 
 // GetOTP retrieves an OTP verification record
-func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpType string) (domain.OTPVerification, error) {
+func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpType string) (core.OTPVerification, error) {
 	start := time.Now()
 	defer func() {
 		dbQueryDuration.Observe(time.Since(start).Seconds())
@@ -470,15 +470,15 @@ func (r *userRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpT
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			dbQueryTotal.WithLabelValues("get_otp", "not_found").Inc()
-			return domain.OTPVerification{}, domain.ErrNotFound
+			return core.OTPVerification{}, domain.ErrNotFound
 		}
 		dbQueryTotal.WithLabelValues("get_otp", "error").Inc()
-		return domain.OTPVerification{}, r.handleError(err, "get OTP")
+		return core.OTPVerification{}, r.handleError(err, "get OTP")
 	}
 
 	dbQueryTotal.WithLabelValues("get_otp", "success").Inc()
 
-	return domain.OTPVerification{
+	return core.OTPVerification{
 		ID:        pgtypeUUIDToUUID(record.ID),
 		UserID:    pgtypeUUIDToUUID(record.UserID),
 		OTP:       record.Otp,
@@ -569,8 +569,8 @@ func (r *userRepository) GetOTPAttemptCount(ctx context.Context, userID uuid.UUI
 
 // Helper functions for mapping
 
-func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
-	return domain.User{
+func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) core.User {
+	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),
 		Email:                stringToStringPtr(u.Email),
 		Phone:                pgtypeTextToStringPtr(u.Phone),
@@ -588,8 +588,8 @@ func (r *userRepository) mapToUserFromCreate(u sqlc.CreateUserRow) domain.User {
 	}
 }
 
-func (r *userRepository) mapToUserFromGetByEmail(u sqlc.GetUserByEmailRow) domain.User {
-	return domain.User{
+func (r *userRepository) mapToUserFromGetByEmail(u sqlc.GetUserByEmailRow) core.User {
+	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),
 		Email:                stringToStringPtr(u.Email),
 		Phone:                pgtypeTextToStringPtr(u.Phone),
@@ -609,8 +609,8 @@ func (r *userRepository) mapToUserFromGetByEmail(u sqlc.GetUserByEmailRow) domai
 	}
 }
 
-func (r *userRepository) mapToUserFromGetByPhone(u sqlc.GetUserByPhoneRow) domain.User {
-	return domain.User{
+func (r *userRepository) mapToUserFromGetByPhone(u sqlc.GetUserByPhoneRow) core.User {
+	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),
 		Email:                stringToStringPtr(u.Email),
 		Phone:                pgtypeTextToStringPtr(u.Phone),
@@ -628,8 +628,8 @@ func (r *userRepository) mapToUserFromGetByPhone(u sqlc.GetUserByPhoneRow) domai
 	}
 }
 
-func (r *userRepository) mapToUserFromGetByID(u sqlc.GetUserByIDRow) domain.User {
-	return domain.User{
+func (r *userRepository) mapToUserFromGetByID(u sqlc.GetUserByIDRow) core.User {
+	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),
 		Email:                stringToStringPtr(u.Email),
 		Phone:                pgtypeTextToStringPtr(u.Phone),
@@ -645,8 +645,8 @@ func (r *userRepository) mapToUserFromGetByID(u sqlc.GetUserByIDRow) domain.User
 	}
 }
 
-func (r *userRepository) mapToUserFromList(u sqlc.ListUsersByRoleRow) domain.User {
-	return domain.User{
+func (r *userRepository) mapToUserFromList(u sqlc.ListUsersByRoleRow) core.User {
+	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),
 		Email:                stringToStringPtr(u.Email),
 		Phone:                pgtypeTextToStringPtr(u.Phone),
@@ -659,8 +659,8 @@ func (r *userRepository) mapToUserFromList(u sqlc.ListUsersByRoleRow) domain.Use
 	}
 }
 
-func (r *userRepository) mapToUserFromGetByVerificationToken(u sqlc.GetUserByVerificationTokenRow) domain.User {
-	return domain.User{
+func (r *userRepository) mapToUserFromGetByVerificationToken(u sqlc.GetUserByVerificationTokenRow) core.User {
+	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),
 		Email:                stringToStringPtr(u.Email),
 		Phone:                pgtypeTextToStringPtr(u.Phone),
@@ -680,8 +680,8 @@ func (r *userRepository) mapToUserFromGetByVerificationToken(u sqlc.GetUserByVer
 	}
 }
 
-func (r *userRepository) mapToUserFromGetByPasswordResetToken(u sqlc.GetUserByPasswordResetTokenRow) domain.User {
-	return domain.User{
+func (r *userRepository) mapToUserFromGetByPasswordResetToken(u sqlc.GetUserByPasswordResetTokenRow) core.User {
+	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),
 		Email:                stringToStringPtr(u.Email),
 		Phone:                pgtypeTextToStringPtr(u.Phone),
@@ -701,8 +701,8 @@ func (r *userRepository) mapToUserFromGetByPasswordResetToken(u sqlc.GetUserByPa
 	}
 }
 
-func (r *userRepository) mapToUserFromGetByPhoneWithHash(u sqlc.GetUserByPhoneWithHashRow) domain.User {
-	return domain.User{
+func (r *userRepository) mapToUserFromGetByPhoneWithHash(u sqlc.GetUserByPhoneWithHashRow) core.User {
+	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),
 		Email:                stringToStringPtr(u.Email),
 		Phone:                pgtypeTextToStringPtr(u.Phone),
