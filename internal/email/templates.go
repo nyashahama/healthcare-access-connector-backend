@@ -426,7 +426,7 @@ The Healthcare Access Connector Team`, resetURL)
 func (tm *TemplateManager) RenderVerification(verificationToken string) (subject, text, html string) {
 	verifyURL := fmt.Sprintf("https://healthcare-access-connector-web.vercel.app/verify-email?token=%s", verificationToken)
 
-	subject = "Verify Your Healthcare Access Connector Email ✅"
+	subject = "Verify Your Healthcare Access Connector Email "
 
 	text = fmt.Sprintf(`Verify Your Email Address
 
@@ -451,7 +451,7 @@ Thank you,
 The Healthcare Access Connector Team`, verifyURL)
 
 	content := fmt.Sprintf(`
-		<h2>Verify Your Email Address ✅</h2>
+		<h2>Verify Your Email Address </h2>
 		
 		<p>Welcome to Healthcare Access Connector! Please verify your email address to complete your registration and access all features.</p>
 		
@@ -504,7 +504,7 @@ The Healthcare Access Connector Team`, verifyURL)
 func (tm *TemplateManager) RenderPasswordChanged(username string) (subject, text, html string) {
 	currentTime := time.Now().Format("January 2, 2006 at 3:04 PM")
 
-	subject = "Your Healthcare Access Connector Password Was Changed 🔒"
+	subject = "Your Healthcare Access Connector Password Was Changed "
 
 	text = fmt.Sprintf(`Password Changed Successfully
 
@@ -637,7 +637,7 @@ Healthcare Access Connector Security Team`, username, currentTime, ipAddress, lo
 		</div>
 		
 		<div class="info-box">
-			<h3>✅ This Was You?</h3>
+			<h3> This Was You?</h3>
 			<p>If you recognize this login activity, no further action is needed. Your account remains secure.</p>
 		</div>
 		
