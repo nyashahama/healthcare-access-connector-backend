@@ -69,7 +69,7 @@ migrate-create: ## Create a new migration (usage: make migrate-create name=add_u
 
 migrate-up: ## Run database migrations up
 	@echo "${GREEN}Running migrations up...${RESET}"
-	migrate -path migrations -database "$(DB_URL)" up
+	migrate -path database/migrations -database "$(DB_URL)" up
 
 migrate-down: ## Run database migrations down
 	@echo "${YELLOW}Warning: This will rollback the last migration${RESET}"
