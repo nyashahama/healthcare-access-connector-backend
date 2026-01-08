@@ -2,31 +2,78 @@
 package email
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/rs/zerolog"
+
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/email/providers"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/email/providers/resend"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/email/providers/ses"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/email/providers/smtp"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/email/types"
 )
 
-// NewEmailService creates an email service based on configuration
-func NewEmailService(cfg *Config, logger *zerolog.Logger) (Service, error) {
-	if err := cfg.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid email config: %w", err)
-	}
+// Service defines the email service interface
+type Service interface {
+	// Core Methods
+	Send(ctx context.Context, msg *types.Message, callback func(error)) error
+	SendSync(ctx context.Context, msg *types.Message) error
 
-	switch cfg.Provider {
-	case "ses":
-		return NewSESService(cfg, logger)
-	case "smtp":
-		return NewSMTPService(cfg, logger)
-	case "resend":
-		return NewResendService(cfg, logger)
-	default:
-		return nil, fmt.Errorf("unsupported email provider: %s", cfg.Provider)
-	}
+	// Template Methods
+	SendWelcomeEmail(ctx context.Context, to, username string) error
+	SendOTPEmail(ctx context.Context, email, otp, userID string) error
+	SendPasswordResetEmail(ctx context.Context, to, resetToken string) error
+	SendVerificationEmail(ctx context.Context, to, verificationToken string) error
+	SendPasswordChangedEmail(ctx context.Context, to, username string) error
+	SendLoginAlertEmail(ctx context.Context, to, username, ipAddress, location string) error
+
+	// Health & Monitoring
+	HealthCheck(ctx context.Context) error
+	GetStats() map[string]interface{}
+	GetHealthStatus() map[string]interface{}
+
+	IsAvailable() bool
+
+	// Lifecycle
+	Close() error
 }
 
-// NewFromEnv creates an email service from environment variables
+// New creates a new email service
+func New(cfg *types.Config, logger *zerolog.Logger) (Service, error) {
+	return NewEmailService(cfg, logger)
+}
+
+// NewFromEnv creates a new email service from environment variables
 func NewFromEnv(logger *zerolog.Logger) (Service, error) {
 	cfg := ConfigFromEnv()
-	return NewEmailService(cfg, logger)
+	return New(cfg, logger)
+}
+
+// Provider factory functions
+
+func createSESProvider(cfg *types.Config, logger *zerolog.Logger) (providers.Provider, error) {
+	return ses.New(cfg, logger)
+}
+
+func createSMTPProvider(cfg *types.Config, logger *zerolog.Logger) (providers.Provider, error) {
+	return smtp.New(cfg, logger)
+}
+
+func createResendProvider(cfg *types.Config, logger *zerolog.Logger) (providers.Provider, error) {
+	return resend.New(cfg, logger)
+}
+
+// CreateProvider creates a provider based on the configuration
+func CreateProvider(cfg *types.Config, logger *zerolog.Logger) (providers.Provider, error) {
+	switch cfg.Provider {
+	case "ses":
+		return createSESProvider(cfg, logger)
+	case "smtp":
+		return createSMTPProvider(cfg, logger)
+	case "resend":
+		return createResendProvider(cfg, logger)
+	default:
+		return nil, fmt.Errorf("unsupported provider: %s", cfg.Provider)
+	}
 }

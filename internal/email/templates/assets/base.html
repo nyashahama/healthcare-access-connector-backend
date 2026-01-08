@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.Title}} - {{.AppName}}</title>
+    <style>
+      /* Base Styles */
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto",
+          "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+          "Helvetica Neue", sans-serif;
+        line-height: 1.6;
+        color: #1e293b;
+        background-color: #f8fafc;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .email-wrapper {
+        max-width: 100%;
+        width: 100%;
+        margin: 0 auto;
+        background-color: #f8fafc;
+        padding: 20px;
+      }
+
+      .email-container {
+        max-width: 600px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e2e8f0;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        color: white;
+        padding: 40px 30px;
+        text-align: center;
+        position: relative;
+      }
+
+      .header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(
+          90deg,
+          #10b981 0%,
+          #3b82f6 50%,
+          #8b5cf6 100%
+        );
+      }
+
+      .logo-container {
+        margin-bottom: 20px;
+      }
+
+      .logo {
+        font-weight: 700;
+        font-size: 24px;
+        letter-spacing: -0.5px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .logo-icon {
+        font-size: 28px;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        line-height: 1.2;
+      }
+
+      .header p {
+        margin: 10px 0 0;
+        opacity: 0.9;
+        font-size: 16px;
+      }
+
+      .content {
+        padding: 40px 30px;
+        color: #334155;
+      }
+
+      .content h2 {
+        color: #1e293b;
+        font-size: 20px;
+        font-weight: 600;
+        margin-top: 0;
+        margin-bottom: 16px;
+      }
+
+      .content h3 {
+        color: #374151;
+        font-size: 18px;
+        font-weight: 600;
+        margin-top: 24px;
+        margin-bottom: 12px;
+      }
+
+      .content p {
+        margin-bottom: 20px;
+        font-size: 15px;
+        line-height: 1.7;
+      }
+
+      .content ul,
+      .content ol {
+        margin: 16px 0;
+        padding-left: 24px;
+      }
+
+      .content li {
+        margin-bottom: 8px;
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      /* Button Styles */
+      .button {
+        display: inline-block;
+        background-color: #3b82f6;
+        color: white;
+        text-decoration: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 15px;
+        text-align: center;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        margin: 16px 0;
+      }
+
+      .button:hover {
+        background-color: #2563eb;
+      }
+
+      .button-secondary {
+        background-color: #6b7280;
+      }
+
+      .button-secondary:hover {
+        background-color: #4b5563;
+      }
+
+      .button-success {
+        background-color: #10b981;
+      }
+
+      .button-success:hover {
+        background-color: #059669;
+      }
+
+      .button-danger {
+        background-color: #ef4444;
+      }
+
+      .button-danger:hover {
+        background-color: #dc2626;
+      }
+
+      /* Info Box */
+      .info-box {
+        background: #f0f9ff;
+        border-left: 4px solid #3b82f6;
+        padding: 20px;
+        margin: 30px 0;
+        border-radius: 8px;
+      }
+
+      .info-box h3 {
+        color: #1d4ed8;
+        margin-top: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .warning-box {
+        background: #fef2f2;
+        border-left: 4px solid #dc2626;
+        padding: 20px;
+        margin: 30px 0;
+        border-radius: 8px;
+      }
+
+      .warning-box h3 {
+        color: #dc2626;
+        margin-top: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .success-box {
+        background: #f0fdf4;
+        border-left: 4px solid #10b981;
+        padding: 20px;
+        margin: 30px 0;
+        border-radius: 8px;
+      }
+
+      .success-box h3 {
+        color: #059669;
+        margin-top: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      /* OTP Display */
+      .otp-container {
+        margin: 30px 0;
+        text-align: center;
+      }
+
+      .otp-code {
+        display: inline-block;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        padding: 16px 32px;
+        border-radius: 12px;
+        font-size: 32px;
+        font-weight: 700;
+        letter-spacing: 8px;
+        color: #1e40af;
+        border: 2px solid #bfdbfe;
+        font-family: "SF Mono", "Roboto Mono", "Consolas", monospace;
+        margin: 10px 0;
+      }
+
+      /* Footer */
+      .footer {
+        background: #f8fafc;
+        padding: 30px;
+        text-align: center;
+        border-top: 1px solid #e2e8f0;
+      }
+
+      .footer-links {
+        margin: 20px 0;
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        flex-wrap: wrap;
+      }
+
+      .footer-links a {
+        color: #64748b;
+        text-decoration: none;
+        font-size: 14px;
+        transition: color 0.2s;
+      }
+
+      .footer-links a:hover {
+        color: #3b82f6;
+        text-decoration: underline;
+      }
+
+      .copyright {
+        color: #94a3b8;
+        font-size: 13px;
+        margin-top: 20px;
+        line-height: 1.5;
+      }
+
+      /* Emergency Notice */
+      .emergency-notice {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: white;
+        padding: 20px;
+        text-align: center;
+        margin-top: 20px;
+        border-radius: 12px;
+      }
+
+      .emergency-notice strong {
+        font-size: 18px;
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .emergency-notice p {
+        margin: 0;
+        font-size: 14px;
+        opacity: 0.9;
+      }
+
+      /* Responsive */
+      @media (max-width: 600px) {
+        .email-wrapper {
+          padding: 10px;
+        }
+
+        .email-container {
+          border-radius: 12px;
+        }
+
+        .header,
+        .content,
+        .footer {
+          padding: 30px 20px;
+        }
+
+        .header h1 {
+          font-size: 24px;
+        }
+
+        .content h2 {
+          font-size: 18px;
+        }
+
+        .otp-code {
+          font-size: 24px;
+          letter-spacing: 6px;
+          padding: 12px 20px;
+        }
+
+        .footer-links {
+          gap: 16px;
+        }
+      }
+
+      /* Dark mode support for email clients that support it */
+      @media (prefers-color-scheme: dark) {
+        .email-wrapper {
+          background-color: #0f172a;
+        }
+
+        .email-container {
+          background-color: #1e293b;
+          border-color: #334155;
+        }
+
+        .content {
+          color: #cbd5e1;
+        }
+
+        .content h2 {
+          color: #f1f5f9;
+        }
+
+        .content h3 {
+          color: #e2e8f0;
+        }
+
+        .footer {
+          background-color: #0f172a;
+          border-top-color: #334155;
+        }
+
+        .footer-links a {
+          color: #94a3b8;
+        }
+
+        .copyright {
+          color: #64748b;
+        }
+
+        .info-box {
+          background-color: #1e3a8a;
+          border-left-color: #3b82f6;
+        }
+
+        .warning-box {
+          background-color: #7f1d1d;
+          border-left-color: #dc2626;
+        }
+
+        .success-box {
+          background-color: #064e3b;
+          border-left-color: #10b981;
+        }
+      }
+
+      /* Print styles */
+      @media print {
+        .email-wrapper {
+          padding: 0;
+          background-color: white;
+        }
+
+        .email-container {
+          box-shadow: none;
+          border: 1px solid #ddd;
+        }
+
+        .button {
+          border: 1px solid #333;
+          color: #333;
+          background-color: transparent;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="email-wrapper">
+      <div class="email-container">
+        <!-- Header -->
+        <div class="header">
+          <div class="logo-container">
+            <div class="logo">
+              <span class="logo-icon">🏥</span>{{.AppName}}
+            </div>
+          </div>
+          <h1>{{.Title}}</h1>
+        </div>
+
+        <!-- Content -->
+        <div class="content">{{.Content}}</div>
+
+        {{if .EmergencyInfo}}
+        <!-- Emergency Notice -->
+        <div class="emergency-notice">
+          <strong>⚠️ Medical Emergency?</strong>
+          <p>{{.EmergencyInfo}}</p>
+        </div>
+        {{end}}
+
+        <!-- Footer -->
+        <div class="footer">
+          <div class="footer-links">
+            <a href="https://healthcare-access-connector-web.vercel.app/"
+              >Home</a
+            >
+            <a
+              href="https://healthcare-access-connector-web.vercel.app/auth/sign-in"
+              >Sign In</a
+            >
+            <a href="https://healthcare-access-connector-web.vercel.app/help"
+              >Help Center</a
+            >
+            <a href="https://healthcare-access-connector-web.vercel.app/privacy"
+              >Privacy Policy</a
+            >
+            <a href="https://healthcare-access-connector-web.vercel.app/terms"
+              >Terms of Service</a
+            >
+          </div>
+          <p class="copyright">
+            © {{year}} {{.AppName}}. All rights reserved.<br />
+            This email was sent to you as part of our healthcare services.<br />
+            If you have any questions, contact us at {{.SupportEmail}}
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

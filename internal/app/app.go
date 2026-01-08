@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -14,6 +15,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
+	emailtypes "github.com/nyashahama/healthcare-access-connector-backend/internal/email/types"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
@@ -57,30 +59,42 @@ func New(cfg *config.Config) (*App, error) {
 
 	// Initialize email service (optional)
 	var emailService email.Service
-	if cfg.EmailFrom != "" {
-		// Try to load email config from environment
-		emailService, err = email.NewFromEnv(logger)
-		if err != nil {
-			logger.Warn().Err(err).Msg("Failed to initialize email service from environment")
+if cfg.EmailFrom != "" {
+    // Try to load email config from environment
+    emailService, err = email.NewFromEnv(logger)
+    if err != nil {
+        logger.Warn().Err(err).Msg("Failed to initialize email service from environment")
 
-			// Fallback to Resend if configured
-			resendAPIKey := os.Getenv("RESEND_API_KEY")
-			if resendAPIKey != "" {
-				emailCfg := &email.Config{
-					Provider:     "resend",
-					FromAddress:  cfg.EmailFrom,
-					FromName:     "Healthcare Access Connector",
-					ResendAPIKey: resendAPIKey,
-				}
+        // Fallback to Resend if configured
+        resendAPIKey := os.Getenv("RESEND_API_KEY")
+        if resendAPIKey != "" {
+            // Create config using email types package
+            emailCfg := &emailtypes.Config{
+                Provider:     "resend",
+                FromAddress:  cfg.EmailFrom,
+                FromName:     "Healthcare Access Connector",
+                ResendAPIKey: resendAPIKey,
+                // Set some reasonable defaults
+                EnableAsync:          true,
+                WorkerPoolSize:       10,
+                QueueSize:           100,
+                MaxRetries:          3,
+                RetryDelay:          time.Second,
+                RetryMaxDelay:       30 * time.Second,
+                EnableCircuitBreaker: true,
+                CircuitBreakerThreshold: 5,
+                CircuitBreakerTimeout:   60 * time.Second,
+                SendTimeout:            30 * time.Second,
+            }
 
-				emailService, err = email.NewEmailService(emailCfg, logger)
-				if err != nil {
-					logger.Warn().Err(err).Msg("Email service initialization failed, continuing without email")
-					emailService = nil
-				}
-			}
-		}
-	}
+            emailService, err = email.New(emailCfg, logger)
+            if err != nil {
+                logger.Warn().Err(err).Msg("Email service initialization failed, continuing without email")
+                emailService = nil
+            }
+        }
+    }
+}
 
 	// Initialize ONLY the repositories that are implemented
 	userRepo := repocore.NewUserRepository(pool)

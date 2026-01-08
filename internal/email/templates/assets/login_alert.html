@@ -1,0 +1,88 @@
+{{define "login_alert"}}
+<h2>New Login Detected 🔔</h2>
+
+<p>Hi {{.Username}},</p>
+
+<p>
+  We detected a new login to your {{.AppName}} account. Here are the details:
+</p>
+
+<div class="info-box">
+  <h3>📋 Login Details</h3>
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+    <tr>
+      <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0">
+        <strong>Time:</strong>
+      </td>
+      <td
+        style="
+          padding: 8px 0;
+          border-bottom: 1px solid #e2e8f0;
+          text-align: right;
+        "
+      >
+        {{.Timestamp}}
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0">
+        <strong>IP Address:</strong>
+      </td>
+      <td
+        style="
+          padding: 8px 0;
+          border-bottom: 1px solid #e2e8f0;
+          text-align: right;
+        "
+      >
+        <code>{{.IPAddress}}</code>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0"><strong>Location:</strong></td>
+      <td style="padding: 8px 0; text-align: right">{{.Location}}</td>
+    </tr>
+  </table>
+</div>
+
+<div class="info-box">
+  <h3>This Was You?</h3>
+  <p>
+    If you recognize this login activity, no further action is needed. Your
+    account remains secure.
+  </p>
+</div>
+
+<div class="warning-box">
+  <h3>⚠️ Don't Recognize This Login?</h3>
+  <p>
+    If you <strong>DON'T</strong> recognize this activity, please take immediate
+    action:
+  </p>
+  <ol>
+    <li>Change your password immediately</li>
+    <li>Review your recent account activity</li>
+    <li>Enable two-factor authentication</li>
+    <li>Contact our security team at {{.SupportEmail}}</li>
+  </ol>
+  <a
+    href="https://healthcare-access-connector-web.vercel.app/auth/forgot-password"
+    class="button button-danger"
+  >
+    Reset Password Now
+  </a>
+</div>
+
+<h3>🔒 Security Tips</h3>
+<ul>
+  <li>Use strong, unique passwords for all your accounts</li>
+  <li>Enable login notifications in your account settings</li>
+  <li>Regularly review your account activity</li>
+  <li>Never share your login credentials with anyone</li>
+</ul>
+
+<p style="color: #64748b; font-size: 13px; margin-top: 30px">
+  <strong>Note:</strong> This is an automated security alert. If you have any
+  concerns, please contact our security team immediately.
+</p>
+{{end}}

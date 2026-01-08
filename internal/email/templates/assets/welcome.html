@@ -1,0 +1,57 @@
+{{define "welcome"}}
+<h2>Welcome aboard, {{.Username}}! 👋</h2>
+
+<p>
+  We're thrilled to welcome you to {{.AppName}} – your new partner in health and
+  wellness.
+</p>
+
+<p>Your account has been successfully created and you're now ready to:</p>
+
+<ul>
+  <li>Access personalized health information</li>
+  <li>Connect with healthcare providers</li>
+  <li>Manage your medical preferences</li>
+  <li>Set up health reminders and alerts</li>
+  <li>Track your health journey securely</li>
+</ul>
+
+<a
+  href="https://healthcare-access-connector-web.vercel.app/auth/sign-in"
+  class="button button-success"
+>
+  Sign In to Your Account
+</a>
+
+<div class="info-box">
+  <h3>🔐 Security First</h3>
+  <p>
+    We use industry-standard encryption to protect your health data. Always keep
+    your login credentials secure and never share them with anyone.
+  </p>
+  <p>
+    <strong>Recommended:</strong> Enable two-factor authentication in your
+    account settings for added security.
+  </p>
+</div>
+
+<div class="success-box">
+  <h3>🎉 Getting Started</h3>
+  <p>Complete your profile to get personalized recommendations:</p>
+  <ol>
+    <li>Add your medical history (optional)</li>
+    <li>Set up emergency contacts</li>
+    <li>Configure notification preferences</li>
+    <li>Connect with healthcare providers</li>
+  </ol>
+</div>
+
+<p style="color: #64748b; font-size: 14px; margin-top: 30px">
+  If you have any questions or need assistance, our support team is here to
+  help.<br />
+  Email us at:
+  <a href="mailto:{{.SupportEmail}}" style="color: #3b82f6"
+    >{{.SupportEmail}}</a
+  >
+</p>
+{{end}}

@@ -1,0 +1,41 @@
+{{define "otp"}}
+<h2>Your Verification Code 🔢</h2>
+
+<p>Hello {{.Username}},</p>
+
+<p>Your verification code for {{.AppName}} is:</p>
+
+<div class="otp-container">
+  <div class="otp-code">{{.OTP}}</div>
+  <p style="color: #64748b; font-size: 14px; margin-top: 10px">
+    Use this code to complete your {{.Action}}
+  </p>
+</div>
+
+<div class="warning-box">
+  <h3>⏰ Code Expires Soon</h3>
+  <p>
+    This verification code will expire in <strong>{{.ExpiresIn}}</strong> for
+    your security.
+  </p>
+  <p>If the code expires, you can request a new one.</p>
+</div>
+
+<div class="info-box">
+  <h3>🔒 Security Notice</h3>
+  <p>
+    <strong>Never share this code with anyone.</strong> Our team will never ask
+    for this code.
+  </p>
+  <p>If you didn't request this code, please:</p>
+  <ul>
+    <li>Ignore this email</li>
+    <li>Review your account security</li>
+    <li>Contact support if you notice suspicious activity</li>
+  </ul>
+</div>
+
+<p style="color: #64748b; font-size: 14px; margin-top: 30px">
+  <strong>Need help?</strong> Contact our support team at {{.SupportEmail}}
+</p>
+{{end}}
