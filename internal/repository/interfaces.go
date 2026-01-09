@@ -13,36 +13,47 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// UserRepository defines methods for user data access
-type UserRepository interface {
-	// Basic CRUD
+// ===================== AUTH REPOSITORY =====================
+type AuthRepository interface {
+	// User Authentication
 	CreateUser(ctx context.Context, user core.User, passwordHash string) (core.User, error)
-	GetUserByID(ctx context.Context, id uuid.UUID) (core.User, error)
 	GetUserByEmail(ctx context.Context, email string) (core.User, string, error)
 	GetUserByPhone(ctx context.Context, phone string) (core.User, error)
 	GetUserByPhoneWithHash(ctx context.Context, phone string) (core.User, string, error)
-	UpdateUser(ctx context.Context, user core.User) error
-	DeactivateUser(ctx context.Context, id uuid.UUID) error
-
-	// Authentication & Verification
+	
+	// Token Management
 	GetUserByVerificationToken(ctx context.Context, token string) (core.User, string, error)
 	GetUserByPasswordResetToken(ctx context.Context, token string) (core.User, string, error)
 	SetVerificationToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
 	SetPasswordResetToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
 	VerifyUser(ctx context.Context, id uuid.UUID) error
-
+	
 	// Password Management
 	UpdateUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
-
-	// Status Management
+	
+	// Session & Status
 	UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
+}
 
-	// Listing
+// ===================== USER REPOSITORY =====================
+type UserRepository interface {
+	// Basic CRUD
+	GetUserByID(ctx context.Context, id uuid.UUID) (core.User, error)
+	UpdateUser(ctx context.Context, user core.User) error
+	DeactivateUser(ctx context.Context, id uuid.UUID) error
+	
+	// Listing & Search
 	ListUsers(ctx context.Context, role string, limit, offset int) ([]core.User, error)
 	CountUsers(ctx context.Context, role string) (int64, error)
+	
+	// Profile Management
+	GetUserProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error)
+}
 
-	// OTP
+// ===================== OTP REPOSITORY =====================
+type OTPRepository interface {
+	// OTP Operations
 	SaveOTP(ctx context.Context, otp core.OTPVerification) error
 	GetOTP(ctx context.Context, userID uuid.UUID, otp, otpType string) (core.OTPVerification, error)
 	MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedAt *time.Time) error

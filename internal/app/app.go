@@ -1,4 +1,4 @@
-// Package app handles application initialization and dependency injection for health project
+// Package app handles application initialization and dependency injection
 package app
 
 import (
@@ -26,7 +26,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// App represents the health project application with all dependencies
+// App represents the application with all dependencies
 type App struct {
 	config *config.Config
 	server *server.Server
@@ -34,7 +34,7 @@ type App struct {
 	logger *zerolog.Logger
 }
 
-// New creates a new application instance for health project
+// New creates a new application instance
 func New(cfg *config.Config) (*App, error) {
 	logger := cfg.Logger()
 
@@ -57,50 +57,48 @@ func New(cfg *config.Config) (*App, error) {
 		}
 	}
 
-	// Initialize email service (optional)
+	// Initialize email service
 	var emailService email.Service
-if cfg.EmailFrom != "" {
-    // Try to load email config from environment
-    emailService, err = email.NewFromEnv(logger)
-    if err != nil {
-        logger.Warn().Err(err).Msg("Failed to initialize email service from environment")
+	if cfg.EmailFrom != "" {
+		emailService, err = email.NewFromEnv(logger)
+		if err != nil {
+			logger.Warn().Err(err).Msg("Failed to initialize email service from environment")
 
-        // Fallback to Resend if configured
-        resendAPIKey := os.Getenv("RESEND_API_KEY")
-        if resendAPIKey != "" {
-            // Create config using email types package
-            emailCfg := &emailtypes.Config{
-                Provider:     "resend",
-                FromAddress:  cfg.EmailFrom,
-                FromName:     "Healthcare Access Connector",
-                ResendAPIKey: resendAPIKey,
-                // Set some reasonable defaults
-                EnableAsync:          true,
-                WorkerPoolSize:       10,
-                QueueSize:           100,
-                MaxRetries:          3,
-                RetryDelay:          time.Second,
-                RetryMaxDelay:       30 * time.Second,
-                EnableCircuitBreaker: true,
-                CircuitBreakerThreshold: 5,
-                CircuitBreakerTimeout:   60 * time.Second,
-                SendTimeout:            30 * time.Second,
-            }
+			// Fallback to Resend if configured
+			resendAPIKey := os.Getenv("RESEND_API_KEY")
+			if resendAPIKey != "" {
+				emailCfg := &emailtypes.Config{
+					Provider:     "resend",
+					FromAddress:  cfg.EmailFrom,
+					FromName:     "Healthcare Access Connector",
+					ResendAPIKey: resendAPIKey,
+					EnableAsync:  true,
+					WorkerPoolSize: 10,
+					QueueSize:    100,
+					MaxRetries:   3,
+					RetryDelay:   time.Second,
+					RetryMaxDelay: 30 * time.Second,
+					EnableCircuitBreaker: true,
+					CircuitBreakerThreshold: 5,
+					CircuitBreakerTimeout: 60 * time.Second,
+					SendTimeout: 30 * time.Second,
+				}
 
-            emailService, err = email.New(emailCfg, logger)
-            if err != nil {
-                logger.Warn().Err(err).Msg("Email service initialization failed, continuing without email")
-                emailService = nil
-            }
-        }
-    }
-}
+				emailService, err = email.New(emailCfg, logger)
+				if err != nil {
+					logger.Warn().Err(err).Msg("Email service initialization failed, continuing without email")
+					emailService = nil
+				}
+			}
+		}
+	}
 
-	// Initialize ONLY the repositories that are implemented
+	// Initialize repositories
+	authRepo := repocore.NewAuthRepository(pool)
 	userRepo := repocore.NewUserRepository(pool)
+	otpRepo := repocore.NewOTPRepository(pool)
 
 	// Initialize stubs for required but not yet implemented repositories
-	// These will be replaced with actual implementations later
 	patientRepo := &stubPatientRepository{}
 	sessionRepo := &stubSessionRepository{}
 	consentRepo := &stubConsentRepository{}
@@ -109,9 +107,11 @@ if cfg.EmailFrom != "" {
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
 
-	// Initialize services with stubs where needed
+	// Initialize services
 	authService := servicecore.NewAuthService(
+		authRepo,
 		userRepo,
+		otpRepo,
 		patientRepo,
 		sessionRepo,
 		consentRepo,
@@ -127,6 +127,7 @@ if cfg.EmailFrom != "" {
 
 	userService := servicecore.NewUserService(
 		userRepo,
+		authRepo,
 		patientRepo,
 		consentRepo,
 		notificationRepo,
@@ -135,15 +136,28 @@ if cfg.EmailFrom != "" {
 		logger,
 	)
 
+	otpService := servicecore.NewOTPService(
+		authRepo,
+		otpRepo,
+		emailService,
+		logger,
+		cfg.SMSEnabled,
+		cfg.BcryptCost,
+	)
+
 	// Initialize handlers
 	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
+	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
+	otpHandler := handlercore.NewOTPHandler(otpService, logger, cfg.Timeout)
 	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService)
 
-	// Initialize server with only implemented handlers
+	// Initialize server with all handlers
 	srv := server.NewServer(
 		cfg,
 		logger,
 		authHandler,
+		userHandler,
+		otpHandler,
 		healthHandler,
 		authService,
 		txManager,
@@ -177,22 +191,18 @@ func (a *App) Cleanup() {
 
 // initDatabase initializes the database connection pool
 func initDatabase(dbURL string, logger *zerolog.Logger) (*pgxpool.Pool, error) {
-	// Parse the connection string
 	config, err := pgxpool.ParseConfig(dbURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	// Disable prepared statement caching to avoid conflicts
 	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 
-	// Create pool with config
 	pool, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
 	}
 
-	// Test connection
 	if err := pool.Ping(context.Background()); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -23,7 +22,7 @@ type AuthHandler struct {
 	timeout     time.Duration
 }
 
-// NewAuthHandler creates a new authentication handler for health project
+// NewAuthHandler creates a new authentication handler
 func NewAuthHandler(
 	authService service.AuthService,
 	userService service.UserService,
@@ -39,17 +38,6 @@ func NewAuthHandler(
 }
 
 // Register handles user registration
-// @Summary Register a new user
-// @Description Register with email or phone
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.RegisterRequest true "Registration data"
-// @Success 201 {object} dto.UserResponse
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 409 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -92,18 +80,6 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 // Login handles user login
-// @Summary Login user
-// @Description Login with email or phone
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.LoginRequest true "Login credentials"
-// @Success 200 {object} dto.LoginResponse
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 401 {object} dto.ErrorResponse
-// @Failure 403 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -173,52 +149,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetProfile retrieves user's profile
-// @Summary Get user profile
-// @Description Get user profile with patient information if applicable
-// @Tags users
-// @Produce json
-// @Param id path string true "User ID"
-// @Security BearerAuth
-// @Success 200 {object} dto.ProfileResponse
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 401 {object} dto.ErrorResponse
-// @Failure 404 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/users/{id}/profile [get]
-func (h *AuthHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-	defer cancel()
-
-	userIDStr := chi.URLParam(r, "id")
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
-			Error: "Invalid user ID format",
-		})
-		return
-	}
-
-	// Get user profile using user service
-	user, patientProfile, err := h.userService.GetProfile(ctx, userID)
-	if err != nil {
-		handler.RespondError(w, h.logger, err)
-		return
-	}
-
-	handler.RespondJSON(w, http.StatusOK, core.ToProfileResponse(user, patientProfile))
-}
-
 // RefreshToken refreshes an access token
-// @Summary Refresh access token
-// @Description Refresh expired access token
-// @Tags auth
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} dto.LoginResponse
-// @Failure 401 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/refresh [post]
 func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -305,16 +236,6 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 }
 
 // RequestPasswordReset requests password reset
-// @Summary Request password reset
-// @Description Send password reset link to email or SMS to phone
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.PasswordResetRequest true "Reset request"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/password/reset [post]
 func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -343,23 +264,13 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Always return success for security (don't reveal if user exists)
+	// Always return success for security
 	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "If your account exists, you will receive reset instructions",
 	})
 }
 
 // ResendVerificationEmail resends verification email
-// @Summary Resend verification email
-// @Description Resend verification email to user
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.ResendVerificationRequest true "Email address"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/resend-verification [post]
 func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -393,19 +304,6 @@ func (h *AuthHandler) ResendVerificationEmail(w http.ResponseWriter, r *http.Req
 }
 
 // UpdatePassword updates user password
-// @Summary Update password
-// @Description Update user password with current password verification
-// @Tags users
-// @Accept json
-// @Produce json
-// @Param id path string true "User ID"
-// @Param request body dto.PasswordUpdateRequest true "Password update data"
-// @Security BearerAuth
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 401 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/users/{id}/password [put]
 func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -445,211 +343,6 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 
 	handler.RespondJSON(w, http.StatusOK, map[string]string{
 		"message": "Password updated successfully",
-	})
-}
-
-// GetConsent retrieves user consent settings
-// @Summary Get consent settings
-// @Description Get user privacy consent settings (POPIA compliance)
-// @Tags users
-// @Produce json
-// @Param id path string true "User ID"
-// @Security BearerAuth
-// @Success 200 {object} dto.ConsentResponse
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 401 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/users/{id}/consent [get]
-func (h *AuthHandler) GetConsent(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-	defer cancel()
-
-	userIDStr := chi.URLParam(r, "id")
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
-			Error: "Invalid user ID format",
-		})
-		return
-	}
-
-	// Get consent
-	consent, err := h.userService.GetConsent(ctx, userID)
-	if err != nil {
-		handler.RespondError(w, h.logger, err)
-		return
-	}
-
-	response := core.ConsentResponse{
-		HealthDataConsent:         consent.HealthDataConsent,
-		ResearchConsent:           consent.ResearchConsent,
-		EmergencyAccessConsent:    consent.EmergencyAccessConsent,
-		SMSCommunicationConsent:   consent.SMSCommunicationConsent,
-		EmailCommunicationConsent: consent.EmailCommunicationConsent,
-		ConsentWithdrawn:          consent.ConsentWithdrawn,
-		ConsentDate:               consent.HealthDataConsentDate,
-		CreatedAt:                 consent.CreatedAt,
-		UpdatedAt:                 consent.UpdatedAt,
-	}
-
-	handler.RespondJSON(w, http.StatusOK, response)
-}
-
-// GenerateOTP generates and sends OTP to user
-// @Summary Generate OTP for password reset
-// @Description Generate and send 6-digit OTP via email/SMS
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.OTPRequest true "OTP request"
-// @Success 200 {object} dto.OTPResponse
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 429 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/otp/generate [post]
-func (h *AuthHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-	defer cancel()
-
-	var req core.OTPRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
-			Error: "Invalid request body",
-		})
-		return
-	}
-
-	// Validate input
-	v := validator.New()
-	v.ValidateRequired("identifier", req.Identifier)
-
-	if !v.Valid() {
-		handler.RespondValidationError(w, v.Errors())
-		return
-	}
-
-	// Generate OTP
-	err := h.authService.GenerateOTP(ctx, req.Identifier)
-	if err != nil {
-		handler.RespondError(w, h.logger, err)
-		return
-	}
-
-	// Always return success message for security
-	response := core.OTPResponse{
-		Message:   "If your account exists, a verification code has been sent",
-		ExpiresIn: 10, // 10 minutes
-	}
-
-	// Determine channel for user feedback
-	if strings.Contains(req.Identifier, "@") {
-		response.Channel = "email"
-	} else {
-		response.Channel = "sms"
-	}
-
-	handler.RespondJSON(w, http.StatusOK, response)
-}
-
-// VerifyOTP verifies OTP and returns reset token
-// @Summary Verify OTP code
-// @Description Verify 6-digit OTP code for password reset
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.OTPVerifyRequest true "OTP verification"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 401 {object} dto.ErrorResponse
-// @Failure 404 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/otp/verify [post]
-func (h *AuthHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-	defer cancel()
-
-	var req core.OTPVerifyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
-			Error: "Invalid request body",
-		})
-		return
-	}
-
-	// Validate input
-	v := validator.New()
-	v.ValidateRequired("identifier", req.Identifier)
-	v.ValidateRequired("otp", req.OTP)
-	v.ValidateLength("otp", req.OTP, 6, 6)
-	v.ValidateNumeric("otp", req.OTP)
-
-	if !v.Valid() {
-		handler.RespondValidationError(w, v.Errors())
-		return
-	}
-
-	// Verify OTP
-	resetToken, err := h.authService.VerifyOTP(ctx, req.Identifier, req.OTP)
-	if err != nil {
-		handler.RespondError(w, h.logger, err)
-		return
-	}
-
-	handler.RespondJSON(w, http.StatusOK, map[string]string{
-		"message":  "OTP verified successfully",
-		"token":    resetToken, // For backward compatibility
-		"verified": "true",
-	})
-}
-
-// ResetPasswordWithOTP resets password using OTP verification
-// @Summary Reset password with OTP
-// @Description Reset password using OTP verification (two-step process)
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param request body dto.PasswordResetWithOTPRequest true "Reset with OTP"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} dto.ErrorResponse
-// @Failure 401 {object} dto.ErrorResponse
-// @Failure 500 {object} dto.ErrorResponse
-// @Router /api/v1/auth/password/reset-with-otp [post]
-func (h *AuthHandler) ResetPasswordWithOTP(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-	defer cancel()
-
-	var req core.PasswordResetWithOTPRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
-			Error: "Invalid request body",
-		})
-		return
-	}
-
-	// Validate input
-	v := validator.New()
-	v.ValidateRequired("identifier", req.Identifier)
-	v.ValidateRequired("otp", req.OTP)
-	v.ValidateRequired("new_password", req.NewPassword)
-	v.ValidateLength("otp", req.OTP, 6, 6)
-	v.ValidateNumeric("otp", req.OTP)
-	v.ValidatePassword("new_password", req.NewPassword)
-
-	if !v.Valid() {
-		handler.RespondValidationError(w, v.Errors())
-		return
-	}
-
-	// Reset password with OTP
-	// This uses the new combined method (or you can call VerifyOTP then ResetPassword)
-	err := h.authService.ResetPasswordWithOTP(ctx, req.Identifier, req.OTP, req.NewPassword)
-	if err != nil {
-		handler.RespondError(w, h.logger, err)
-		return
-	}
-
-	handler.RespondJSON(w, http.StatusOK, map[string]string{
-		"message": "Password reset successfully",
 	})
 }
 

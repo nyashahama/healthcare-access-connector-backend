@@ -49,6 +49,8 @@ type Server struct {
 	config        *config.Config
 	logger        *zerolog.Logger
 	authHandler   *handlercore.AuthHandler
+	userHandler   *handlercore.UserHandler
+	otpHandler    *handlercore.OTPHandler
 	healthHandler *handler.HealthHandler
 	authService   service.AuthService
 }
@@ -58,6 +60,8 @@ func NewServer(
 	cfg *config.Config,
 	logger *zerolog.Logger,
 	authHandler *handlercore.AuthHandler,
+	userHandler *handlercore.UserHandler,
+	otpHandler *handlercore.OTPHandler,
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
 	txManager repository.TxManager,
@@ -66,6 +70,8 @@ func NewServer(
 		config:        cfg,
 		logger:        logger,
 		authHandler:   authHandler,
+		userHandler:   userHandler,
+		otpHandler:    otpHandler,
 		healthHandler: healthHandler,
 		authService:   authService,
 	}
@@ -128,7 +134,7 @@ func (s *Server) Start() error {
 func (s *Server) setupRoutes() http.Handler {
 	r := chi.NewRouter()
 
-	// Global middleware (order matters)
+	// Global middleware
 	r.Use(middleware.Recovery(s.logger))
 	r.Use(middleware.Logger(s.logger))
 	r.Use(middleware.CORS(s.config.AllowedOrigins))
@@ -137,7 +143,7 @@ func (s *Server) setupRoutes() http.Handler {
 	r.Use(middleware.RateLimiter(s.config.RateLimitRPS, s.config.RateLimitBurst))
 	r.Use(s.metricsMiddleware())
 
-	// Health check routes (no auth required)
+	// Health check routes
 	r.Get("/health", s.healthHandler.Health)
 	r.Get("/ready", s.healthHandler.Readiness)
 	r.Get("/live", s.healthHandler.Liveness)
@@ -146,30 +152,30 @@ func (s *Server) setupRoutes() http.Handler {
 	// API routes
 	r.Route("/api/v1", func(r chi.Router) {
 		// Public authentication routes
-		r.Post("/register", s.authHandler.Register)
-		r.Post("/login", s.authHandler.Login)
-		r.Get("/verify-email", s.authHandler.VerifyEmail) // ?token=xxx
-		r.Post("/password/reset-request", s.authHandler.RequestPasswordReset)
-		r.Post("/password/reset", s.authHandler.ResetPassword)
+		r.Post("/auth/register", s.authHandler.Register)
+		r.Post("/auth/login", s.authHandler.Login)
+		r.Get("/auth/verify-email", s.authHandler.VerifyEmail)
+		r.Post("/auth/password/reset-request", s.authHandler.RequestPasswordReset)
+		r.Post("/auth/password/reset", s.authHandler.ResetPassword)
 		r.Post("/auth/resend-verification", s.authHandler.ResendVerificationEmail)
 
-		// OTP-based authentication routes
-		r.Post("/auth/otp/generate", s.authHandler.GenerateOTP)
-		r.Post("/auth/otp/verify", s.authHandler.VerifyOTP)
-		// r.Post("/auth/password/reset-with-otp", s.authHandler.ResetPasswordWithOTP) //(some issues here still thinking to only go with password/reset)
+		// OTP routes
+		r.Post("/auth/otp/generate", s.otpHandler.GenerateOTP)
+		r.Post("/auth/otp/verify", s.otpHandler.VerifyOTP)
+		r.Post("/auth/password/reset-with-otp", s.otpHandler.ResetPasswordWithOTP)
 
 		// Protected routes - require authentication
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(s.authService, s.logger))
 
-			// Auth management (authenticated)
+			// Auth management
 			r.Post("/auth/refresh", s.authHandler.RefreshToken)
 			r.Post("/auth/logout", s.authHandler.Logout)
 
 			// User profile routes
-			r.Get("/users/{id}", s.authHandler.GetProfile)
+			r.Get("/users/{id}/profile", s.userHandler.GetProfile)
 			r.Put("/users/{id}/password", s.authHandler.UpdatePassword)
-			r.Get("/users/{id}/consent", s.authHandler.GetConsent)
+			r.Get("/users/{id}/consent", s.userHandler.GetConsent)
 
 			// Admin routes
 			r.Group(func(r chi.Router) {
@@ -197,13 +203,9 @@ func (s *Server) metricsMiddleware() func(next http.Handler) http.Handler {
 			path := r.URL.Path
 			method := r.Method
 
-			// Wrap response writer to capture status
 			ww := chimiddleware.NewWrapResponseWriter(w, r.ProtoMajor)
-
-			// Call next handler
 			next.ServeHTTP(ww, r)
 
-			// Record metrics
 			duration := time.Since(start).Seconds()
 			status := fmt.Sprintf("%d", ww.Status())
 

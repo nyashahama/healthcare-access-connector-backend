@@ -10,23 +10,20 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 )
 
-// AuthService handles authentication operations for health project
+// ===================== AUTH SERVICE =====================
 type AuthService interface {
 	Register(ctx context.Context, email, phone, password, role string) (core.User, error)
 	Login(ctx context.Context, identifier, password string) (string, time.Time, core.User, error)
 	Logout(ctx context.Context, tokenString string, userID uuid.UUID) error
 	ValidateToken(ctx context.Context, token string) (*TokenClaims, error)
 	RefreshToken(ctx context.Context, tokenString string) (string, time.Time, core.User, error)
-	RequestPasswordReset(ctx context.Context, identifier string) error
 	VerifyEmail(ctx context.Context, token string) error
+	RequestPasswordReset(ctx context.Context, identifier string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	ResendVerificationEmail(ctx context.Context, email string) error
-	GenerateOTP(ctx context.Context, identifier string) error
-	VerifyOTP(ctx context.Context, identifier, otp string) (string, error) // Returns reset token
-	ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error
 }
 
-// UserService handles user operations for health project
+// ===================== USER SERVICE =====================
 type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (core.User, error)
@@ -37,6 +34,14 @@ type UserService interface {
 	GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error)
 	UpdateConsent(ctx context.Context, userID uuid.UUID, consent core.PrivacyConsent) error
 }
+
+// ===================== OTP SERVICE =====================
+type OTPService interface {
+	GenerateOTP(ctx context.Context, identifier string) error
+	VerifyOTP(ctx context.Context, identifier, otp string) (string, error)
+	ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error
+}
+
 
 // PatientService handles patient operations
 type PatientService interface {

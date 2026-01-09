@@ -19,30 +19,33 @@ import (
 
 type userService struct {
 	userRepo         repository.UserRepository
+	authRepo         repository.AuthRepository
 	patientRepo      repository.PatientRepository
 	consentRepo      repository.ConsentRepository
 	notificationRepo repository.NotificationRepository
-	sessionRepo      repository.SessionRepository // Added this
+	sessionRepo      repository.SessionRepository
 	cache            cache.Service
 	logger           *zerolog.Logger
 }
 
-// NewUserService creates a new user service for health project
+// NewUserService creates a new user service
 func NewUserService(
 	userRepo repository.UserRepository,
+	authRepo repository.AuthRepository,
 	patientRepo repository.PatientRepository,
 	consentRepo repository.ConsentRepository,
 	notificationRepo repository.NotificationRepository,
-	sessionRepo repository.SessionRepository, // Added this
+	sessionRepo repository.SessionRepository,
 	cache cache.Service,
 	logger *zerolog.Logger,
 ) service.UserService {
 	return &userService{
 		userRepo:         userRepo,
+		authRepo:         authRepo,
 		patientRepo:      patientRepo,
 		consentRepo:      consentRepo,
 		notificationRepo: notificationRepo,
-		sessionRepo:      sessionRepo, // Added this
+		sessionRepo:      sessionRepo,
 		cache:            cache,
 		logger:           logger,
 	}
@@ -54,7 +57,7 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (core.Us
 
 	// Try cache first
 	type CachedProfile struct {
-		User    core.User           `json:"user"`
+		User    core.User              `json:"user"`
 		Profile patients.PatientProfile `json:"profile"`
 	}
 	var cached CachedProfile
@@ -63,7 +66,7 @@ func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (core.Us
 		return cached.User, cached.Profile, nil
 	}
 
-	// Get user
+	// Get user from auth repo (since GetUserByID is in auth repo)
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
@@ -102,7 +105,7 @@ func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (core.U
 		return user, nil
 	}
 
-	// Fetch from database
+	// Fetch from database using auth repo
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
@@ -128,16 +131,11 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, updat
 	// Invalidate cache
 	s.invalidateUserCache(ctx, userID)
 
-	// This is a simplified update - in reality, you'd have specific update methods
-	// For now, we'll update the user object based on the updates map
-	// Note: In production, you should validate and sanitize updates
-
 	// Update patient profile if user is a patient
 	if user.Role == "patient" {
 		profile, err := s.patientRepo.GetPatientProfileByUserID(ctx, userID)
 		if err == nil {
 			// Update profile fields based on updates map
-			// This is simplified - you'd need proper type checking
 			s.updatePatientProfileFromMap(&profile, updates)
 
 			if err := s.patientRepo.UpdatePatientProfile(ctx, profile); err != nil {
@@ -153,7 +151,7 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, updat
 
 // UpdatePassword updates user password
 func (s *userService) UpdatePassword(ctx context.Context, userID uuid.UUID, currentPassword, newPassword string) error {
-	// Get user with password hash
+	// Get user
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		return domain.NewAppError(err, "User not found", 404)
@@ -165,7 +163,7 @@ func (s *userService) UpdatePassword(ctx context.Context, userID uuid.UUID, curr
 	}
 
 	// Get password hash using email
-	_, passwordHash, err := s.userRepo.GetUserByEmail(ctx, *user.Email)
+	_, passwordHash, err := s.authRepo.GetUserByEmail(ctx, *user.Email)
 	if err != nil {
 		return domain.NewAppError(err, "Failed to verify current password", 500)
 	}
@@ -183,12 +181,12 @@ func (s *userService) UpdatePassword(ctx context.Context, userID uuid.UUID, curr
 	}
 
 	// Update password
-	if err := s.userRepo.UpdateUserPassword(ctx, userID, string(newHash)); err != nil {
+	if err := s.authRepo.UpdateUserPassword(ctx, userID, string(newHash)); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to update password in database")
 		return domain.NewAppError(err, "Failed to update password", 500)
 	}
 
-	// Invalidate all user sessions if sessionRepo exists
+	// Invalidate all user sessions
 	if s.sessionRepo != nil {
 		if err := s.sessionRepo.DeleteUserSessions(ctx, userID); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to delete user sessions")
@@ -210,7 +208,7 @@ func (s *userService) DeleteProfile(ctx context.Context, userID uuid.UUID) error
 		return domain.NewAppError(err, "Failed to delete profile", 500)
 	}
 
-	// Delete all sessions if sessionRepo exists
+	// Delete all sessions
 	if s.sessionRepo != nil {
 		if err := s.sessionRepo.DeleteUserSessions(ctx, userID); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to delete user sessions")
@@ -253,19 +251,6 @@ func (s *userService) UpdateConsent(ctx context.Context, userID uuid.UUID, conse
 		return domain.NewAppError(err, "Failed to update consent", 500)
 	}
 
-	// Update user consent flags
-	user, err := s.userRepo.GetUserByID(ctx, userID)
-	if err != nil {
-		return domain.NewAppError(err, "User not found", 404)
-	}
-
-	user.SMSConsentGiven = consent.SMSCommunicationConsent
-	user.POPIAConsentGiven = consent.HealthDataConsent
-	user.ConsentDate = &[]time.Time{time.Now()}[0]
-
-	// Invalidate cache
-	s.invalidateUserCache(ctx, userID)
-
 	s.logger.Info().Str("user_id", userID.String()).Msg("Consent updated")
 	return nil
 }
@@ -285,7 +270,6 @@ func (s *userService) invalidateUserCache(ctx context.Context, userID uuid.UUID)
 }
 
 func (s *userService) updatePatientProfileFromMap(profile *patients.PatientProfile, updates map[string]interface{}) {
-	// Simplified update - in reality, you'd need proper type assertions and validation
 	if firstName, ok := updates["first_name"].(string); ok {
 		profile.FirstName = firstName
 	}
@@ -295,6 +279,5 @@ func (s *userService) updatePatientProfileFromMap(profile *patients.PatientProfi
 	if preferredName, ok := updates["preferred_name"].(string); ok {
 		profile.PreferredName = &preferredName
 	}
-	// Add more fields as needed
 	profile.LastProfileUpdate = &[]time.Time{time.Now()}[0]
 }
