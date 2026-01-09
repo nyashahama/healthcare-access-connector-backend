@@ -10,8 +10,13 @@ import (
 type Config struct {
 	// Provider settings
 	Provider    string // "ses", "smtp", or "resend"
-	FromAddress string
+	FromAddress string // Default from address
 	FromName    string
+
+	// Multiple from addresses for different purposes
+	NoReplyAddress string // For automated emails (no-reply@nyashahama.xyz)
+	SupportAddress string // For support emails (support@nyashahama.xyz)
+	HealthAddress  string // For health-related emails (health@nyashahama.xyz)
 
 	// AWS SES config
 	AWSRegion          string
@@ -29,9 +34,9 @@ type Config struct {
 	ResendAPIKey string
 
 	// Retry configuration
-	MaxRetries     int
-	RetryDelay     time.Duration
-	RetryMaxDelay  time.Duration
+	MaxRetries      int
+	RetryDelay      time.Duration
+	RetryMaxDelay   time.Duration
 	RetryMultiplier float64
 
 	// Circuit breaker configuration
@@ -40,14 +45,52 @@ type Config struct {
 	CircuitBreakerMaxRequests int
 
 	// Performance settings
-	WorkerPoolSize int
-	QueueSize      int
-	SendTimeout    time.Duration
+	WorkerPoolSize     int
+	QueueSize          int
+	SendTimeout        time.Duration
+	ConnectionPoolSize int
+
+	// Template configuration
+	TemplatesDir  string
+	DefaultLocale string
 
 	// Feature flags
-	EnableMetrics       bool
+	EnableMetrics        bool
 	EnableCircuitBreaker bool
-	EnableAsync         bool
+	EnableAsync          bool
+
+	// Logging
+	LogLevel string
+}
+
+// GetFromAddress returns the appropriate from address based on email type
+func (c *Config) GetFromAddress(emailType EmailTemplate) string {
+	switch emailType {
+	case TemplateWelcome, TemplatePasswordReset, TemplateVerification, TemplateOTP, TemplatePasswordChanged, TemplateLoginAlert:
+		// Automated system emails use no-reply
+		if c.NoReplyAddress != "" {
+			return c.NoReplyAddress
+		}
+	}
+	
+	// Default to main from address
+	return c.FromAddress
+}
+
+// GetSupportAddress returns the support email address
+func (c *Config) GetSupportAddress() string {
+	if c.SupportAddress != "" {
+		return c.SupportAddress
+	}
+	return c.FromAddress
+}
+
+// GetHealthAddress returns the health email address
+func (c *Config) GetHealthAddress() string {
+	if c.HealthAddress != "" {
+		return c.HealthAddress
+	}
+	return c.FromAddress
 }
 
 // Validate validates email configuration
@@ -57,7 +100,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Provider == "" {
-		c.Provider = "ses" // Default to SES
+		c.Provider = "smtp" // Default to SMTP for local dev
 	}
 
 	switch c.Provider {
@@ -80,12 +123,23 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid email provider: %s (must be 'ses', 'smtp', or 'resend')", c.Provider)
 	}
 
+	// Set default addresses if not provided
+	if c.NoReplyAddress == "" {
+		c.NoReplyAddress = c.FromAddress
+	}
+	if c.SupportAddress == "" {
+		c.SupportAddress = c.FromAddress
+	}
+	if c.HealthAddress == "" {
+		c.HealthAddress = c.FromAddress
+	}
+
 	// Set defaults for retry
 	if c.MaxRetries == 0 {
 		c.MaxRetries = 3
 	}
 	if c.RetryDelay == 0 {
-		c.RetryDelay = time.Second
+		c.RetryDelay = 2 * time.Second
 	}
 	if c.RetryMaxDelay == 0 {
 		c.RetryMaxDelay = 30 * time.Second
@@ -114,6 +168,22 @@ func (c *Config) Validate() error {
 	}
 	if c.SendTimeout == 0 {
 		c.SendTimeout = 30 * time.Second
+	}
+	if c.ConnectionPoolSize == 0 {
+		c.ConnectionPoolSize = 5
+	}
+
+	// Set defaults for templates
+	if c.TemplatesDir == "" {
+		c.TemplatesDir = "./internal/email/templates/assets"
+	}
+	if c.DefaultLocale == "" {
+		c.DefaultLocale = "en"
+	}
+
+	// Set defaults for logging
+	if c.LogLevel == "" {
+		c.LogLevel = "info"
 	}
 
 	return nil

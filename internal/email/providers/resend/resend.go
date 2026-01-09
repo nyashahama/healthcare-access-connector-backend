@@ -83,9 +83,12 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 		return emailtypes.ErrNoRecipients
 	}
 
+	// Determine from address based on template type
+	fromAddress := p.config.GetFromAddress(msg.Template)
+	
 	// Build Resend request
 	resendReq := ResendEmailRequest{
-		From:    fmt.Sprintf("%s <%s>", p.config.FromName, p.config.FromAddress),
+		From:    fmt.Sprintf("%s <%s>", p.config.FromName, fromAddress),
 		To:      msg.To,
 		Subject: msg.Subject,
 	}

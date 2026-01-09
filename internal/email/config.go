@@ -30,6 +30,7 @@ func ConfigFromEnv() *types.Config {
 
 		// Resend
 		ResendAPIKey: getEnv("RESEND_API_KEY", ""),
+		
 
 		// Retry configuration
 		MaxRetries:      getEnvAsInt("EMAIL_MAX_RETRIES", 3),
