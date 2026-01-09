@@ -46,7 +46,7 @@ func (m *Manager) loadTemplates() error {
 
 // RenderWelcome generates welcome email content
 func (m *Manager) RenderWelcome(username string) (subject, text, html string) {
-	subject = "Welcome to Healthcare Access Connector! 🏥"
+	subject = "Welcome to Healthcare Access Connector"
 
 	text = fmt.Sprintf(`Welcome %s!
 
@@ -57,6 +57,7 @@ Your account has been successfully created. Here's what you can do now:
 • Connect with healthcare providers
 • Manage your medical preferences
 • Set up health reminders
+• Track your health journey
 
 To get started, sign in to your account:
 https://healthcare-access-connector-web.vercel.app/auth/sign-in
@@ -69,49 +70,47 @@ Best regards,
 The Healthcare Access Connector Team`, username)
 
 	content := fmt.Sprintf(`
-		<h2>Welcome aboard, %s! 👋</h2>
+		<h2>Welcome aboard, %s!</h2>
 		
 		<p>We're thrilled to welcome you to Healthcare Access Connector – your new partner in health and wellness.</p>
 		
 		<p>Your account has been successfully created and you're now ready to:</p>
 		
-		<ul style="margin: 20px 0; padding-left: 20px;">
-			<li style="margin-bottom: 8px;">Access personalized health information</li>
-			<li style="margin-bottom: 8px;">Connect with healthcare providers</li>
-			<li style="margin-bottom: 8px;">Manage your medical preferences</li>
-			<li style="margin-bottom: 8px;">Set up health reminders and alerts</li>
-			<li>Track your health journey</li>
+		<ul>
+			<li>Access personalized health information</li>
+			<li>Connect with healthcare providers</li>
+			<li>Manage your medical preferences</li>
+			<li>Set up health reminders and alerts</li>
+			<li>Track your health journey securely</li>
 		</ul>
 		
-		<p>To get started, sign in to your account:</p>
-		
-		<table class="btn btn-primary" cellpadding="0" cellspacing="0" border="0">
-			<tr>
-				<td align="center">
-					<table cellpadding="0" cellspacing="0" border="0">
-						<tr>
-							<td style="background-color: #3b82f6; border-radius: 8px;">
-								<a href="https://healthcare-access-connector-web.vercel.app/auth/sign-in" target="_blank" style="color: #ffffff; font-family: 'Inter', Arial, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; display: inline-block;">
-									Sign In to Your Account
-								</a>
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-		</table>
+		<a href="https://healthcare-access-connector-web.vercel.app/auth/sign-in" class="button">
+			Sign In to Your Account
+		</a>
 		
 		<div class="info-box">
-			<h3>🔐 Security First</h3>
+			<h3>🔒 Security First</h3>
 			<p>We use industry-standard encryption to protect your health data. Always keep your login credentials secure and never share them with anyone.</p>
+			<p><strong>Recommended:</strong> Enable two-factor authentication in your account settings for added security.</p>
 		</div>
 		
-		<p style="color: #64748b; font-size: 14px;">
+		<div class="success-box">
+			<h3>Getting Started</h3>
+			<p>Complete your profile to get personalized recommendations:</p>
+			<ol>
+				<li>Add your medical history (optional)</li>
+				<li>Set up emergency contacts</li>
+				<li>Configure notification preferences</li>
+				<li>Connect with healthcare providers</li>
+			</ol>
+		</div>
+		
+		<p style="color: #6b7280; font-size: 14px; margin-top: 32px;">
 			If you have any questions or need assistance, our support team is here to help.<br>
-			Email us at: support@healthcare-access-connector.com
+			Email us at: <a href="mailto:support@healthcare-access-connector.com" style="color: #10b981;">support@healthcare-access-connector.com</a>
 		</p>`, username)
 
-	html = m.baseTemplate("Welcome to Healthcare Access Connector!", content)
+	html = m.baseTemplate("Welcome to Healthcare Access Connector", content, true)
 	return subject, text, html
 }
 
@@ -119,7 +118,7 @@ The Healthcare Access Connector Team`, username)
 func (m *Manager) RenderPasswordReset(resetToken string) (subject, text, html string) {
 	resetURL := fmt.Sprintf("https://healthcare-access-connector-web.vercel.app/auth/reset-password?token=%s", resetToken)
 
-	subject = "Reset Your Healthcare Access Connector Password 🔐"
+	subject = "Reset Your Healthcare Access Connector Password"
 
 	text = fmt.Sprintf(`Password Reset Request
 
@@ -138,39 +137,45 @@ Stay safe,
 The Healthcare Access Connector Team`, resetURL)
 
 	content := fmt.Sprintf(`
-		<h2>Password Reset Request 🔐</h2>
+		<h2>Password Reset Request</h2>
 		
 		<p>We received a request to reset your password for your Healthcare Access Connector account.</p>
 		
 		<p>Click the button below to securely reset your password:</p>
 		
-		<table class="btn btn-primary" cellpadding="0" cellspacing="0" border="0">
-			<tr>
-				<td align="center">
-					<table cellpadding="0" cellspacing="0" border="0">
-						<tr>
-							<td style="background-color: #3b82f6; border-radius: 8px;">
-								<a href="%s" target="_blank" style="color: #ffffff; font-family: 'Inter', Arial, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; display: inline-block;">
-									Reset Your Password
-								</a>
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-		</table>
+		<a href="%s" class="button">Reset Your Password</a>
 		
 		<div class="warning-box">
 			<h3>⏰ Link Expires Soon</h3>
 			<p>This password reset link will expire in <strong>1 hour</strong> for your security.</p>
+			<p>If the link expires, you can request a new one from the login page.</p>
 		</div>
 		
 		<div class="info-box">
-			<h3>🔒 Didn't Request This?</h3>
-			<p>If you didn't request a password reset, please ignore this email. Your account remains secure.</p>
-		</div>`, resetURL)
+			<h3>🔐 Didn't Request This?</h3>
+			<p>If you <strong>DID NOT</strong> request a password reset, please ignore this email. Your account remains secure.</p>
+			<p>For added security, we recommend:</p>
+			<ul>
+				<li>Review your recent account activity</li>
+				<li>Update your security settings</li>
+				<li>Contact support if you notice anything suspicious</li>
+			</ul>
+		</div>
+		
+		<hr class="divider">
+		
+		<p style="color: #6b7280; font-size: 13px;">
+			<strong>Note:</strong> For your security, this link can only be used once.<br>
+			If you need another reset link, request a new one at: 
+			<a href="https://healthcare-access-connector-web.vercel.app/auth/forgot-password" style="color: #10b981;">Forgot Password</a>
+		</p>
+		
+		<p style="color: #9ca3af; font-size: 12px; margin-top: 12px;">
+			Or copy and paste this URL into your browser:<br>
+			<code style="background: #f3f4f6; padding: 6px 10px; border-radius: 4px; font-size: 11px; word-break: break-all; display: inline-block; margin-top: 4px; color: #1f2937;">%s</code>
+		</p>`, resetURL, resetURL)
 
-	html = m.baseTemplate("Reset Your Password", content)
+	html = m.baseTemplate("Reset Your Password", content, true)
 	return subject, text, html
 }
 
@@ -178,7 +183,7 @@ The Healthcare Access Connector Team`, resetURL)
 func (m *Manager) RenderVerification(verificationToken string) (subject, text, html string) {
 	verifyURL := fmt.Sprintf("https://healthcare-access-connector-web.vercel.app/verify-email?token=%s", verificationToken)
 
-	subject = "Verify Your Healthcare Access Connector Email ✉️"
+	subject = "Verify Your Healthcare Access Connector Email"
 
 	text = fmt.Sprintf(`Verify Your Email Address
 
@@ -195,32 +200,39 @@ Thank you,
 The Healthcare Access Connector Team`, verifyURL)
 
 	content := fmt.Sprintf(`
-		<h2>Verify Your Email Address ✉️</h2>
+		<h2>Verify Your Email Address</h2>
 		
 		<p>Welcome to Healthcare Access Connector! Please verify your email address to complete your registration.</p>
 		
-		<table class="btn btn-primary" cellpadding="0" cellspacing="0" border="0">
-			<tr>
-				<td align="center">
-					<table cellpadding="0" cellspacing="0" border="0">
-						<tr>
-							<td style="background-color: #10b981; border-radius: 8px;">
-								<a href="%s" target="_blank" style="color: #ffffff; font-family: 'Inter', Arial, sans-serif; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; display: inline-block;">
-									Verify Email Address
-								</a>
-							</td>
-						</tr>
-					</table>
-				</td>
-			</tr>
-		</table>
+		<a href="%s" class="button">Verify Email Address</a>
 		
-		<div class="warning-box">
+		<div class="success-box">
+			<h3>What's Next?</h3>
+			<p>After verification, you'll have access to:</p>
+			<ul>
+				<li><strong>Health Dashboard:</strong> Personalized health insights</li>
+				<li><strong>Appointments:</strong> Schedule with healthcare providers</li>
+				<li><strong>Medical Records:</strong> Secure access to your health data</li>
+				<li><strong>Messaging:</strong> Secure communication with providers</li>
+				<li><strong>Reminders:</strong> Medication and appointment alerts</li>
+			</ul>
+		</div>
+		
+		<div class="neutral-box">
 			<h3>⏰ Link Expires</h3>
 			<p>This verification link will expire in <strong>24 hours</strong>.</p>
-		</div>`, verifyURL)
+		</div>
+		
+		<p style="color: #6b7280; font-size: 14px; margin-top: 28px;">
+			If you didn't create an account, please ignore this email.<br>
+			If you're having trouble with the link, copy and paste this URL into your browser:
+		</p>
+		
+		<p style="color: #9ca3af; font-size: 12px; margin-top: 8px;">
+			<code style="background: #f3f4f6; padding: 6px 10px; border-radius: 4px; font-size: 11px; word-break: break-all; display: inline-block; color: #1f2937;">%s</code>
+		</p>`, verifyURL, verifyURL)
 
-	html = m.baseTemplate("Verify Your Email", content)
+	html = m.baseTemplate("Verify Your Email", content, true)
 	return subject, text, html
 }
 
@@ -228,7 +240,7 @@ The Healthcare Access Connector Team`, verifyURL)
 func (m *Manager) RenderPasswordChanged(username string) (subject, text, html string) {
 	currentTime := time.Now().Format("January 2, 2006 at 3:04 PM")
 
-	subject = "Your Healthcare Access Connector Password Was Changed 🔒"
+	subject = "Your Healthcare Access Connector Password Was Changed"
 
 	text = fmt.Sprintf(`Password Changed Successfully
 
@@ -244,23 +256,29 @@ Stay secure,
 The Healthcare Access Connector Team`, username, currentTime)
 
 	content := fmt.Sprintf(`
-		<h2>Password Changed Successfully 🔒</h2>
+		<h2>Password Changed Successfully</h2>
 		
 		<p>Hi %s,</p>
 		
 		<p>Your Healthcare Access Connector password was successfully changed on <strong>%s</strong>.</p>
 		
-		<div class="info-box">
-			<h3>✅ You're All Set</h3>
-			<p>If you made this change, no further action is needed.</p>
+		<div class="success-box">
+			<h3>✓ You're All Set</h3>
+			<p>If you made this change, no further action is needed. Your account is secure.</p>
 		</div>
 		
 		<div class="warning-box">
 			<h3>⚠️ Didn't Make This Change?</h3>
-			<p>If you <strong>DID NOT</strong> make this change, please reset your password immediately.</p>
+			<p>If you <strong>DID NOT</strong> make this change, please take immediate action:</p>
+			<ol>
+				<li>Reset your password immediately</li>
+				<li>Review your recent account activity</li>
+				<li>Contact our security team</li>
+			</ol>
+			<a href="https://healthcare-access-connector-web.vercel.app/auth/forgot-password" class="button">Reset Password Now</a>
 		</div>`, username, currentTime)
 
-	html = m.baseTemplate("Password Changed", content)
+	html = m.baseTemplate("Password Changed", content, true)
 	return subject, text, html
 }
 
@@ -268,7 +286,7 @@ The Healthcare Access Connector Team`, username, currentTime)
 func (m *Manager) RenderLoginAlert(username, ipAddress, location string) (subject, text, html string) {
 	currentTime := time.Now().Format("January 2, 2006 at 3:04 PM")
 
-	subject = "New Login Detected on Your Healthcare Account 🔔"
+	subject = "New Login Detected on Your Healthcare Account"
 
 	text = fmt.Sprintf(`New Login Alert
 
@@ -286,48 +304,79 @@ Stay safe,
 Healthcare Access Connector Security Team`, username, currentTime, ipAddress, location)
 
 	content := fmt.Sprintf(`
-		<h2>New Login Detected 🔔</h2>
+		<h2>New Login Detected</h2>
 		
 		<p>Hi %s,</p>
 		
 		<p>We detected a new login to your Healthcare Access Connector account:</p>
 		
-		<div class="info-box">
+		<div class="neutral-box">
 			<h3>📋 Login Details</h3>
-			<table style="width: 100%%; border-collapse: collapse; font-size: 14px;">
+			<table class="data-table">
 				<tr>
-					<td style="padding: 8px 0;"><strong>Time:</strong></td>
-					<td style="padding: 8px 0; text-align: right;">%s</td>
+					<td><strong>Time:</strong></td>
+					<td>%s</td>
 				</tr>
 				<tr>
-					<td style="padding: 8px 0;"><strong>IP Address:</strong></td>
-					<td style="padding: 8px 0; text-align: right;"><code>%s</code></td>
+					<td><strong>IP Address:</strong></td>
+					<td><code>%s</code></td>
 				</tr>
 				<tr>
-					<td style="padding: 8px 0;"><strong>Location:</strong></td>
-					<td style="padding: 8px 0; text-align: right;">%s</td>
+					<td><strong>Location:</strong></td>
+					<td>%s</td>
 				</tr>
 			</table>
-		</div>`, username, currentTime, template.HTMLEscapeString(ipAddress), template.HTMLEscapeString(location))
+		</div>
+		
+		<div class="info-box">
+			<h3>This Was You?</h3>
+			<p>If you recognize this login activity, no further action is needed. Your account remains secure.</p>
+		</div>
+		
+		<div class="warning-box">
+			<h3>⚠️ Don't Recognize This Login?</h3>
+			<p>If you <strong>DON'T</strong> recognize this activity, please take immediate action:</p>
+			<ol>
+				<li>Change your password immediately</li>
+				<li>Review your recent account activity</li>
+				<li>Enable two-factor authentication</li>
+				<li>Contact our security team at support@healthcare-access-connector.com</li>
+			</ol>
+			<a href="https://healthcare-access-connector-web.vercel.app/auth/forgot-password" class="button">Reset Password Now</a>
+		</div>
+		
+		<hr class="divider">
+		
+		<h3>🔐 Security Tips</h3>
+		<ul>
+			<li>Use strong, unique passwords for all your accounts</li>
+			<li>Enable login notifications in your account settings</li>
+			<li>Regularly review your account activity</li>
+			<li>Never share your login credentials with anyone</li>
+		</ul>
+		
+		<p style="color: #6b7280; font-size: 13px; margin-top: 28px;">
+			<strong>Note:</strong> This is an automated security alert. If you have any concerns, please contact our security team immediately.
+		</p>`, username, currentTime, template.HTMLEscapeString(ipAddress), template.HTMLEscapeString(location))
 
-	html = m.baseTemplate("New Login Alert", content)
+	html = m.baseTemplate("New Login Alert", content, false)
 	return subject, text, html
 }
 
 // RenderOTP generates OTP email template
 func (m *Manager) RenderOTP(email, otp, username string) (subject, text, html string) {
-	subject = "Your Password Reset Code - Healthcare Access Connector 🔢"
+	subject = "Your Verification Code - Healthcare Access Connector"
 
 	greeting := "Hello,"
 	if username != "" {
 		greeting = fmt.Sprintf("Hello %s,", username)
 	}
 
-	text = fmt.Sprintf(`Password Reset Code
+	text = fmt.Sprintf(`Your Verification Code
 
 %s
 
-Your password reset verification code is:
+Your verification code is:
 
 %s
 
@@ -339,36 +388,59 @@ Stay secure,
 Healthcare Access Connector Team`, greeting, otp)
 
 	content := fmt.Sprintf(`
-		<h2>Password Reset Code 🔢</h2>
+		<h2>Your Verification Code</h2>
 		
 		<p>%s</p>
 		
-		<p>Your password reset verification code is:</p>
+		<p>Your verification code for Healthcare Access Connector is:</p>
 		
 		<div class="otp-container">
 			<div class="otp-code">%s</div>
+			<p style="color: #6b7280; font-size: 14px; margin-top: 10px;">
+				Use this code to complete your password reset
+			</p>
 		</div>
 		
 		<div class="warning-box">
 			<h3>⏰ Code Expires Soon</h3>
 			<p>This verification code will expire in <strong>10 minutes</strong> for your security.</p>
+			<p>If the code expires, you can request a new one.</p>
 		</div>
 		
 		<div class="info-box">
 			<h3>🔒 Security Notice</h3>
 			<p><strong>Never share this code with anyone.</strong> Our team will never ask for this code.</p>
-		</div>`, greeting, otp)
+			<p>If you didn't request this code, please:</p>
+			<ul>
+				<li>Ignore this email</li>
+				<li>Review your account security</li>
+				<li>Contact support if you notice suspicious activity</li>
+			</ul>
+		</div>
+		
+		<p style="color: #6b7280; font-size: 14px; margin-top: 28px;">
+			<strong>Need help?</strong> Contact our support team at support@healthcare-access-connector.com
+		</p>`, greeting, otp)
 
-	html = m.baseTemplate("Your Verification Code", content)
+	html = m.baseTemplate("Your Verification Code", content, true)
 	return subject, text, html
 }
 
 // baseTemplate provides the common structure for all emails
-func (m *Manager) baseTemplate(title, content string) string {
+func (m *Manager) baseTemplate(title, content string, showEmergency bool) string {
 	year := time.Now().Year()
 
+	emergencySection := ""
+	if showEmergency {
+		emergencySection = `
+		<div class="emergency-notice">
+			<strong>⚠️ Medical Emergency?</strong>
+			<p>Call 10177 or go to the nearest emergency room immediately.</p>
+		</div>`
+	}
+
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -376,144 +448,355 @@ func (m *Manager) baseTemplate(title, content string) string {
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             line-height: 1.6;
-            color: #1e293b;
-            background-color: #f8fafc;
+            color: #1f2937;
+            background-color: #f9fafb;
+        }
+        
+        .email-wrapper {
+            max-width: 100%%;
+            width: 100%%;
+            margin: 0 auto;
+            background-color: #f9fafb;
+            padding: 40px 20px;
         }
         
         .email-container {
             max-width: 600px;
             margin: 0 auto;
             background-color: #ffffff;
-            border-radius: 16px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e5e7eb;
         }
         
         .header {
-            background: linear-gradient(135deg, #3b82f6 0%%, #1d4ed8 100%%);
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
+            background-color: #ffffff;
+            border-bottom: 3px solid #10b981;
+            color: #1f2937;
+            padding: 40px 40px 32px;
+            text-align: left;
+        }
+        
+        .logo-container {
+            margin-bottom: 24px;
         }
         
         .logo {
-            font-weight: 700;
-            font-size: 24px;
-            margin-bottom: 20px;
+            font-weight: 600;
+            font-size: 18px;
+            letter-spacing: -0.3px;
+            color: #1f2937;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .header h1 {
             margin: 0;
-            font-size: 28px;
-            font-weight: 700;
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+            line-height: 1.3;
+            color: #111827;
         }
         
         .content {
-            padding: 40px 30px;
-            color: #334155;
+            padding: 40px;
+            color: #4b5563;
+            font-size: 15px;
+            line-height: 1.7;
         }
         
         .content h2 {
-            color: #1e293b;
+            color: #111827;
             font-size: 20px;
             font-weight: 600;
             margin-top: 0;
+            margin-bottom: 16px;
         }
         
-        .otp-container {
-            margin: 30px 0;
-            text-align: center;
+        .content h3 {
+            color: #1f2937;
+            font-size: 17px;
+            font-weight: 600;
+            margin-top: 28px;
+            margin-bottom: 12px;
         }
         
-        .otp-code {
+        .content p {
+            margin-bottom: 16px;
+        }
+        
+        .content ul, .content ol {
+            margin: 16px 0;
+            padding-left: 24px;
+        }
+        
+        .content li {
+            margin-bottom: 8px;
+        }
+        
+        .button {
             display: inline-block;
-            background: #f1f5f9;
-            padding: 16px 24px;
-            border-radius: 12px;
-            font-size: 32px;
-            font-weight: 700;
-            letter-spacing: 8px;
-            color: #3b82f6;
-            border: 2px dashed #cbd5e1;
-            font-family: monospace;
+            background-color: #10b981;
+            color: white;
+            text-decoration: none;
+            padding: 14px 28px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 15px;
+            margin: 20px 0;
         }
         
         .info-box {
-            background: #f0f9ff;
-            border-left: 4px solid #3b82f6;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-left: 3px solid #10b981;
             padding: 20px;
-            margin: 30px 0;
-            border-radius: 8px;
+            margin: 24px 0;
+            border-radius: 6px;
         }
         
         .info-box h3 {
-            color: #1d4ed8;
+            color: #059669;
             margin-top: 0;
-            font-size: 16px;
+            margin-bottom: 8px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        
+        .info-box p {
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .info-box p:last-child {
+            margin-bottom: 0;
         }
         
         .warning-box {
-            background: #fef2f2;
-            border-left: 4px solid #dc2626;
+            background: #fef9f9;
+            border: 1px solid #fee2e2;
+            border-left: 3px solid #dc2626;
             padding: 20px;
-            margin: 30px 0;
-            border-radius: 8px;
+            margin: 24px 0;
+            border-radius: 6px;
         }
         
         .warning-box h3 {
             color: #dc2626;
             margin-top: 0;
-            font-size: 16px;
+            margin-bottom: 8px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        
+        .success-box {
+            background: #f6fef9;
+            border: 1px solid #d1fae5;
+            border-left: 3px solid #10b981;
+            padding: 20px;
+            margin: 24px 0;
+            border-radius: 6px;
+        }
+        
+        .success-box h3 {
+            color: #059669;
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        
+        .neutral-box {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-left: 3px solid #6b7280;
+            padding: 20px;
+            margin: 24px 0;
+            border-radius: 6px;
+        }
+        
+        .neutral-box h3 {
+            color: #374151;
+            margin-top: 0;
+            margin-bottom: 8px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        
+        .otp-container {
+            margin: 28px 0;
+            text-align: center;
+        }
+        
+        .otp-code {
+            display: inline-block;
+            background: #ffffff;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-size: 32px;
+            font-weight: 600;
+            letter-spacing: 12px;
+            color: #111827;
+            border: 2px solid #e5e7eb;
+            font-family: monospace;
+            margin: 10px 0;
         }
         
         .footer {
-            background: #f8fafc;
-            padding: 30px;
-            text-align: center;
-            border-top: 1px solid #e2e8f0;
+            background: #f9fafb;
+            padding: 32px 40px;
+            border-top: 1px solid #e5e7eb;
         }
         
-        .copyright {
-            color: #94a3b8;
+        .footer-links {
+            margin: 0 0 20px 0;
+            display: flex;
+            justify-content: flex-start;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .footer-links a {
+            color: #6b7280;
+            text-decoration: none;
             font-size: 13px;
         }
         
+        .copyright {
+            color: #9ca3af;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        
         .emergency-notice {
-            background: linear-gradient(135deg, #dc2626 0%%, #b91c1c 100%%);
-            color: white;
-            padding: 20px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 16px 20px;
+            margin: 24px 40px;
+            border-radius: 6px;
             text-align: center;
-            margin-top: 20px;
-            border-radius: 12px;
+        }
+        
+        .emergency-notice strong {
+            font-size: 14px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .emergency-notice p {
+            margin: 0;
+            font-size: 13px;
+        }
+        
+        .divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 32px 0;
+            border: none;
+        }
+        
+        .data-table {
+            width: 100%%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin: 16px 0;
+        }
+        
+        .data-table tr {
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .data-table tr:last-child {
+            border-bottom: none;
+        }
+        
+        .data-table td {
+            padding: 12px 0;
+            color: #4b5563;
+        }
+        
+        .data-table td:first-child {
+            font-weight: 500;
+            color: #1f2937;
+        }
+        
+        .data-table td:last-child {
+            text-align: right;
+        }
+        
+        .data-table code {
+            background: #f3f4f6;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #1f2937;
+        }
+        
+        @media (max-width: 600px) {
+            .email-wrapper {
+                padding: 20px 10px;
+            }
+            
+            .header, .content, .footer {
+                padding: 32px 24px;
+            }
+            
+            .emergency-notice {
+                margin: 24px 24px;
+            }
+            
+            .header h1 {
+                font-size: 22px;
+            }
+            
+            .otp-code {
+                font-size: 26px;
+                letter-spacing: 8px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="email-container">
-        <div class="header">
-            <div class="logo">🏥 Healthcare Access Connector</div>
-            <h1>%s</h1>
-        </div>
-        
-        <div class="content">
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="header">
+                <div class="logo-container">
+                    <div class="logo">
+                        <span>🏥</span>
+                        <span>Healthcare Access Connector</span>
+                    </div>
+                </div>
+                <h1>%s</h1>
+            </div>
+            
+            <div class="content">
+                %s
+            </div>
+            
             %s
-        </div>
-        
-        <div class="emergency-notice">
-            <strong>⚠️ Medical Emergency?</strong>
-            <p style="margin: 0; font-size: 14px;">
-                Call <strong>10177</strong> or go to the nearest emergency room immediately.
-            </p>
-        </div>
-        
-        <div class="footer">
-            <p class="copyright">
-                © %d Healthcare Access Connector. All rights reserved.
-            </p>
+            
+            <div class="footer">
+                <div class="footer-links">
+                    <a href="https://healthcare-access-connector-web.vercel.app/">Home</a>
+                    <a href="https://healthcare-access-connector-web.vercel.app/auth/sign-in">Sign In</a>
+                    <a href="https://healthcare-access-connector-web.vercel.app/help">Help</a>
+                    <a href="https://healthcare-access-connector-web.vercel.app/privacy">Privacy</a>
+                    <a href="https://healthcare-access-connector-web.vercel.app/terms">Terms</a>
+                </div>
+                <p class="copyright">
+                    © %d Healthcare Access Connector. All rights reserved.<br>
+                    Questions? Contact support@healthcare-access-connector.com
+                </p>
+            </div>
         </div>
     </div>
 </body>
-</html>`, title, content, year)
+</html>`, title, content, emergencySection, year)
 }
