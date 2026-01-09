@@ -34,6 +34,13 @@ type ResendEmailRequest struct {
 	ReplyTo string   `json:"reply_to,omitempty"`
 	CC      []string `json:"cc,omitempty"`
 	BCC     []string `json:"bcc,omitempty"`
+	Tags    []Tag    `json:"tags,omitempty"`
+}
+
+// Tag represents an email tag for tracking
+type Tag struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 // ResendEmailResponse represents the Resend API response
@@ -57,11 +64,19 @@ func New(cfg *emailtypes.Config, logger *zerolog.Logger) (*Provider, error) {
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        cfg.ConnectionPoolSize,
+			MaxIdleConnsPerHost: cfg.ConnectionPoolSize,
+			IdleConnTimeout:     90 * time.Second,
+		},
 	}
 
 	logger.Info().
 		Str("provider", "resend").
 		Str("from_address", cfg.FromAddress).
+		Str("noreply_address", cfg.NoReplyAddress).
+		Str("support_address", cfg.SupportAddress).
+		Str("health_address", cfg.HealthAddress).
 		Msg("Resend provider initialized")
 
 	return &Provider{
@@ -83,12 +98,13 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 		return emailtypes.ErrNoRecipients
 	}
 
-	// Determine from address based on template type
+	// Determine from address and name based on template type
 	fromAddress := p.config.GetFromAddress(msg.Template)
-	
+	fromName := p.config.GetFromName(msg.Template)
+
 	// Build Resend request
 	resendReq := ResendEmailRequest{
-		From:    fmt.Sprintf("%s <%s>", p.config.FromName, fromAddress),
+		From:    fmt.Sprintf("%s <%s>", fromName, fromAddress),
 		To:      msg.To,
 		Subject: msg.Subject,
 	}
@@ -101,8 +117,13 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 		resendReq.Text = msg.Body
 	}
 
+	// Set reply-to based on template type
+	replyTo := p.config.GetReplyTo(msg.Template)
 	if msg.ReplyTo != "" {
-		resendReq.ReplyTo = msg.ReplyTo
+		replyTo = msg.ReplyTo
+	}
+	if replyTo != "" && replyTo != fromAddress {
+		resendReq.ReplyTo = replyTo
 	}
 
 	if len(msg.CC) > 0 {
@@ -111,6 +132,12 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 
 	if len(msg.BCC) > 0 {
 		resendReq.BCC = msg.BCC
+	}
+
+	// Add tags for tracking
+	resendReq.Tags = []Tag{
+		{Name: "template", Value: string(msg.Template)},
+		{Name: "environment", Value: p.getEnvironment()},
 	}
 
 	// Marshal request to JSON
@@ -127,6 +154,7 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 
 	req.Header.Set("Authorization", "Bearer "+p.apiKey)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "Healthcare-Access-Connector/1.0")
 
 	// Send request
 	resp, err := p.client.Do(req)
@@ -135,6 +163,8 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 			Err(err).
 			Strs("recipients", msg.To).
 			Str("subject", msg.Subject).
+			Str("from", fromAddress).
+			Str("template", string(msg.Template)).
 			Msg("Failed to send email via Resend")
 		return fmt.Errorf("%w: %v", emailtypes.ErrSendFailed, err)
 	}
@@ -158,29 +188,50 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 			Str("message_id", resendResp.ID).
 			Strs("recipients", msg.To).
 			Str("subject", msg.Subject).
+			Str("from", fromAddress).
+			Str("template", string(msg.Template)).
 			Msg("Email sent successfully via Resend")
 		return nil
 	}
 
-	// Handle 403 specifically (common with unverified domains)
-	if resp.StatusCode == 403 {
+	// Handle specific error codes
+	switch resp.StatusCode {
+	case 403:
 		p.logger.Warn().
 			Int("status_code", resp.StatusCode).
 			Str("error", resendResp.Error.Message).
 			Strs("recipients", msg.To).
 			Str("subject", msg.Subject).
-			Msg("Resend API returned 403 - Check domain verification")
-		return nil
+			Str("from", fromAddress).
+			Msg("Resend API returned 403 - Check domain verification and API key")
+		return fmt.Errorf("%w: domain not verified or invalid API key", emailtypes.ErrSendFailed)
+		
+	case 401:
+		p.logger.Error().
+			Int("status_code", resp.StatusCode).
+			Str("error", resendResp.Error.Message).
+			Msg("Resend API authentication failed - Check API key")
+		p.available = false
+		return fmt.Errorf("%w: invalid API key", emailtypes.ErrSendFailed)
+		
+	case 429:
+		p.logger.Warn().
+			Int("status_code", resp.StatusCode).
+			Str("error", resendResp.Error.Message).
+			Msg("Resend API rate limit exceeded")
+		return fmt.Errorf("%w: rate limit exceeded", emailtypes.ErrSendFailed)
+		
+	default:
+		p.logger.Error().
+			Int("status_code", resp.StatusCode).
+			Str("error", resendResp.Error.Message).
+			Str("error_name", resendResp.Error.Name).
+			Strs("recipients", msg.To).
+			Str("subject", msg.Subject).
+			Str("from", fromAddress).
+			Msg("Resend API returned error")
+		return fmt.Errorf("%w: %s (status: %d)", emailtypes.ErrSendFailed, resendResp.Error.Message, resp.StatusCode)
 	}
-
-	// For other errors
-	p.logger.Error().
-		Int("status_code", resp.StatusCode).
-		Str("error", resendResp.Error.Message).
-		Strs("recipients", msg.To).
-		Str("subject", msg.Subject).
-		Msg("Resend API returned error")
-	return fmt.Errorf("%w: %s (status: %d)", emailtypes.ErrSendFailed, resendResp.Error.Message, resp.StatusCode)
 }
 
 // IsAvailable checks if the provider is available
@@ -199,7 +250,9 @@ func (p *Provider) HealthCheck(ctx context.Context) error {
 		return emailtypes.ErrServiceUnavailable
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.resend.com/emails", nil)
+	// Resend doesn't have a dedicated health check endpoint
+	// We'll use the domains endpoint as a health check
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.resend.com/domains", nil)
 	if err != nil {
 		return err
 	}
@@ -219,11 +272,23 @@ func (p *Provider) HealthCheck(ctx context.Context) error {
 		return fmt.Errorf("invalid Resend API key")
 	}
 
+	if resp.StatusCode != 200 {
+		p.available = false
+		return fmt.Errorf("Resend health check failed with status: %d", resp.StatusCode)
+	}
+
 	return nil
 }
 
 // Close closes the provider connection
 func (p *Provider) Close() error {
 	p.logger.Info().Msg("Closing Resend provider")
+	p.client.CloseIdleConnections()
 	return nil
+}
+
+// getEnvironment returns the current environment
+func (p *Provider) getEnvironment() string {
+	// You can get this from config or environment variable
+	return "production"
 }

@@ -66,8 +66,18 @@ type Config struct {
 // GetFromAddress returns the appropriate from address based on email type
 func (c *Config) GetFromAddress(emailType EmailTemplate) string {
 	switch emailType {
-	case TemplateWelcome, TemplatePasswordReset, TemplateVerification, TemplateOTP, TemplatePasswordChanged, TemplateLoginAlert:
-		// Automated system emails use no-reply
+	case TemplateWelcome, TemplateVerification:
+		// Welcome and verification emails can use no-reply
+		if c.NoReplyAddress != "" {
+			return c.NoReplyAddress
+		}
+	case TemplatePasswordReset, TemplatePasswordChanged, TemplateLoginAlert:
+		// Security-related emails should use no-reply
+		if c.NoReplyAddress != "" {
+			return c.NoReplyAddress
+		}
+	case TemplateOTP:
+		// OTP emails use no-reply
 		if c.NoReplyAddress != "" {
 			return c.NoReplyAddress
 		}
@@ -75,6 +85,18 @@ func (c *Config) GetFromAddress(emailType EmailTemplate) string {
 	
 	// Default to main from address
 	return c.FromAddress
+}
+
+// GetFromName returns the appropriate from name based on email type
+func (c *Config) GetFromName(emailType EmailTemplate) string {
+	switch emailType {
+	case TemplatePasswordReset, TemplatePasswordChanged, TemplateLoginAlert, TemplateOTP:
+		return c.FromName + " Security"
+	case TemplateWelcome, TemplateVerification:
+		return c.FromName
+	default:
+		return c.FromName
+	}
 }
 
 // GetSupportAddress returns the support email address
@@ -93,10 +115,28 @@ func (c *Config) GetHealthAddress() string {
 	return c.FromAddress
 }
 
+// GetReplyTo returns the appropriate reply-to address based on email type
+func (c *Config) GetReplyTo(emailType EmailTemplate) string {
+	switch emailType {
+	case TemplateWelcome, TemplateVerification:
+		// Welcome emails can be replied to support
+		return c.GetSupportAddress()
+	case TemplatePasswordReset, TemplatePasswordChanged, TemplateLoginAlert, TemplateOTP:
+		// Security emails should not have reply-to (or use support)
+		return c.GetSupportAddress()
+	default:
+		return c.GetSupportAddress()
+	}
+}
+
 // Validate validates email configuration
 func (c *Config) Validate() error {
 	if c.FromAddress == "" {
 		return fmt.Errorf("from address is required")
+	}
+
+	if c.FromName == "" {
+		c.FromName = "Healthcare Access Connector"
 	}
 
 	if c.Provider == "" {
