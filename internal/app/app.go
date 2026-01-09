@@ -59,8 +59,9 @@ func New(cfg *config.Config) (*App, error) {
 
 	// Initialize email service
 	var emailService email.Service
+	frontendURL := os.Getenv("FRONTEND_URL")
 	if cfg.EmailFrom != "" {
-		emailService, err = email.NewFromEnv(logger)
+		emailService, err = email.NewFromEnv(frontendURL, logger)
 		if err != nil {
 			logger.Warn().Err(err).Msg("Failed to initialize email service from environment")
 
@@ -68,23 +69,23 @@ func New(cfg *config.Config) (*App, error) {
 			resendAPIKey := os.Getenv("RESEND_API_KEY")
 			if resendAPIKey != "" {
 				emailCfg := &emailtypes.Config{
-					Provider:     "resend",
-					FromAddress:  cfg.EmailFrom,
-					FromName:     "Healthcare Access Connector",
-					ResendAPIKey: resendAPIKey,
-					EnableAsync:  true,
-					WorkerPoolSize: 10,
-					QueueSize:    100,
-					MaxRetries:   3,
-					RetryDelay:   time.Second,
-					RetryMaxDelay: 30 * time.Second,
-					EnableCircuitBreaker: true,
+					Provider:                "resend",
+					FromAddress:             cfg.EmailFrom,
+					FromName:                "Healthcare Access Connector",
+					ResendAPIKey:            resendAPIKey,
+					EnableAsync:             true,
+					WorkerPoolSize:          10,
+					QueueSize:               100,
+					MaxRetries:              3,
+					RetryDelay:              time.Second,
+					RetryMaxDelay:           30 * time.Second,
+					EnableCircuitBreaker:    true,
 					CircuitBreakerThreshold: 5,
-					CircuitBreakerTimeout: 60 * time.Second,
-					SendTimeout: 30 * time.Second,
+					CircuitBreakerTimeout:   60 * time.Second,
+					SendTimeout:             30 * time.Second,
 				}
 
-				emailService, err = email.New(emailCfg, logger)
+				emailService, err = email.New(emailCfg, frontendURL, logger)
 				if err != nil {
 					logger.Warn().Err(err).Msg("Email service initialization failed, continuing without email")
 					emailService = nil

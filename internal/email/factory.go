@@ -40,14 +40,14 @@ type Service interface {
 }
 
 // New creates a new email service
-func New(cfg *types.Config, logger *zerolog.Logger) (Service, error) {
-	return NewEmailService(cfg, logger)
+func New(cfg *types.Config, frontendUrl string, logger *zerolog.Logger) (Service, error) {
+	return NewEmailService(cfg, frontendUrl, logger)
 }
 
 // NewFromEnv creates a new email service from environment variables
-func NewFromEnv(logger *zerolog.Logger) (Service, error) {
+func NewFromEnv(frontendUrl string, logger *zerolog.Logger) (Service, error) {
 	cfg := ConfigFromEnv()
-	return New(cfg, logger)
+	return New(cfg, frontendUrl, logger)
 }
 
 // Provider factory functions

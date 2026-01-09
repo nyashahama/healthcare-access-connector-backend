@@ -41,7 +41,7 @@ type queuedEmail struct {
 }
 
 // NewEmailService creates a new email service
-func NewEmailService(cfg *types.Config, logger *zerolog.Logger) (Service, error) {
+func NewEmailService(cfg *types.Config, frontendUrl string, logger *zerolog.Logger) (Service, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
@@ -66,7 +66,7 @@ func NewEmailService(cfg *types.Config, logger *zerolog.Logger) (Service, error)
 	}
 
 	// Create templates manager
-	templateMgr, err := templates.NewManager(cfg)
+	templateMgr, err := templates.NewManager(cfg, frontendUrl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create template manager: %w", err)
 	}
@@ -314,11 +314,11 @@ func (s *emailService) GetHealthStatus() map[string]interface{} {
 }
 
 func (s *emailService) IsAvailable() bool {
-    // Check if provider is available
-    if s.provider == nil {
-        return false
-    }
-    return s.provider.IsAvailable()
+	// Check if provider is available
+	if s.provider == nil {
+		return false
+	}
+	return s.provider.IsAvailable()
 }
 
 // Close closes the email service

@@ -11,22 +11,24 @@ import (
 
 // Manager handles email template rendering
 type Manager struct {
-	config    *types.Config
-	templates map[types.EmailTemplate]*template.Template
-	parser    *Parser
+	config      *types.Config
+	templates   map[types.EmailTemplate]*template.Template
+	parser      *Parser
+	frontendURL string
 }
 
 // NewManager creates a new template manager
-func NewManager(cfg *types.Config) (*Manager, error) {
+func NewManager(cfg *types.Config, frontendURL string) (*Manager, error) {
 	parser, err := NewParser()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parser: %w", err)
 	}
 
 	manager := &Manager{
-		config:    cfg,
-		templates: make(map[types.EmailTemplate]*template.Template),
-		parser:    parser,
+		config:      cfg,
+		templates:   make(map[types.EmailTemplate]*template.Template),
+		parser:      parser,
+		frontendURL: frontendURL,
 	}
 
 	// Load all templates
@@ -47,10 +49,11 @@ func (m *Manager) loadTemplates() error {
 // RenderWelcome generates welcome email content
 func (m *Manager) RenderWelcome(username string) (subject, text, html string) {
 	subject = "Welcome to Healthcare Access Connector"
+	signInURL := fmt.Sprintf("%s/auth/sign-in", m.frontendURL)
 
 	text = fmt.Sprintf(`Welcome %s!
 
-We're thrilled to welcome you to Healthcare Access Connector – your new partner in health.
+We're thrilled to welcome you to Healthcare Access Connector — your new partner in health.
 
 Your account has been successfully created. Here's what you can do now:
 • Access personalized health information
@@ -60,19 +63,19 @@ Your account has been successfully created. Here's what you can do now:
 • Track your health journey
 
 To get started, sign in to your account:
-https://healthcare-access-connector-web.vercel.app/auth/sign-in
+%s
 
 If you have any questions or need assistance, our support team is here to help.
 
 Medical Emergency? Call 10177 or go to the nearest emergency room immediately.
 
 Best regards,
-The Healthcare Access Connector Team`, username)
+The Healthcare Access Connector Team`, username, signInURL)
 
 	content := fmt.Sprintf(`
 		<h2>Welcome aboard, %s!</h2>
 		
-		<p>We're thrilled to welcome you to Healthcare Access Connector – your new partner in health and wellness.</p>
+		<p>We're thrilled to welcome you to Healthcare Access Connector — your new partner in health and wellness.</p>
 		
 		<p>Your account has been successfully created and you're now ready to:</p>
 		
@@ -84,7 +87,7 @@ The Healthcare Access Connector Team`, username)
 			<li>Track your health journey securely</li>
 		</ul>
 		
-		<a href="https://healthcare-access-connector-web.vercel.app/auth/sign-in" class="button">
+		<a href="%s" class="button">
 			Sign In to Your Account
 		</a>
 		
@@ -108,7 +111,7 @@ The Healthcare Access Connector Team`, username)
 		<p style="color: #6b7280; font-size: 14px; margin-top: 32px;">
 			If you have any questions or need assistance, our support team is here to help.<br>
 			Email us at: <a href="mailto:support@healthcare-access-connector.com" style="color: #10b981;">support@healthcare-access-connector.com</a>
-		</p>`, username)
+		</p>`, username, signInURL)
 
 	html = m.baseTemplate("Welcome to Healthcare Access Connector", content, true)
 	return subject, text, html
@@ -116,7 +119,8 @@ The Healthcare Access Connector Team`, username)
 
 // RenderPasswordReset generates password reset email
 func (m *Manager) RenderPasswordReset(resetToken string) (subject, text, html string) {
-	resetURL := fmt.Sprintf("https://healthcare-access-connector-web.vercel.app/auth/reset-password?token=%s", resetToken)
+	resetURL := fmt.Sprintf("%s/auth/reset-password?token=%s", m.frontendURL, resetToken)
+	forgotPasswordURL := fmt.Sprintf("%s/auth/forgot-password", m.frontendURL)
 
 	subject = "Reset Your Healthcare Access Connector Password"
 
@@ -167,13 +171,13 @@ The Healthcare Access Connector Team`, resetURL)
 		<p style="color: #6b7280; font-size: 13px;">
 			<strong>Note:</strong> For your security, this link can only be used once.<br>
 			If you need another reset link, request a new one at: 
-			<a href="https://healthcare-access-connector-web.vercel.app/auth/forgot-password" style="color: #10b981;">Forgot Password</a>
+			<a href="%s" style="color: #10b981;">Forgot Password</a>
 		</p>
 		
 		<p style="color: #9ca3af; font-size: 12px; margin-top: 12px;">
 			Or copy and paste this URL into your browser:<br>
 			<code style="background: #f3f4f6; padding: 6px 10px; border-radius: 4px; font-size: 11px; word-break: break-all; display: inline-block; margin-top: 4px; color: #1f2937;">%s</code>
-		</p>`, resetURL, resetURL)
+		</p>`, resetURL, forgotPasswordURL, resetURL)
 
 	html = m.baseTemplate("Reset Your Password", content, true)
 	return subject, text, html
@@ -181,7 +185,7 @@ The Healthcare Access Connector Team`, resetURL)
 
 // RenderVerification generates email verification email
 func (m *Manager) RenderVerification(verificationToken string) (subject, text, html string) {
-	verifyURL := fmt.Sprintf("https://healthcare-access-connector-web.vercel.app/verify-email?token=%s", verificationToken)
+	verifyURL := fmt.Sprintf("%s/auth/verify-email?token=%s", m.frontendURL, verificationToken)
 
 	subject = "Verify Your Healthcare Access Connector Email"
 
@@ -239,6 +243,7 @@ The Healthcare Access Connector Team`, verifyURL)
 // RenderPasswordChanged generates password changed notification
 func (m *Manager) RenderPasswordChanged(username string) (subject, text, html string) {
 	currentTime := time.Now().Format("January 2, 2006 at 3:04 PM")
+	forgotPasswordURL := fmt.Sprintf("%s/auth/forgot-password", m.frontendURL)
 
 	subject = "Your Healthcare Access Connector Password Was Changed"
 
@@ -275,8 +280,8 @@ The Healthcare Access Connector Team`, username, currentTime)
 				<li>Review your recent account activity</li>
 				<li>Contact our security team</li>
 			</ol>
-			<a href="https://healthcare-access-connector-web.vercel.app/auth/forgot-password" class="button">Reset Password Now</a>
-		</div>`, username, currentTime)
+			<a href="%s" class="button">Reset Password Now</a>
+		</div>`, username, currentTime, forgotPasswordURL)
 
 	html = m.baseTemplate("Password Changed", content, true)
 	return subject, text, html
@@ -285,6 +290,7 @@ The Healthcare Access Connector Team`, username, currentTime)
 // RenderLoginAlert generates suspicious login alert
 func (m *Manager) RenderLoginAlert(username, ipAddress, location string) (subject, text, html string) {
 	currentTime := time.Now().Format("January 2, 2006 at 3:04 PM")
+	forgotPasswordURL := fmt.Sprintf("%s/auth/forgot-password", m.frontendURL)
 
 	subject = "New Login Detected on Your Healthcare Account"
 
@@ -342,7 +348,7 @@ Healthcare Access Connector Security Team`, username, currentTime, ipAddress, lo
 				<li>Enable two-factor authentication</li>
 				<li>Contact our security team at support@healthcare-access-connector.com</li>
 			</ol>
-			<a href="https://healthcare-access-connector-web.vercel.app/auth/forgot-password" class="button">Reset Password Now</a>
+			<a href="%s" class="button">Reset Password Now</a>
 		</div>
 		
 		<hr class="divider">
@@ -357,7 +363,7 @@ Healthcare Access Connector Security Team`, username, currentTime, ipAddress, lo
 		
 		<p style="color: #6b7280; font-size: 13px; margin-top: 28px;">
 			<strong>Note:</strong> This is an automated security alert. If you have any concerns, please contact our security team immediately.
-		</p>`, username, currentTime, template.HTMLEscapeString(ipAddress), template.HTMLEscapeString(location))
+		</p>`, username, currentTime, template.HTMLEscapeString(ipAddress), template.HTMLEscapeString(location), forgotPasswordURL)
 
 	html = m.baseTemplate("New Login Alert", content, false)
 	return subject, text, html
@@ -784,11 +790,11 @@ func (m *Manager) baseTemplate(title, content string, showEmergency bool) string
             
             <div class="footer">
                 <div class="footer-links">
-                    <a href="https://healthcare-access-connector-web.vercel.app/">Home</a>
-                    <a href="https://healthcare-access-connector-web.vercel.app/auth/sign-in">Sign In</a>
-                    <a href="https://healthcare-access-connector-web.vercel.app/help">Help</a>
-                    <a href="https://healthcare-access-connector-web.vercel.app/privacy">Privacy</a>
-                    <a href="https://healthcare-access-connector-web.vercel.app/terms">Terms</a>
+                    <a href="%s/">Home</a>
+                    <a href="%s/auth/sign-in">Sign In</a>
+                    <a href="%s/help">Help</a>
+                    <a href="%s/privacy">Privacy</a>
+                    <a href="%s/terms">Terms</a>
                 </div>
                 <p class="copyright">
                     © %d Healthcare Access Connector. All rights reserved.<br>
@@ -798,5 +804,5 @@ func (m *Manager) baseTemplate(title, content string, showEmergency bool) string
         </div>
     </div>
 </body>
-</html>`, title, content, emergencySection, year)
+</html>`, title, content, emergencySection, m.frontendURL, m.frontendURL, m.frontendURL, m.frontendURL, m.frontendURL, year)
 }
