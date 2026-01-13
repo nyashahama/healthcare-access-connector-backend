@@ -16,6 +16,10 @@ func ConfigFromEnv() *types.Config {
 		FromAddress: getEnv("EMAIL_FROM_ADDRESS", "noreply@hac.com"),
 		FromName:    getEnv("EMAIL_FROM_NAME", "Healthcare Access Connector"),
 
+		NoReplyAddress: getEnv("EMAIL_NOREPLY_ADDRESS", ""),
+		SupportAddress: getEnv("EMAIL_SUPPORT_ADDRESS", ""),
+		HealthAddress:  getEnv("EMAIL_HEALTH_ADDRESS", ""),
+
 		// AWS SES
 		AWSRegion:          getEnv("AWS_REGION", "us-east-1"),
 		AWSAccessKeyID:     getEnv("AWS_ACCESS_KEY_ID", ""),
@@ -30,7 +34,6 @@ func ConfigFromEnv() *types.Config {
 
 		// Resend
 		ResendAPIKey: getEnv("RESEND_API_KEY", ""),
-		
 
 		// Retry configuration
 		MaxRetries:      getEnvAsInt("EMAIL_MAX_RETRIES", 3),
