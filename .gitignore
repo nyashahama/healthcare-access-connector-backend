@@ -19,6 +19,8 @@ go.work
 .env.*.local
 .env.test
 .env.development
+.env.production
+
 # IDEs
 .vscode/
 .idea/
