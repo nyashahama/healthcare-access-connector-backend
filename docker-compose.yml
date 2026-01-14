@@ -93,7 +93,7 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - .env
+      - .env  # Will be a symlink to .env.development or .env.production
     environment:
       # Override with Docker internal hostnames
       DB_HOST: postgres

@@ -11,10 +11,10 @@ type Collector struct {
 	mu sync.RWMutex
 
 	// Counters
-	emailsSent     int64
-	emailsFailed   int64
-	emailsQueued   int64
-	emailsRetried  int64
+	emailsSent    int64
+	emailsFailed  int64
+	emailsQueued  int64
+	emailsRetried int64
 
 	// Timing
 	totalSendTime time.Duration

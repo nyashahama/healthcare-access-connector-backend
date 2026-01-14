@@ -5,7 +5,7 @@ package templates
 
 // WelcomeData contains data for welcome emails
 type WelcomeData struct {
-	Username string
+	Username  string
 	SignInURL string
 }
 

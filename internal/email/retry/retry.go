@@ -12,11 +12,11 @@ import (
 
 // Strategy defines retry strategy configuration
 type Strategy struct {
-	MaxRetries  int
+	MaxRetries   int
 	InitialDelay time.Duration
-	MaxDelay    time.Duration
-	Multiplier  float64
-	Logger      *zerolog.Logger
+	MaxDelay     time.Duration
+	Multiplier   float64
+	Logger       *zerolog.Logger
 }
 
 // DefaultStrategy returns a default retry strategy

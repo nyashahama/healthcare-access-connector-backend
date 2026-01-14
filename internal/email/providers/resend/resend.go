@@ -205,7 +205,7 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 			Str("from", fromAddress).
 			Msg("Resend API returned 403 - Check domain verification and API key")
 		return fmt.Errorf("%w: domain not verified or invalid API key", emailtypes.ErrSendFailed)
-		
+
 	case 401:
 		p.logger.Error().
 			Int("status_code", resp.StatusCode).
@@ -213,14 +213,14 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 			Msg("Resend API authentication failed - Check API key")
 		p.available = false
 		return fmt.Errorf("%w: invalid API key", emailtypes.ErrSendFailed)
-		
+
 	case 429:
 		p.logger.Warn().
 			Int("status_code", resp.StatusCode).
 			Str("error", resendResp.Error.Message).
 			Msg("Resend API rate limit exceeded")
 		return fmt.Errorf("%w: rate limit exceeded", emailtypes.ErrSendFailed)
-		
+
 	default:
 		p.logger.Error().
 			Int("status_code", resp.StatusCode).

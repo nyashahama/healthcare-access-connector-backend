@@ -53,6 +53,9 @@ help:
 	@echo "  make sqlc             - Generate database code"
 	@echo "  make tidy             - Tidy dependencies"
 	@echo "  make install-tools    - Install development tools"
+	@echo "  make env-status       - Show current environment"
+	@echo "  make switch-dev       - Switch to development environment"
+	@echo "  make switch-prod      - Switch to production environment"
 	@echo ""
 	@echo "Services URLs (when running locally):"
 	@echo "  - Application:        http://localhost:8080"
@@ -62,18 +65,21 @@ help:
 	@echo "  - NATS:               localhost:4222"
 
 # Development mode - uses local services
-dev: docker-up
+dev: 
+	@echo "${GREEN}Switching to DEVELOPMENT environment...${RESET}"
+	@ln -sf .env.development .env
+	@$(MAKE) docker-up
 	@echo "${GREEN}Starting application in DEVELOPMENT mode...${RESET}"
 	@echo "Using local PostgreSQL, Redis, and Mailpit"
-	@cp .env.development .env 2>/dev/null || true
 	@sleep 3
 	go run $(MAIN_PATH)/main.go
 
 # Production mode - uses cloud services
 prod:
+	@echo "${GREEN}Switching to PRODUCTION environment...${RESET}"
+	@ln -sf .env.production .env
 	@echo "${GREEN}Starting application in PRODUCTION mode...${RESET}"
 	@echo "Using Supabase, Upstash Redis, and Resend"
-	@cp .env.production .env 2>/dev/null || true
 	go run $(MAIN_PATH)/main.go
 
 # Run application directly
@@ -236,7 +242,39 @@ setup: install-tools
 	@echo "${GREEN}Setting up development environment...${RESET}"
 	@if [ ! -f .env.development ]; then echo "${YELLOW}Warning: .env.development not found${RESET}"; fi
 	@if [ ! -f .env.production ]; then echo "${YELLOW}Warning: .env.production not found${RESET}"; fi
+	@if [ ! -L .env ]; then ln -sf .env.development .env; echo "${GREEN}.env symlink created${RESET}"; fi
 	@$(MAKE) docker-up
 	@sleep 5
 	@echo ""
 	@echo "${GREEN}✓ Setup complete! Run 'make dev' to start the application.${RESET}"
+
+# Environment management
+env-status:
+	@echo "${GREEN}Current Environment Status:${RESET}"
+	@if [ -L .env ]; then \
+		target=$(readlink .env); \
+		echo "  .env is a symlink pointing to: $target"; \
+		if [ "$target" = ".env.development" ]; then \
+			echo "${GREEN}  → DEVELOPMENT mode${RESET}"; \
+		elif [ "$target" = ".env.production" ]; then \
+			echo "${YELLOW}  → PRODUCTION mode${RESET}"; \
+		fi; \
+	elif [ -f .env ]; then \
+		echo "${YELLOW}  .env is a regular file (not a symlink)${RESET}"; \
+	else \
+		echo "${YELLOW}  .env does not exist${RESET}"; \
+	fi
+
+switch-dev:
+	@echo "${GREEN}Switching to DEVELOPMENT environment...${RESET}"
+	@rm -f .env
+	@ln -sf .env.development .env
+	@echo "${GREEN}✓ Now using .env.development${RESET}"
+	@echo "Run 'make dev' to start in development mode"
+
+switch-prod:
+	@echo "${YELLOW}Switching to PRODUCTION environment...${RESET}"
+	@rm -f .env
+	@ln -sf .env.production .env
+	@echo "${YELLOW}✓ Now using .env.production${RESET}"
+	@echo "Run 'make prod' to start in production mode"

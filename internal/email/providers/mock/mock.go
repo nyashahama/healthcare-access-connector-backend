@@ -10,12 +10,12 @@ import (
 
 // Provider implements a mock email provider
 type Provider struct {
-	mu          sync.RWMutex
-	sentEmails  []*emailtypes.Message
-	available   bool
-	shouldFail  bool
-	failureErr  error
-	healthErr   error
+	mu         sync.RWMutex
+	sentEmails []*emailtypes.Message
+	available  bool
+	shouldFail bool
+	failureErr error
+	healthErr  error
 }
 
 // New creates a new mock provider

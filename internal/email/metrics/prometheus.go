@@ -10,11 +10,11 @@ import (
 
 // PrometheusCollector collects metrics for Prometheus
 type PrometheusCollector struct {
-	emailsSent     *prometheus.CounterVec
-	emailsFailed   *prometheus.CounterVec
-	emailDuration  *prometheus.HistogramVec
-	emailsInQueue  prometheus.Gauge
-	retryAttempts  *prometheus.CounterVec
+	emailsSent    *prometheus.CounterVec
+	emailsFailed  *prometheus.CounterVec
+	emailDuration *prometheus.HistogramVec
+	emailsInQueue prometheus.Gauge
+	retryAttempts *prometheus.CounterVec
 }
 
 // NewPrometheusCollector creates a new Prometheus collector

@@ -182,12 +182,12 @@ func (cb *CircuitBreaker) GetStats() map[string]interface{} {
 	defer cb.mu.RUnlock()
 
 	return map[string]interface{}{
-		"state":            cb.getStateName(),
-		"failure_count":    cb.failureCount,
-		"success_count":    cb.successCount,
+		"state":             cb.getStateName(),
+		"failure_count":     cb.failureCount,
+		"success_count":     cb.successCount,
 		"last_failure_time": cb.lastFailureTime,
-		"threshold":        cb.threshold,
-		"timeout":          cb.timeout.String(),
+		"threshold":         cb.threshold,
+		"timeout":           cb.timeout.String(),
 	}
 }
 

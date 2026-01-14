@@ -37,17 +37,20 @@ echo "✓ Docker Compose is installed"
 echo "✓ Go is installed"
 echo ""
 
-# Copy development environment file
-if [ ! -f .env ]; then
-    echo "📝 Creating .env from .env.development..."
-    cp .env.development .env
-    echo "✓ .env file created"
+# Create symlink to development environment
+if [ ! -f .env ] && [ ! -L .env ]; then
+    echo "📝 Creating .env symlink to .env.development..."
+    ln -s .env.development .env
+    echo "✓ .env symlink created"
     echo ""
     echo "⚠️  IMPORTANT: Generate a secure JWT_SECRET:"
     echo "   Run: make generate-jwt"
-    echo "   Then update JWT_SECRET in .env"
+    echo "   Then update JWT_SECRET in .env.development"
+elif [ -L .env ]; then
+    target=$(readlink .env)
+    echo "ℹ️  .env is already a symlink pointing to: $target"
 else
-    echo "⚠️  .env file already exists, skipping..."
+    echo "⚠️  .env file already exists (not a symlink), skipping..."
 fi
 echo ""
 
