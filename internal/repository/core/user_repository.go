@@ -40,13 +40,18 @@ var (
 )
 
 type userRepository struct {
-	db *sqlc.Queries
+	querier sqlc.Querier
 }
 
-// NewUserRepository creates a new user repository
+// NewUserRepository creates a new user repository using a pool
 func NewUserRepository(pool *pgxpool.Pool) repository.UserRepository {
+	return NewUserRepositoryWithQuerier(sqlc.New(pool))
+}
+
+// NewUserRepositoryWithQuerier creates a new user repository using a provided querier (for transactions)
+func NewUserRepositoryWithQuerier(querier sqlc.Querier) repository.UserRepository {
 	return &userRepository{
-		db: sqlc.New(pool),
+		querier: querier,
 	}
 }
 
@@ -57,7 +62,7 @@ func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (core.Us
 	}()
 
 	pgID := uuidToPgtypeUUID(id)
-	u, err := r.db.GetUserByID(ctx, pgID)
+	u, err := r.querier.GetUserByID(ctx, pgID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			userDbQueryTotal.WithLabelValues("get_user_by_id", "not_found").Inc()
@@ -88,7 +93,7 @@ func (r *userRepository) DeactivateUser(ctx context.Context, id uuid.UUID) error
 		userDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
+	err := r.querier.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
 		ID:     uuidToPgtypeUUID(id),
 		Status: pgtype.Text{String: "inactive", Valid: true},
 	})
@@ -107,7 +112,7 @@ func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offs
 		userDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	users, err := r.db.ListUsersByRole(ctx, sqlc.ListUsersByRoleParams{
+	users, err := r.querier.ListUsersByRole(ctx, sqlc.ListUsersByRoleParams{
 		Role:   role,
 		Limit:  int32(limit),
 		Offset: int32(offset),
@@ -133,7 +138,7 @@ func (r *userRepository) CountUsers(ctx context.Context, role string) (int64, er
 		userDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	count, err := r.db.CountUsersByRole(ctx, role)
+	count, err := r.querier.CountUsersByRole(ctx, role)
 	if err != nil {
 		userDbQueryTotal.WithLabelValues("count_users", "error").Inc()
 		return 0, fmt.Errorf("count users: %w", err)

@@ -50,6 +50,7 @@ func (m *Manager) loadTemplates() error {
 func (m *Manager) RenderWelcome(username string) (subject, text, html string) {
 	subject = "Welcome to Healthcare Access Connector"
 	signInURL := fmt.Sprintf("%s/auth/sign-in", m.frontendURL)
+	supportEmail := m.config.GetSupportAddress()
 
 	text = fmt.Sprintf(`Welcome %s!
 
@@ -65,12 +66,12 @@ Your account has been successfully created. Here's what you can do now:
 To get started, sign in to your account:
 %s
 
-If you have any questions or need assistance, our support team is here to help.
+If you have any questions or need assistance, our support team is here to help: %s
 
 Medical Emergency? Call 10177 or go to the nearest emergency room immediately.
 
 Best regards,
-The Healthcare Access Connector Team`, username, signInURL)
+The Healthcare Access Connector Team`, username, signInURL, supportEmail)
 
 	content := fmt.Sprintf(`
 		<h2>Welcome aboard, %s!</h2>
@@ -110,10 +111,10 @@ The Healthcare Access Connector Team`, username, signInURL)
 		
 		<p style="color: #6b7280; font-size: 14px; margin-top: 32px;">
 			If you have any questions or need assistance, our support team is here to help.<br>
-			Email us at: <a href="mailto:support@healthcare-access-connector.com" style="color: #10b981;">support@healthcare-access-connector.com</a>
-		</p>`, username, signInURL)
+			Email us at: <a href="mailto:%s" style="color: #10b981;">%s</a>
+		</p>`, username, signInURL, supportEmail, supportEmail)
 
-	html = m.baseTemplate("Welcome to Healthcare Access Connector", content, true)
+	html = m.baseTemplate("Welcome to Healthcare Access Connector", content, supportEmail, true)
 	return subject, text, html
 }
 
@@ -121,6 +122,7 @@ The Healthcare Access Connector Team`, username, signInURL)
 func (m *Manager) RenderPasswordReset(resetToken string) (subject, text, html string) {
 	resetURL := fmt.Sprintf("%s/auth/reset-password?token=%s", m.frontendURL, resetToken)
 	forgotPasswordURL := fmt.Sprintf("%s/auth/forgot-password", m.frontendURL)
+	supportEmail := m.config.GetSupportAddress()
 
 	subject = "Reset Your Healthcare Access Connector Password"
 
@@ -179,13 +181,14 @@ The Healthcare Access Connector Team`, resetURL)
 			<code style="background: #f3f4f6; padding: 6px 10px; border-radius: 4px; font-size: 11px; word-break: break-all; display: inline-block; margin-top: 4px; color: #1f2937;">%s</code>
 		</p>`, resetURL, forgotPasswordURL, resetURL)
 
-	html = m.baseTemplate("Reset Your Password", content, true)
+	html = m.baseTemplate("Reset Your Password", content, supportEmail, true)
 	return subject, text, html
 }
 
 // RenderVerification generates email verification email
 func (m *Manager) RenderVerification(verificationToken string) (subject, text, html string) {
 	verifyURL := fmt.Sprintf("%s/auth/verify-email?token=%s", m.frontendURL, verificationToken)
+	supportEmail := m.config.GetSupportAddress()
 
 	subject = "Verify Your Healthcare Access Connector Email"
 
@@ -236,7 +239,7 @@ The Healthcare Access Connector Team`, verifyURL)
 			<code style="background: #f3f4f6; padding: 6px 10px; border-radius: 4px; font-size: 11px; word-break: break-all; display: inline-block; color: #1f2937;">%s</code>
 		</p>`, verifyURL, verifyURL)
 
-	html = m.baseTemplate("Verify Your Email", content, true)
+	html = m.baseTemplate("Verify Your Email", content, supportEmail, true)
 	return subject, text, html
 }
 
@@ -244,6 +247,7 @@ The Healthcare Access Connector Team`, verifyURL)
 func (m *Manager) RenderPasswordChanged(username string) (subject, text, html string) {
 	currentTime := time.Now().Format("January 2, 2006 at 3:04 PM")
 	forgotPasswordURL := fmt.Sprintf("%s/auth/forgot-password", m.frontendURL)
+	supportEmail := m.config.GetSupportAddress()
 
 	subject = "Your Healthcare Access Connector Password Was Changed"
 
@@ -278,12 +282,12 @@ The Healthcare Access Connector Team`, username, currentTime)
 			<ol>
 				<li>Reset your password immediately</li>
 				<li>Review your recent account activity</li>
-				<li>Contact our security team</li>
+				<li>Contact our security team: %s</li>
 			</ol>
 			<a href="%s" class="button">Reset Password Now</a>
-		</div>`, username, currentTime, forgotPasswordURL)
+		</div>`, username, currentTime, supportEmail, forgotPasswordURL)
 
-	html = m.baseTemplate("Password Changed", content, true)
+	html = m.baseTemplate("Password Changed", content, supportEmail, true)
 	return subject, text, html
 }
 
@@ -291,6 +295,7 @@ The Healthcare Access Connector Team`, username, currentTime)
 func (m *Manager) RenderLoginAlert(username, ipAddress, location string) (subject, text, html string) {
 	currentTime := time.Now().Format("January 2, 2006 at 3:04 PM")
 	forgotPasswordURL := fmt.Sprintf("%s/auth/forgot-password", m.frontendURL)
+	supportEmail := m.config.GetSupportAddress()
 
 	subject = "New Login Detected on Your Healthcare Account"
 
@@ -306,8 +311,10 @@ Location: %s
 
 If this was you, no action is needed.
 
+If you don't recognize this activity, contact our security team: %s
+
 Stay safe,
-Healthcare Access Connector Security Team`, username, currentTime, ipAddress, location)
+Healthcare Access Connector Security Team`, username, currentTime, ipAddress, location, supportEmail)
 
 	content := fmt.Sprintf(`
 		<h2>New Login Detected</h2>
@@ -346,7 +353,7 @@ Healthcare Access Connector Security Team`, username, currentTime, ipAddress, lo
 				<li>Change your password immediately</li>
 				<li>Review your recent account activity</li>
 				<li>Enable two-factor authentication</li>
-				<li>Contact our security team at support@healthcare-access-connector.com</li>
+				<li>Contact our security team at %s</li>
 			</ol>
 			<a href="%s" class="button">Reset Password Now</a>
 		</div>
@@ -363,15 +370,16 @@ Healthcare Access Connector Security Team`, username, currentTime, ipAddress, lo
 		
 		<p style="color: #6b7280; font-size: 13px; margin-top: 28px;">
 			<strong>Note:</strong> This is an automated security alert. If you have any concerns, please contact our security team immediately.
-		</p>`, username, currentTime, template.HTMLEscapeString(ipAddress), template.HTMLEscapeString(location), forgotPasswordURL)
+		</p>`, username, currentTime, template.HTMLEscapeString(ipAddress), template.HTMLEscapeString(location), supportEmail, forgotPasswordURL)
 
-	html = m.baseTemplate("New Login Alert", content, false)
+	html = m.baseTemplate("New Login Alert", content, supportEmail, false)
 	return subject, text, html
 }
 
 // RenderOTP generates OTP email template
 func (m *Manager) RenderOTP(email, otp, username string) (subject, text, html string) {
 	subject = "Your Verification Code - Healthcare Access Connector"
+	supportEmail := m.config.GetSupportAddress()
 
 	greeting := "Hello,"
 	if username != "" {
@@ -420,20 +428,20 @@ Healthcare Access Connector Team`, greeting, otp)
 			<ul>
 				<li>Ignore this email</li>
 				<li>Review your account security</li>
-				<li>Contact support if you notice suspicious activity</li>
+				<li>Contact support if you notice suspicious activity: %s</li>
 			</ul>
 		</div>
 		
 		<p style="color: #6b7280; font-size: 14px; margin-top: 28px;">
-			<strong>Need help?</strong> Contact our support team at support@healthcare-access-connector.com
-		</p>`, greeting, otp)
+			<strong>Need help?</strong> Contact our support team at %s
+		</p>`, greeting, otp, supportEmail, supportEmail)
 
-	html = m.baseTemplate("Your Verification Code", content, true)
+	html = m.baseTemplate("Your Verification Code", content, supportEmail, true)
 	return subject, text, html
 }
 
 // baseTemplate provides the common structure for all emails
-func (m *Manager) baseTemplate(title, content string, showEmergency bool) string {
+func (m *Manager) baseTemplate(title, content string, supportEmail string, showEmergency bool) string {
 	year := time.Now().Year()
 
 	emergencySection := ""
@@ -798,11 +806,11 @@ func (m *Manager) baseTemplate(title, content string, showEmergency bool) string
                 </div>
                 <p class="copyright">
                     © %d Healthcare Access Connector. All rights reserved.<br>
-                    Questions? Contact support@healthcare-access-connector.com
+                    Questions? Contact %s
                 </p>
             </div>
         </div>
     </div>
 </body>
-</html>`, title, content, emergencySection, m.frontendURL, m.frontendURL, m.frontendURL, m.frontendURL, m.frontendURL, year)
+</html>`, title, content, emergencySection, m.frontendURL, m.frontendURL, m.frontendURL, m.frontendURL, m.frontendURL, year, supportEmail)
 }

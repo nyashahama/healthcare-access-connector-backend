@@ -41,13 +41,18 @@ var (
 )
 
 type authRepository struct {
-	db *sqlc.Queries
+	querier sqlc.Querier
 }
 
-// NewAuthRepository creates a new auth repository
+// NewAuthRepository creates a new auth repository using a pool
 func NewAuthRepository(pool *pgxpool.Pool) repository.AuthRepository {
+	return NewAuthRepositoryWithQuerier(sqlc.New(pool))
+}
+
+// NewAuthRepositoryWithQuerier creates a new auth repository using a provided querier (for transactions)
+func NewAuthRepositoryWithQuerier(querier sqlc.Querier) repository.AuthRepository {
 	return &authRepository{
-		db: sqlc.New(pool),
+		querier: querier,
 	}
 }
 
@@ -67,7 +72,7 @@ func (r *authRepository) CreateUser(ctx context.Context, user core.User, passwor
 		phone = pgtype.Text{String: *user.Phone, Valid: true}
 	}
 
-	created, err := r.db.CreateUser(ctx, sqlc.CreateUserParams{
+	created, err := r.querier.CreateUser(ctx, sqlc.CreateUserParams{
 		Email:             email,
 		Phone:             phone,
 		PasswordHash:      pgtype.Text{String: passwordHash, Valid: true},
@@ -93,7 +98,7 @@ func (r *authRepository) GetUserByVerificationToken(ctx context.Context, token s
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByVerificationToken(ctx, pgtype.Text{String: token, Valid: true})
+	u, err := r.querier.GetUserByVerificationToken(ctx, pgtype.Text{String: token, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			authDbQueryTotal.WithLabelValues("get_user_by_verification_token", "not_found").Inc()
@@ -119,7 +124,7 @@ func (r *authRepository) GetUserByPasswordResetToken(ctx context.Context, token 
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPasswordResetToken(ctx, pgtype.Text{String: token, Valid: true})
+	u, err := r.querier.GetUserByPasswordResetToken(ctx, pgtype.Text{String: token, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			authDbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "not_found").Inc()
@@ -145,7 +150,7 @@ func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (core
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByEmail(ctx, email)
+	u, err := r.querier.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			authDbQueryTotal.WithLabelValues("get_user_by_email", "not_found").Inc()
@@ -171,7 +176,7 @@ func (r *authRepository) GetUserByPhone(ctx context.Context, phone string) (core
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPhone(ctx, pgtype.Text{String: phone, Valid: true})
+	u, err := r.querier.GetUserByPhone(ctx, pgtype.Text{String: phone, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			authDbQueryTotal.WithLabelValues("get_user_by_phone", "not_found").Inc()
@@ -191,7 +196,7 @@ func (r *authRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	u, err := r.db.GetUserByPhoneWithHash(ctx, pgtype.Text{String: phone, Valid: true})
+	u, err := r.querier.GetUserByPhoneWithHash(ctx, pgtype.Text{String: phone, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			authDbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "not_found").Inc()
@@ -217,7 +222,7 @@ func (r *authRepository) VerifyUser(ctx context.Context, id uuid.UUID) error {
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.VerifyUser(ctx, uuidToPgtypeUUID(id))
+	err := r.querier.VerifyUser(ctx, uuidToPgtypeUUID(id))
 	if err != nil {
 		authDbQueryTotal.WithLabelValues("verify_user", "error").Inc()
 		return r.handleError(err, "verify user")
@@ -233,7 +238,7 @@ func (r *authRepository) SetVerificationToken(ctx context.Context, id uuid.UUID,
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.SetVerificationToken(ctx, sqlc.SetVerificationTokenParams{
+	err := r.querier.SetVerificationToken(ctx, sqlc.SetVerificationTokenParams{
 		ID:                  uuidToPgtypeUUID(id),
 		VerificationToken:   pgtype.Text{String: token, Valid: true},
 		VerificationExpires: pgtype.Timestamp{Time: expires, Valid: true},
@@ -253,7 +258,7 @@ func (r *authRepository) SetPasswordResetToken(ctx context.Context, id uuid.UUID
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.SetPasswordResetToken(ctx, sqlc.SetPasswordResetTokenParams{
+	err := r.querier.SetPasswordResetToken(ctx, sqlc.SetPasswordResetTokenParams{
 		ID:                   uuidToPgtypeUUID(id),
 		ResetPasswordToken:   pgtype.Text{String: token, Valid: true},
 		ResetPasswordExpires: pgtype.Timestamp{Time: expires, Valid: true},
@@ -273,7 +278,7 @@ func (r *authRepository) UpdateUserPassword(ctx context.Context, id uuid.UUID, p
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
+	err := r.querier.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
 		ID:           uuidToPgtypeUUID(id),
 		PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
 	})
@@ -292,7 +297,7 @@ func (r *authRepository) UpdateUserStatus(ctx context.Context, id uuid.UUID, sta
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
+	err := r.querier.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
 		ID:     uuidToPgtypeUUID(id),
 		Status: pgtype.Text{String: status, Valid: true},
 	})
@@ -311,7 +316,7 @@ func (r *authRepository) UpdateLastLogin(ctx context.Context, id uuid.UUID) erro
 		authDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.UpdateUserLastLogin(ctx, uuidToPgtypeUUID(id))
+	err := r.querier.UpdateUserLastLogin(ctx, uuidToPgtypeUUID(id))
 	if err != nil {
 		authDbQueryTotal.WithLabelValues("update_last_login", "error").Inc()
 		return r.handleError(err, "update last login")

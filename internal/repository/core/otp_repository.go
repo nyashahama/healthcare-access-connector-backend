@@ -38,13 +38,18 @@ var (
 )
 
 type otpRepository struct {
-	db *sqlc.Queries
+	querier sqlc.Querier
 }
 
-// NewOTPRepository creates a new OTP repository
+// NewOTPRepository creates a new OTP repository using a pool
 func NewOTPRepository(pool *pgxpool.Pool) repository.OTPRepository {
+	return NewOTPRepositoryWithQuerier(sqlc.New(pool))
+}
+
+// NewOTPRepositoryWithQuerier creates a new OTP repository using a provided querier (for transactions)
+func NewOTPRepositoryWithQuerier(querier sqlc.Querier) repository.OTPRepository {
 	return &otpRepository{
-		db: sqlc.New(pool),
+		querier: querier,
 	}
 }
 
@@ -54,7 +59,7 @@ func (r *otpRepository) SaveOTP(ctx context.Context, otp core.OTPVerification) e
 		otpDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	_, err := r.db.SaveOTP(ctx, sqlc.SaveOTPParams{
+	_, err := r.querier.SaveOTP(ctx, sqlc.SaveOTPParams{
 		ID:        uuidToPgtypeUUID(otp.ID),
 		UserID:    uuidToPgtypeUUID(otp.UserID),
 		Otp:       otp.OTP,
@@ -77,7 +82,7 @@ func (r *otpRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpTy
 		otpDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	record, err := r.db.GetOTP(ctx, sqlc.GetOTPParams{
+	record, err := r.querier.GetOTP(ctx, sqlc.GetOTPParams{
 		UserID: uuidToPgtypeUUID(userID),
 		Otp:    otp,
 		Type:   otpType,
@@ -111,7 +116,7 @@ func (r *otpRepository) MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedAt
 		otpDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.MarkOTPUsed(ctx, sqlc.MarkOTPUsedParams{
+	err := r.querier.MarkOTPUsed(ctx, sqlc.MarkOTPUsedParams{
 		ID:     uuidToPgtypeUUID(otpID),
 		UsedAt: timePtrToPgtypeTimestamp(usedAt),
 	})
@@ -130,7 +135,7 @@ func (r *otpRepository) DeleteExpiredOTPs(ctx context.Context) error {
 		otpDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.DeleteExpiredOTPs(ctx)
+	err := r.querier.DeleteExpiredOTPs(ctx)
 	if err != nil {
 		otpDbQueryTotal.WithLabelValues("delete_expired_otps", "error").Inc()
 		return fmt.Errorf("delete expired OTPs: %w", err)
@@ -146,7 +151,7 @@ func (r *otpRepository) DeleteUserOTPs(ctx context.Context, userID uuid.UUID, ot
 		otpDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	err := r.db.DeleteUserOTPs(ctx, sqlc.DeleteUserOTPsParams{
+	err := r.querier.DeleteUserOTPs(ctx, sqlc.DeleteUserOTPsParams{
 		UserID: uuidToPgtypeUUID(userID),
 		Type:   otpType,
 	})
@@ -165,7 +170,7 @@ func (r *otpRepository) GetOTPAttemptCount(ctx context.Context, userID uuid.UUID
 		otpDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	count, err := r.db.GetOTPAttemptCount(ctx, sqlc.GetOTPAttemptCountParams{
+	count, err := r.querier.GetOTPAttemptCount(ctx, sqlc.GetOTPAttemptCountParams{
 		UserID: uuidToPgtypeUUID(userID),
 		Type:   otpType,
 	})
