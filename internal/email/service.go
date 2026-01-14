@@ -221,6 +221,7 @@ func (s *emailService) SendWelcomeEmail(ctx context.Context, to, username string
 		Body:     text,
 		HTMLBody: html,
 		Template: types.TemplateWelcome,
+		ReplyTo:  s.config.GetReplyTo(types.TemplateWelcome),
 	})
 }
 
@@ -234,6 +235,7 @@ func (s *emailService) SendOTPEmail(ctx context.Context, email, otp, userID stri
 		Body:     text,
 		HTMLBody: html,
 		Template: types.TemplateOTP,
+		ReplyTo:  s.config.GetReplyTo(types.TemplateOTP),
 	})
 }
 
@@ -247,6 +249,7 @@ func (s *emailService) SendPasswordResetEmail(ctx context.Context, to, resetToke
 		Body:     text,
 		HTMLBody: html,
 		Template: types.TemplatePasswordReset,
+		ReplyTo:  s.config.GetReplyTo(types.TemplatePasswordReset),
 	})
 }
 
@@ -260,6 +263,7 @@ func (s *emailService) SendVerificationEmail(ctx context.Context, to, verificati
 		Body:     text,
 		HTMLBody: html,
 		Template: types.TemplateVerification,
+		ReplyTo:  s.config.GetReplyTo(types.TemplateVerification),
 	})
 }
 
@@ -273,6 +277,7 @@ func (s *emailService) SendPasswordChangedEmail(ctx context.Context, to, usernam
 		Body:     text,
 		HTMLBody: html,
 		Template: types.TemplatePasswordChanged,
+		ReplyTo:  s.config.GetReplyTo(types.TemplatePasswordChanged),
 	})
 }
 
@@ -286,6 +291,7 @@ func (s *emailService) SendLoginAlertEmail(ctx context.Context, to, username, ip
 		Body:     text,
 		HTMLBody: html,
 		Template: types.TemplateLoginAlert,
+		ReplyTo:  s.config.GetReplyTo(types.TemplateLoginAlert),
 	})
 }
 
