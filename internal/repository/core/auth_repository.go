@@ -1,3 +1,4 @@
+// Package core
 package core
 
 import (
@@ -23,7 +24,7 @@ import (
 )
 
 var (
-	authDbQueryDuration = promauto.NewHistogram(
+	authDBQueryDuration = promauto.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "auth_db_query_duration_seconds",
 			Help:    "Auth database query latency in seconds",
@@ -31,7 +32,7 @@ var (
 		},
 	)
 
-	authDbQueryTotal = promauto.NewCounterVec(
+	authDBQueryTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "auth_db_query_total",
 			Help: "Total number of auth database queries",
@@ -59,7 +60,7 @@ func NewAuthRepositoryWithQuerier(querier sqlc.Querier) repository.AuthRepositor
 func (r *authRepository) CreateUser(ctx context.Context, user core.User, passwordHash string) (core.User, error) {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	var email string
@@ -84,31 +85,31 @@ func (r *authRepository) CreateUser(ctx context.Context, user core.User, passwor
 		ConsentDate:       timePtrToPgtypeTimestamp(user.ConsentDate),
 	})
 	if err != nil {
-		authDbQueryTotal.WithLabelValues("create_user", "error").Inc()
+		authDBQueryTotal.WithLabelValues("create_user", "error").Inc()
 		return core.User{}, r.handleError(err, "create user")
 	}
 
-	authDbQueryTotal.WithLabelValues("create_user", "success").Inc()
+	authDBQueryTotal.WithLabelValues("create_user", "success").Inc()
 	return r.mapToUserFromCreate(created), nil
 }
 
 func (r *authRepository) GetUserByVerificationToken(ctx context.Context, token string) (core.User, string, error) {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	u, err := r.querier.GetUserByVerificationToken(ctx, pgtype.Text{String: token, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			authDbQueryTotal.WithLabelValues("get_user_by_verification_token", "not_found").Inc()
+			authDBQueryTotal.WithLabelValues("get_user_by_verification_token", "not_found").Inc()
 			return core.User{}, "", domain.ErrUserNotFound
 		}
-		authDbQueryTotal.WithLabelValues("get_user_by_verification_token", "error").Inc()
+		authDBQueryTotal.WithLabelValues("get_user_by_verification_token", "error").Inc()
 		return core.User{}, "", r.handleError(err, "get user by verification token")
 	}
 
-	authDbQueryTotal.WithLabelValues("get_user_by_verification_token", "success").Inc()
+	authDBQueryTotal.WithLabelValues("get_user_by_verification_token", "success").Inc()
 
 	passwordHash := ""
 	if u.PasswordHash.Valid {
@@ -121,20 +122,20 @@ func (r *authRepository) GetUserByVerificationToken(ctx context.Context, token s
 func (r *authRepository) GetUserByPasswordResetToken(ctx context.Context, token string) (core.User, string, error) {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	u, err := r.querier.GetUserByPasswordResetToken(ctx, pgtype.Text{String: token, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			authDbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "not_found").Inc()
+			authDBQueryTotal.WithLabelValues("get_user_by_password_reset_token", "not_found").Inc()
 			return core.User{}, "", domain.ErrUserNotFound
 		}
-		authDbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "error").Inc()
+		authDBQueryTotal.WithLabelValues("get_user_by_password_reset_token", "error").Inc()
 		return core.User{}, "", r.handleError(err, "get user by password reset token")
 	}
 
-	authDbQueryTotal.WithLabelValues("get_user_by_password_reset_token", "success").Inc()
+	authDBQueryTotal.WithLabelValues("get_user_by_password_reset_token", "success").Inc()
 
 	passwordHash := ""
 	if u.PasswordHash.Valid {
@@ -147,20 +148,20 @@ func (r *authRepository) GetUserByPasswordResetToken(ctx context.Context, token 
 func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (core.User, string, error) {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	u, err := r.querier.GetUserByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			authDbQueryTotal.WithLabelValues("get_user_by_email", "not_found").Inc()
+			authDBQueryTotal.WithLabelValues("get_user_by_email", "not_found").Inc()
 			return core.User{}, "", domain.ErrUserNotFound
 		}
-		authDbQueryTotal.WithLabelValues("get_user_by_email", "error").Inc()
+		authDBQueryTotal.WithLabelValues("get_user_by_email", "error").Inc()
 		return core.User{}, "", r.handleError(err, "get user by email")
 	}
 
-	authDbQueryTotal.WithLabelValues("get_user_by_email", "success").Inc()
+	authDBQueryTotal.WithLabelValues("get_user_by_email", "success").Inc()
 
 	passwordHash := ""
 	if u.PasswordHash.Valid {
@@ -173,40 +174,40 @@ func (r *authRepository) GetUserByEmail(ctx context.Context, email string) (core
 func (r *authRepository) GetUserByPhone(ctx context.Context, phone string) (core.User, error) {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	u, err := r.querier.GetUserByPhone(ctx, pgtype.Text{String: phone, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			authDbQueryTotal.WithLabelValues("get_user_by_phone", "not_found").Inc()
+			authDBQueryTotal.WithLabelValues("get_user_by_phone", "not_found").Inc()
 			return core.User{}, domain.ErrUserNotFound
 		}
-		authDbQueryTotal.WithLabelValues("get_user_by_phone", "error").Inc()
+		authDBQueryTotal.WithLabelValues("get_user_by_phone", "error").Inc()
 		return core.User{}, r.handleError(err, "get user by phone")
 	}
 
-	authDbQueryTotal.WithLabelValues("get_user_by_phone", "success").Inc()
+	authDBQueryTotal.WithLabelValues("get_user_by_phone", "success").Inc()
 	return r.mapToUserFromGetByPhone(u), nil
 }
 
 func (r *authRepository) GetUserByPhoneWithHash(ctx context.Context, phone string) (core.User, string, error) {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	u, err := r.querier.GetUserByPhoneWithHash(ctx, pgtype.Text{String: phone, Valid: true})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			authDbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "not_found").Inc()
+			authDBQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "not_found").Inc()
 			return core.User{}, "", domain.ErrUserNotFound
 		}
-		authDbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "error").Inc()
+		authDBQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "error").Inc()
 		return core.User{}, "", r.handleError(err, "get user by phone with hash")
 	}
 
-	authDbQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "success").Inc()
+	authDBQueryTotal.WithLabelValues("get_user_by_phone_with_hash", "success").Inc()
 
 	passwordHash := ""
 	if u.PasswordHash.Valid {
@@ -219,23 +220,23 @@ func (r *authRepository) GetUserByPhoneWithHash(ctx context.Context, phone strin
 func (r *authRepository) VerifyUser(ctx context.Context, id uuid.UUID) error {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.VerifyUser(ctx, uuidToPgtypeUUID(id))
 	if err != nil {
-		authDbQueryTotal.WithLabelValues("verify_user", "error").Inc()
+		authDBQueryTotal.WithLabelValues("verify_user", "error").Inc()
 		return r.handleError(err, "verify user")
 	}
 
-	authDbQueryTotal.WithLabelValues("verify_user", "success").Inc()
+	authDBQueryTotal.WithLabelValues("verify_user", "success").Inc()
 	return nil
 }
 
 func (r *authRepository) SetVerificationToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.SetVerificationToken(ctx, sqlc.SetVerificationTokenParams{
@@ -244,18 +245,18 @@ func (r *authRepository) SetVerificationToken(ctx context.Context, id uuid.UUID,
 		VerificationExpires: pgtype.Timestamp{Time: expires, Valid: true},
 	})
 	if err != nil {
-		authDbQueryTotal.WithLabelValues("set_verification_token", "error").Inc()
+		authDBQueryTotal.WithLabelValues("set_verification_token", "error").Inc()
 		return r.handleError(err, "set verification token")
 	}
 
-	authDbQueryTotal.WithLabelValues("set_verification_token", "success").Inc()
+	authDBQueryTotal.WithLabelValues("set_verification_token", "success").Inc()
 	return nil
 }
 
 func (r *authRepository) SetPasswordResetToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.SetPasswordResetToken(ctx, sqlc.SetPasswordResetTokenParams{
@@ -264,18 +265,18 @@ func (r *authRepository) SetPasswordResetToken(ctx context.Context, id uuid.UUID
 		ResetPasswordExpires: pgtype.Timestamp{Time: expires, Valid: true},
 	})
 	if err != nil {
-		authDbQueryTotal.WithLabelValues("set_password_reset_token", "error").Inc()
+		authDBQueryTotal.WithLabelValues("set_password_reset_token", "error").Inc()
 		return r.handleError(err, "set password reset token")
 	}
 
-	authDbQueryTotal.WithLabelValues("set_password_reset_token", "success").Inc()
+	authDBQueryTotal.WithLabelValues("set_password_reset_token", "success").Inc()
 	return nil
 }
 
 func (r *authRepository) UpdateUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
@@ -283,18 +284,18 @@ func (r *authRepository) UpdateUserPassword(ctx context.Context, id uuid.UUID, p
 		PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
 	})
 	if err != nil {
-		authDbQueryTotal.WithLabelValues("update_user_password", "error").Inc()
+		authDBQueryTotal.WithLabelValues("update_user_password", "error").Inc()
 		return r.handleError(err, "update user password")
 	}
 
-	authDbQueryTotal.WithLabelValues("update_user_password", "success").Inc()
+	authDBQueryTotal.WithLabelValues("update_user_password", "success").Inc()
 	return nil
 }
 
 func (r *authRepository) UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
@@ -302,27 +303,27 @@ func (r *authRepository) UpdateUserStatus(ctx context.Context, id uuid.UUID, sta
 		Status: pgtype.Text{String: status, Valid: true},
 	})
 	if err != nil {
-		authDbQueryTotal.WithLabelValues("update_user_status", "error").Inc()
+		authDBQueryTotal.WithLabelValues("update_user_status", "error").Inc()
 		return r.handleError(err, "update user status")
 	}
 
-	authDbQueryTotal.WithLabelValues("update_user_status", "success").Inc()
+	authDBQueryTotal.WithLabelValues("update_user_status", "success").Inc()
 	return nil
 }
 
 func (r *authRepository) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
 	start := time.Now()
 	defer func() {
-		authDbQueryDuration.Observe(time.Since(start).Seconds())
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.UpdateUserLastLogin(ctx, uuidToPgtypeUUID(id))
 	if err != nil {
-		authDbQueryTotal.WithLabelValues("update_last_login", "error").Inc()
+		authDBQueryTotal.WithLabelValues("update_last_login", "error").Inc()
 		return r.handleError(err, "update last login")
 	}
 
-	authDbQueryTotal.WithLabelValues("update_last_login", "success").Inc()
+	authDBQueryTotal.WithLabelValues("update_last_login", "success").Inc()
 	return nil
 }
 

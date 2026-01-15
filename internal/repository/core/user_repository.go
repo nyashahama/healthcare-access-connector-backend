@@ -22,7 +22,7 @@ import (
 )
 
 var (
-	userDbQueryDuration = promauto.NewHistogram(
+	userDBQueryDuration = promauto.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "user_db_query_duration_seconds",
 			Help:    "User database query latency in seconds",
@@ -30,7 +30,7 @@ var (
 		},
 	)
 
-	userDbQueryTotal = promauto.NewCounterVec(
+	userDBQueryTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "user_db_query_total",
 			Help: "Total number of user database queries",
@@ -58,28 +58,28 @@ func NewUserRepositoryWithQuerier(querier sqlc.Querier) repository.UserRepositor
 func (r *userRepository) GetUserByID(ctx context.Context, id uuid.UUID) (core.User, error) {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	pgID := uuidToPgtypeUUID(id)
 	u, err := r.querier.GetUserByID(ctx, pgID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			userDbQueryTotal.WithLabelValues("get_user_by_id", "not_found").Inc()
+			userDBQueryTotal.WithLabelValues("get_user_by_id", "not_found").Inc()
 			return core.User{}, domain.ErrUserNotFound
 		}
-		userDbQueryTotal.WithLabelValues("get_user_by_id", "error").Inc()
+		userDBQueryTotal.WithLabelValues("get_user_by_id", "error").Inc()
 		return core.User{}, fmt.Errorf("get user by id: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("get_user_by_id", "success").Inc()
+	userDBQueryTotal.WithLabelValues("get_user_by_id", "success").Inc()
 	return r.mapToUserFromGetByID(u), nil
 }
 
 func (r *userRepository) UpdateUser(ctx context.Context, user core.User) error {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	var email string
@@ -105,18 +105,18 @@ func (r *userRepository) UpdateUser(ctx context.Context, user core.User) error {
 		ProfileCompletionPercentage: pgtype.Int4{Int32: int32(user.ProfileCompletionPct), Valid: true},
 	})
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("update_user", "error").Inc()
+		userDBQueryTotal.WithLabelValues("update_user", "error").Inc()
 		return fmt.Errorf("update user: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("update_user", "success").Inc()
+	userDBQueryTotal.WithLabelValues("update_user", "success").Inc()
 	return nil
 }
 
 func (r *userRepository) DeactivateUser(ctx context.Context, id uuid.UUID) error {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
@@ -124,18 +124,18 @@ func (r *userRepository) DeactivateUser(ctx context.Context, id uuid.UUID) error
 		Status: pgtype.Text{String: "inactive", Valid: true},
 	})
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("deactivate_user", "error").Inc()
+		userDBQueryTotal.WithLabelValues("deactivate_user", "error").Inc()
 		return fmt.Errorf("deactivate user: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("deactivate_user", "success").Inc()
+	userDBQueryTotal.WithLabelValues("deactivate_user", "success").Inc()
 	return nil
 }
 
 func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offset int) ([]core.User, error) {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	users, err := r.querier.ListUsersByRole(ctx, sqlc.ListUsersByRoleParams{
@@ -144,11 +144,11 @@ func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offs
 		Offset: int32(offset),
 	})
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("list_users", "error").Inc()
+		userDBQueryTotal.WithLabelValues("list_users", "error").Inc()
 		return nil, fmt.Errorf("list users: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("list_users", "success").Inc()
+	userDBQueryTotal.WithLabelValues("list_users", "success").Inc()
 
 	result := make([]core.User, len(users))
 	for i, u := range users {
@@ -161,35 +161,35 @@ func (r *userRepository) ListUsers(ctx context.Context, role string, limit, offs
 func (r *userRepository) CountUsers(ctx context.Context, role string) (int64, error) {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	count, err := r.querier.CountUsersByRole(ctx, role)
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("count_users", "error").Inc()
+		userDBQueryTotal.WithLabelValues("count_users", "error").Inc()
 		return 0, fmt.Errorf("count users: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("count_users", "success").Inc()
+	userDBQueryTotal.WithLabelValues("count_users", "success").Inc()
 	return count, nil
 }
 
 func (r *userRepository) GetUserProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error) {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	// Get the user
 	user, err := r.GetUserByID(ctx, userID)
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("get_user_profile", "error").Inc()
+		userDBQueryTotal.WithLabelValues("get_user_profile", "error").Inc()
 		return core.User{}, patients.PatientProfile{}, err
 	}
 
 	// TODO: When patient profile repository is implemented, fetch patient profile here
 	// For now, return empty patient profile
-	userDbQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
+	userDBQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
 	return user, patients.PatientProfile{}, nil
 }
 
@@ -197,7 +197,7 @@ func (r *userRepository) GetUserProfile(ctx context.Context, userID uuid.UUID) (
 func (r *userRepository) UpdateUserEmail(ctx context.Context, id uuid.UUID, email string) error {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.UpdateUserEmail(ctx, sqlc.UpdateUserEmailParams{
@@ -205,18 +205,18 @@ func (r *userRepository) UpdateUserEmail(ctx context.Context, id uuid.UUID, emai
 		Email: email,
 	})
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("update_user_email", "error").Inc()
+		userDBQueryTotal.WithLabelValues("update_user_email", "error").Inc()
 		return fmt.Errorf("update user email: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("update_user_email", "success").Inc()
+	userDBQueryTotal.WithLabelValues("update_user_email", "success").Inc()
 	return nil
 }
 
 func (r *userRepository) UpdateUserPhone(ctx context.Context, id uuid.UUID, phone string) error {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.UpdateUserPhone(ctx, sqlc.UpdateUserPhoneParams{
@@ -224,18 +224,18 @@ func (r *userRepository) UpdateUserPhone(ctx context.Context, id uuid.UUID, phon
 		Phone: pgtype.Text{String: phone, Valid: true},
 	})
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("update_user_phone", "error").Inc()
+		userDBQueryTotal.WithLabelValues("update_user_phone", "error").Inc()
 		return fmt.Errorf("update user phone: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("update_user_phone", "success").Inc()
+	userDBQueryTotal.WithLabelValues("update_user_phone", "success").Inc()
 	return nil
 }
 
 func (r *userRepository) UpdateUserProfileCompletion(ctx context.Context, id uuid.UUID, percentage int) error {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.UpdateUserProfileCompletion(ctx, sqlc.UpdateUserProfileCompletionParams{
@@ -243,18 +243,18 @@ func (r *userRepository) UpdateUserProfileCompletion(ctx context.Context, id uui
 		ProfileCompletionPercentage: pgtype.Int4{Int32: int32(percentage), Valid: true},
 	})
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("update_user_profile_completion", "error").Inc()
+		userDBQueryTotal.WithLabelValues("update_user_profile_completion", "error").Inc()
 		return fmt.Errorf("update user profile completion: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("update_user_profile_completion", "success").Inc()
+	userDBQueryTotal.WithLabelValues("update_user_profile_completion", "success").Inc()
 	return nil
 }
 
 func (r *userRepository) UpdateUserConsents(ctx context.Context, id uuid.UUID, smsConsent, popiaConsent bool, consentDate time.Time) error {
 	start := time.Now()
 	defer func() {
-		userDbQueryDuration.Observe(time.Since(start).Seconds())
+		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	err := r.querier.UpdateUserConsents(ctx, sqlc.UpdateUserConsentsParams{
@@ -264,11 +264,11 @@ func (r *userRepository) UpdateUserConsents(ctx context.Context, id uuid.UUID, s
 		ConsentDate:       pgtype.Timestamp{Time: consentDate, Valid: true},
 	})
 	if err != nil {
-		userDbQueryTotal.WithLabelValues("update_user_consents", "error").Inc()
+		userDBQueryTotal.WithLabelValues("update_user_consents", "error").Inc()
 		return fmt.Errorf("update user consents: %w", err)
 	}
 
-	userDbQueryTotal.WithLabelValues("update_user_consents", "success").Inc()
+	userDBQueryTotal.WithLabelValues("update_user_consents", "success").Inc()
 	return nil
 }
 
