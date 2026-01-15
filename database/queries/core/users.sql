@@ -99,3 +99,42 @@ LIMIT $2 OFFSET $3;
 -- name: CountUsersByRole :one
 SELECT COUNT(*) FROM users 
 WHERE role = $1 AND status != 'inactive';
+
+-- name: UpdateUser :exec
+UPDATE users
+SET 
+    email = COALESCE($2, email),
+    phone = COALESCE($3, phone),
+    role = COALESCE($4, role),
+    status = COALESCE($5, status),
+    is_sms_only = COALESCE($6, is_sms_only),
+    sms_consent_given = COALESCE($7, sms_consent_given),
+    popia_consent_given = COALESCE($8, popia_consent_given),
+    consent_date = COALESCE($9, consent_date),
+    profile_completion_percentage = COALESCE($10, profile_completion_percentage),
+    updated_at = NOW()
+WHERE id = $1;
+
+-- name: UpdateUserEmail :exec
+UPDATE users
+SET email = $2, updated_at = NOW()
+WHERE id = $1;
+
+-- name: UpdateUserPhone :exec
+UPDATE users
+SET phone = $2, updated_at = NOW()
+WHERE id = $1;
+
+-- name: UpdateUserProfileCompletion :exec
+UPDATE users
+SET profile_completion_percentage = $2, updated_at = NOW()
+WHERE id = $1;
+
+-- name: UpdateUserConsents :exec
+UPDATE users
+SET 
+    sms_consent_given = $2,
+    popia_consent_given = $3,
+    consent_date = $4,
+    updated_at = NOW()
+WHERE id = $1;

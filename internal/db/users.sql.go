@@ -490,6 +490,94 @@ func (q *Queries) SetVerificationToken(ctx context.Context, arg SetVerificationT
 	return err
 }
 
+const updateUser = `-- name: UpdateUser :exec
+UPDATE users
+SET 
+    email = COALESCE($2, email),
+    phone = COALESCE($3, phone),
+    role = COALESCE($4, role),
+    status = COALESCE($5, status),
+    is_sms_only = COALESCE($6, is_sms_only),
+    sms_consent_given = COALESCE($7, sms_consent_given),
+    popia_consent_given = COALESCE($8, popia_consent_given),
+    consent_date = COALESCE($9, consent_date),
+    profile_completion_percentage = COALESCE($10, profile_completion_percentage),
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserParams struct {
+	ID                          pgtype.UUID      `json:"id"`
+	Email                       string           `json:"email"`
+	Phone                       pgtype.Text      `json:"phone"`
+	Role                        string           `json:"role"`
+	Status                      pgtype.Text      `json:"status"`
+	IsSmsOnly                   pgtype.Bool      `json:"is_sms_only"`
+	SmsConsentGiven             pgtype.Bool      `json:"sms_consent_given"`
+	PopiaConsentGiven           pgtype.Bool      `json:"popia_consent_given"`
+	ConsentDate                 pgtype.Timestamp `json:"consent_date"`
+	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.Exec(ctx, updateUser,
+		arg.ID,
+		arg.Email,
+		arg.Phone,
+		arg.Role,
+		arg.Status,
+		arg.IsSmsOnly,
+		arg.SmsConsentGiven,
+		arg.PopiaConsentGiven,
+		arg.ConsentDate,
+		arg.ProfileCompletionPercentage,
+	)
+	return err
+}
+
+const updateUserConsents = `-- name: UpdateUserConsents :exec
+UPDATE users
+SET 
+    sms_consent_given = $2,
+    popia_consent_given = $3,
+    consent_date = $4,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserConsentsParams struct {
+	ID                pgtype.UUID      `json:"id"`
+	SmsConsentGiven   pgtype.Bool      `json:"sms_consent_given"`
+	PopiaConsentGiven pgtype.Bool      `json:"popia_consent_given"`
+	ConsentDate       pgtype.Timestamp `json:"consent_date"`
+}
+
+func (q *Queries) UpdateUserConsents(ctx context.Context, arg UpdateUserConsentsParams) error {
+	_, err := q.db.Exec(ctx, updateUserConsents,
+		arg.ID,
+		arg.SmsConsentGiven,
+		arg.PopiaConsentGiven,
+		arg.ConsentDate,
+	)
+	return err
+}
+
+const updateUserEmail = `-- name: UpdateUserEmail :exec
+UPDATE users
+SET email = $2, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserEmailParams struct {
+	ID    pgtype.UUID `json:"id"`
+	Email string      `json:"email"`
+}
+
+func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
+	_, err := q.db.Exec(ctx, updateUserEmail, arg.ID, arg.Email)
+	return err
+}
+
 const updateUserLastLogin = `-- name: UpdateUserLastLogin :exec
 UPDATE users
 SET last_login = NOW(), login_count = login_count + 1
@@ -514,6 +602,38 @@ type UpdateUserPasswordParams struct {
 
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
 	_, err := q.db.Exec(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
+	return err
+}
+
+const updateUserPhone = `-- name: UpdateUserPhone :exec
+UPDATE users
+SET phone = $2, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserPhoneParams struct {
+	ID    pgtype.UUID `json:"id"`
+	Phone pgtype.Text `json:"phone"`
+}
+
+func (q *Queries) UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) error {
+	_, err := q.db.Exec(ctx, updateUserPhone, arg.ID, arg.Phone)
+	return err
+}
+
+const updateUserProfileCompletion = `-- name: UpdateUserProfileCompletion :exec
+UPDATE users
+SET profile_completion_percentage = $2, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserProfileCompletionParams struct {
+	ID                          pgtype.UUID `json:"id"`
+	ProfileCompletionPercentage pgtype.Int4 `json:"profile_completion_percentage"`
+}
+
+func (q *Queries) UpdateUserProfileCompletion(ctx context.Context, arg UpdateUserProfileCompletionParams) error {
+	_, err := q.db.Exec(ctx, updateUserProfileCompletion, arg.ID, arg.ProfileCompletionPercentage)
 	return err
 }
 

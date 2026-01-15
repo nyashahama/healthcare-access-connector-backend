@@ -82,9 +82,35 @@ func (r *userRepository) UpdateUser(ctx context.Context, user core.User) error {
 		userDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// TODO: Implement specific update queries
-	userDbQueryTotal.WithLabelValues("update_user", "error").Inc()
-	return fmt.Errorf("not implemented")
+	var email string
+	if user.Email != nil {
+		email = *user.Email
+	}
+
+	var phone pgtype.Text
+	if user.Phone != nil {
+		phone = pgtype.Text{String: *user.Phone, Valid: true}
+	}
+
+	err := r.querier.UpdateUser(ctx, sqlc.UpdateUserParams{
+		ID:                          uuidToPgtypeUUID(user.ID),
+		Email:                       email,
+		Phone:                       phone,
+		Role:                        user.Role,
+		Status:                      pgtype.Text{String: user.Status, Valid: true},
+		IsSmsOnly:                   pgtype.Bool{Bool: user.IsSMSOnly, Valid: true},
+		SmsConsentGiven:             pgtype.Bool{Bool: user.SMSConsentGiven, Valid: true},
+		PopiaConsentGiven:           pgtype.Bool{Bool: user.POPIAConsentGiven, Valid: true},
+		ConsentDate:                 timePtrToPgtypeTimestamp(user.ConsentDate),
+		ProfileCompletionPercentage: pgtype.Int4{Int32: int32(user.ProfileCompletionPct), Valid: true},
+	})
+	if err != nil {
+		userDbQueryTotal.WithLabelValues("update_user", "error").Inc()
+		return fmt.Errorf("update user: %w", err)
+	}
+
+	userDbQueryTotal.WithLabelValues("update_user", "success").Inc()
+	return nil
 }
 
 func (r *userRepository) DeactivateUser(ctx context.Context, id uuid.UUID) error {
@@ -154,18 +180,99 @@ func (r *userRepository) GetUserProfile(ctx context.Context, userID uuid.UUID) (
 		userDbQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// TODO: Implement this query to get user with patient profile
-	// For now, return empty patient profile
+	// Get the user
 	user, err := r.GetUserByID(ctx, userID)
 	if err != nil {
 		userDbQueryTotal.WithLabelValues("get_user_profile", "error").Inc()
 		return core.User{}, patients.PatientProfile{}, err
 	}
 
+	// TODO: When patient profile repository is implemented, fetch patient profile here
+	// For now, return empty patient profile
 	userDbQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
 	return user, patients.PatientProfile{}, nil
 }
 
+// Additional helper methods for specific updates
+func (r *userRepository) UpdateUserEmail(ctx context.Context, id uuid.UUID, email string) error {
+	start := time.Now()
+	defer func() {
+		userDbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.UpdateUserEmail(ctx, sqlc.UpdateUserEmailParams{
+		ID:    uuidToPgtypeUUID(id),
+		Email: email,
+	})
+	if err != nil {
+		userDbQueryTotal.WithLabelValues("update_user_email", "error").Inc()
+		return fmt.Errorf("update user email: %w", err)
+	}
+
+	userDbQueryTotal.WithLabelValues("update_user_email", "success").Inc()
+	return nil
+}
+
+func (r *userRepository) UpdateUserPhone(ctx context.Context, id uuid.UUID, phone string) error {
+	start := time.Now()
+	defer func() {
+		userDbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.UpdateUserPhone(ctx, sqlc.UpdateUserPhoneParams{
+		ID:    uuidToPgtypeUUID(id),
+		Phone: pgtype.Text{String: phone, Valid: true},
+	})
+	if err != nil {
+		userDbQueryTotal.WithLabelValues("update_user_phone", "error").Inc()
+		return fmt.Errorf("update user phone: %w", err)
+	}
+
+	userDbQueryTotal.WithLabelValues("update_user_phone", "success").Inc()
+	return nil
+}
+
+func (r *userRepository) UpdateUserProfileCompletion(ctx context.Context, id uuid.UUID, percentage int) error {
+	start := time.Now()
+	defer func() {
+		userDbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.UpdateUserProfileCompletion(ctx, sqlc.UpdateUserProfileCompletionParams{
+		ID:                          uuidToPgtypeUUID(id),
+		ProfileCompletionPercentage: pgtype.Int4{Int32: int32(percentage), Valid: true},
+	})
+	if err != nil {
+		userDbQueryTotal.WithLabelValues("update_user_profile_completion", "error").Inc()
+		return fmt.Errorf("update user profile completion: %w", err)
+	}
+
+	userDbQueryTotal.WithLabelValues("update_user_profile_completion", "success").Inc()
+	return nil
+}
+
+func (r *userRepository) UpdateUserConsents(ctx context.Context, id uuid.UUID, smsConsent, popiaConsent bool, consentDate time.Time) error {
+	start := time.Now()
+	defer func() {
+		userDbQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.UpdateUserConsents(ctx, sqlc.UpdateUserConsentsParams{
+		ID:                uuidToPgtypeUUID(id),
+		SmsConsentGiven:   pgtype.Bool{Bool: smsConsent, Valid: true},
+		PopiaConsentGiven: pgtype.Bool{Bool: popiaConsent, Valid: true},
+		ConsentDate:       pgtype.Timestamp{Time: consentDate, Valid: true},
+	})
+	if err != nil {
+		userDbQueryTotal.WithLabelValues("update_user_consents", "error").Inc()
+		return fmt.Errorf("update user consents: %w", err)
+	}
+
+	userDbQueryTotal.WithLabelValues("update_user_consents", "success").Inc()
+	return nil
+}
+
+// Mapping functions
 func (r *userRepository) mapToUserFromGetByID(u sqlc.GetUserByIDRow) core.User {
 	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),

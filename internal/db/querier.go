@@ -134,8 +134,13 @@ type Querier interface {
 	UpdateSMSConversation(ctx context.Context, arg UpdateSMSConversationParams) error
 	UpdateSessionToken(ctx context.Context, arg UpdateSessionTokenParams) error
 	UpdateStaffStatus(ctx context.Context, arg UpdateStaffStatusParams) error
+	UpdateUser(ctx context.Context, arg UpdateUserParams) error
+	UpdateUserConsents(ctx context.Context, arg UpdateUserConsentsParams) error
+	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error
 	UpdateUserLastLogin(ctx context.Context, id pgtype.UUID) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
+	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) error
+	UpdateUserProfileCompletion(ctx context.Context, arg UpdateUserProfileCompletionParams) error
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error
 	VerifyClinic(ctx context.Context, arg VerifyClinicParams) error
 	VerifyCredential(ctx context.Context, arg VerifyCredentialParams) error

@@ -13,45 +13,50 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// ===================== AUTH REPOSITORY =====================
+// AuthRepository defines methods for authentication
 type AuthRepository interface {
 	// User Authentication
 	CreateUser(ctx context.Context, user core.User, passwordHash string) (core.User, error)
 	GetUserByEmail(ctx context.Context, email string) (core.User, string, error)
 	GetUserByPhone(ctx context.Context, phone string) (core.User, error)
 	GetUserByPhoneWithHash(ctx context.Context, phone string) (core.User, string, error)
-	
+
 	// Token Management
 	GetUserByVerificationToken(ctx context.Context, token string) (core.User, string, error)
 	GetUserByPasswordResetToken(ctx context.Context, token string) (core.User, string, error)
 	SetVerificationToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
 	SetPasswordResetToken(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
 	VerifyUser(ctx context.Context, id uuid.UUID) error
-	
+
 	// Password Management
 	UpdateUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
-	
+
 	// Session & Status
 	UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
 }
 
-// ===================== USER REPOSITORY =====================
+// UserRepository defines methods for user
 type UserRepository interface {
 	// Basic CRUD
 	GetUserByID(ctx context.Context, id uuid.UUID) (core.User, error)
 	UpdateUser(ctx context.Context, user core.User) error
 	DeactivateUser(ctx context.Context, id uuid.UUID) error
-	
+
 	// Listing & Search
 	ListUsers(ctx context.Context, role string, limit, offset int) ([]core.User, error)
 	CountUsers(ctx context.Context, role string) (int64, error)
-	
+
 	// Profile Management
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error)
+	// Specific updates (optional - for more granular control)
+	UpdateUserEmail(ctx context.Context, id uuid.UUID, email string) error
+	UpdateUserPhone(ctx context.Context, id uuid.UUID, phone string) error
+	UpdateUserProfileCompletion(ctx context.Context, id uuid.UUID, percentage int) error
+	UpdateUserConsents(ctx context.Context, id uuid.UUID, smsConsent, popiaConsent bool, consentDate time.Time) error
 }
 
-// ===================== OTP REPOSITORY =====================
+// OTPRepository defines methods for otp
 type OTPRepository interface {
 	// OTP Operations
 	SaveOTP(ctx context.Context, otp core.OTPVerification) error
