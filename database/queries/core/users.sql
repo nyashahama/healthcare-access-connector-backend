@@ -65,27 +65,27 @@ WHERE id = $1;
 
 -- name: UpdateUserStatus :exec
 UPDATE users
-SET status = $2
+SET status = $2, updated_at = NOW()
 WHERE id = $1;
 
 -- name: VerifyUser :exec
 UPDATE users
-SET is_verified = TRUE, verification_token = NULL, verification_expires = NULL
+SET is_verified = TRUE, verification_token = NULL, verification_expires = NULL, updated_at = NOW()
 WHERE id = $1;
 
 -- name: SetVerificationToken :exec
 UPDATE users
-SET verification_token = $2, verification_expires = $3
+SET verification_token = $2, verification_expires = $3, updated_at = NOW()
 WHERE id = $1;
 
 -- name: SetPasswordResetToken :exec
 UPDATE users
-SET reset_password_token = $2, reset_password_expires = $3
+SET reset_password_token = $2, reset_password_expires = $3, updated_at = NOW()
 WHERE id = $1;
 
 -- name: UpdateUserPassword :exec
 UPDATE users
-SET password_hash = $2, reset_password_token = NULL, reset_password_expires = NULL
+SET password_hash = $2, reset_password_token = NULL, reset_password_expires = NULL, updated_at = NOW()
 WHERE id = $1;
 
 -- name: ListUsersByRole :many
@@ -138,3 +138,38 @@ SET
     consent_date = $4,
     updated_at = NOW()
 WHERE id = $1;
+
+-- name: UpdateUserRole :exec
+UPDATE users
+SET role = $2, updated_at = NOW()
+WHERE id = $1;
+
+-- name: SearchUsers :many
+SELECT id, email, phone, role, status, is_verified, last_login, 
+    profile_completion_percentage, created_at
+FROM users
+WHERE status != 'inactive'
+    AND (
+        $1 = '' OR 
+        email ILIKE '%' || $1 || '%' OR 
+        phone ILIKE '%' || $1 || '%'
+    )
+    AND ($2 = '' OR role = $2)
+    AND ($3 = '' OR status = $3)
+ORDER BY created_at DESC;
+
+-- name: DeleteUser :exec
+DELETE FROM users WHERE id = $1;
+
+-- name: BulkUpdateUserStatus :exec
+UPDATE users
+SET status = $2, updated_at = NOW()
+WHERE id = ANY($1::uuid[]);
+
+-- name: GetUsersByIDs :many
+SELECT id, email, phone, role, status, is_verified, last_login, 
+    login_count, is_sms_only, profile_completion_percentage, 
+    created_at, updated_at
+FROM users
+WHERE id = ANY($1::uuid[]) AND status != 'inactive'
+ORDER BY created_at DESC;

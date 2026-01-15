@@ -349,7 +349,7 @@ func (r *authRepository) handleError(err error, operation string) error {
 	return fmt.Errorf("%s failed: %w", operation, err)
 }
 
-// Helper mapping functions (same as before, but only for auth-related queries)
+// Helper mapping functions
 func (r *authRepository) mapToUserFromCreate(u sqlc.CreateUserRow) core.User {
 	return core.User{
 		ID:                   pgtypeUUIDToUUID(u.ID),

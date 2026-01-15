@@ -36,6 +36,38 @@ func (q *Queries) DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) 
 	return err
 }
 
+const getLatestActiveOTP = `-- name: GetLatestActiveOTP :one
+SELECT id, user_id, otp, type, channel, expires_at, used_at, created_at
+FROM otp_verifications
+WHERE user_id = $1 
+    AND type = $2
+    AND used_at IS NULL
+    AND expires_at > NOW()
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type GetLatestActiveOTPParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Type   string      `json:"type"`
+}
+
+func (q *Queries) GetLatestActiveOTP(ctx context.Context, arg GetLatestActiveOTPParams) (OtpVerification, error) {
+	row := q.db.QueryRow(ctx, getLatestActiveOTP, arg.UserID, arg.Type)
+	var i OtpVerification
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Otp,
+		&i.Type,
+		&i.Channel,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getOTP = `-- name: GetOTP :one
 SELECT id, user_id, otp, type, channel, expires_at, used_at, created_at
 FROM otp_verifications
@@ -88,6 +120,64 @@ func (q *Queries) GetOTPAttemptCount(ctx context.Context, arg GetOTPAttemptCount
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const getRecentOTPs = `-- name: GetRecentOTPs :many
+SELECT id, user_id, otp, type, channel, expires_at, used_at, created_at
+FROM otp_verifications
+WHERE user_id = $1
+    AND created_at > $2
+ORDER BY created_at DESC
+`
+
+type GetRecentOTPsParams struct {
+	UserID    pgtype.UUID      `json:"user_id"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetRecentOTPs(ctx context.Context, arg GetRecentOTPsParams) ([]OtpVerification, error) {
+	rows, err := q.db.Query(ctx, getRecentOTPs, arg.UserID, arg.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OtpVerification{}
+	for rows.Next() {
+		var i OtpVerification
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Otp,
+			&i.Type,
+			&i.Channel,
+			&i.ExpiresAt,
+			&i.UsedAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const invalidateUserOTPs = `-- name: InvalidateUserOTPs :exec
+UPDATE otp_verifications
+SET used_at = NOW()
+WHERE user_id = $1 AND type = $2 AND used_at IS NULL
+`
+
+type InvalidateUserOTPsParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	Type   string      `json:"type"`
+}
+
+func (q *Queries) InvalidateUserOTPs(ctx context.Context, arg InvalidateUserOTPsParams) error {
+	_, err := q.db.Exec(ctx, invalidateUserOTPs, arg.UserID, arg.Type)
+	return err
 }
 
 const markOTPUsed = `-- name: MarkOTPUsed :exec

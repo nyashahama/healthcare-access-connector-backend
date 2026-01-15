@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -212,7 +213,15 @@ func (s *stubPatientRepository) GetPatientProfileByID(ctx context.Context, id uu
 	return patients.PatientProfile{}, nil
 }
 
+func (s *stubPatientRepository) GetPatientsByClinic(ctx context.Context, clinicID uuid.UUID, limit, offset int) ([]patients.PatientProfile, error) {
+	return []patients.PatientProfile{}, nil
+}
+
 func (s *stubPatientRepository) UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error {
+	return nil
+}
+
+func (s *stubPatientRepository) DeletePatientProfile(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
@@ -232,7 +241,15 @@ func (s *stubPatientRepository) UpdateMedicalInfo(ctx context.Context, info pati
 	return nil
 }
 
+func (s *stubPatientRepository) DeleteMedicalInfo(ctx context.Context, patientID uuid.UUID) error {
+	return nil
+}
+
 func (s *stubPatientRepository) AddAllergy(ctx context.Context, allergy patients.PatientAllergy) (patients.PatientAllergy, error) {
+	return patients.PatientAllergy{}, nil
+}
+
+func (s *stubPatientRepository) GetAllergy(ctx context.Context, id uuid.UUID) (patients.PatientAllergy, error) {
 	return patients.PatientAllergy{}, nil
 }
 
@@ -252,6 +269,10 @@ func (s *stubPatientRepository) AddMedication(ctx context.Context, med patients.
 	return patients.PatientMedication{}, nil
 }
 
+func (s *stubPatientRepository) GetMedication(ctx context.Context, id uuid.UUID) (patients.PatientMedication, error) {
+	return patients.PatientMedication{}, nil
+}
+
 func (s *stubPatientRepository) GetMedications(ctx context.Context, patientID uuid.UUID, status string) ([]patients.PatientMedication, error) {
 	return []patients.PatientMedication{}, nil
 }
@@ -260,7 +281,19 @@ func (s *stubPatientRepository) UpdateMedication(ctx context.Context, med patien
 	return nil
 }
 
+func (s *stubPatientRepository) DeleteMedication(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+func (s *stubPatientRepository) GetActiveMedications(ctx context.Context, patientID uuid.UUID) ([]patients.PatientMedication, error) {
+	return []patients.PatientMedication{}, nil
+}
+
 func (s *stubPatientRepository) AddCondition(ctx context.Context, condition patients.PatientCondition) (patients.PatientCondition, error) {
+	return patients.PatientCondition{}, nil
+}
+
+func (s *stubPatientRepository) GetCondition(ctx context.Context, id uuid.UUID) (patients.PatientCondition, error) {
 	return patients.PatientCondition{}, nil
 }
 
@@ -272,7 +305,19 @@ func (s *stubPatientRepository) UpdateCondition(ctx context.Context, condition p
 	return nil
 }
 
+func (s *stubPatientRepository) DeleteCondition(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
+func (s *stubPatientRepository) GetActiveConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error) {
+	return []patients.PatientCondition{}, nil
+}
+
 func (s *stubPatientRepository) AddImmunization(ctx context.Context, imm patients.PatientImmunization) (patients.PatientImmunization, error) {
+	return patients.PatientImmunization{}, nil
+}
+
+func (s *stubPatientRepository) GetImmunization(ctx context.Context, id uuid.UUID) (patients.PatientImmunization, error) {
 	return patients.PatientImmunization{}, nil
 }
 
@@ -280,7 +325,19 @@ func (s *stubPatientRepository) GetImmunizations(ctx context.Context, patientID 
 	return []patients.PatientImmunization{}, nil
 }
 
+func (s *stubPatientRepository) UpdateImmunization(ctx context.Context, imm patients.PatientImmunization) error {
+	return nil
+}
+
+func (s *stubPatientRepository) DeleteImmunization(ctx context.Context, id uuid.UUID) error {
+	return nil
+}
+
 func (s *stubPatientRepository) GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
+	return []patients.PatientImmunization{}, nil
+}
+
+func (s *stubPatientRepository) GetImmunizationHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
 	return []patients.PatientImmunization{}, nil
 }
 
@@ -294,6 +351,14 @@ func (s *stubSessionRepository) GetSession(ctx context.Context, sessionToken str
 	return core.UserSession{}, nil
 }
 
+func (s *stubSessionRepository) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]core.UserSession, error) {
+	return []core.UserSession{}, nil
+}
+
+func (s *stubSessionRepository) UpdateSession(ctx context.Context, session core.UserSession) error {
+	return nil
+}
+
 func (s *stubSessionRepository) DeleteSession(ctx context.Context, sessionToken string) error {
 	return nil
 }
@@ -303,6 +368,14 @@ func (s *stubSessionRepository) DeleteUserSessions(ctx context.Context, userID u
 }
 
 func (s *stubSessionRepository) DeleteExpiredSessions(ctx context.Context) error {
+	return nil
+}
+
+func (s *stubSessionRepository) RevokeAllExceptCurrent(ctx context.Context, userID, currentSessionID uuid.UUID) error {
+	return nil
+}
+
+func (s *stubSessionRepository) InvalidateSessionByDevice(ctx context.Context, userID uuid.UUID, deviceID string) error {
 	return nil
 }
 
@@ -324,6 +397,26 @@ func (s *stubConsentRepository) WithdrawConsent(ctx context.Context, userID uuid
 	return nil
 }
 
+func (s *stubConsentRepository) GetConsentHistory(ctx context.Context, userID uuid.UUID) ([]core.PrivacyConsent, error) {
+	return []core.PrivacyConsent{}, nil
+}
+
+func (s *stubConsentRepository) GetActiveConsentsByType(ctx context.Context, consentType string) ([]core.PrivacyConsent, error) {
+	return []core.PrivacyConsent{}, nil
+}
+
+func (s *stubConsentRepository) GetExpiredConsents(ctx context.Context) ([]core.PrivacyConsent, error) {
+	return []core.PrivacyConsent{}, nil
+}
+
+func (s *stubConsentRepository) ExportConsentData(ctx context.Context, userID uuid.UUID) ([]byte, error) {
+	return []byte{}, nil
+}
+
+func (s *stubConsentRepository) NotifyConsentExpirations(ctx context.Context, daysBefore int) ([]uuid.UUID, error) {
+	return []uuid.UUID{}, nil
+}
+
 type stubNotificationRepository struct{}
 
 func (s *stubNotificationRepository) CreatePreferences(ctx context.Context, prefs core.NotificationPreferences) (core.NotificationPreferences, error) {
@@ -336,4 +429,48 @@ func (s *stubNotificationRepository) GetPreferences(ctx context.Context, userID 
 
 func (s *stubNotificationRepository) UpdatePreferences(ctx context.Context, prefs core.NotificationPreferences) error {
 	return nil
+}
+
+func (s *stubNotificationRepository) DeletePreferences(ctx context.Context, userID uuid.UUID) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) UpdateEmailPreferences(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) UpdateSMSPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) UpdatePushPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) UpdateAppointmentReminders(ctx context.Context, userID uuid.UUID, enabled bool, hoursBefore int) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) UpdateMedicationReminders(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) UpdateHealthTips(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) UpdateEmergencyAlerts(ctx context.Context, userID uuid.UUID, enabled bool) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) SetQuietHours(ctx context.Context, userID uuid.UUID, startTime, endTime time.Time) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) UpdateNotificationLanguage(ctx context.Context, userID uuid.UUID, language string) error {
+	return nil
+}
+
+func (s *stubNotificationRepository) GetUsersWithDisabledNotifications(ctx context.Context, notificationType string) ([]uuid.UUID, error) {
+	return []uuid.UUID{}, nil
 }

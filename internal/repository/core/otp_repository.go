@@ -14,6 +14,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -110,6 +111,39 @@ func (r *otpRepository) GetOTP(ctx context.Context, userID uuid.UUID, otp, otpTy
 	}, nil
 }
 
+func (r *otpRepository) GetLatestActiveOTP(ctx context.Context, userID uuid.UUID, otpType string) (core.OTPVerification, error) {
+	start := time.Now()
+	defer func() {
+		otpDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	record, err := r.querier.GetLatestActiveOTP(ctx, sqlc.GetLatestActiveOTPParams{
+		UserID: uuidToPgtypeUUID(userID),
+		Type:   otpType,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			otpDBQueryTotal.WithLabelValues("get_latest_active_otp", "not_found").Inc()
+			return core.OTPVerification{}, domain.ErrNotFound
+		}
+		otpDBQueryTotal.WithLabelValues("get_latest_active_otp", "error").Inc()
+		return core.OTPVerification{}, fmt.Errorf("get latest active OTP: %w", err)
+	}
+
+	otpDBQueryTotal.WithLabelValues("get_latest_active_otp", "success").Inc()
+
+	return core.OTPVerification{
+		ID:        pgtypeUUIDToUUID(record.ID),
+		UserID:    pgtypeUUIDToUUID(record.UserID),
+		OTP:       record.Otp,
+		Type:      record.Type,
+		Channel:   record.Channel,
+		ExpiresAt: record.ExpiresAt.Time,
+		UsedAt:    pgtypeTimestampToTimePtr(record.UsedAt),
+		CreatedAt: record.CreatedAt.Time,
+	}, nil
+}
+
 func (r *otpRepository) MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedAt *time.Time) error {
 	start := time.Now()
 	defer func() {
@@ -126,6 +160,25 @@ func (r *otpRepository) MarkOTPUsed(ctx context.Context, otpID uuid.UUID, usedAt
 	}
 
 	otpDBQueryTotal.WithLabelValues("mark_otp_used", "success").Inc()
+	return nil
+}
+
+func (r *otpRepository) InvalidateUserOTPs(ctx context.Context, userID uuid.UUID, otpType string) error {
+	start := time.Now()
+	defer func() {
+		otpDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.InvalidateUserOTPs(ctx, sqlc.InvalidateUserOTPsParams{
+		UserID: uuidToPgtypeUUID(userID),
+		Type:   otpType,
+	})
+	if err != nil {
+		otpDBQueryTotal.WithLabelValues("invalidate_user_otps", "error").Inc()
+		return fmt.Errorf("invalidate user OTPs: %w", err)
+	}
+
+	otpDBQueryTotal.WithLabelValues("invalidate_user_otps", "success").Inc()
 	return nil
 }
 
@@ -181,4 +234,41 @@ func (r *otpRepository) GetOTPAttemptCount(ctx context.Context, userID uuid.UUID
 
 	otpDBQueryTotal.WithLabelValues("get_otp_attempt_count", "success").Inc()
 	return count, nil
+}
+
+func (r *otpRepository) GetRecentOTPs(ctx context.Context, userID uuid.UUID, within time.Duration) ([]core.OTPVerification, error) {
+	start := time.Now()
+	defer func() {
+		otpDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	// Calculate the time threshold
+	threshold := time.Now().Add(-within)
+
+	records, err := r.querier.GetRecentOTPs(ctx, sqlc.GetRecentOTPsParams{
+		UserID:    uuidToPgtypeUUID(userID),
+		CreatedAt: pgtype.Timestamp{Time: threshold, Valid: true},
+	})
+	if err != nil {
+		otpDBQueryTotal.WithLabelValues("get_recent_otps", "error").Inc()
+		return nil, fmt.Errorf("get recent OTPs: %w", err)
+	}
+
+	otpDBQueryTotal.WithLabelValues("get_recent_otps", "success").Inc()
+
+	result := make([]core.OTPVerification, len(records))
+	for i, record := range records {
+		result[i] = core.OTPVerification{
+			ID:        pgtypeUUIDToUUID(record.ID),
+			UserID:    pgtypeUUIDToUUID(record.UserID),
+			OTP:       record.Otp,
+			Type:      record.Type,
+			Channel:   record.Channel,
+			ExpiresAt: record.ExpiresAt.Time,
+			UsedAt:    pgtypeTimestampToTimePtr(record.UsedAt),
+			CreatedAt: record.CreatedAt.Time,
+		}
+	}
+
+	return result, nil
 }

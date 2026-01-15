@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bulkUpdateUserStatus = `-- name: BulkUpdateUserStatus :exec
+UPDATE users
+SET status = $2, updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkUpdateUserStatusParams struct {
+	Column1 []pgtype.UUID `json:"column_1"`
+	Status  pgtype.Text   `json:"status"`
+}
+
+func (q *Queries) BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error {
+	_, err := q.db.Exec(ctx, bulkUpdateUserStatus, arg.Column1, arg.Status)
+	return err
+}
+
 const countUsersByRole = `-- name: CountUsersByRole :one
 SELECT COUNT(*) FROM users 
 WHERE role = $1 AND status != 'inactive'
@@ -89,6 +105,15 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const deleteUser = `-- name: DeleteUser :exec
+DELETE FROM users WHERE id = $1
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUser, id)
+	return err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
@@ -399,6 +424,63 @@ func (q *Queries) GetUserByVerificationToken(ctx context.Context, verificationTo
 	return i, err
 }
 
+const getUsersByIDs = `-- name: GetUsersByIDs :many
+SELECT id, email, phone, role, status, is_verified, last_login, 
+    login_count, is_sms_only, profile_completion_percentage, 
+    created_at, updated_at
+FROM users
+WHERE id = ANY($1::uuid[]) AND status != 'inactive'
+ORDER BY created_at DESC
+`
+
+type GetUsersByIDsRow struct {
+	ID                          pgtype.UUID      `json:"id"`
+	Email                       string           `json:"email"`
+	Phone                       pgtype.Text      `json:"phone"`
+	Role                        string           `json:"role"`
+	Status                      pgtype.Text      `json:"status"`
+	IsVerified                  pgtype.Bool      `json:"is_verified"`
+	LastLogin                   pgtype.Timestamp `json:"last_login"`
+	LoginCount                  pgtype.Int4      `json:"login_count"`
+	IsSmsOnly                   pgtype.Bool      `json:"is_sms_only"`
+	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	CreatedAt                   pgtype.Timestamp `json:"created_at"`
+	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
+}
+
+func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetUsersByIDsRow, error) {
+	rows, err := q.db.Query(ctx, getUsersByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUsersByIDsRow{}
+	for rows.Next() {
+		var i GetUsersByIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Phone,
+			&i.Role,
+			&i.Status,
+			&i.IsVerified,
+			&i.LastLogin,
+			&i.LoginCount,
+			&i.IsSmsOnly,
+			&i.ProfileCompletionPercentage,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsersByRole = `-- name: ListUsersByRole :many
 SELECT id, email, phone, role, status, is_verified, last_login, 
     profile_completion_percentage, created_at
@@ -456,9 +538,72 @@ func (q *Queries) ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams
 	return items, nil
 }
 
+const searchUsers = `-- name: SearchUsers :many
+SELECT id, email, phone, role, status, is_verified, last_login, 
+    profile_completion_percentage, created_at
+FROM users
+WHERE status != 'inactive'
+    AND (
+        $1 = '' OR 
+        email ILIKE '%' || $1 || '%' OR 
+        phone ILIKE '%' || $1 || '%'
+    )
+    AND ($2 = '' OR role = $2)
+    AND ($3 = '' OR status = $3)
+ORDER BY created_at DESC
+`
+
+type SearchUsersParams struct {
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+}
+
+type SearchUsersRow struct {
+	ID                          pgtype.UUID      `json:"id"`
+	Email                       string           `json:"email"`
+	Phone                       pgtype.Text      `json:"phone"`
+	Role                        string           `json:"role"`
+	Status                      pgtype.Text      `json:"status"`
+	IsVerified                  pgtype.Bool      `json:"is_verified"`
+	LastLogin                   pgtype.Timestamp `json:"last_login"`
+	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	CreatedAt                   pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error) {
+	rows, err := q.db.Query(ctx, searchUsers, arg.Column1, arg.Column2, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchUsersRow{}
+	for rows.Next() {
+		var i SearchUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Phone,
+			&i.Role,
+			&i.Status,
+			&i.IsVerified,
+			&i.LastLogin,
+			&i.ProfileCompletionPercentage,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setPasswordResetToken = `-- name: SetPasswordResetToken :exec
 UPDATE users
-SET reset_password_token = $2, reset_password_expires = $3
+SET reset_password_token = $2, reset_password_expires = $3, updated_at = NOW()
 WHERE id = $1
 `
 
@@ -475,7 +620,7 @@ func (q *Queries) SetPasswordResetToken(ctx context.Context, arg SetPasswordRese
 
 const setVerificationToken = `-- name: SetVerificationToken :exec
 UPDATE users
-SET verification_token = $2, verification_expires = $3
+SET verification_token = $2, verification_expires = $3, updated_at = NOW()
 WHERE id = $1
 `
 
@@ -591,7 +736,7 @@ func (q *Queries) UpdateUserLastLogin(ctx context.Context, id pgtype.UUID) error
 
 const updateUserPassword = `-- name: UpdateUserPassword :exec
 UPDATE users
-SET password_hash = $2, reset_password_token = NULL, reset_password_expires = NULL
+SET password_hash = $2, reset_password_token = NULL, reset_password_expires = NULL, updated_at = NOW()
 WHERE id = $1
 `
 
@@ -637,9 +782,25 @@ func (q *Queries) UpdateUserProfileCompletion(ctx context.Context, arg UpdateUse
 	return err
 }
 
+const updateUserRole = `-- name: UpdateUserRole :exec
+UPDATE users
+SET role = $2, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserRoleParams struct {
+	ID   pgtype.UUID `json:"id"`
+	Role string      `json:"role"`
+}
+
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error {
+	_, err := q.db.Exec(ctx, updateUserRole, arg.ID, arg.Role)
+	return err
+}
+
 const updateUserStatus = `-- name: UpdateUserStatus :exec
 UPDATE users
-SET status = $2
+SET status = $2, updated_at = NOW()
 WHERE id = $1
 `
 
@@ -655,7 +816,7 @@ func (q *Queries) UpdateUserStatus(ctx context.Context, arg UpdateUserStatusPara
 
 const verifyUser = `-- name: VerifyUser :exec
 UPDATE users
-SET is_verified = TRUE, verification_token = NULL, verification_expires = NULL
+SET is_verified = TRUE, verification_token = NULL, verification_expires = NULL, updated_at = NOW()
 WHERE id = $1
 `
 

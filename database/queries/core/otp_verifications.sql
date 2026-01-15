@@ -15,6 +15,16 @@ WHERE user_id = $1
 ORDER BY created_at DESC
 LIMIT 1;
 
+-- name: GetLatestActiveOTP :one
+SELECT id, user_id, otp, type, channel, expires_at, used_at, created_at
+FROM otp_verifications
+WHERE user_id = $1 
+    AND type = $2
+    AND used_at IS NULL
+    AND expires_at > NOW()
+ORDER BY created_at DESC
+LIMIT 1;
+
 -- name: MarkOTPUsed :exec
 UPDATE otp_verifications
 SET used_at = $2
@@ -28,9 +38,21 @@ WHERE expires_at < NOW() OR created_at < NOW() - INTERVAL '24 hours';
 DELETE FROM otp_verifications
 WHERE user_id = $1 AND type = $2;
 
+-- name: InvalidateUserOTPs :exec
+UPDATE otp_verifications
+SET used_at = NOW()
+WHERE user_id = $1 AND type = $2 AND used_at IS NULL;
+
 -- name: GetOTPAttemptCount :one
 SELECT COUNT(*) 
 FROM otp_verifications
 WHERE user_id = $1 
     AND type = $2 
     AND created_at > NOW() - INTERVAL '1 hour';
+
+-- name: GetRecentOTPs :many
+SELECT id, user_id, otp, type, channel, expires_at, used_at, created_at
+FROM otp_verifications
+WHERE user_id = $1
+    AND created_at > $2
+ORDER BY created_at DESC;

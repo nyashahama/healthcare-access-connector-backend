@@ -35,6 +35,7 @@ type Querier interface {
 	// Professional Credentials Queries
 	// ============================================
 	AddProfessionalCredential(ctx context.Context, arg AddProfessionalCredentialParams) (AddProfessionalCredentialRow, error)
+	BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error
 	CountUsersByRole(ctx context.Context, role string) (int64, error)
 	// ============================================
 	// Clinic Queries
@@ -73,6 +74,7 @@ type Querier interface {
 	DeleteExpiredSessions(ctx context.Context) error
 	DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error
 	DeleteSession(ctx context.Context, sessionToken string) error
+	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
 	GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, error)
@@ -81,6 +83,7 @@ type Querier interface {
 	GetClinicStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error)
 	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error)
 	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]GetDataAccessLogsRow, error)
+	GetLatestActiveOTP(ctx context.Context, arg GetLatestActiveOTPParams) (OtpVerification, error)
 	GetNotificationPreferences(ctx context.Context, userID pgtype.UUID) (NotificationPreference, error)
 	GetOTP(ctx context.Context, arg GetOTPParams) (OtpVerification, error)
 	GetOTPAttemptCount(ctx context.Context, arg GetOTPAttemptCountParams) (int64, error)
@@ -92,6 +95,7 @@ type Querier interface {
 	GetPatientProfileByID(ctx context.Context, id pgtype.UUID) (PatientProfile, error)
 	GetPatientProfileByUserID(ctx context.Context, userID pgtype.UUID) (PatientProfile, error)
 	GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error)
+	GetRecentOTPs(ctx context.Context, arg GetRecentOTPsParams) ([]OtpVerification, error)
 	GetSMSConversationByPhone(ctx context.Context, phoneNumber string) (SmsConversation, error)
 	GetSession(ctx context.Context, sessionToken string) (GetSessionRow, error)
 	GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]GetStaffCredentialsRow, error)
@@ -103,6 +107,8 @@ type Querier interface {
 	GetUserByPhone(ctx context.Context, phone pgtype.Text) (GetUserByPhoneRow, error)
 	GetUserByPhoneWithHash(ctx context.Context, phone pgtype.Text) (GetUserByPhoneWithHashRow, error)
 	GetUserByVerificationToken(ctx context.Context, verificationToken pgtype.Text) (GetUserByVerificationTokenRow, error)
+	GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetUsersByIDsRow, error)
+	InvalidateUserOTPs(ctx context.Context, arg InvalidateUserOTPsParams) error
 	ListClinicStaff(ctx context.Context, arg ListClinicStaffParams) ([]ListClinicStaffRow, error)
 	ListClinics(ctx context.Context, arg ListClinicsParams) ([]ListClinicsRow, error)
 	ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams) ([]ListUsersByRoleRow, error)
@@ -118,6 +124,7 @@ type Querier interface {
 	SearchClinics(ctx context.Context, arg SearchClinicsParams) ([]SearchClinicsRow, error)
 	SearchClinicsByLocation(ctx context.Context, arg SearchClinicsByLocationParams) ([]SearchClinicsByLocationRow, error)
 	SearchPatients(ctx context.Context, arg SearchPatientsParams) ([]SearchPatientsRow, error)
+	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error
 	UpdateClinic(ctx context.Context, arg UpdateClinicParams) error
@@ -141,6 +148,7 @@ type Querier interface {
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) error
 	UpdateUserProfileCompletion(ctx context.Context, arg UpdateUserProfileCompletionParams) error
+	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error
 	VerifyClinic(ctx context.Context, arg VerifyClinicParams) error
 	VerifyCredential(ctx context.Context, arg VerifyCredentialParams) error
