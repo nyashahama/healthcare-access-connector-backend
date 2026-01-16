@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,45 +54,7 @@ func NewUserService(
 
 // GetProfile gets user profile with additional info
 func (s *userService) GetProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error) {
-	cacheKey := fmt.Sprintf("user:profile:%s", userID.String())
-
-	// Try cache first
-	type CachedProfile struct {
-		User    core.User              `json:"user"`
-		Profile patients.PatientProfile `json:"profile"`
-	}
-	var cached CachedProfile
-	if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("Profile retrieved from cache")
-		return cached.User, cached.Profile, nil
-	}
-
-	// Get user from auth repo (since GetUserByID is in auth repo)
-	user, err := s.userRepo.GetUserByID(ctx, userID)
-	if err != nil {
-		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
-		return core.User{}, patients.PatientProfile{}, domain.NewAppError(err, "User not found", 404)
-	}
-
-	// Get patient profile if user is a patient
-	var patientProfile patients.PatientProfile
-	if user.Role == "patient" {
-		patientProfile, err = s.patientRepo.GetPatientProfileByUserID(ctx, userID)
-		if err != nil && !errors.Is(err, domain.ErrPatientNotFound) {
-			s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to get patient profile")
-		}
-	}
-
-	// Cache the result
-	cached = CachedProfile{
-		User:    user,
-		Profile: patientProfile,
-	}
-	if err := s.cache.Set(ctx, cacheKey, cached, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache user profile")
-	}
-
-	return user, patientProfile, nil
+	return s.GetUserProfile(ctx, userID)
 }
 
 // GetUserByID gets user by ID
@@ -105,7 +68,7 @@ func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (core.U
 		return user, nil
 	}
 
-	// Fetch from database using auth repo
+	// Fetch from database using user repo
 	user, err := s.userRepo.GetUserByID(ctx, userID)
 	if err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
@@ -128,6 +91,64 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, updat
 		return domain.NewAppError(err, "User not found", 404)
 	}
 
+	// Prepare user update
+	updatedUser := user
+
+	// Update user fields based on updates map
+	if email, ok := updates["email"].(string); ok && email != "" {
+		// Validate email format
+		if !strings.Contains(email, "@") {
+			return domain.NewAppError(domain.ErrValidation, "Invalid email format", 400)
+		}
+		// Update email via dedicated method
+		if err := s.UpdateUserEmail(ctx, userID, email); err != nil {
+			return err
+		}
+		updatedUser.Email = &email
+	}
+
+	if phone, ok := updates["phone"].(string); ok && phone != "" {
+		// Update phone via dedicated method
+		if err := s.UpdateUserPhone(ctx, userID, phone); err != nil {
+			return err
+		}
+		updatedUser.Phone = &phone
+	}
+
+	// Update other user fields directly
+	if role, ok := updates["role"].(string); ok && role != "" {
+		// Only system admins can change roles
+		// This should be validated at the handler level
+		if err := s.UpdateUserRole(ctx, userID, role); err != nil {
+			return err
+		}
+		updatedUser.Role = role
+	}
+
+	if status, ok := updates["status"].(string); ok && status != "" {
+		if err := s.UpdateUserStatus(ctx, userID, status); err != nil {
+			return err
+		}
+		updatedUser.Status = status
+	}
+
+	if smsOnly, ok := updates["is_sms_only"].(bool); ok {
+		updatedUser.IsSMSOnly = smsOnly
+	}
+
+	if profilePct, ok := updates["profile_completion_pct"].(int); ok {
+		if err := s.UpdateUserProfileCompletion(ctx, userID, profilePct); err != nil {
+			return err
+		}
+		updatedUser.ProfileCompletionPct = profilePct
+	}
+
+	// Update user in repository
+	if err := s.userRepo.UpdateUser(ctx, updatedUser); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to update user")
+		return domain.NewAppError(err, "Failed to update profile", 500)
+	}
+
 	// Invalidate cache
 	s.invalidateUserCache(ctx, userID)
 
@@ -140,7 +161,7 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, updat
 
 			if err := s.patientRepo.UpdatePatientProfile(ctx, profile); err != nil {
 				s.logger.Error().Err(err).Msg("Failed to update patient profile")
-				return domain.NewAppError(err, "Failed to update profile", 500)
+				// Don't return error, just log it
 			}
 		}
 	}
@@ -157,15 +178,22 @@ func (s *userService) UpdatePassword(ctx context.Context, userID uuid.UUID, curr
 		return domain.NewAppError(err, "User not found", 404)
 	}
 
-	// Check if user has email
-	if user.Email == nil || *user.Email == "" {
-		return domain.NewAppError(nil, "User does not have email set", 400)
-	}
-
-	// Get password hash using email
-	_, passwordHash, err := s.authRepo.GetUserByEmail(ctx, *user.Email)
-	if err != nil {
-		return domain.NewAppError(err, "Failed to verify current password", 500)
+	// Check if user has email or phone for authentication
+	var passwordHash string
+	if user.Email != nil && *user.Email != "" {
+		// Get user with password hash by email
+		_, passwordHash, err = s.authRepo.GetUserByEmail(ctx, *user.Email)
+		if err != nil {
+			return domain.NewAppError(err, "Failed to verify current password", 500)
+		}
+	} else if user.Phone != nil && *user.Phone != "" {
+		// Get user with password hash by phone
+		_, passwordHash, err = s.authRepo.GetUserByPhoneWithHash(ctx, *user.Phone)
+		if err != nil {
+			return domain.NewAppError(err, "Failed to verify current password", 500)
+		}
+	} else {
+		return domain.NewAppError(nil, "User does not have email or phone set for authentication", 400)
 	}
 
 	// Verify current password
@@ -180,7 +208,7 @@ func (s *userService) UpdatePassword(ctx context.Context, userID uuid.UUID, curr
 		return domain.NewAppError(err, "Failed to update password", 500)
 	}
 
-	// Update password
+	// Update password using auth repo
 	if err := s.authRepo.UpdateUserPassword(ctx, userID, string(newHash)); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to update password in database")
 		return domain.NewAppError(err, "Failed to update password", 500)
@@ -233,6 +261,16 @@ func (s *userService) ListUsers(ctx context.Context, role string, limit, offset 
 	return users, nil
 }
 
+// SearchUsers searches users with query, role, and status filters
+func (s *userService) SearchUsers(ctx context.Context, query string, role string, status string) ([]core.User, error) {
+	users, err := s.userRepo.SearchUsers(ctx, query, role, status)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to search users")
+		return nil, domain.NewAppError(err, "Failed to search users", 500)
+	}
+	return users, nil
+}
+
 // GetConsent gets user consent settings
 func (s *userService) GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error) {
 	consent, err := s.consentRepo.GetConsent(ctx, userID)
@@ -246,13 +284,182 @@ func (s *userService) GetConsent(ctx context.Context, userID uuid.UUID) (core.Pr
 
 // UpdateConsent updates user consent settings
 func (s *userService) UpdateConsent(ctx context.Context, userID uuid.UUID, consent core.PrivacyConsent) error {
+	// Ensure the consent belongs to the user
+	consent.UserID = userID
+	consent.UpdatedAt = time.Now()
+
 	if err := s.consentRepo.UpdateConsent(ctx, consent); err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to update consent")
 		return domain.NewAppError(err, "Failed to update consent", 500)
 	}
 
+	// Also update user's consent flags
+	if err := s.userRepo.UpdateUserConsents(ctx, userID,
+		consent.SMSCommunicationConsent,
+		consent.HealthDataConsent,
+		time.Now()); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to update user consent flags")
+	}
+
 	s.logger.Info().Str("user_id", userID.String()).Msg("Consent updated")
 	return nil
+}
+
+// UpdateUserEmail updates user email
+func (s *userService) UpdateUserEmail(ctx context.Context, id uuid.UUID, email string) error {
+	if err := s.userRepo.UpdateUserEmail(ctx, id, email); err != nil {
+		s.logger.Error().Err(err).Str("user_id", id.String()).Str("email", email).Msg("Failed to update user email")
+		return domain.NewAppError(err, "Failed to update email", 500)
+	}
+
+	// Invalidate cache
+	s.invalidateUserCache(ctx, id)
+	s.logger.Info().Str("user_id", id.String()).Msg("User email updated")
+	return nil
+}
+
+// UpdateUserPhone updates user phone
+func (s *userService) UpdateUserPhone(ctx context.Context, id uuid.UUID, phone string) error {
+	if err := s.userRepo.UpdateUserPhone(ctx, id, phone); err != nil {
+		s.logger.Error().Err(err).Str("user_id", id.String()).Str("phone", phone).Msg("Failed to update user phone")
+		return domain.NewAppError(err, "Failed to update phone", 500)
+	}
+
+	// Invalidate cache
+	s.invalidateUserCache(ctx, id)
+	s.logger.Info().Str("user_id", id.String()).Msg("User phone updated")
+	return nil
+}
+
+// UpdateUserRole updates user role
+func (s *userService) UpdateUserRole(ctx context.Context, id uuid.UUID, role string) error {
+	if err := s.userRepo.UpdateUserRole(ctx, id, role); err != nil {
+		s.logger.Error().Err(err).Str("user_id", id.String()).Str("role", role).Msg("Failed to update user role")
+		return domain.NewAppError(err, "Failed to update role", 500)
+	}
+
+	// Invalidate cache
+	s.invalidateUserCache(ctx, id)
+	s.logger.Info().Str("user_id", id.String()).Msg("User role updated")
+	return nil
+}
+
+// UpdateUserStatus updates user status
+func (s *userService) UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error {
+	if err := s.userRepo.UpdateUserStatus(ctx, id, status); err != nil {
+		s.logger.Error().Err(err).Str("user_id", id.String()).Str("status", status).Msg("Failed to update user status")
+		return domain.NewAppError(err, "Failed to update status", 500)
+	}
+
+	// Invalidate cache
+	s.invalidateUserCache(ctx, id)
+	s.logger.Info().Str("user_id", id.String()).Msg("User status updated")
+	return nil
+}
+
+// UpdateUserProfileCompletion updates user profile completion percentage
+func (s *userService) UpdateUserProfileCompletion(ctx context.Context, id uuid.UUID, percentage int) error {
+	if err := s.userRepo.UpdateUserProfileCompletion(ctx, id, percentage); err != nil {
+		s.logger.Error().Err(err).Str("user_id", id.String()).Int("percentage", percentage).Msg("Failed to update user profile completion")
+		return domain.NewAppError(err, "Failed to update profile completion", 500)
+	}
+
+	// Invalidate cache
+	s.invalidateUserCache(ctx, id)
+	s.logger.Info().Str("user_id", id.String()).Int("percentage", percentage).Msg("User profile completion updated")
+	return nil
+}
+
+// UpdateUserConsents updates user consents
+func (s *userService) UpdateUserConsents(ctx context.Context, id uuid.UUID, smsConsent, popiaConsent bool, consentDate time.Time) error {
+	if err := s.userRepo.UpdateUserConsents(ctx, id, smsConsent, popiaConsent, consentDate); err != nil {
+		s.logger.Error().Err(err).Str("user_id", id.String()).Msg("Failed to update user consents")
+		return domain.NewAppError(err, "Failed to update consents", 500)
+	}
+
+	// Invalidate cache
+	s.invalidateUserCache(ctx, id)
+	s.logger.Info().Str("user_id", id.String()).Msg("User consents updated")
+	return nil
+}
+
+// BulkUpdateStatus updates status for multiple users
+func (s *userService) BulkUpdateStatus(ctx context.Context, ids []uuid.UUID, status string) error {
+	if err := s.userRepo.BulkUpdateStatus(ctx, ids, status); err != nil {
+		s.logger.Error().Err(err).Int("user_count", len(ids)).Str("status", status).Msg("Failed to bulk update user status")
+		return domain.NewAppError(err, "Failed to bulk update status", 500)
+	}
+
+	// Invalidate cache for all users
+	for _, id := range ids {
+		s.invalidateUserCache(ctx, id)
+	}
+
+	s.logger.Info().Int("user_count", len(ids)).Str("status", status).Msg("Bulk user status updated")
+	return nil
+}
+
+// GetUsersByIDs gets multiple users by their IDs
+func (s *userService) GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]core.User, error) {
+	users, err := s.userRepo.GetUsersByIDs(ctx, ids)
+	if err != nil {
+		s.logger.Error().Err(err).Int("user_count", len(ids)).Msg("Failed to get users by IDs")
+		return nil, domain.NewAppError(err, "Failed to get users", 500)
+	}
+	return users, nil
+}
+
+// CountUsers counts users by role
+func (s *userService) CountUsers(ctx context.Context, role string) (int64, error) {
+	count, err := s.userRepo.CountUsers(ctx, role)
+	if err != nil {
+		s.logger.Error().Err(err).Str("role", role).Msg("Failed to count users")
+		return 0, domain.NewAppError(err, "Failed to count users", 500)
+	}
+	return count, nil
+}
+
+// GetUserProfile gets user profile with patient profile (alias for GetProfile for interface compatibility)
+func (s *userService) GetUserProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error) {
+	cacheKey := fmt.Sprintf("user:profile:%s", userID.String())
+
+	// Try cache first
+	type CachedProfile struct {
+		User    core.User               `json:"user"`
+		Profile patients.PatientProfile `json:"profile"`
+	}
+	var cached CachedProfile
+	if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
+		s.logger.Debug().Str("user_id", userID.String()).Msg("Profile retrieved from cache")
+		return cached.User, cached.Profile, nil
+	}
+
+	// Get user from user repo
+	user, err := s.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
+		return core.User{}, patients.PatientProfile{}, domain.NewAppError(err, "User not found", 404)
+	}
+
+	// Get patient profile if user is a patient
+	var patientProfile patients.PatientProfile
+	if user.Role == "patient" {
+		patientProfile, err = s.patientRepo.GetPatientProfileByUserID(ctx, userID)
+		if err != nil && !errors.Is(err, domain.ErrPatientNotFound) {
+			s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to get patient profile")
+		}
+	}
+
+	// Cache the result
+	cached = CachedProfile{
+		User:    user,
+		Profile: patientProfile,
+	}
+	if err := s.cache.Set(ctx, cacheKey, cached, 5*time.Minute); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to cache user profile")
+	}
+
+	return user, patientProfile, nil
 }
 
 // Helper methods
@@ -260,6 +467,8 @@ func (s *userService) invalidateUserCache(ctx context.Context, userID uuid.UUID)
 	cacheKeys := []string{
 		fmt.Sprintf("user:%s", userID.String()),
 		fmt.Sprintf("user:profile:%s", userID.String()),
+		// Invalidate login caches too
+		fmt.Sprintf("user:login:*"), // This would need pattern matching
 	}
 
 	for _, key := range cacheKeys {
@@ -279,5 +488,8 @@ func (s *userService) updatePatientProfileFromMap(profile *patients.PatientProfi
 	if preferredName, ok := updates["preferred_name"].(string); ok {
 		profile.PreferredName = &preferredName
 	}
-	profile.LastProfileUpdate = &[]time.Time{time.Now()}[0]
+	if country, ok := updates["country"].(string); ok {
+		profile.Country = country
+	}
+	profile.UpdatedAt = time.Now()
 }

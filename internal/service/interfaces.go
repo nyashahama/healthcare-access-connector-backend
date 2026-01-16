@@ -33,6 +33,18 @@ type UserService interface {
 	ListUsers(ctx context.Context, role string, limit, offset int) ([]core.User, error)
 	GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error)
 	UpdateConsent(ctx context.Context, userID uuid.UUID, consent core.PrivacyConsent) error
+	// Add new methods based on repository updates
+	UpdateUserEmail(ctx context.Context, id uuid.UUID, email string) error
+	UpdateUserPhone(ctx context.Context, id uuid.UUID, phone string) error
+	UpdateUserRole(ctx context.Context, id uuid.UUID, role string) error
+	UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error
+	UpdateUserProfileCompletion(ctx context.Context, id uuid.UUID, percentage int) error
+	UpdateUserConsents(ctx context.Context, id uuid.UUID, smsConsent, popiaConsent bool, consentDate time.Time) error
+	BulkUpdateStatus(ctx context.Context, ids []uuid.UUID, status string) error
+	GetUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]core.User, error)
+	SearchUsers(ctx context.Context, query string, role string, status string) ([]core.User, error)
+	CountUsers(ctx context.Context, role string) (int64, error)
+	GetUserProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error)
 }
 
 // ===================== OTP SERVICE =====================
@@ -41,7 +53,6 @@ type OTPService interface {
 	VerifyOTP(ctx context.Context, identifier, otp string) (string, error)
 	ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error
 }
-
 
 // PatientService handles patient operations
 type PatientService interface {
