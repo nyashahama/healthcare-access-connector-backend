@@ -159,7 +159,7 @@ func (s *Server) setupRoutes() http.Handler {
 		r.Post("/auth/password/reset", s.authHandler.ResetPassword)
 		r.Post("/auth/resend-verification", s.authHandler.ResendVerificationEmail)
 
-		// OTP routes
+		// Public OTP routes
 		r.Post("/auth/otp/generate", s.otpHandler.GenerateOTP)
 		r.Post("/auth/otp/verify", s.otpHandler.VerifyOTP)
 		r.Post("/auth/password/reset-with-otp", s.otpHandler.ResetPasswordWithOTP)
@@ -173,14 +173,48 @@ func (s *Server) setupRoutes() http.Handler {
 			r.Post("/auth/logout", s.authHandler.Logout)
 
 			// User profile routes
-			r.Get("/users/{id}/profile", s.userHandler.GetProfile)
-			r.Put("/users/{id}/password", s.authHandler.UpdatePassword)
-			r.Get("/users/{id}/consent", s.userHandler.GetConsent)
+			r.Route("/users", func(r chi.Router) {
+				// User-specific routes
+				r.Get("/{id}", s.userHandler.GetUser)
+				r.Get("/{id}/profile", s.userHandler.GetProfile)
+				r.Put("/{id}/profile", s.userHandler.UpdateProfile)
+				r.Delete("/{id}/profile", s.userHandler.DeleteProfile)
+				r.Put("/{id}/password", s.authHandler.UpdatePassword)
 
-			// Admin routes
+				// Consent management
+				r.Get("/{id}/consent", s.userHandler.GetConsent)
+				r.Put("/{id}/consent", s.userHandler.UpdateConsent)
+
+				// User field updates
+				r.Put("/{id}/email", s.userHandler.UpdateUserEmail)
+				r.Put("/{id}/phone", s.userHandler.UpdateUserPhone)
+
+				// List and search users (may need role restrictions)
+				r.Get("/", s.userHandler.ListUsers)
+				r.Get("/search", s.userHandler.SearchUsers)
+				r.Get("/batch", s.userHandler.GetUsersByIDs)
+				r.Get("/count", s.userHandler.CountUsers)
+			})
+
+			// OTP management routes (for testing/admin)
+			r.Route("/otp", func(r chi.Router) {
+				r.Get("/latest", s.otpHandler.GetLatestActiveOTP)
+				r.Delete("/invalidate", s.otpHandler.InvalidateUserOTPs)
+				r.Get("/attempts", s.otpHandler.GetOTPAttemptCount)
+				r.Get("/recent", s.otpHandler.GetRecentOTPs)
+			})
+
+			// Admin-only routes
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole("system_admin"))
-				// Add admin-only routes here
+
+				// Admin user management
+				r.Put("/users/{id}/role", s.userHandler.UpdateUserRole)
+				r.Put("/users/{id}/status", s.userHandler.UpdateUserStatus)
+				r.Put("/users/bulk/status", s.userHandler.BulkUpdateStatus)
+
+				// Admin OTP management
+				r.Delete("/otp/expired", s.otpHandler.DeleteExpiredOTPs)
 			})
 		})
 	})
