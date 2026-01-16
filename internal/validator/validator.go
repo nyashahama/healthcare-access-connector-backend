@@ -144,3 +144,18 @@ func (v *Validator) ValidateOTP(field, otp string) {
 
 	v.ValidateNumeric(field, otp)
 }
+
+func (v *Validator) ValidateEnum(field, value string, allowedValues []string) {
+	if value == "" {
+		v.AddError(field, "is required")
+		return
+	}
+
+	for _, allowed := range allowedValues {
+		if value == allowed {
+			return
+		}
+	}
+
+	v.AddError(field, fmt.Sprintf("must be one of: %s", strings.Join(allowedValues, ", ")))
+}
