@@ -15,15 +15,16 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/rs/zerolog"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type otpService struct {
-	authRepo      repository.AuthRepository
-	otpRepo       repository.OTPRepository
-	emailService  email.Service
-	logger        *zerolog.Logger
-	smsEnabled    bool
-	bcryptCost    int
+	authRepo     repository.AuthRepository
+	otpRepo      repository.OTPRepository
+	emailService email.Service
+	logger       *zerolog.Logger
+	smsEnabled   bool
+	bcryptCost   int
 }
 
 // NewOTPService creates a new OTP service
@@ -55,7 +56,7 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 	if strings.Contains(identifier, "@") {
 		user, _, err = s.authRepo.GetUserByEmail(ctx, strings.ToLower(identifier))
 	} else {
-		user, err = s.authRepo.GetUserByPhone(ctx, identifier)
+		user, _, err = s.authRepo.GetUserByPhoneWithHash(ctx, identifier)
 		channel = "sms"
 	}
 
@@ -75,11 +76,11 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 	}
 
 	// Check if user can receive OTP
-	if channel == "email" && (user.Email == nil) {
+	if channel == "email" && (user.Email == nil || *user.Email == "") {
 		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive email OTP")
 		return nil
 	}
-	if channel == "sms" && (user.Phone == nil || !user.SMSConsentGiven) {
+	if channel == "sms" && (user.Phone == nil || *user.Phone == "" || !user.SMSConsentGiven) {
 		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive SMS OTP")
 		return nil
 	}
@@ -112,9 +113,9 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 
 	// Send OTP via email or SMS
 	if channel == "email" && user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
-		if err := s.emailService.SendOTPEmail(context.Background(), *user.Email, otp, user.ID.String()); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to send verification email")
-			return domain.NewAppError(err, "Failed to send verification email", 500)
+		if err := s.emailService.SendOTPEmail(ctx, *user.Email, otp, user.ID.String()); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to send OTP email")
+			return domain.NewAppError(err, "Failed to send OTP email", 500)
 		}
 	} else if channel == "sms" && user.Phone != nil && s.smsEnabled {
 		// TODO: Implement SMS sending for OTP
@@ -141,7 +142,7 @@ func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (str
 	if strings.Contains(identifier, "@") {
 		user, _, err = s.authRepo.GetUserByEmail(ctx, strings.ToLower(identifier))
 	} else {
-		user, err = s.authRepo.GetUserByPhone(ctx, identifier)
+		user, _, err = s.authRepo.GetUserByPhoneWithHash(ctx, identifier)
 	}
 
 	if err != nil {
@@ -182,7 +183,7 @@ func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (str
 	}
 
 	// Generate password reset token
-	resetToken := generateSecureToken()
+	resetToken := s.generateSecureToken()
 	tokenExpires := time.Now().Add(1 * time.Hour)
 
 	// Store reset token
@@ -210,6 +211,59 @@ func (s *otpService) ResetPasswordWithOTP(ctx context.Context, identifier, otp, 
 	return s.resetPasswordWithToken(ctx, resetToken, newPassword)
 }
 
+// GetLatestActiveOTP gets the latest active OTP for a user
+func (s *otpService) GetLatestActiveOTP(ctx context.Context, userID uuid.UUID, otpType string) (core.OTPVerification, error) {
+	otp, err := s.otpRepo.GetLatestActiveOTP(ctx, userID, otpType)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return core.OTPVerification{}, domain.NewAppError(domain.ErrNotFound, "No active OTP found", 404)
+		}
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Str("type", otpType).Msg("Failed to get latest active OTP")
+		return core.OTPVerification{}, domain.NewAppError(err, "Failed to get OTP", 500)
+	}
+	return otp, nil
+}
+
+// InvalidateUserOTPs invalidates all OTPs for a user
+func (s *otpService) InvalidateUserOTPs(ctx context.Context, userID uuid.UUID, otpType string) error {
+	if err := s.otpRepo.InvalidateUserOTPs(ctx, userID, otpType); err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Str("type", otpType).Msg("Failed to invalidate user OTPs")
+		return domain.NewAppError(err, "Failed to invalidate OTPs", 500)
+	}
+	s.logger.Info().Str("user_id", userID.String()).Str("type", otpType).Msg("User OTPs invalidated")
+	return nil
+}
+
+// DeleteExpiredOTPs deletes all expired OTPs
+func (s *otpService) DeleteExpiredOTPs(ctx context.Context) error {
+	if err := s.otpRepo.DeleteExpiredOTPs(ctx); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to delete expired OTPs")
+		return domain.NewAppError(err, "Failed to delete expired OTPs", 500)
+	}
+	s.logger.Info().Msg("Expired OTPs deleted")
+	return nil
+}
+
+// GetOTPAttemptCount gets OTP attempt count for a user
+func (s *otpService) GetOTPAttemptCount(ctx context.Context, userID uuid.UUID, otpType string) (int64, error) {
+	count, err := s.otpRepo.GetOTPAttemptCount(ctx, userID, otpType)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Str("type", otpType).Msg("Failed to get OTP attempt count")
+		return 0, domain.NewAppError(err, "Failed to get OTP attempt count", 500)
+	}
+	return count, nil
+}
+
+// GetRecentOTPs gets recent OTPs for a user within a time period
+func (s *otpService) GetRecentOTPs(ctx context.Context, userID uuid.UUID, within time.Duration) ([]core.OTPVerification, error) {
+	otps, err := s.otpRepo.GetRecentOTPs(ctx, userID, within)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get recent OTPs")
+		return nil, domain.NewAppError(err, "Failed to get recent OTPs", 500)
+	}
+	return otps, nil
+}
+
 // Helper method to reset password with token
 func (s *otpService) resetPasswordWithToken(ctx context.Context, token, newPassword string) error {
 	user, _, err := s.authRepo.GetUserByPasswordResetToken(ctx, token)
@@ -222,7 +276,7 @@ func (s *otpService) resetPasswordWithToken(ctx context.Context, token, newPassw
 	}
 
 	// Hash new password
-	hash, err := generateBcryptHash(newPassword, s.bcryptCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), s.bcryptCost)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to hash new password")
 		return domain.NewAppError(err, "Password reset failed", 500)
@@ -251,35 +305,8 @@ func (s *otpService) generateNumericOTP(length int) string {
 	return string(b)
 }
 
-func generateSecureToken() string {
+func (s *otpService) generateSecureToken() string {
 	b := make([]byte, 32)
 	rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)
 }
-
-func generateBcryptHash(password string, cost int) ([]byte, error) {
-	// This would be imported from bcrypt package
-	// For now, it's a placeholder
-	return []byte("hashed_password"), nil
-}
-
-// func maskIdentifier(identifier string) string {
-// 	if len(identifier) <= 3 {
-// 		return "***"
-// 	}
-// 	if strings.Contains(identifier, "@") {
-// 		parts := strings.Split(identifier, "@")
-// 		if len(parts) != 2 {
-// 			return "***"
-// 		}
-// 		local := parts[0]
-// 		if len(local) <= 3 {
-// 			return "***@" + parts[1]
-// 		}
-// 		return local[:3] + "***@" + parts[1]
-// 	}
-// 	if len(identifier) <= 4 {
-// 		return "***"
-// 	}
-// 	return "***" + identifier[len(identifier)-4:]
-// }

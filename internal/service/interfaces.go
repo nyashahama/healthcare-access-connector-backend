@@ -10,7 +10,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 )
 
-// ===================== AUTH SERVICE =====================
+// AuthService handles auth operations
 type AuthService interface {
 	Register(ctx context.Context, email, phone, password, role string) (core.User, error)
 	Login(ctx context.Context, identifier, password string) (string, time.Time, core.User, error)
@@ -23,7 +23,7 @@ type AuthService interface {
 	ResendVerificationEmail(ctx context.Context, email string) error
 }
 
-// ===================== USER SERVICE =====================
+// UserService handles user operations
 type UserService interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (core.User, error)
@@ -47,11 +47,17 @@ type UserService interface {
 	GetUserProfile(ctx context.Context, userID uuid.UUID) (core.User, patients.PatientProfile, error)
 }
 
-// ===================== OTP SERVICE =====================
+// OTPService handles otp operations
 type OTPService interface {
 	GenerateOTP(ctx context.Context, identifier string) error
 	VerifyOTP(ctx context.Context, identifier, otp string) (string, error)
 	ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error
+	// Add new methods based on repository updates
+	GetLatestActiveOTP(ctx context.Context, userID uuid.UUID, otpType string) (core.OTPVerification, error)
+	InvalidateUserOTPs(ctx context.Context, userID uuid.UUID, otpType string) error
+	DeleteExpiredOTPs(ctx context.Context) error
+	GetOTPAttemptCount(ctx context.Context, userID uuid.UUID, otpType string) (int64, error)
+	GetRecentOTPs(ctx context.Context, userID uuid.UUID, within time.Duration) ([]core.OTPVerification, error)
 }
 
 // PatientService handles patient operations
