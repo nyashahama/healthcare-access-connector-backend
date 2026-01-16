@@ -379,6 +379,21 @@ func TestOTPRepository_GetLatestActiveOTP(t *testing.T) {
 		assert.ErrorIs(t, err, domain.ErrNotFound)
 		mockQuerier.AssertExpectations(t)
 	})
+
+	t.Run("database error", func(t *testing.T) {
+		mockQuerier := new(MockOTPQuerier)
+		repo := newTestOTPRepository(mockQuerier)
+
+		mockQuerier.On("GetLatestActiveOTP", ctx, sqlc.GetLatestActiveOTPParams{
+			UserID: makePgtypeUUID(userID),
+			Type:   otpType,
+		}).Return(sqlc.OtpVerification{}, errors.New("database error"))
+
+		_, err := repo.GetLatestActiveOTP(ctx, userID, otpType)
+
+		require.Error(t, err)
+		mockQuerier.AssertExpectations(t)
+	})
 }
 
 // Test MarkOTPUsed
@@ -558,7 +573,6 @@ func TestOTPRepository_GetRecentOTPs(t *testing.T) {
 		mockQuerier := new(MockOTPQuerier)
 		repo := newTestOTPRepository(mockQuerier)
 
-		threshold := now.Add(-within)
 		expectedRows := []sqlc.OtpVerification{
 			{
 				ID:        makePgtypeUUID(uuid.New()),
@@ -571,10 +585,11 @@ func TestOTPRepository_GetRecentOTPs(t *testing.T) {
 			},
 		}
 
-		mockQuerier.On("GetRecentOTPs", ctx, sqlc.GetRecentOTPsParams{
-			UserID:    makePgtypeUUID(userID),
-			CreatedAt: pgtype.Timestamp{Time: threshold, Valid: true},
-		}).Return(expectedRows, nil)
+		mockQuerier.On("GetRecentOTPs", ctx, mock.MatchedBy(func(params sqlc.GetRecentOTPsParams) bool {
+			expectedThreshold := now.Add(-within)
+			delta := params.CreatedAt.Time.Sub(expectedThreshold)
+			return params.UserID == makePgtypeUUID(userID) && delta >= 0 && delta < time.Millisecond*100 // allow up to 100ms delta
+		})).Return(expectedRows, nil)
 
 		otps, err := repo.GetRecentOTPs(ctx, userID, within)
 
