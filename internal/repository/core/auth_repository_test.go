@@ -826,5 +826,57 @@ func TestAuthRepository_GetUserByPhoneWithHash(t *testing.T) {
 	}
 }
 
+func TestAuthRepository_VerifyUser(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		id            uuid.UUID
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name: "successful verification",
+			id:   userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("VerifyUser", ctx, pgtype.UUID{Bytes: userID, Valid: true}).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "generic database error",
+			id:   userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("VerifyUser", ctx, pgtype.UUID{Bytes: userID, Valid: true}).Return(assert.AnError)
+			},
+			expectedError: assert.AnError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &authRepository{querier: mockQuerier}
+
+			err := repo.VerifyUser(ctx, tt.id)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				if tt.expectedError == assert.AnError {
+					assert.Contains(t, err.Error(), "verify user failed")
+				} else {
+					assert.Equal(t, tt.expectedError, err)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
+
 // Helper function
 func stringPtr(s string) *string { return &s }
