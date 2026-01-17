@@ -1065,5 +1065,64 @@ func TestAuthRepository_UpdateUserPassword(t *testing.T) {
 	}
 }
 
+func TestAuthRepository_UpdateUserStatus(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	status := "active"
+
+	tests := []struct {
+		name          string
+		id            uuid.UUID
+		status        string
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:   "successful update",
+			id:     userID,
+			status: status,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserStatus", ctx, mock.MatchedBy(func(p sqlc.UpdateUserStatusParams) bool {
+					return p.ID.Bytes == userID &&
+						p.Status.String == status
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "generic database error",
+			id:     userID,
+			status: status,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserStatus", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: assert.AnError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &authRepository{querier: mockQuerier}
+
+			err := repo.UpdateUserStatus(ctx, tt.id, tt.status)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				if tt.expectedError == assert.AnError {
+					assert.Contains(t, err.Error(), "update user status failed")
+				} else {
+					assert.Equal(t, tt.expectedError, err)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
+
 // Helper function
 func stringPtr(s string) *string { return &s }
