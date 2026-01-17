@@ -1006,5 +1006,64 @@ func TestAuthRepository_SetPasswordResetToken(t *testing.T) {
 	}
 }
 
+func TestAuthRepository_UpdateUserPassword(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	passwordHash := "$2a$10$newhashedpassword"
+
+	tests := []struct {
+		name          string
+		id            uuid.UUID
+		passwordHash  string
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:         "successful update",
+			id:           userID,
+			passwordHash: passwordHash,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserPassword", ctx, mock.MatchedBy(func(p sqlc.UpdateUserPasswordParams) bool {
+					return p.ID.Bytes == userID &&
+						p.PasswordHash.String == passwordHash
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:         "generic database error",
+			id:           userID,
+			passwordHash: passwordHash,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserPassword", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: assert.AnError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &authRepository{querier: mockQuerier}
+
+			err := repo.UpdateUserPassword(ctx, tt.id, tt.passwordHash)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				if tt.expectedError == assert.AnError {
+					assert.Contains(t, err.Error(), "update user password failed")
+				} else {
+					assert.Equal(t, tt.expectedError, err)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
+
 // Helper function
 func stringPtr(s string) *string { return &s }
