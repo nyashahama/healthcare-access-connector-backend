@@ -942,5 +942,69 @@ func TestAuthRepository_SetVerificationToken(t *testing.T) {
 	}
 }
 
+func TestAuthRepository_SetPasswordResetToken(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	token := "reset-token"
+	expires := time.Now().Add(time.Hour * 1)
+
+	tests := []struct {
+		name          string
+		id            uuid.UUID
+		token         string
+		expires       time.Time
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:    "successful set",
+			id:      userID,
+			token:   token,
+			expires: expires,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("SetPasswordResetToken", ctx, mock.MatchedBy(func(p sqlc.SetPasswordResetTokenParams) bool {
+					return p.ID.Bytes == userID &&
+						p.ResetPasswordToken.String == token &&
+						p.ResetPasswordExpires.Time.Equal(expires)
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "generic database error",
+			id:      userID,
+			token:   token,
+			expires: expires,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("SetPasswordResetToken", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: assert.AnError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &authRepository{querier: mockQuerier}
+
+			err := repo.SetPasswordResetToken(ctx, tt.id, tt.token, tt.expires)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				if tt.expectedError == assert.AnError {
+					assert.Contains(t, err.Error(), "set password reset token failed")
+				} else {
+					assert.Equal(t, tt.expectedError, err)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
+
 // Helper function
 func stringPtr(s string) *string { return &s }
