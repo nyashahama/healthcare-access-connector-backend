@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -18,9 +19,80 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Helper function to assert equality between two core.User structs
+func assertUserEqual(t *testing.T, expected, got core.User, msgAndArgs ...interface{}) {
+	t.Helper()
+	assert.Equal(t, expected.ID, got.ID, msgAndArgs...)
+	if expected.Email == nil {
+		assert.Nil(t, got.Email, msgAndArgs...)
+	} else {
+		assert.NotNil(t, got.Email, msgAndArgs...)
+		assert.Equal(t, *expected.Email, *got.Email, msgAndArgs...)
+	}
+	if expected.Phone == nil {
+		assert.Nil(t, got.Phone, msgAndArgs...)
+	} else {
+		assert.NotNil(t, got.Phone, msgAndArgs...)
+		assert.Equal(t, *expected.Phone, *got.Phone, msgAndArgs...)
+	}
+	assert.Equal(t, expected.Role, got.Role, msgAndArgs...)
+	assert.Equal(t, expected.Status, got.Status, msgAndArgs...)
+	assert.Equal(t, expected.IsVerified, got.IsVerified, msgAndArgs...)
+	if expected.VerificationToken == nil {
+		assert.Nil(t, got.VerificationToken, msgAndArgs...)
+	} else {
+		assert.NotNil(t, got.VerificationToken, msgAndArgs...)
+		assert.Equal(t, *expected.VerificationToken, *got.VerificationToken, msgAndArgs...)
+	}
+	if expected.VerificationExpires == nil {
+		assert.Nil(t, got.VerificationExpires, msgAndArgs...)
+	} else {
+		assert.NotNil(t, got.VerificationExpires, msgAndArgs...)
+		assert.True(t, expected.VerificationExpires.Equal(*got.VerificationExpires), msgAndArgs...)
+	}
+	if expected.ResetPasswordToken == nil {
+		assert.Nil(t, got.ResetPasswordToken, msgAndArgs...)
+	} else {
+		assert.NotNil(t, got.ResetPasswordToken, msgAndArgs...)
+		assert.Equal(t, *expected.ResetPasswordToken, *got.ResetPasswordToken, msgAndArgs...)
+	}
+	if expected.ResetPasswordExpires == nil {
+		assert.Nil(t, got.ResetPasswordExpires, msgAndArgs...)
+	} else {
+		assert.NotNil(t, got.ResetPasswordExpires, msgAndArgs...)
+		assert.True(t, expected.ResetPasswordExpires.Equal(*got.ResetPasswordExpires), msgAndArgs...)
+	}
+	if expected.LastLogin == nil {
+		assert.Nil(t, got.LastLogin, msgAndArgs...)
+	} else {
+		assert.NotNil(t, got.LastLogin, msgAndArgs...)
+		assert.True(t, expected.LastLogin.Equal(*got.LastLogin), msgAndArgs...)
+	}
+	assert.Equal(t, expected.LoginCount, got.LoginCount, msgAndArgs...)
+	assert.Equal(t, expected.IsSMSOnly, got.IsSMSOnly, msgAndArgs...)
+	assert.Equal(t, expected.SMSConsentGiven, got.SMSConsentGiven, msgAndArgs...)
+	assert.Equal(t, expected.POPIAConsentGiven, got.POPIAConsentGiven, msgAndArgs...)
+	assert.Equal(t, expected.ProfileCompletionPct, got.ProfileCompletionPct, msgAndArgs...)
+	assert.True(t, expected.CreatedAt.Equal(got.CreatedAt), msgAndArgs...)
+	assert.True(t, expected.UpdatedAt.Equal(got.UpdatedAt), msgAndArgs...)
+}
+
+// Helper to create a pgtype.UUID from a string
+func uuidPgtypeFromString(s string) pgtype.UUID {
+	return pgtype.UUID{Bytes: uuid.MustParse(s), Valid: true}
+}
+
+// Helper to create a standard now time for consistency
+func nowTime() time.Time {
+	return time.Now().UTC().Truncate(time.Second) // Truncate to second for comparison consistency
+}
+
+// Helper function
+func stringPtr(s string) *string { return &s }
+
 func TestAuthRepository_CreateUser(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
+	now := nowTime()
 
 	tests := []struct {
 		name          string
@@ -44,7 +116,7 @@ func TestAuthRepository_CreateUser(t *testing.T) {
 			passwordHash: "$2a$10$hashedpassword",
 			mockSetup: func(m *mocks.Querier) {
 				expectedRow := sqlc.CreateUserRow{
-					ID:                          pgtype.UUID{Bytes: uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"), Valid: true},
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "test@example.com",
 					Phone:                       pgtype.Text{Valid: false},
 					Role:                        "patient",
@@ -100,7 +172,7 @@ func TestAuthRepository_CreateUser(t *testing.T) {
 			passwordHash: "$2a$10$hashedpassword",
 			mockSetup: func(m *mocks.Querier) {
 				expectedRow := sqlc.CreateUserRow{
-					ID:                          pgtype.UUID{Bytes: uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"), Valid: true},
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174001"),
 					Email:                       "",
 					Phone:                       pgtype.Text{String: "+1234567890", Valid: true},
 					Role:                        "patient",
@@ -141,6 +213,81 @@ func TestAuthRepository_CreateUser(t *testing.T) {
 				UpdatedAt:            now,
 			},
 			expectedError: nil,
+		},
+		{
+			name: "successful creation with both email and phone",
+			user: core.User{
+				Email:             stringPtr("both@example.com"),
+				Phone:             stringPtr("+1234567892"),
+				Role:              "doctor",
+				Status:            "pending",
+				IsSMSOnly:         false,
+				SMSConsentGiven:   false,
+				POPIAConsentGiven: false,
+				ConsentDate:       &now,
+			},
+			passwordHash: "$2a$10$hashedpassword",
+			mockSetup: func(m *mocks.Querier) {
+				expectedRow := sqlc.CreateUserRow{
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174002"),
+					Email:                       "both@example.com",
+					Phone:                       pgtype.Text{String: "+1234567892", Valid: true},
+					Role:                        "doctor",
+					Status:                      pgtype.Text{String: "pending", Valid: true},
+					IsVerified:                  pgtype.Bool{Bool: false, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Valid: false},
+					LoginCount:                  pgtype.Int4{Int32: 0, Valid: true},
+					IsSmsOnly:                   pgtype.Bool{Bool: false, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 0, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
+				}
+				m.On("CreateUser", ctx, mock.MatchedBy(func(p sqlc.CreateUserParams) bool {
+					return p.Email == "both@example.com" &&
+						p.Phone.String == "+1234567892" &&
+						p.PasswordHash.String == "$2a$10$hashedpassword" &&
+						p.Role == "doctor" &&
+						p.Status.String == "pending" &&
+						p.IsSmsOnly.Bool == false &&
+						p.SmsConsentGiven.Bool == false &&
+						p.PopiaConsentGiven.Bool == false &&
+						p.ConsentDate.Time.Equal(now)
+				})).Return(expectedRow, nil)
+			},
+			expectedUser: core.User{
+				ID:                   uuid.MustParse("123e4567-e89b-12d3-a456-426614174002"),
+				Email:                stringPtr("both@example.com"),
+				Phone:                stringPtr("+1234567892"),
+				Role:                 "doctor",
+				Status:               "pending",
+				IsVerified:           false,
+				LastLogin:            nil,
+				LoginCount:           0,
+				IsSMSOnly:            false,
+				SMSConsentGiven:      false,
+				POPIAConsentGiven:    false,
+				ProfileCompletionPct: 0,
+				CreatedAt:            now,
+				UpdatedAt:            now,
+			},
+			expectedError: nil,
+		},
+		{
+			name: "creation without email or phone",
+			user: core.User{
+				Role:              "patient",
+				Status:            "pending",
+				IsSMSOnly:         false,
+				SMSConsentGiven:   true,
+				POPIAConsentGiven: true,
+				ConsentDate:       &now,
+			},
+			passwordHash: "$2a$10$hashedpassword",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("CreateUser", ctx, mock.Anything).Return(sqlc.CreateUserRow{}, &pgconn.PgError{Code: "23502"}) // not_null_violation simulation
+			},
+			expectedUser:  core.User{},
+			expectedError: fmt.Errorf("create user failed: %w", &pgconn.PgError{Code: "23502"}),
 		},
 		{
 			name: "duplicate email error",
@@ -205,23 +352,10 @@ func TestAuthRepository_CreateUser(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expectedError, err)
 				}
-				assert.Equal(t, tt.expectedUser, gotUser)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedUser.ID, gotUser.ID)
-				assert.Equal(t, tt.expectedUser.Email, gotUser.Email)
-				assert.Equal(t, tt.expectedUser.Phone, gotUser.Phone)
-				assert.Equal(t, tt.expectedUser.Role, gotUser.Role)
-				assert.Equal(t, tt.expectedUser.Status, gotUser.Status)
-				assert.Equal(t, tt.expectedUser.IsVerified, gotUser.IsVerified)
-				assert.Equal(t, tt.expectedUser.LastLogin, gotUser.LastLogin)
-				assert.Equal(t, tt.expectedUser.LoginCount, gotUser.LoginCount)
-				assert.Equal(t, tt.expectedUser.IsSMSOnly, gotUser.IsSMSOnly)
-				assert.Equal(t, tt.expectedUser.SMSConsentGiven, gotUser.SMSConsentGiven)
-				assert.Equal(t, tt.expectedUser.POPIAConsentGiven, gotUser.POPIAConsentGiven)
-				assert.Equal(t, tt.expectedUser.ProfileCompletionPct, gotUser.ProfileCompletionPct)
-				assert.Equal(t, tt.expectedUser.CreatedAt, gotUser.CreatedAt)
-				assert.Equal(t, tt.expectedUser.UpdatedAt, gotUser.UpdatedAt)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 			}
 			mockQuerier.AssertExpectations(t)
 		})
@@ -230,7 +364,7 @@ func TestAuthRepository_CreateUser(t *testing.T) {
 
 func TestAuthRepository_GetUserByVerificationToken(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
+	now := nowTime()
 	expires := now.Add(time.Hour * 24)
 
 	tests := []struct {
@@ -242,11 +376,11 @@ func TestAuthRepository_GetUserByVerificationToken(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:  "successful retrieval",
+			name:  "successful retrieval with email",
 			token: "verification-token",
 			mockSetup: func(m *mocks.Querier) {
 				expectedRow := sqlc.GetUserByVerificationTokenRow{
-					ID:                          pgtype.UUID{Bytes: uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"), Valid: true},
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "test@example.com",
 					Phone:                       pgtype.Text{Valid: false},
 					PasswordHash:                pgtype.Text{String: "$2a$10$hashedpassword", Valid: true},
@@ -288,10 +422,66 @@ func TestAuthRepository_GetUserByVerificationToken(t *testing.T) {
 			expectedError: nil,
 		},
 		{
+			name:  "successful retrieval with phone",
+			token: "verification-token-phone",
+			mockSetup: func(m *mocks.Querier) {
+				expectedRow := sqlc.GetUserByVerificationTokenRow{
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174003"),
+					Email:                       "",
+					Phone:                       pgtype.Text{String: "+1234567893", Valid: true},
+					PasswordHash:                pgtype.Text{String: "$2a$10$hashedpassword", Valid: true},
+					Role:                        "patient",
+					Status:                      pgtype.Text{String: "pending", Valid: true},
+					IsVerified:                  pgtype.Bool{Bool: false, Valid: true},
+					VerificationToken:           pgtype.Text{String: "verification-token-phone", Valid: true},
+					VerificationExpires:         pgtype.Timestamp{Time: expires, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Valid: false},
+					LoginCount:                  pgtype.Int4{Int32: 0, Valid: true},
+					IsSmsOnly:                   pgtype.Bool{Bool: true, Valid: true},
+					SmsConsentGiven:             pgtype.Bool{Bool: false, Valid: true},
+					PopiaConsentGiven:           pgtype.Bool{Bool: false, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 0, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
+				}
+				m.On("GetUserByVerificationToken", ctx, pgtype.Text{String: "verification-token-phone", Valid: true}).Return(expectedRow, nil)
+			},
+			expectedUser: core.User{
+				ID:                   uuid.MustParse("123e4567-e89b-12d3-a456-426614174003"),
+				Email:                nil,
+				Phone:                stringPtr("+1234567893"),
+				Role:                 "patient",
+				Status:               "pending",
+				IsVerified:           false,
+				VerificationToken:    stringPtr("verification-token-phone"),
+				VerificationExpires:  &expires,
+				LastLogin:            nil,
+				LoginCount:           0,
+				IsSMSOnly:            true,
+				SMSConsentGiven:      false,
+				POPIAConsentGiven:    false,
+				ProfileCompletionPct: 0,
+				CreatedAt:            now,
+				UpdatedAt:            now,
+			},
+			expectedHash:  "$2a$10$hashedpassword",
+			expectedError: nil,
+		},
+		{
 			name:  "user not found",
 			token: "invalid-token",
 			mockSetup: func(m *mocks.Querier) {
 				m.On("GetUserByVerificationToken", ctx, pgtype.Text{String: "invalid-token", Valid: true}).Return(sqlc.GetUserByVerificationTokenRow{}, pgx.ErrNoRows)
+			},
+			expectedUser:  core.User{},
+			expectedHash:  "",
+			expectedError: domain.ErrUserNotFound,
+		},
+		{
+			name:  "empty token",
+			token: "",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetUserByVerificationToken", ctx, pgtype.Text{String: "", Valid: true}).Return(sqlc.GetUserByVerificationTokenRow{}, pgx.ErrNoRows)
 			},
 			expectedUser:  core.User{},
 			expectedHash:  "",
@@ -325,26 +515,11 @@ func TestAuthRepository_GetUserByVerificationToken(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expectedError, err)
 				}
-				assert.Equal(t, tt.expectedUser, gotUser)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 				assert.Equal(t, tt.expectedHash, gotHash)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedUser.ID, gotUser.ID)
-				assert.Equal(t, tt.expectedUser.Email, gotUser.Email)
-				assert.Equal(t, tt.expectedUser.Phone, gotUser.Phone)
-				assert.Equal(t, tt.expectedUser.Role, gotUser.Role)
-				assert.Equal(t, tt.expectedUser.Status, gotUser.Status)
-				assert.Equal(t, tt.expectedUser.IsVerified, gotUser.IsVerified)
-				assert.Equal(t, tt.expectedUser.VerificationToken, gotUser.VerificationToken)
-				assert.Equal(t, tt.expectedUser.VerificationExpires, gotUser.VerificationExpires)
-				assert.Equal(t, tt.expectedUser.LastLogin, gotUser.LastLogin)
-				assert.Equal(t, tt.expectedUser.LoginCount, gotUser.LoginCount)
-				assert.Equal(t, tt.expectedUser.IsSMSOnly, gotUser.IsSMSOnly)
-				assert.Equal(t, tt.expectedUser.SMSConsentGiven, gotUser.SMSConsentGiven)
-				assert.Equal(t, tt.expectedUser.POPIAConsentGiven, gotUser.POPIAConsentGiven)
-				assert.Equal(t, tt.expectedUser.ProfileCompletionPct, gotUser.ProfileCompletionPct)
-				assert.Equal(t, tt.expectedUser.CreatedAt, gotUser.CreatedAt)
-				assert.Equal(t, tt.expectedUser.UpdatedAt, gotUser.UpdatedAt)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 				assert.Equal(t, tt.expectedHash, gotHash)
 			}
 			mockQuerier.AssertExpectations(t)
@@ -354,7 +529,7 @@ func TestAuthRepository_GetUserByVerificationToken(t *testing.T) {
 
 func TestAuthRepository_GetUserByPasswordResetToken(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
+	now := nowTime()
 	expires := now.Add(time.Hour * 1)
 
 	tests := []struct {
@@ -366,11 +541,11 @@ func TestAuthRepository_GetUserByPasswordResetToken(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:  "successful retrieval",
+			name:  "successful retrieval with email",
 			token: "reset-token",
 			mockSetup: func(m *mocks.Querier) {
 				expectedRow := sqlc.GetUserByPasswordResetTokenRow{
-					ID:                          pgtype.UUID{Bytes: uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"), Valid: true},
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "test@example.com",
 					Phone:                       pgtype.Text{Valid: false},
 					PasswordHash:                pgtype.Text{String: "$2a$10$hashedpassword", Valid: true},
@@ -379,14 +554,14 @@ func TestAuthRepository_GetUserByPasswordResetToken(t *testing.T) {
 					IsVerified:                  pgtype.Bool{Bool: true, Valid: true},
 					ResetPasswordToken:          pgtype.Text{String: "reset-token", Valid: true},
 					ResetPasswordExpires:        pgtype.Timestamp{Time: expires, Valid: true},
-					LastLogin:                   pgtype.Timestamp{Time: now, Valid: true},
-					LoginCount:                  pgtype.Int4{Int32: 1, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+					LoginCount:                  pgtype.Int4{Int32: 5, Valid: true},
 					IsSmsOnly:                   pgtype.Bool{Bool: false, Valid: true},
 					SmsConsentGiven:             pgtype.Bool{Bool: true, Valid: true},
 					PopiaConsentGiven:           pgtype.Bool{Bool: true, Valid: true},
-					ProfileCompletionPercentage: pgtype.Int4{Int32: 50, Valid: true},
-					CreatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
-					UpdatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 75, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour * 24 * 7), Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
 				}
 				m.On("GetUserByPasswordResetToken", ctx, pgtype.Text{String: "reset-token", Valid: true}).Return(expectedRow, nil)
 			},
@@ -399,23 +574,23 @@ func TestAuthRepository_GetUserByPasswordResetToken(t *testing.T) {
 				IsVerified:           true,
 				ResetPasswordToken:   stringPtr("reset-token"),
 				ResetPasswordExpires: &expires,
-				LastLogin:            &now,
-				LoginCount:           1,
+				LastLogin:            timePtr(now.Add(-time.Hour)),
+				LoginCount:           5,
 				IsSMSOnly:            false,
 				SMSConsentGiven:      true,
 				POPIAConsentGiven:    true,
-				ProfileCompletionPct: 50,
-				CreatedAt:            now,
-				UpdatedAt:            now,
+				ProfileCompletionPct: 75,
+				CreatedAt:            now.Add(-time.Hour * 24 * 7),
+				UpdatedAt:            now.Add(-time.Hour),
 			},
 			expectedHash:  "$2a$10$hashedpassword",
 			expectedError: nil,
 		},
 		{
 			name:  "user not found",
-			token: "invalid-token",
+			token: "invalid-reset-token",
 			mockSetup: func(m *mocks.Querier) {
-				m.On("GetUserByPasswordResetToken", ctx, pgtype.Text{String: "invalid-token", Valid: true}).Return(sqlc.GetUserByPasswordResetTokenRow{}, pgx.ErrNoRows)
+				m.On("GetUserByPasswordResetToken", ctx, pgtype.Text{String: "invalid-reset-token", Valid: true}).Return(sqlc.GetUserByPasswordResetTokenRow{}, pgx.ErrNoRows)
 			},
 			expectedUser:  core.User{},
 			expectedHash:  "",
@@ -423,9 +598,9 @@ func TestAuthRepository_GetUserByPasswordResetToken(t *testing.T) {
 		},
 		{
 			name:  "generic database error",
-			token: "error-token",
+			token: "error-reset-token",
 			mockSetup: func(m *mocks.Querier) {
-				m.On("GetUserByPasswordResetToken", ctx, pgtype.Text{String: "error-token", Valid: true}).Return(sqlc.GetUserByPasswordResetTokenRow{}, assert.AnError)
+				m.On("GetUserByPasswordResetToken", ctx, pgtype.Text{String: "error-reset-token", Valid: true}).Return(sqlc.GetUserByPasswordResetTokenRow{}, assert.AnError)
 			},
 			expectedUser:  core.User{},
 			expectedHash:  "",
@@ -449,26 +624,11 @@ func TestAuthRepository_GetUserByPasswordResetToken(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expectedError, err)
 				}
-				assert.Equal(t, tt.expectedUser, gotUser)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 				assert.Equal(t, tt.expectedHash, gotHash)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedUser.ID, gotUser.ID)
-				assert.Equal(t, tt.expectedUser.Email, gotUser.Email)
-				assert.Equal(t, tt.expectedUser.Phone, gotUser.Phone)
-				assert.Equal(t, tt.expectedUser.Role, gotUser.Role)
-				assert.Equal(t, tt.expectedUser.Status, gotUser.Status)
-				assert.Equal(t, tt.expectedUser.IsVerified, gotUser.IsVerified)
-				assert.Equal(t, tt.expectedUser.ResetPasswordToken, gotUser.ResetPasswordToken)
-				assert.Equal(t, tt.expectedUser.ResetPasswordExpires, gotUser.ResetPasswordExpires)
-				assert.Equal(t, tt.expectedUser.LastLogin, gotUser.LastLogin)
-				assert.Equal(t, tt.expectedUser.LoginCount, gotUser.LoginCount)
-				assert.Equal(t, tt.expectedUser.IsSMSOnly, gotUser.IsSMSOnly)
-				assert.Equal(t, tt.expectedUser.SMSConsentGiven, gotUser.SMSConsentGiven)
-				assert.Equal(t, tt.expectedUser.POPIAConsentGiven, gotUser.POPIAConsentGiven)
-				assert.Equal(t, tt.expectedUser.ProfileCompletionPct, gotUser.ProfileCompletionPct)
-				assert.Equal(t, tt.expectedUser.CreatedAt, gotUser.CreatedAt)
-				assert.Equal(t, tt.expectedUser.UpdatedAt, gotUser.UpdatedAt)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 				assert.Equal(t, tt.expectedHash, gotHash)
 			}
 			mockQuerier.AssertExpectations(t)
@@ -478,7 +638,8 @@ func TestAuthRepository_GetUserByPasswordResetToken(t *testing.T) {
 
 func TestAuthRepository_GetUserByEmail(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
+	now := nowTime()
+	expires := now.Add(time.Hour * 24)
 
 	tests := []struct {
 		name          string
@@ -493,7 +654,7 @@ func TestAuthRepository_GetUserByEmail(t *testing.T) {
 			email: "test@example.com",
 			mockSetup: func(m *mocks.Querier) {
 				expectedRow := sqlc.GetUserByEmailRow{
-					ID:                          pgtype.UUID{Bytes: uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"), Valid: true},
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "test@example.com",
 					Phone:                       pgtype.Text{Valid: false},
 					PasswordHash:                pgtype.Text{String: "$2a$10$hashedpassword", Valid: true},
@@ -502,14 +663,14 @@ func TestAuthRepository_GetUserByEmail(t *testing.T) {
 					IsVerified:                  pgtype.Bool{Bool: true, Valid: true},
 					VerificationToken:           pgtype.Text{Valid: false},
 					VerificationExpires:         pgtype.Timestamp{Valid: false},
-					LastLogin:                   pgtype.Timestamp{Time: now, Valid: true},
-					LoginCount:                  pgtype.Int4{Int32: 1, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+					LoginCount:                  pgtype.Int4{Int32: 10, Valid: true},
 					IsSmsOnly:                   pgtype.Bool{Bool: false, Valid: true},
 					SmsConsentGiven:             pgtype.Bool{Bool: true, Valid: true},
 					PopiaConsentGiven:           pgtype.Bool{Bool: true, Valid: true},
-					ProfileCompletionPercentage: pgtype.Int4{Int32: 50, Valid: true},
-					CreatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
-					UpdatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 90, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour * 24 * 30), Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
 				}
 				m.On("GetUserByEmail", ctx, "test@example.com").Return(expectedRow, nil)
 			},
@@ -522,23 +683,79 @@ func TestAuthRepository_GetUserByEmail(t *testing.T) {
 				IsVerified:           true,
 				VerificationToken:    nil,
 				VerificationExpires:  nil,
-				LastLogin:            &now,
-				LoginCount:           1,
+				LastLogin:            timePtr(now.Add(-time.Hour)),
+				LoginCount:           10,
 				IsSMSOnly:            false,
 				SMSConsentGiven:      true,
 				POPIAConsentGiven:    true,
-				ProfileCompletionPct: 50,
-				CreatedAt:            now,
-				UpdatedAt:            now,
+				ProfileCompletionPct: 90,
+				CreatedAt:            now.Add(-time.Hour * 24 * 30),
+				UpdatedAt:            now.Add(-time.Hour),
+			},
+			expectedHash:  "$2a$10$hashedpassword",
+			expectedError: nil,
+		},
+		{
+			name:  "user with verification token",
+			email: "unverified@example.com",
+			mockSetup: func(m *mocks.Querier) {
+				expectedRow := sqlc.GetUserByEmailRow{
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174001"),
+					Email:                       "unverified@example.com",
+					Phone:                       pgtype.Text{Valid: false},
+					PasswordHash:                pgtype.Text{String: "$2a$10$hashedpassword", Valid: true},
+					Role:                        "patient",
+					Status:                      pgtype.Text{String: "pending", Valid: true},
+					IsVerified:                  pgtype.Bool{Bool: false, Valid: true},
+					VerificationToken:           pgtype.Text{String: "token-123", Valid: true},
+					VerificationExpires:         pgtype.Timestamp{Time: expires, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Valid: false},
+					LoginCount:                  pgtype.Int4{Int32: 0, Valid: true},
+					IsSmsOnly:                   pgtype.Bool{Bool: false, Valid: true},
+					SmsConsentGiven:             pgtype.Bool{Bool: false, Valid: true},
+					PopiaConsentGiven:           pgtype.Bool{Bool: false, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 0, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+				}
+				m.On("GetUserByEmail", ctx, "unverified@example.com").Return(expectedRow, nil)
+			},
+			expectedUser: core.User{
+				ID:                   uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"),
+				Email:                stringPtr("unverified@example.com"),
+				Phone:                nil,
+				Role:                 "patient",
+				Status:               "pending",
+				IsVerified:           false,
+				VerificationToken:    stringPtr("token-123"),
+				VerificationExpires:  &expires,
+				LastLogin:            nil,
+				LoginCount:           0,
+				IsSMSOnly:            false,
+				SMSConsentGiven:      false,
+				POPIAConsentGiven:    false,
+				ProfileCompletionPct: 0,
+				CreatedAt:            now.Add(-time.Hour),
+				UpdatedAt:            now.Add(-time.Hour),
 			},
 			expectedHash:  "$2a$10$hashedpassword",
 			expectedError: nil,
 		},
 		{
 			name:  "user not found",
-			email: "missing@example.com",
+			email: "nonexistent@example.com",
 			mockSetup: func(m *mocks.Querier) {
-				m.On("GetUserByEmail", ctx, "missing@example.com").Return(sqlc.GetUserByEmailRow{}, pgx.ErrNoRows)
+				m.On("GetUserByEmail", ctx, "nonexistent@example.com").Return(sqlc.GetUserByEmailRow{}, pgx.ErrNoRows)
+			},
+			expectedUser:  core.User{},
+			expectedHash:  "",
+			expectedError: domain.ErrUserNotFound,
+		},
+		{
+			name:  "empty email",
+			email: "",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetUserByEmail", ctx, "").Return(sqlc.GetUserByEmailRow{}, pgx.ErrNoRows)
 			},
 			expectedUser:  core.User{},
 			expectedHash:  "",
@@ -572,26 +789,11 @@ func TestAuthRepository_GetUserByEmail(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expectedError, err)
 				}
-				assert.Equal(t, tt.expectedUser, gotUser)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 				assert.Equal(t, tt.expectedHash, gotHash)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedUser.ID, gotUser.ID)
-				assert.Equal(t, tt.expectedUser.Email, gotUser.Email)
-				assert.Equal(t, tt.expectedUser.Phone, gotUser.Phone)
-				assert.Equal(t, tt.expectedUser.Role, gotUser.Role)
-				assert.Equal(t, tt.expectedUser.Status, gotUser.Status)
-				assert.Equal(t, tt.expectedUser.IsVerified, gotUser.IsVerified)
-				assert.Equal(t, tt.expectedUser.VerificationToken, gotUser.VerificationToken)
-				assert.Equal(t, tt.expectedUser.VerificationExpires, gotUser.VerificationExpires)
-				assert.Equal(t, tt.expectedUser.LastLogin, gotUser.LastLogin)
-				assert.Equal(t, tt.expectedUser.LoginCount, gotUser.LoginCount)
-				assert.Equal(t, tt.expectedUser.IsSMSOnly, gotUser.IsSMSOnly)
-				assert.Equal(t, tt.expectedUser.SMSConsentGiven, gotUser.SMSConsentGiven)
-				assert.Equal(t, tt.expectedUser.POPIAConsentGiven, gotUser.POPIAConsentGiven)
-				assert.Equal(t, tt.expectedUser.ProfileCompletionPct, gotUser.ProfileCompletionPct)
-				assert.Equal(t, tt.expectedUser.CreatedAt, gotUser.CreatedAt)
-				assert.Equal(t, tt.expectedUser.UpdatedAt, gotUser.UpdatedAt)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 				assert.Equal(t, tt.expectedHash, gotHash)
 			}
 			mockQuerier.AssertExpectations(t)
@@ -601,7 +803,7 @@ func TestAuthRepository_GetUserByEmail(t *testing.T) {
 
 func TestAuthRepository_GetUserByPhone(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
+	now := nowTime()
 
 	tests := []struct {
 		name          string
@@ -615,20 +817,20 @@ func TestAuthRepository_GetUserByPhone(t *testing.T) {
 			phone: "+1234567890",
 			mockSetup: func(m *mocks.Querier) {
 				expectedRow := sqlc.GetUserByPhoneRow{
-					ID:                          pgtype.UUID{Bytes: uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"), Valid: true},
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "",
 					Phone:                       pgtype.Text{String: "+1234567890", Valid: true},
-					Role:                        "patient",
+					Role:                        "doctor",
 					Status:                      pgtype.Text{String: "active", Valid: true},
 					IsVerified:                  pgtype.Bool{Bool: true, Valid: true},
-					LastLogin:                   pgtype.Timestamp{Time: now, Valid: true},
-					LoginCount:                  pgtype.Int4{Int32: 1, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+					LoginCount:                  pgtype.Int4{Int32: 15, Valid: true},
 					IsSmsOnly:                   pgtype.Bool{Bool: true, Valid: true},
 					SmsConsentGiven:             pgtype.Bool{Bool: true, Valid: true},
 					PopiaConsentGiven:           pgtype.Bool{Bool: true, Valid: true},
-					ProfileCompletionPercentage: pgtype.Int4{Int32: 50, Valid: true},
-					CreatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
-					UpdatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 100, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour * 24 * 60), Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Minute * 30), Valid: true},
 				}
 				m.On("GetUserByPhone", ctx, pgtype.Text{String: "+1234567890", Valid: true}).Return(expectedRow, nil)
 			},
@@ -636,17 +838,57 @@ func TestAuthRepository_GetUserByPhone(t *testing.T) {
 				ID:                   uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
 				Email:                nil,
 				Phone:                stringPtr("+1234567890"),
-				Role:                 "patient",
+				Role:                 "doctor",
 				Status:               "active",
 				IsVerified:           true,
-				LastLogin:            &now,
-				LoginCount:           1,
+				LastLogin:            timePtr(now.Add(-time.Hour)),
+				LoginCount:           15,
 				IsSMSOnly:            true,
 				SMSConsentGiven:      true,
 				POPIAConsentGiven:    true,
+				ProfileCompletionPct: 100,
+				CreatedAt:            now.Add(-time.Hour * 24 * 60),
+				UpdatedAt:            now.Add(-time.Minute * 30),
+			},
+			expectedError: nil,
+		},
+		{
+			name:  "user with email and phone",
+			phone: "+1234567891",
+			mockSetup: func(m *mocks.Querier) {
+				expectedRow := sqlc.GetUserByPhoneRow{
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174001"),
+					Email:                       "user@example.com",
+					Phone:                       pgtype.Text{String: "+1234567891", Valid: true},
+					Role:                        "patient",
+					Status:                      pgtype.Text{String: "active", Valid: true},
+					IsVerified:                  pgtype.Bool{Bool: true, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Time: now.Add(-time.Hour * 2), Valid: true},
+					LoginCount:                  pgtype.Int4{Int32: 8, Valid: true},
+					IsSmsOnly:                   pgtype.Bool{Bool: false, Valid: true},
+					SmsConsentGiven:             pgtype.Bool{Bool: false, Valid: true},
+					PopiaConsentGiven:           pgtype.Bool{Bool: true, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 50, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour * 24 * 14), Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+				}
+				m.On("GetUserByPhone", ctx, pgtype.Text{String: "+1234567891", Valid: true}).Return(expectedRow, nil)
+			},
+			expectedUser: core.User{
+				ID:                   uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"),
+				Email:                stringPtr("user@example.com"),
+				Phone:                stringPtr("+1234567891"),
+				Role:                 "patient",
+				Status:               "active",
+				IsVerified:           true,
+				LastLogin:            timePtr(now.Add(-time.Hour * 2)),
+				LoginCount:           8,
+				IsSMSOnly:            false,
+				SMSConsentGiven:      false,
+				POPIAConsentGiven:    true,
 				ProfileCompletionPct: 50,
-				CreatedAt:            now,
-				UpdatedAt:            now,
+				CreatedAt:            now.Add(-time.Hour * 24 * 14),
+				UpdatedAt:            now.Add(-time.Hour),
 			},
 			expectedError: nil,
 		},
@@ -660,10 +902,19 @@ func TestAuthRepository_GetUserByPhone(t *testing.T) {
 			expectedError: domain.ErrUserNotFound,
 		},
 		{
-			name:  "generic database error",
-			phone: "+errorphone",
+			name:  "empty phone",
+			phone: "",
 			mockSetup: func(m *mocks.Querier) {
-				m.On("GetUserByPhone", ctx, pgtype.Text{String: "+errorphone", Valid: true}).Return(sqlc.GetUserByPhoneRow{}, assert.AnError)
+				m.On("GetUserByPhone", ctx, pgtype.Text{String: "", Valid: true}).Return(sqlc.GetUserByPhoneRow{}, pgx.ErrNoRows)
+			},
+			expectedUser:  core.User{},
+			expectedError: domain.ErrUserNotFound,
+		},
+		{
+			name:  "generic database error",
+			phone: "+1234567899",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetUserByPhone", ctx, pgtype.Text{String: "+1234567899", Valid: true}).Return(sqlc.GetUserByPhoneRow{}, assert.AnError)
 			},
 			expectedUser:  core.User{},
 			expectedError: assert.AnError,
@@ -686,23 +937,10 @@ func TestAuthRepository_GetUserByPhone(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expectedError, err)
 				}
-				assert.Equal(t, tt.expectedUser, gotUser)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedUser.ID, gotUser.ID)
-				assert.Equal(t, tt.expectedUser.Email, gotUser.Email)
-				assert.Equal(t, tt.expectedUser.Phone, gotUser.Phone)
-				assert.Equal(t, tt.expectedUser.Role, gotUser.Role)
-				assert.Equal(t, tt.expectedUser.Status, gotUser.Status)
-				assert.Equal(t, tt.expectedUser.IsVerified, gotUser.IsVerified)
-				assert.Equal(t, tt.expectedUser.LastLogin, gotUser.LastLogin)
-				assert.Equal(t, tt.expectedUser.LoginCount, gotUser.LoginCount)
-				assert.Equal(t, tt.expectedUser.IsSMSOnly, gotUser.IsSMSOnly)
-				assert.Equal(t, tt.expectedUser.SMSConsentGiven, gotUser.SMSConsentGiven)
-				assert.Equal(t, tt.expectedUser.POPIAConsentGiven, gotUser.POPIAConsentGiven)
-				assert.Equal(t, tt.expectedUser.ProfileCompletionPct, gotUser.ProfileCompletionPct)
-				assert.Equal(t, tt.expectedUser.CreatedAt, gotUser.CreatedAt)
-				assert.Equal(t, tt.expectedUser.UpdatedAt, gotUser.UpdatedAt)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 			}
 			mockQuerier.AssertExpectations(t)
 		})
@@ -711,7 +949,7 @@ func TestAuthRepository_GetUserByPhone(t *testing.T) {
 
 func TestAuthRepository_GetUserByPhoneWithHash(t *testing.T) {
 	ctx := context.Background()
-	now := time.Now()
+	now := nowTime()
 
 	tests := []struct {
 		name          string
@@ -726,21 +964,21 @@ func TestAuthRepository_GetUserByPhoneWithHash(t *testing.T) {
 			phone: "+1234567890",
 			mockSetup: func(m *mocks.Querier) {
 				expectedRow := sqlc.GetUserByPhoneWithHashRow{
-					ID:                          pgtype.UUID{Bytes: uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"), Valid: true},
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "",
 					Phone:                       pgtype.Text{String: "+1234567890", Valid: true},
 					PasswordHash:                pgtype.Text{String: "$2a$10$hashedpassword", Valid: true},
 					Role:                        "patient",
 					Status:                      pgtype.Text{String: "active", Valid: true},
 					IsVerified:                  pgtype.Bool{Bool: true, Valid: true},
-					LastLogin:                   pgtype.Timestamp{Time: now, Valid: true},
-					LoginCount:                  pgtype.Int4{Int32: 1, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+					LoginCount:                  pgtype.Int4{Int32: 5, Valid: true},
 					IsSmsOnly:                   pgtype.Bool{Bool: true, Valid: true},
 					SmsConsentGiven:             pgtype.Bool{Bool: true, Valid: true},
 					PopiaConsentGiven:           pgtype.Bool{Bool: true, Valid: true},
-					ProfileCompletionPercentage: pgtype.Int4{Int32: 50, Valid: true},
-					CreatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
-					UpdatedAt:                   pgtype.Timestamp{Time: now, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 80, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour * 24 * 7), Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
 				}
 				m.On("GetUserByPhoneWithHash", ctx, pgtype.Text{String: "+1234567890", Valid: true}).Return(expectedRow, nil)
 			},
@@ -751,14 +989,14 @@ func TestAuthRepository_GetUserByPhoneWithHash(t *testing.T) {
 				Role:                 "patient",
 				Status:               "active",
 				IsVerified:           true,
-				LastLogin:            &now,
-				LoginCount:           1,
+				LastLogin:            timePtr(now.Add(-time.Hour)),
+				LoginCount:           5,
 				IsSMSOnly:            true,
 				SMSConsentGiven:      true,
 				POPIAConsentGiven:    true,
-				ProfileCompletionPct: 50,
-				CreatedAt:            now,
-				UpdatedAt:            now,
+				ProfileCompletionPct: 80,
+				CreatedAt:            now.Add(-time.Hour * 24 * 7),
+				UpdatedAt:            now.Add(-time.Hour),
 			},
 			expectedHash:  "$2a$10$hashedpassword",
 			expectedError: nil,
@@ -774,10 +1012,52 @@ func TestAuthRepository_GetUserByPhoneWithHash(t *testing.T) {
 			expectedError: domain.ErrUserNotFound,
 		},
 		{
-			name:  "generic database error",
-			phone: "+errorphone",
+			name:  "user found but no password hash",
+			phone: "+1234567891",
 			mockSetup: func(m *mocks.Querier) {
-				m.On("GetUserByPhoneWithHash", ctx, pgtype.Text{String: "+errorphone", Valid: true}).Return(sqlc.GetUserByPhoneWithHashRow{}, assert.AnError)
+				expectedRow := sqlc.GetUserByPhoneWithHashRow{
+					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174001"),
+					Email:                       "test@example.com",
+					Phone:                       pgtype.Text{String: "+1234567891", Valid: true},
+					PasswordHash:                pgtype.Text{Valid: false},
+					Role:                        "patient",
+					Status:                      pgtype.Text{String: "active", Valid: true},
+					IsVerified:                  pgtype.Bool{Bool: true, Valid: true},
+					LastLogin:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+					LoginCount:                  pgtype.Int4{Int32: 3, Valid: true},
+					IsSmsOnly:                   pgtype.Bool{Bool: false, Valid: true},
+					SmsConsentGiven:             pgtype.Bool{Bool: false, Valid: true},
+					PopiaConsentGiven:           pgtype.Bool{Bool: true, Valid: true},
+					ProfileCompletionPercentage: pgtype.Int4{Int32: 60, Valid: true},
+					CreatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour * 24 * 3), Valid: true},
+					UpdatedAt:                   pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+				}
+				m.On("GetUserByPhoneWithHash", ctx, pgtype.Text{String: "+1234567891", Valid: true}).Return(expectedRow, nil)
+			},
+			expectedUser: core.User{
+				ID:                   uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"),
+				Email:                stringPtr("test@example.com"),
+				Phone:                stringPtr("+1234567891"),
+				Role:                 "patient",
+				Status:               "active",
+				IsVerified:           true,
+				LastLogin:            timePtr(now.Add(-time.Hour)),
+				LoginCount:           3,
+				IsSMSOnly:            false,
+				SMSConsentGiven:      false,
+				POPIAConsentGiven:    true,
+				ProfileCompletionPct: 60,
+				CreatedAt:            now.Add(-time.Hour * 24 * 3),
+				UpdatedAt:            now.Add(-time.Hour),
+			},
+			expectedHash:  "",
+			expectedError: nil,
+		},
+		{
+			name:  "generic database error",
+			phone: "+1234567899",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetUserByPhoneWithHash", ctx, pgtype.Text{String: "+1234567899", Valid: true}).Return(sqlc.GetUserByPhoneWithHashRow{}, assert.AnError)
 			},
 			expectedUser:  core.User{},
 			expectedHash:  "",
@@ -801,24 +1081,11 @@ func TestAuthRepository_GetUserByPhoneWithHash(t *testing.T) {
 				} else {
 					assert.Equal(t, tt.expectedError, err)
 				}
-				assert.Equal(t, tt.expectedUser, gotUser)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 				assert.Equal(t, tt.expectedHash, gotHash)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.expectedUser.ID, gotUser.ID)
-				assert.Equal(t, tt.expectedUser.Email, gotUser.Email)
-				assert.Equal(t, tt.expectedUser.Phone, gotUser.Phone)
-				assert.Equal(t, tt.expectedUser.Role, gotUser.Role)
-				assert.Equal(t, tt.expectedUser.Status, gotUser.Status)
-				assert.Equal(t, tt.expectedUser.IsVerified, gotUser.IsVerified)
-				assert.Equal(t, tt.expectedUser.LastLogin, gotUser.LastLogin)
-				assert.Equal(t, tt.expectedUser.LoginCount, gotUser.LoginCount)
-				assert.Equal(t, tt.expectedUser.IsSMSOnly, gotUser.IsSMSOnly)
-				assert.Equal(t, tt.expectedUser.SMSConsentGiven, gotUser.SMSConsentGiven)
-				assert.Equal(t, tt.expectedUser.POPIAConsentGiven, gotUser.POPIAConsentGiven)
-				assert.Equal(t, tt.expectedUser.ProfileCompletionPct, gotUser.ProfileCompletionPct)
-				assert.Equal(t, tt.expectedUser.CreatedAt, gotUser.CreatedAt)
-				assert.Equal(t, tt.expectedUser.UpdatedAt, gotUser.UpdatedAt)
+				assertUserEqual(t, tt.expectedUser, gotUser)
 				assert.Equal(t, tt.expectedHash, gotHash)
 			}
 			mockQuerier.AssertExpectations(t)
@@ -840,15 +1107,23 @@ func TestAuthRepository_VerifyUser(t *testing.T) {
 			name: "successful verification",
 			id:   userID,
 			mockSetup: func(m *mocks.Querier) {
-				m.On("VerifyUser", ctx, pgtype.UUID{Bytes: userID, Valid: true}).Return(nil)
+				m.On("VerifyUser", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(nil)
 			},
 			expectedError: nil,
+		},
+		{
+			name: "user not found",
+			id:   userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("VerifyUser", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(pgx.ErrNoRows)
+			},
+			expectedError: fmt.Errorf("verify user failed: %w", pgx.ErrNoRows),
 		},
 		{
 			name: "generic database error",
 			id:   userID,
 			mockSetup: func(m *mocks.Querier) {
-				m.On("VerifyUser", ctx, pgtype.UUID{Bytes: userID, Valid: true}).Return(assert.AnError)
+				m.On("VerifyUser", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(assert.AnError)
 			},
 			expectedError: assert.AnError,
 		},
@@ -868,7 +1143,7 @@ func TestAuthRepository_VerifyUser(t *testing.T) {
 				if tt.expectedError == assert.AnError {
 					assert.Contains(t, err.Error(), "verify user failed")
 				} else {
-					assert.Equal(t, tt.expectedError, err)
+					assert.Equal(t, tt.expectedError.Error(), err.Error())
 				}
 			} else {
 				require.NoError(t, err)
@@ -881,8 +1156,8 @@ func TestAuthRepository_VerifyUser(t *testing.T) {
 func TestAuthRepository_SetVerificationToken(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
-	token := "verification-token"
-	expires := time.Now().Add(time.Hour * 24)
+	token := "verification-token-123"
+	expires := nowTime().Add(time.Hour * 24)
 
 	tests := []struct {
 		name          string
@@ -893,16 +1168,30 @@ func TestAuthRepository_SetVerificationToken(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:    "successful set",
+			name:    "successful set verification token",
 			id:      userID,
 			token:   token,
 			expires: expires,
 			mockSetup: func(m *mocks.Querier) {
-				m.On("SetVerificationToken", ctx, mock.MatchedBy(func(p sqlc.SetVerificationTokenParams) bool {
-					return p.ID.Bytes == userID &&
-						p.VerificationToken.String == token &&
-						p.VerificationExpires.Time.Equal(expires)
-				})).Return(nil)
+				m.On("SetVerificationToken", ctx, sqlc.SetVerificationTokenParams{
+					ID:                  uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					VerificationToken:   pgtype.Text{String: token, Valid: true},
+					VerificationExpires: pgtype.Timestamp{Time: expires, Valid: true},
+				}).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "empty token",
+			id:      userID,
+			token:   "",
+			expires: expires,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("SetVerificationToken", ctx, sqlc.SetVerificationTokenParams{
+					ID:                  uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					VerificationToken:   pgtype.Text{String: "", Valid: true},
+					VerificationExpires: pgtype.Timestamp{Time: expires, Valid: true},
+				}).Return(nil)
 			},
 			expectedError: nil,
 		},
@@ -932,7 +1221,7 @@ func TestAuthRepository_SetVerificationToken(t *testing.T) {
 				if tt.expectedError == assert.AnError {
 					assert.Contains(t, err.Error(), "set verification token failed")
 				} else {
-					assert.Equal(t, tt.expectedError, err)
+					assert.Equal(t, tt.expectedError.Error(), err.Error())
 				}
 			} else {
 				require.NoError(t, err)
@@ -945,8 +1234,8 @@ func TestAuthRepository_SetVerificationToken(t *testing.T) {
 func TestAuthRepository_SetPasswordResetToken(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
-	token := "reset-token"
-	expires := time.Now().Add(time.Hour * 1)
+	token := "reset-token-456"
+	expires := nowTime().Add(time.Hour * 1)
 
 	tests := []struct {
 		name          string
@@ -957,16 +1246,30 @@ func TestAuthRepository_SetPasswordResetToken(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:    "successful set",
+			name:    "successful set password reset token",
 			id:      userID,
 			token:   token,
 			expires: expires,
 			mockSetup: func(m *mocks.Querier) {
-				m.On("SetPasswordResetToken", ctx, mock.MatchedBy(func(p sqlc.SetPasswordResetTokenParams) bool {
-					return p.ID.Bytes == userID &&
-						p.ResetPasswordToken.String == token &&
-						p.ResetPasswordExpires.Time.Equal(expires)
-				})).Return(nil)
+				m.On("SetPasswordResetToken", ctx, sqlc.SetPasswordResetTokenParams{
+					ID:                   uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					ResetPasswordToken:   pgtype.Text{String: token, Valid: true},
+					ResetPasswordExpires: pgtype.Timestamp{Time: expires, Valid: true},
+				}).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "empty token",
+			id:      userID,
+			token:   "",
+			expires: expires,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("SetPasswordResetToken", ctx, sqlc.SetPasswordResetTokenParams{
+					ID:                   uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					ResetPasswordToken:   pgtype.Text{String: "", Valid: true},
+					ResetPasswordExpires: pgtype.Timestamp{Time: expires, Valid: true},
+				}).Return(nil)
 			},
 			expectedError: nil,
 		},
@@ -996,7 +1299,7 @@ func TestAuthRepository_SetPasswordResetToken(t *testing.T) {
 				if tt.expectedError == assert.AnError {
 					assert.Contains(t, err.Error(), "set password reset token failed")
 				} else {
-					assert.Equal(t, tt.expectedError, err)
+					assert.Equal(t, tt.expectedError.Error(), err.Error())
 				}
 			} else {
 				require.NoError(t, err)
@@ -1019,16 +1322,37 @@ func TestAuthRepository_UpdateUserPassword(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:         "successful update",
+			name:         "successful password update",
 			id:           userID,
 			passwordHash: passwordHash,
 			mockSetup: func(m *mocks.Querier) {
-				m.On("UpdateUserPassword", ctx, mock.MatchedBy(func(p sqlc.UpdateUserPasswordParams) bool {
-					return p.ID.Bytes == userID &&
-						p.PasswordHash.String == passwordHash
-				})).Return(nil)
+				m.On("UpdateUserPassword", ctx, sqlc.UpdateUserPasswordParams{
+					ID:           uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
+				}).Return(nil)
 			},
 			expectedError: nil,
+		},
+		{
+			name:         "empty password hash",
+			id:           userID,
+			passwordHash: "",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserPassword", ctx, sqlc.UpdateUserPasswordParams{
+					ID:           uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					PasswordHash: pgtype.Text{String: "", Valid: true},
+				}).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:         "user not found",
+			id:           userID,
+			passwordHash: passwordHash,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserPassword", ctx, mock.Anything).Return(pgx.ErrNoRows)
+			},
+			expectedError: fmt.Errorf("update user password failed: %w", pgx.ErrNoRows),
 		},
 		{
 			name:         "generic database error",
@@ -1055,7 +1379,7 @@ func TestAuthRepository_UpdateUserPassword(t *testing.T) {
 				if tt.expectedError == assert.AnError {
 					assert.Contains(t, err.Error(), "update user password failed")
 				} else {
-					assert.Equal(t, tt.expectedError, err)
+					assert.Equal(t, tt.expectedError.Error(), err.Error())
 				}
 			} else {
 				require.NoError(t, err)
@@ -1068,7 +1392,6 @@ func TestAuthRepository_UpdateUserPassword(t *testing.T) {
 func TestAuthRepository_UpdateUserStatus(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
-	status := "active"
 
 	tests := []struct {
 		name          string
@@ -1078,21 +1401,54 @@ func TestAuthRepository_UpdateUserStatus(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name:   "successful update",
+			name:   "successful status update to active",
 			id:     userID,
-			status: status,
+			status: "active",
 			mockSetup: func(m *mocks.Querier) {
-				m.On("UpdateUserStatus", ctx, mock.MatchedBy(func(p sqlc.UpdateUserStatusParams) bool {
-					return p.ID.Bytes == userID &&
-						p.Status.String == status
-				})).Return(nil)
+				m.On("UpdateUserStatus", ctx, sqlc.UpdateUserStatusParams{
+					ID:     uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					Status: pgtype.Text{String: "active", Valid: true},
+				}).Return(nil)
 			},
 			expectedError: nil,
 		},
 		{
+			name:   "successful status update to suspended",
+			id:     userID,
+			status: "suspended",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserStatus", ctx, sqlc.UpdateUserStatusParams{
+					ID:     uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					Status: pgtype.Text{String: "suspended", Valid: true},
+				}).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "empty status",
+			id:     userID,
+			status: "",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserStatus", ctx, sqlc.UpdateUserStatusParams{
+					ID:     uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					Status: pgtype.Text{String: "", Valid: true},
+				}).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "user not found",
+			id:     userID,
+			status: "active",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserStatus", ctx, mock.Anything).Return(pgx.ErrNoRows)
+			},
+			expectedError: fmt.Errorf("update user status failed: %w", pgx.ErrNoRows),
+		},
+		{
 			name:   "generic database error",
 			id:     userID,
-			status: status,
+			status: "active",
 			mockSetup: func(m *mocks.Querier) {
 				m.On("UpdateUserStatus", ctx, mock.Anything).Return(assert.AnError)
 			},
@@ -1114,7 +1470,7 @@ func TestAuthRepository_UpdateUserStatus(t *testing.T) {
 				if tt.expectedError == assert.AnError {
 					assert.Contains(t, err.Error(), "update user status failed")
 				} else {
-					assert.Equal(t, tt.expectedError, err)
+					assert.Equal(t, tt.expectedError.Error(), err.Error())
 				}
 			} else {
 				require.NoError(t, err)
@@ -1135,18 +1491,26 @@ func TestAuthRepository_UpdateLastLogin(t *testing.T) {
 		expectedError error
 	}{
 		{
-			name: "successful update",
+			name: "successful last login update",
 			id:   userID,
 			mockSetup: func(m *mocks.Querier) {
-				m.On("UpdateUserLastLogin", ctx, pgtype.UUID{Bytes: userID, Valid: true}).Return(nil)
+				m.On("UpdateUserLastLogin", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(nil)
 			},
 			expectedError: nil,
+		},
+		{
+			name: "user not found",
+			id:   userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateUserLastLogin", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(pgx.ErrNoRows)
+			},
+			expectedError: fmt.Errorf("update last login failed: %w", pgx.ErrNoRows),
 		},
 		{
 			name: "generic database error",
 			id:   userID,
 			mockSetup: func(m *mocks.Querier) {
-				m.On("UpdateUserLastLogin", ctx, pgtype.UUID{Bytes: userID, Valid: true}).Return(assert.AnError)
+				m.On("UpdateUserLastLogin", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(assert.AnError)
 			},
 			expectedError: assert.AnError,
 		},
@@ -1166,7 +1530,7 @@ func TestAuthRepository_UpdateLastLogin(t *testing.T) {
 				if tt.expectedError == assert.AnError {
 					assert.Contains(t, err.Error(), "update last login failed")
 				} else {
-					assert.Equal(t, tt.expectedError, err)
+					assert.Equal(t, tt.expectedError.Error(), err.Error())
 				}
 			} else {
 				require.NoError(t, err)
@@ -1176,5 +1540,79 @@ func TestAuthRepository_UpdateLastLogin(t *testing.T) {
 	}
 }
 
-// Helper function
-func stringPtr(s string) *string { return &s }
+func TestAuthRepository_handleError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected error
+	}{
+		{
+			name: "duplicate email error",
+			err: &pgconn.PgError{
+				Code:           "23505",
+				ConstraintName: "users_email_key",
+			},
+			expected: domain.ErrDuplicateEmail,
+		},
+		{
+			name: "duplicate phone error",
+			err: &pgconn.PgError{
+				Code:           "23505",
+				ConstraintName: "users_phone_key",
+			},
+			expected: domain.ErrDuplicatePhone,
+		},
+		{
+			name: "other unique violation",
+			err: &pgconn.PgError{
+				Code:           "23505",
+				ConstraintName: "some_other_constraint",
+			},
+			expected: fmt.Errorf("duplicate constraint violation: %w", &pgconn.PgError{
+				Code:           "23505",
+				ConstraintName: "some_other_constraint",
+			}),
+		},
+		{
+			name: "foreign key violation",
+			err: &pgconn.PgError{
+				Code: "23503",
+			},
+			expected: fmt.Errorf("foreign key violation: %w", &pgconn.PgError{
+				Code: "23503",
+			}),
+		},
+		{
+			name: "check violation",
+			err: &pgconn.PgError{
+				Code: "23514",
+			},
+			expected: fmt.Errorf("check constraint violation: %w", &pgconn.PgError{
+				Code: "23514",
+			}),
+		},
+		{
+			name:     "generic error",
+			err:      assert.AnError,
+			expected: fmt.Errorf("%s failed: %w", "test operation", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &authRepository{}
+			err := repo.handleError(tt.err, "test operation")
+
+			if tt.expected == domain.ErrDuplicateEmail || tt.expected == domain.ErrDuplicatePhone {
+				assert.Equal(t, tt.expected, err)
+			} else {
+				assert.Contains(t, err.Error(), tt.expected.Error())
+			}
+		})
+	}
+}
+
+// Helper function to create time pointer
+func timePtr(t time.Time) *time.Time {
+	return &t
+}
