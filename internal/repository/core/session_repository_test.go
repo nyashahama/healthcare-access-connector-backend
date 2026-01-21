@@ -305,3 +305,51 @@ func TestSessionRepository_DeleteSession(t *testing.T) {
 		})
 	}
 }
+
+func TestSessionRepository_DeleteUserSessions(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:   "successful delete user sessions",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("DeleteUserSessions", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "database error",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("DeleteUserSessions", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("delete user sessions failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &sessionRepository{querier: mockQuerier}
+
+			err := repo.DeleteUserSessions(ctx, tt.userID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
