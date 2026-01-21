@@ -12,6 +12,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countActiveConsents = `-- name: CountActiveConsents :one
+SELECT COUNT(*) FROM privacy_consents
+WHERE consent_withdrawn = false
+`
+
+func (q *Queries) CountActiveConsents(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveConsents)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countConsentsByType = `-- name: CountConsentsByType :one
+SELECT 
+    COUNT(*) FILTER (WHERE health_data_consent = true) as health_data_count,
+    COUNT(*) FILTER (WHERE research_consent = true) as research_count,
+    COUNT(*) FILTER (WHERE emergency_access_consent = true) as emergency_access_count,
+    COUNT(*) FILTER (WHERE sms_communication_consent = true) as sms_count,
+    COUNT(*) FILTER (WHERE email_communication_consent = true) as email_count
+FROM privacy_consents
+WHERE consent_withdrawn = false
+`
+
+type CountConsentsByTypeRow struct {
+	HealthDataCount      int64 `json:"health_data_count"`
+	ResearchCount        int64 `json:"research_count"`
+	EmergencyAccessCount int64 `json:"emergency_access_count"`
+	SmsCount             int64 `json:"sms_count"`
+	EmailCount           int64 `json:"email_count"`
+}
+
+func (q *Queries) CountConsentsByType(ctx context.Context) (CountConsentsByTypeRow, error) {
+	row := q.db.QueryRow(ctx, countConsentsByType)
+	var i CountConsentsByTypeRow
+	err := row.Scan(
+		&i.HealthDataCount,
+		&i.ResearchCount,
+		&i.EmergencyAccessCount,
+		&i.SmsCount,
+		&i.EmailCount,
+	)
+	return i, err
+}
+
 const createPrivacyConsent = `-- name: CreatePrivacyConsent :one
 
 INSERT INTO privacy_consents (
@@ -68,8 +112,322 @@ func (q *Queries) CreatePrivacyConsent(ctx context.Context, arg CreatePrivacyCon
 	return i, err
 }
 
+const deletePrivacyConsent = `-- name: DeletePrivacyConsent :exec
+DELETE FROM privacy_consents
+WHERE user_id = $1
+`
+
+func (q *Queries) DeletePrivacyConsent(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deletePrivacyConsent, userID)
+	return err
+}
+
+const getActiveEmergencyAccessConsents = `-- name: GetActiveEmergencyAccessConsents :many
+SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents
+WHERE emergency_access_consent = true
+AND consent_withdrawn = false
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetActiveEmergencyAccessConsents(ctx context.Context) ([]PrivacyConsent, error) {
+	rows, err := q.db.Query(ctx, getActiveEmergencyAccessConsents)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PrivacyConsent{}
+	for rows.Next() {
+		var i PrivacyConsent
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.HealthDataConsent,
+			&i.HealthDataConsentDate,
+			&i.HealthDataConsentVersion,
+			&i.ResearchConsent,
+			&i.ResearchConsentDate,
+			&i.EmergencyAccessConsent,
+			&i.EmergencyAccessConsentDate,
+			&i.SmsCommunicationConsent,
+			&i.EmailCommunicationConsent,
+			&i.DataSharingConsent,
+			&i.SpecialCategoriesConsent,
+			&i.ConsentWithdrawn,
+			&i.ConsentWithdrawnDate,
+			&i.WithdrawalReason,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getActiveHealthDataConsents = `-- name: GetActiveHealthDataConsents :many
+SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents
+WHERE health_data_consent = true
+AND consent_withdrawn = false
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetActiveHealthDataConsents(ctx context.Context) ([]PrivacyConsent, error) {
+	rows, err := q.db.Query(ctx, getActiveHealthDataConsents)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PrivacyConsent{}
+	for rows.Next() {
+		var i PrivacyConsent
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.HealthDataConsent,
+			&i.HealthDataConsentDate,
+			&i.HealthDataConsentVersion,
+			&i.ResearchConsent,
+			&i.ResearchConsentDate,
+			&i.EmergencyAccessConsent,
+			&i.EmergencyAccessConsentDate,
+			&i.SmsCommunicationConsent,
+			&i.EmailCommunicationConsent,
+			&i.DataSharingConsent,
+			&i.SpecialCategoriesConsent,
+			&i.ConsentWithdrawn,
+			&i.ConsentWithdrawnDate,
+			&i.WithdrawalReason,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getActiveResearchConsents = `-- name: GetActiveResearchConsents :many
+SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents
+WHERE research_consent = true
+AND consent_withdrawn = false
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetActiveResearchConsents(ctx context.Context) ([]PrivacyConsent, error) {
+	rows, err := q.db.Query(ctx, getActiveResearchConsents)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PrivacyConsent{}
+	for rows.Next() {
+		var i PrivacyConsent
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.HealthDataConsent,
+			&i.HealthDataConsentDate,
+			&i.HealthDataConsentVersion,
+			&i.ResearchConsent,
+			&i.ResearchConsentDate,
+			&i.EmergencyAccessConsent,
+			&i.EmergencyAccessConsentDate,
+			&i.SmsCommunicationConsent,
+			&i.EmailCommunicationConsent,
+			&i.DataSharingConsent,
+			&i.SpecialCategoriesConsent,
+			&i.ConsentWithdrawn,
+			&i.ConsentWithdrawnDate,
+			&i.WithdrawalReason,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getConsentByID = `-- name: GetConsentByID :one
+SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents
+WHERE id = $1
+`
+
+func (q *Queries) GetConsentByID(ctx context.Context, id pgtype.UUID) (PrivacyConsent, error) {
+	row := q.db.QueryRow(ctx, getConsentByID, id)
+	var i PrivacyConsent
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.HealthDataConsent,
+		&i.HealthDataConsentDate,
+		&i.HealthDataConsentVersion,
+		&i.ResearchConsent,
+		&i.ResearchConsentDate,
+		&i.EmergencyAccessConsent,
+		&i.EmergencyAccessConsentDate,
+		&i.SmsCommunicationConsent,
+		&i.EmailCommunicationConsent,
+		&i.DataSharingConsent,
+		&i.SpecialCategoriesConsent,
+		&i.ConsentWithdrawn,
+		&i.ConsentWithdrawnDate,
+		&i.WithdrawalReason,
+		&i.IpAddress,
+		&i.UserAgent,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getConsentHistory = `-- name: GetConsentHistory :many
+SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents
+WHERE user_id = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetConsentHistory(ctx context.Context, userID pgtype.UUID) ([]PrivacyConsent, error) {
+	rows, err := q.db.Query(ctx, getConsentHistory, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PrivacyConsent{}
+	for rows.Next() {
+		var i PrivacyConsent
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.HealthDataConsent,
+			&i.HealthDataConsentDate,
+			&i.HealthDataConsentVersion,
+			&i.ResearchConsent,
+			&i.ResearchConsentDate,
+			&i.EmergencyAccessConsent,
+			&i.EmergencyAccessConsentDate,
+			&i.SmsCommunicationConsent,
+			&i.EmailCommunicationConsent,
+			&i.DataSharingConsent,
+			&i.SpecialCategoriesConsent,
+			&i.ConsentWithdrawn,
+			&i.ConsentWithdrawnDate,
+			&i.WithdrawalReason,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getConsentsExpiringBefore = `-- name: GetConsentsExpiringBefore :many
+SELECT user_id FROM privacy_consents
+WHERE health_data_consent = true
+AND consent_withdrawn = false
+AND health_data_consent_date < $1
+ORDER BY health_data_consent_date ASC
+`
+
+func (q *Queries) GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, getConsentsExpiringBefore, healthDataConsentDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var user_id pgtype.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getExpiredConsents = `-- name: GetExpiredConsents :many
+SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents
+WHERE health_data_consent_date < CURRENT_TIMESTAMP - INTERVAL '2 years'
+AND consent_withdrawn = false
+ORDER BY health_data_consent_date ASC
+`
+
+func (q *Queries) GetExpiredConsents(ctx context.Context) ([]PrivacyConsent, error) {
+	rows, err := q.db.Query(ctx, getExpiredConsents)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PrivacyConsent{}
+	for rows.Next() {
+		var i PrivacyConsent
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.HealthDataConsent,
+			&i.HealthDataConsentDate,
+			&i.HealthDataConsentVersion,
+			&i.ResearchConsent,
+			&i.ResearchConsentDate,
+			&i.EmergencyAccessConsent,
+			&i.EmergencyAccessConsentDate,
+			&i.SmsCommunicationConsent,
+			&i.EmailCommunicationConsent,
+			&i.DataSharingConsent,
+			&i.SpecialCategoriesConsent,
+			&i.ConsentWithdrawn,
+			&i.ConsentWithdrawnDate,
+			&i.WithdrawalReason,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPrivacyConsent = `-- name: GetPrivacyConsent :one
-SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents WHERE user_id = $1
+SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents 
+WHERE user_id = $1 
+AND consent_withdrawn = false
+ORDER BY created_at DESC
+LIMIT 1
 `
 
 func (q *Queries) GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error) {
@@ -100,11 +458,149 @@ func (q *Queries) GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (Pr
 	return i, err
 }
 
+const getWithdrawnConsents = `-- name: GetWithdrawnConsents :many
+SELECT id, user_id, health_data_consent, health_data_consent_date, health_data_consent_version, research_consent, research_consent_date, emergency_access_consent, emergency_access_consent_date, sms_communication_consent, email_communication_consent, data_sharing_consent, special_categories_consent, consent_withdrawn, consent_withdrawn_date, withdrawal_reason, ip_address, user_agent, created_at, updated_at FROM privacy_consents
+WHERE consent_withdrawn = true
+AND consent_withdrawn_date >= $1
+AND consent_withdrawn_date <= $2
+ORDER BY consent_withdrawn_date DESC
+`
+
+type GetWithdrawnConsentsParams struct {
+	ConsentWithdrawnDate   pgtype.Timestamp `json:"consent_withdrawn_date"`
+	ConsentWithdrawnDate_2 pgtype.Timestamp `json:"consent_withdrawn_date_2"`
+}
+
+func (q *Queries) GetWithdrawnConsents(ctx context.Context, arg GetWithdrawnConsentsParams) ([]PrivacyConsent, error) {
+	rows, err := q.db.Query(ctx, getWithdrawnConsents, arg.ConsentWithdrawnDate, arg.ConsentWithdrawnDate_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PrivacyConsent{}
+	for rows.Next() {
+		var i PrivacyConsent
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.HealthDataConsent,
+			&i.HealthDataConsentDate,
+			&i.HealthDataConsentVersion,
+			&i.ResearchConsent,
+			&i.ResearchConsentDate,
+			&i.EmergencyAccessConsent,
+			&i.EmergencyAccessConsentDate,
+			&i.SmsCommunicationConsent,
+			&i.EmailCommunicationConsent,
+			&i.DataSharingConsent,
+			&i.SpecialCategoriesConsent,
+			&i.ConsentWithdrawn,
+			&i.ConsentWithdrawnDate,
+			&i.WithdrawalReason,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateCommunicationConsents = `-- name: UpdateCommunicationConsents :exec
+UPDATE privacy_consents
+SET sms_communication_consent = $2,
+    email_communication_consent = $3,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateCommunicationConsentsParams struct {
+	UserID                    pgtype.UUID `json:"user_id"`
+	SmsCommunicationConsent   pgtype.Bool `json:"sms_communication_consent"`
+	EmailCommunicationConsent pgtype.Bool `json:"email_communication_consent"`
+}
+
+func (q *Queries) UpdateCommunicationConsents(ctx context.Context, arg UpdateCommunicationConsentsParams) error {
+	_, err := q.db.Exec(ctx, updateCommunicationConsents, arg.UserID, arg.SmsCommunicationConsent, arg.EmailCommunicationConsent)
+	return err
+}
+
+const updateDataSharingConsent = `-- name: UpdateDataSharingConsent :exec
+UPDATE privacy_consents
+SET data_sharing_consent = $2,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateDataSharingConsentParams struct {
+	UserID             pgtype.UUID `json:"user_id"`
+	DataSharingConsent []byte      `json:"data_sharing_consent"`
+}
+
+func (q *Queries) UpdateDataSharingConsent(ctx context.Context, arg UpdateDataSharingConsentParams) error {
+	_, err := q.db.Exec(ctx, updateDataSharingConsent, arg.UserID, arg.DataSharingConsent)
+	return err
+}
+
+const updateEmergencyAccessConsent = `-- name: UpdateEmergencyAccessConsent :exec
+UPDATE privacy_consents
+SET emergency_access_consent = $2,
+    emergency_access_consent_date = $3,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateEmergencyAccessConsentParams struct {
+	UserID                     pgtype.UUID      `json:"user_id"`
+	EmergencyAccessConsent     pgtype.Bool      `json:"emergency_access_consent"`
+	EmergencyAccessConsentDate pgtype.Timestamp `json:"emergency_access_consent_date"`
+}
+
+func (q *Queries) UpdateEmergencyAccessConsent(ctx context.Context, arg UpdateEmergencyAccessConsentParams) error {
+	_, err := q.db.Exec(ctx, updateEmergencyAccessConsent, arg.UserID, arg.EmergencyAccessConsent, arg.EmergencyAccessConsentDate)
+	return err
+}
+
+const updateHealthDataConsent = `-- name: UpdateHealthDataConsent :exec
+UPDATE privacy_consents
+SET health_data_consent = $2,
+    health_data_consent_date = $3,
+    health_data_consent_version = $4,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateHealthDataConsentParams struct {
+	UserID                   pgtype.UUID      `json:"user_id"`
+	HealthDataConsent        pgtype.Bool      `json:"health_data_consent"`
+	HealthDataConsentDate    pgtype.Timestamp `json:"health_data_consent_date"`
+	HealthDataConsentVersion pgtype.Text      `json:"health_data_consent_version"`
+}
+
+func (q *Queries) UpdateHealthDataConsent(ctx context.Context, arg UpdateHealthDataConsentParams) error {
+	_, err := q.db.Exec(ctx, updateHealthDataConsent,
+		arg.UserID,
+		arg.HealthDataConsent,
+		arg.HealthDataConsentDate,
+		arg.HealthDataConsentVersion,
+	)
+	return err
+}
+
 const updatePrivacyConsent = `-- name: UpdatePrivacyConsent :exec
 UPDATE privacy_consents
-SET health_data_consent = $2, research_consent = $3,
-    sms_communication_consent = $4, email_communication_consent = $5,
-    data_sharing_consent = $6
+SET health_data_consent = $2, 
+    research_consent = $3,
+    sms_communication_consent = $4, 
+    email_communication_consent = $5,
+    data_sharing_consent = $6,
+    updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1
 `
 
@@ -129,10 +625,31 @@ func (q *Queries) UpdatePrivacyConsent(ctx context.Context, arg UpdatePrivacyCon
 	return err
 }
 
+const updateResearchConsent = `-- name: UpdateResearchConsent :exec
+UPDATE privacy_consents
+SET research_consent = $2,
+    research_consent_date = $3,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateResearchConsentParams struct {
+	UserID              pgtype.UUID      `json:"user_id"`
+	ResearchConsent     pgtype.Bool      `json:"research_consent"`
+	ResearchConsentDate pgtype.Timestamp `json:"research_consent_date"`
+}
+
+func (q *Queries) UpdateResearchConsent(ctx context.Context, arg UpdateResearchConsentParams) error {
+	_, err := q.db.Exec(ctx, updateResearchConsent, arg.UserID, arg.ResearchConsent, arg.ResearchConsentDate)
+	return err
+}
+
 const withdrawConsent = `-- name: WithdrawConsent :exec
 UPDATE privacy_consents
-SET consent_withdrawn = TRUE, consent_withdrawn_date = NOW(),
-    withdrawal_reason = $2
+SET consent_withdrawn = TRUE, 
+    consent_withdrawn_date = CURRENT_TIMESTAMP,
+    withdrawal_reason = $2,
+    updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1
 `
 

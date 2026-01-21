@@ -36,6 +36,8 @@ type Querier interface {
 	// ============================================
 	AddProfessionalCredential(ctx context.Context, arg AddProfessionalCredentialParams) (AddProfessionalCredentialRow, error)
 	BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error
+	CountActiveConsents(ctx context.Context) (int64, error)
+	CountConsentsByType(ctx context.Context) (CountConsentsByTypeRow, error)
 	CountUsersByRole(ctx context.Context, role string) (int64, error)
 	// ============================================
 	// Clinic Queries
@@ -75,17 +77,25 @@ type Querier interface {
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteNotificationPreferences(ctx context.Context, userID pgtype.UUID) error
 	DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error
+	DeletePrivacyConsent(ctx context.Context, userID pgtype.UUID) error
 	DeleteSession(ctx context.Context, sessionToken string) error
 	DeleteSessionByDevice(ctx context.Context, arg DeleteSessionByDeviceParams) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
+	GetActiveEmergencyAccessConsents(ctx context.Context) ([]PrivacyConsent, error)
+	GetActiveHealthDataConsents(ctx context.Context) ([]PrivacyConsent, error)
+	GetActiveResearchConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, error)
 	GetClinicServices(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicServicesRow, error)
 	GetClinicStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff, error)
 	GetClinicStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error)
+	GetConsentByID(ctx context.Context, id pgtype.UUID) (PrivacyConsent, error)
+	GetConsentHistory(ctx context.Context, userID pgtype.UUID) ([]PrivacyConsent, error)
+	GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error)
 	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error)
 	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]GetDataAccessLogsRow, error)
+	GetExpiredConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetLatestActiveOTP(ctx context.Context, arg GetLatestActiveOTPParams) (OtpVerification, error)
 	GetNotificationPreferences(ctx context.Context, userID pgtype.UUID) (NotificationPreference, error)
 	GetOTP(ctx context.Context, arg GetOTPParams) (OtpVerification, error)
@@ -114,6 +124,7 @@ type Querier interface {
 	GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetUsersByIDsRow, error)
 	GetUsersForHealthTips(ctx context.Context, healthTipsFrequency pgtype.Text) ([]pgtype.UUID, error)
 	GetUsersWithDisabledType(ctx context.Context, dollar_1 interface{}) ([]pgtype.UUID, error)
+	GetWithdrawnConsents(ctx context.Context, arg GetWithdrawnConsentsParams) ([]PrivacyConsent, error)
 	InvalidateUserOTPs(ctx context.Context, arg InvalidateUserOTPsParams) error
 	ListClinicStaff(ctx context.Context, arg ListClinicStaffParams) ([]ListClinicStaffRow, error)
 	ListClinics(ctx context.Context, arg ListClinicsParams) ([]ListClinicsRow, error)
@@ -138,8 +149,12 @@ type Querier interface {
 	UpdateClinic(ctx context.Context, arg UpdateClinicParams) error
 	UpdateClinicService(ctx context.Context, arg UpdateClinicServiceParams) error
 	UpdateClinicStaff(ctx context.Context, arg UpdateClinicStaffParams) error
+	UpdateCommunicationConsents(ctx context.Context, arg UpdateCommunicationConsentsParams) error
 	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) error
+	UpdateDataSharingConsent(ctx context.Context, arg UpdateDataSharingConsentParams) error
+	UpdateEmergencyAccessConsent(ctx context.Context, arg UpdateEmergencyAccessConsentParams) error
 	UpdateEmergencyAlerts(ctx context.Context, arg UpdateEmergencyAlertsParams) error
+	UpdateHealthDataConsent(ctx context.Context, arg UpdateHealthDataConsentParams) error
 	UpdateHealthTips(ctx context.Context, arg UpdateHealthTipsParams) error
 	UpdateMedicationReminders(ctx context.Context, arg UpdateMedicationRemindersParams) error
 	UpdateNotificationLanguage(ctx context.Context, arg UpdateNotificationLanguageParams) error
@@ -151,6 +166,7 @@ type Querier interface {
 	UpdatePatientProfile(ctx context.Context, arg UpdatePatientProfileParams) error
 	UpdatePrivacyConsent(ctx context.Context, arg UpdatePrivacyConsentParams) error
 	UpdateQuietHours(ctx context.Context, arg UpdateQuietHoursParams) error
+	UpdateResearchConsent(ctx context.Context, arg UpdateResearchConsentParams) error
 	UpdateSMSConversation(ctx context.Context, arg UpdateSMSConversationParams) error
 	UpdateSession(ctx context.Context, arg UpdateSessionParams) error
 	UpdateSessionToken(ctx context.Context, arg UpdateSessionTokenParams) error
