@@ -467,3 +467,123 @@ func TestSessionRepository_UpdateSessionToken(t *testing.T) {
 		})
 	}
 }
+
+func TestSessionRepository_GetUserSessions(t *testing.T) {
+	ctx := context.Background()
+	now := nowTime()
+	expires := now.Add(time.Hour * 24)
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	sessionID1 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174001")
+	sessionID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174002")
+	ipStr1 := "192.168.1.1"
+	ipStr2 := "192.168.1.2"
+	ipAddr1 := netip.MustParseAddr(ipStr1)
+	ipAddr2 := netip.MustParseAddr(ipStr2)
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		mockSetup     func(*mocks.Querier)
+		expectedSess  []core.UserSession
+		expectedError error
+	}{
+		{
+			name:   "successful get user sessions",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				expectedRows := []sqlc.UserSession{
+					{
+						ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174001"),
+						UserID:       uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+						SessionToken: "token1",
+						DeviceType:   pgtype.Text{String: "mobile", Valid: true},
+						DeviceID:     pgtype.Text{String: "device1", Valid: true},
+						IpAddress:    &ipAddr1,
+						UserAgent:    pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						ExpiresAt:    pgtype.Timestamp{Time: expires, Valid: true},
+						CreatedAt:    pgtype.Timestamp{Time: now, Valid: true},
+					},
+					{
+						ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174002"),
+						UserID:       uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+						SessionToken: "token2",
+						DeviceType:   pgtype.Text{String: "desktop", Valid: true},
+						DeviceID:     pgtype.Text{String: "device2", Valid: true},
+						IpAddress:    &ipAddr2,
+						UserAgent:    pgtype.Text{String: "Chrome", Valid: true},
+						ExpiresAt:    pgtype.Timestamp{Time: expires.Add(time.Hour), Valid: true},
+						CreatedAt:    pgtype.Timestamp{Time: now.Add(time.Hour), Valid: true},
+					},
+				}
+				m.On("GetUserSessions", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(expectedRows, nil)
+			},
+			expectedSess: []core.UserSession{
+				{
+					ID:           sessionID1,
+					UserID:       userID,
+					SessionToken: "token1",
+					DeviceType:   stringPtr("mobile"),
+					DeviceID:     stringPtr("device1"),
+					IPAddress:    &ipStr1,
+					UserAgent:    stringPtr("Mozilla/5.0"),
+					ExpiresAt:    expires,
+					CreatedAt:    now,
+				},
+				{
+					ID:           sessionID2,
+					UserID:       userID,
+					SessionToken: "token2",
+					DeviceType:   stringPtr("desktop"),
+					DeviceID:     stringPtr("device2"),
+					IPAddress:    &ipStr2,
+					UserAgent:    stringPtr("Chrome"),
+					ExpiresAt:    expires.Add(time.Hour),
+					CreatedAt:    now.Add(time.Hour),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "no sessions found",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetUserSessions", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return([]sqlc.UserSession{}, pgx.ErrNoRows)
+			},
+			expectedSess:  []core.UserSession{},
+			expectedError: nil,
+		},
+		{
+			name:   "database error",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetUserSessions", ctx, mock.Anything).Return([]sqlc.UserSession{}, assert.AnError)
+			},
+			expectedSess:  nil,
+			expectedError: fmt.Errorf("get user sessions failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &sessionRepository{querier: mockQuerier}
+
+			gotSess, err := repo.GetUserSessions(ctx, tt.userID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, gotSess)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedSess), len(gotSess))
+				for i, expected := range tt.expectedSess {
+					assertUserSessionEqual(t, expected, gotSess[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
