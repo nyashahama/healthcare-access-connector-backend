@@ -587,3 +587,58 @@ func TestSessionRepository_GetUserSessions(t *testing.T) {
 		})
 	}
 }
+
+func TestSessionRepository_RevokeAllExceptCurrent(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	currentSessionID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name             string
+		userID           uuid.UUID
+		currentSessionID uuid.UUID
+		mockSetup        func(*mocks.Querier)
+		expectedError    error
+	}{
+		{
+			name:             "successful revoke all except current",
+			userID:           userID,
+			currentSessionID: currentSessionID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("DeleteAllSessionsExcept", ctx, mock.MatchedBy(func(p sqlc.DeleteAllSessionsExceptParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.ID.Bytes == currentSessionID
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:             "database error",
+			userID:           userID,
+			currentSessionID: currentSessionID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("DeleteAllSessionsExcept", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("revoke all except current session failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &sessionRepository{querier: mockQuerier}
+
+			err := repo.RevokeAllExceptCurrent(ctx, tt.userID, tt.currentSessionID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
