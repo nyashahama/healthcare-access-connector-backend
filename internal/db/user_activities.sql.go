@@ -12,9 +12,217 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteOldUserActivities = `-- name: DeleteOldUserActivities :exec
+DELETE FROM user_activities
+WHERE performed_at < $1
+`
+
+func (q *Queries) DeleteOldUserActivities(ctx context.Context, performedAt pgtype.Timestamp) error {
+	_, err := q.db.Exec(ctx, deleteOldUserActivities, performedAt)
+	return err
+}
+
+const exportUserActivities = `-- name: ExportUserActivities :many
+SELECT id, user_id, activity_type, activity_details, ip_address,
+    user_agent, device_type, device_id, location,
+    resource_type, resource_id, performed_at
+FROM user_activities
+WHERE user_id = $1
+    AND performed_at >= $2
+    AND performed_at <= $3
+ORDER BY performed_at DESC
+`
+
+type ExportUserActivitiesParams struct {
+	UserID        pgtype.UUID      `json:"user_id"`
+	PerformedAt   pgtype.Timestamp `json:"performed_at"`
+	PerformedAt_2 pgtype.Timestamp `json:"performed_at_2"`
+}
+
+func (q *Queries) ExportUserActivities(ctx context.Context, arg ExportUserActivitiesParams) ([]UserActivity, error) {
+	rows, err := q.db.Query(ctx, exportUserActivities, arg.UserID, arg.PerformedAt, arg.PerformedAt_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserActivity{}
+	for rows.Next() {
+		var i UserActivity
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ActivityType,
+			&i.ActivityDetails,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.DeviceType,
+			&i.DeviceID,
+			&i.Location,
+			&i.ResourceType,
+			&i.ResourceID,
+			&i.PerformedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getActivitiesByResource = `-- name: GetActivitiesByResource :many
+SELECT id, user_id, activity_type, activity_details, ip_address,
+    user_agent, device_type, device_id, location,
+    resource_type, resource_id, performed_at
+FROM user_activities
+WHERE resource_type = $1
+    AND resource_id = $2
+ORDER BY performed_at DESC
+`
+
+type GetActivitiesByResourceParams struct {
+	ResourceType pgtype.Text `json:"resource_type"`
+	ResourceID   pgtype.UUID `json:"resource_id"`
+}
+
+func (q *Queries) GetActivitiesByResource(ctx context.Context, arg GetActivitiesByResourceParams) ([]UserActivity, error) {
+	rows, err := q.db.Query(ctx, getActivitiesByResource, arg.ResourceType, arg.ResourceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserActivity{}
+	for rows.Next() {
+		var i UserActivity
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ActivityType,
+			&i.ActivityDetails,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.DeviceType,
+			&i.DeviceID,
+			&i.Location,
+			&i.ResourceType,
+			&i.ResourceID,
+			&i.PerformedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getActivitiesByType = `-- name: GetActivitiesByType :many
+SELECT id, user_id, activity_type, activity_details, ip_address,
+    user_agent, device_type, device_id, location,
+    resource_type, resource_id, performed_at
+FROM user_activities
+WHERE activity_type = $1
+    AND performed_at >= $2
+    AND performed_at <= $3
+ORDER BY performed_at DESC
+`
+
+type GetActivitiesByTypeParams struct {
+	ActivityType  string           `json:"activity_type"`
+	PerformedAt   pgtype.Timestamp `json:"performed_at"`
+	PerformedAt_2 pgtype.Timestamp `json:"performed_at_2"`
+}
+
+func (q *Queries) GetActivitiesByType(ctx context.Context, arg GetActivitiesByTypeParams) ([]UserActivity, error) {
+	rows, err := q.db.Query(ctx, getActivitiesByType, arg.ActivityType, arg.PerformedAt, arg.PerformedAt_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserActivity{}
+	for rows.Next() {
+		var i UserActivity
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ActivityType,
+			&i.ActivityDetails,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.DeviceType,
+			&i.DeviceID,
+			&i.Location,
+			&i.ResourceType,
+			&i.ResourceID,
+			&i.PerformedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecentActivities = `-- name: GetRecentActivities :many
+SELECT id, user_id, activity_type, activity_details, ip_address,
+    user_agent, device_type, device_id, location,
+    resource_type, resource_id, performed_at
+FROM user_activities
+WHERE performed_at >= $1
+ORDER BY performed_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type GetRecentActivitiesParams struct {
+	PerformedAt pgtype.Timestamp `json:"performed_at"`
+	Limit       int32            `json:"limit"`
+	Offset      int32            `json:"offset"`
+}
+
+func (q *Queries) GetRecentActivities(ctx context.Context, arg GetRecentActivitiesParams) ([]UserActivity, error) {
+	rows, err := q.db.Query(ctx, getRecentActivities, arg.PerformedAt, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserActivity{}
+	for rows.Next() {
+		var i UserActivity
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ActivityType,
+			&i.ActivityDetails,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.DeviceType,
+			&i.DeviceID,
+			&i.Location,
+			&i.ResourceType,
+			&i.ResourceID,
+			&i.PerformedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserActivities = `-- name: GetUserActivities :many
 SELECT id, user_id, activity_type, activity_details, ip_address,
-    device_type, resource_type, resource_id, performed_at
+    user_agent, device_type, device_id, location,
+    resource_type, resource_id, performed_at
 FROM user_activities
 WHERE user_id = $1
 ORDER BY performed_at DESC
@@ -27,34 +235,25 @@ type GetUserActivitiesParams struct {
 	Offset int32       `json:"offset"`
 }
 
-type GetUserActivitiesRow struct {
-	ID              pgtype.UUID      `json:"id"`
-	UserID          pgtype.UUID      `json:"user_id"`
-	ActivityType    string           `json:"activity_type"`
-	ActivityDetails []byte           `json:"activity_details"`
-	IpAddress       *netip.Addr      `json:"ip_address"`
-	DeviceType      pgtype.Text      `json:"device_type"`
-	ResourceType    pgtype.Text      `json:"resource_type"`
-	ResourceID      pgtype.UUID      `json:"resource_id"`
-	PerformedAt     pgtype.Timestamp `json:"performed_at"`
-}
-
-func (q *Queries) GetUserActivities(ctx context.Context, arg GetUserActivitiesParams) ([]GetUserActivitiesRow, error) {
+func (q *Queries) GetUserActivities(ctx context.Context, arg GetUserActivitiesParams) ([]UserActivity, error) {
 	rows, err := q.db.Query(ctx, getUserActivities, arg.UserID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetUserActivitiesRow{}
+	items := []UserActivity{}
 	for rows.Next() {
-		var i GetUserActivitiesRow
+		var i UserActivity
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
 			&i.ActivityType,
 			&i.ActivityDetails,
 			&i.IpAddress,
+			&i.UserAgent,
 			&i.DeviceType,
+			&i.DeviceID,
+			&i.Location,
 			&i.ResourceType,
 			&i.ResourceID,
 			&i.PerformedAt,
@@ -73,9 +272,10 @@ const logUserActivity = `-- name: LogUserActivity :exec
 
 INSERT INTO user_activities (
     user_id, activity_type, activity_details, ip_address,
-    user_agent, device_type, device_id, resource_type, resource_id
+    user_agent, device_type, device_id, location, 
+    resource_type, resource_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type LogUserActivityParams struct {
@@ -86,12 +286,13 @@ type LogUserActivityParams struct {
 	UserAgent       pgtype.Text `json:"user_agent"`
 	DeviceType      pgtype.Text `json:"device_type"`
 	DeviceID        pgtype.Text `json:"device_id"`
+	Location        []byte      `json:"location"`
 	ResourceType    pgtype.Text `json:"resource_type"`
 	ResourceID      pgtype.UUID `json:"resource_id"`
 }
 
 // ============================================
-// Audit Logging Queries (POPIA Compliance)
+// User Activity Queries
 // ============================================
 func (q *Queries) LogUserActivity(ctx context.Context, arg LogUserActivityParams) error {
 	_, err := q.db.Exec(ctx, logUserActivity,
@@ -102,8 +303,74 @@ func (q *Queries) LogUserActivity(ctx context.Context, arg LogUserActivityParams
 		arg.UserAgent,
 		arg.DeviceType,
 		arg.DeviceID,
+		arg.Location,
 		arg.ResourceType,
 		arg.ResourceID,
 	)
 	return err
+}
+
+const searchUserActivities = `-- name: SearchUserActivities :many
+SELECT id, user_id, activity_type, activity_details, ip_address,
+    user_agent, device_type, device_id, location,
+    resource_type, resource_id, performed_at
+FROM user_activities
+WHERE ($1::uuid IS NULL OR user_id = $1)
+    AND ($2::varchar IS NULL OR activity_type = $2)
+    AND ($3::varchar IS NULL OR resource_type = $3)
+    AND ($4::timestamp IS NULL OR performed_at >= $4)
+    AND ($5::timestamp IS NULL OR performed_at <= $5)
+ORDER BY performed_at DESC
+LIMIT $6 OFFSET $7
+`
+
+type SearchUserActivitiesParams struct {
+	Column1 pgtype.UUID      `json:"column_1"`
+	Column2 string           `json:"column_2"`
+	Column3 string           `json:"column_3"`
+	Column4 pgtype.Timestamp `json:"column_4"`
+	Column5 pgtype.Timestamp `json:"column_5"`
+	Limit   int32            `json:"limit"`
+	Offset  int32            `json:"offset"`
+}
+
+func (q *Queries) SearchUserActivities(ctx context.Context, arg SearchUserActivitiesParams) ([]UserActivity, error) {
+	rows, err := q.db.Query(ctx, searchUserActivities,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserActivity{}
+	for rows.Next() {
+		var i UserActivity
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ActivityType,
+			&i.ActivityDetails,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.DeviceType,
+			&i.DeviceID,
+			&i.Location,
+			&i.ResourceType,
+			&i.ResourceID,
+			&i.PerformedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

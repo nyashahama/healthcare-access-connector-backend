@@ -12,10 +12,124 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteOldDataAccessLogs = `-- name: DeleteOldDataAccessLogs :exec
+DELETE FROM data_access_logs
+WHERE accessed_at < $1
+`
+
+func (q *Queries) DeleteOldDataAccessLogs(ctx context.Context, accessedAt pgtype.Timestamp) error {
+	_, err := q.db.Exec(ctx, deleteOldDataAccessLogs, accessedAt)
+	return err
+}
+
+const exportDataAccessLogs = `-- name: ExportDataAccessLogs :many
+SELECT id, accessed_by_user_id, accessed_by_role, accessed_user_id,
+    accessed_resource_type, accessed_resource_id, access_type,
+    access_reason, is_emergency_access, ip_address, user_agent,
+    location, accessed_at
+FROM data_access_logs
+WHERE accessed_user_id = $1
+    AND accessed_at >= $2
+    AND accessed_at <= $3
+ORDER BY accessed_at DESC
+`
+
+type ExportDataAccessLogsParams struct {
+	AccessedUserID pgtype.UUID      `json:"accessed_user_id"`
+	AccessedAt     pgtype.Timestamp `json:"accessed_at"`
+	AccessedAt_2   pgtype.Timestamp `json:"accessed_at_2"`
+}
+
+func (q *Queries) ExportDataAccessLogs(ctx context.Context, arg ExportDataAccessLogsParams) ([]DataAccessLog, error) {
+	rows, err := q.db.Query(ctx, exportDataAccessLogs, arg.AccessedUserID, arg.AccessedAt, arg.AccessedAt_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DataAccessLog{}
+	for rows.Next() {
+		var i DataAccessLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccessedByUserID,
+			&i.AccessedByRole,
+			&i.AccessedUserID,
+			&i.AccessedResourceType,
+			&i.AccessedResourceID,
+			&i.AccessType,
+			&i.AccessReason,
+			&i.IsEmergencyAccess,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.Location,
+			&i.AccessedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAccessLogsByAccessedByUser = `-- name: GetAccessLogsByAccessedByUser :many
+SELECT id, accessed_by_user_id, accessed_by_role, accessed_user_id,
+    accessed_resource_type, accessed_resource_id, access_type,
+    access_reason, is_emergency_access, ip_address, user_agent,
+    location, accessed_at
+FROM data_access_logs
+WHERE accessed_by_user_id = $1
+ORDER BY accessed_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type GetAccessLogsByAccessedByUserParams struct {
+	AccessedByUserID pgtype.UUID `json:"accessed_by_user_id"`
+	Limit            int32       `json:"limit"`
+	Offset           int32       `json:"offset"`
+}
+
+func (q *Queries) GetAccessLogsByAccessedByUser(ctx context.Context, arg GetAccessLogsByAccessedByUserParams) ([]DataAccessLog, error) {
+	rows, err := q.db.Query(ctx, getAccessLogsByAccessedByUser, arg.AccessedByUserID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DataAccessLog{}
+	for rows.Next() {
+		var i DataAccessLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccessedByUserID,
+			&i.AccessedByRole,
+			&i.AccessedUserID,
+			&i.AccessedResourceType,
+			&i.AccessedResourceID,
+			&i.AccessType,
+			&i.AccessReason,
+			&i.IsEmergencyAccess,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.Location,
+			&i.AccessedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDataAccessLogs = `-- name: GetDataAccessLogs :many
-SELECT id, accessed_by_user_id, accessed_by_role, accessed_resource_type,
-    accessed_resource_id, access_type, access_reason, 
-    is_emergency_access, accessed_at
+SELECT id, accessed_by_user_id, accessed_by_role, accessed_user_id,
+    accessed_resource_type, accessed_resource_id, access_type,
+    access_reason, is_emergency_access, ip_address, user_agent,
+    location, accessed_at
 FROM data_access_logs
 WHERE accessed_user_id = $1
 ORDER BY accessed_at DESC
@@ -28,36 +142,78 @@ type GetDataAccessLogsParams struct {
 	Offset         int32       `json:"offset"`
 }
 
-type GetDataAccessLogsRow struct {
-	ID                   pgtype.UUID      `json:"id"`
-	AccessedByUserID     pgtype.UUID      `json:"accessed_by_user_id"`
-	AccessedByRole       pgtype.Text      `json:"accessed_by_role"`
-	AccessedResourceType pgtype.Text      `json:"accessed_resource_type"`
-	AccessedResourceID   pgtype.UUID      `json:"accessed_resource_id"`
-	AccessType           pgtype.Text      `json:"access_type"`
-	AccessReason         pgtype.Text      `json:"access_reason"`
-	IsEmergencyAccess    pgtype.Bool      `json:"is_emergency_access"`
-	AccessedAt           pgtype.Timestamp `json:"accessed_at"`
-}
-
-func (q *Queries) GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]GetDataAccessLogsRow, error) {
+func (q *Queries) GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]DataAccessLog, error) {
 	rows, err := q.db.Query(ctx, getDataAccessLogs, arg.AccessedUserID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetDataAccessLogsRow{}
+	items := []DataAccessLog{}
 	for rows.Next() {
-		var i GetDataAccessLogsRow
+		var i DataAccessLog
 		if err := rows.Scan(
 			&i.ID,
 			&i.AccessedByUserID,
 			&i.AccessedByRole,
+			&i.AccessedUserID,
 			&i.AccessedResourceType,
 			&i.AccessedResourceID,
 			&i.AccessType,
 			&i.AccessReason,
 			&i.IsEmergencyAccess,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.Location,
+			&i.AccessedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getEmergencyAccessLogs = `-- name: GetEmergencyAccessLogs :many
+SELECT id, accessed_by_user_id, accessed_by_role, accessed_user_id,
+    accessed_resource_type, accessed_resource_id, access_type,
+    access_reason, is_emergency_access, ip_address, user_agent,
+    location, accessed_at
+FROM data_access_logs
+WHERE is_emergency_access = true
+ORDER BY accessed_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type GetEmergencyAccessLogsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) GetEmergencyAccessLogs(ctx context.Context, arg GetEmergencyAccessLogsParams) ([]DataAccessLog, error) {
+	rows, err := q.db.Query(ctx, getEmergencyAccessLogs, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DataAccessLog{}
+	for rows.Next() {
+		var i DataAccessLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccessedByUserID,
+			&i.AccessedByRole,
+			&i.AccessedUserID,
+			&i.AccessedResourceType,
+			&i.AccessedResourceID,
+			&i.AccessType,
+			&i.AccessReason,
+			&i.IsEmergencyAccess,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.Location,
 			&i.AccessedAt,
 		); err != nil {
 			return nil, err
@@ -71,12 +227,14 @@ func (q *Queries) GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsPa
 }
 
 const logDataAccess = `-- name: LogDataAccess :exec
+
 INSERT INTO data_access_logs (
     accessed_by_user_id, accessed_by_role, accessed_user_id,
     accessed_resource_type, accessed_resource_id, access_type,
-    access_reason, is_emergency_access, ip_address, user_agent
+    access_reason, is_emergency_access, ip_address, user_agent,
+    location
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 `
 
 type LogDataAccessParams struct {
@@ -90,8 +248,12 @@ type LogDataAccessParams struct {
 	IsEmergencyAccess    pgtype.Bool `json:"is_emergency_access"`
 	IpAddress            *netip.Addr `json:"ip_address"`
 	UserAgent            pgtype.Text `json:"user_agent"`
+	Location             []byte      `json:"location"`
 }
 
+// ============================================
+// Data Access Log Queries
+// ============================================
 func (q *Queries) LogDataAccess(ctx context.Context, arg LogDataAccessParams) error {
 	_, err := q.db.Exec(ctx, logDataAccess,
 		arg.AccessedByUserID,
@@ -104,6 +266,80 @@ func (q *Queries) LogDataAccess(ctx context.Context, arg LogDataAccessParams) er
 		arg.IsEmergencyAccess,
 		arg.IpAddress,
 		arg.UserAgent,
+		arg.Location,
 	)
 	return err
+}
+
+const searchDataAccessLogs = `-- name: SearchDataAccessLogs :many
+SELECT id, accessed_by_user_id, accessed_by_role, accessed_user_id,
+    accessed_resource_type, accessed_resource_id, access_type,
+    access_reason, is_emergency_access, ip_address, user_agent,
+    location, accessed_at
+FROM data_access_logs
+WHERE ($1::uuid IS NULL OR accessed_user_id = $1)
+    AND ($2::uuid IS NULL OR accessed_by_user_id = $2)
+    AND ($3::varchar IS NULL OR access_type = $3)
+    AND ($4::varchar IS NULL OR accessed_resource_type = $4)
+    AND ($5::boolean IS NULL OR is_emergency_access = $5)
+    AND ($6::timestamp IS NULL OR accessed_at >= $6)
+    AND ($7::timestamp IS NULL OR accessed_at <= $7)
+ORDER BY accessed_at DESC
+LIMIT $8 OFFSET $9
+`
+
+type SearchDataAccessLogsParams struct {
+	Column1 pgtype.UUID      `json:"column_1"`
+	Column2 pgtype.UUID      `json:"column_2"`
+	Column3 string           `json:"column_3"`
+	Column4 string           `json:"column_4"`
+	Column5 bool             `json:"column_5"`
+	Column6 pgtype.Timestamp `json:"column_6"`
+	Column7 pgtype.Timestamp `json:"column_7"`
+	Limit   int32            `json:"limit"`
+	Offset  int32            `json:"offset"`
+}
+
+func (q *Queries) SearchDataAccessLogs(ctx context.Context, arg SearchDataAccessLogsParams) ([]DataAccessLog, error) {
+	rows, err := q.db.Query(ctx, searchDataAccessLogs,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DataAccessLog{}
+	for rows.Next() {
+		var i DataAccessLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccessedByUserID,
+			&i.AccessedByRole,
+			&i.AccessedUserID,
+			&i.AccessedResourceType,
+			&i.AccessedResourceID,
+			&i.AccessType,
+			&i.AccessReason,
+			&i.IsEmergencyAccess,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.Location,
+			&i.AccessedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

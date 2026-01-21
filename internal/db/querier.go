@@ -76,6 +76,8 @@ type Querier interface {
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteNotificationPreferences(ctx context.Context, userID pgtype.UUID) error
+	DeleteOldDataAccessLogs(ctx context.Context, accessedAt pgtype.Timestamp) error
+	DeleteOldUserActivities(ctx context.Context, performedAt pgtype.Timestamp) error
 	DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error
 	DeletePrivacyConsent(ctx context.Context, userID pgtype.UUID) error
 	DeleteSession(ctx context.Context, sessionToken string) error
@@ -83,9 +85,14 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
+	ExportDataAccessLogs(ctx context.Context, arg ExportDataAccessLogsParams) ([]DataAccessLog, error)
+	ExportUserActivities(ctx context.Context, arg ExportUserActivitiesParams) ([]UserActivity, error)
+	GetAccessLogsByAccessedByUser(ctx context.Context, arg GetAccessLogsByAccessedByUserParams) ([]DataAccessLog, error)
 	GetActiveEmergencyAccessConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetActiveHealthDataConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetActiveResearchConsents(ctx context.Context) ([]PrivacyConsent, error)
+	GetActivitiesByResource(ctx context.Context, arg GetActivitiesByResourceParams) ([]UserActivity, error)
+	GetActivitiesByType(ctx context.Context, arg GetActivitiesByTypeParams) ([]UserActivity, error)
 	GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, error)
 	GetClinicServices(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicServicesRow, error)
 	GetClinicStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff, error)
@@ -94,7 +101,8 @@ type Querier interface {
 	GetConsentHistory(ctx context.Context, userID pgtype.UUID) ([]PrivacyConsent, error)
 	GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error)
 	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error)
-	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]GetDataAccessLogsRow, error)
+	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]DataAccessLog, error)
+	GetEmergencyAccessLogs(ctx context.Context, arg GetEmergencyAccessLogsParams) ([]DataAccessLog, error)
 	GetExpiredConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetLatestActiveOTP(ctx context.Context, arg GetLatestActiveOTPParams) (OtpVerification, error)
 	GetNotificationPreferences(ctx context.Context, userID pgtype.UUID) (NotificationPreference, error)
@@ -108,12 +116,13 @@ type Querier interface {
 	GetPatientProfileByID(ctx context.Context, id pgtype.UUID) (PatientProfile, error)
 	GetPatientProfileByUserID(ctx context.Context, userID pgtype.UUID) (PatientProfile, error)
 	GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error)
+	GetRecentActivities(ctx context.Context, arg GetRecentActivitiesParams) ([]UserActivity, error)
 	GetRecentOTPs(ctx context.Context, arg GetRecentOTPsParams) ([]OtpVerification, error)
 	GetSMSConversationByPhone(ctx context.Context, phoneNumber string) (SmsConversation, error)
 	GetSession(ctx context.Context, sessionToken string) (GetSessionRow, error)
 	GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]GetStaffCredentialsRow, error)
 	GetUpcomingImmunizations(ctx context.Context, patientID pgtype.UUID) ([]GetUpcomingImmunizationsRow, error)
-	GetUserActivities(ctx context.Context, arg GetUserActivitiesParams) ([]GetUserActivitiesRow, error)
+	GetUserActivities(ctx context.Context, arg GetUserActivitiesParams) ([]UserActivity, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
 	GetUserByID(ctx context.Context, id pgtype.UUID) (GetUserByIDRow, error)
 	GetUserByPasswordResetToken(ctx context.Context, resetPasswordToken pgtype.Text) (GetUserByPasswordResetTokenRow, error)
@@ -129,10 +138,13 @@ type Querier interface {
 	ListClinicStaff(ctx context.Context, arg ListClinicStaffParams) ([]ListClinicStaffRow, error)
 	ListClinics(ctx context.Context, arg ListClinicsParams) ([]ListClinicsRow, error)
 	ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams) ([]ListUsersByRoleRow, error)
+	// ============================================
+	// Data Access Log Queries
+	// ============================================
 	LogDataAccess(ctx context.Context, arg LogDataAccessParams) error
 	LogSMSMessage(ctx context.Context, arg LogSMSMessageParams) (LogSMSMessageRow, error)
 	// ============================================
-	// Audit Logging Queries (POPIA Compliance)
+	// User Activity Queries
 	// ============================================
 	LogUserActivity(ctx context.Context, arg LogUserActivityParams) error
 	MarkOTPUsed(ctx context.Context, arg MarkOTPUsedParams) error
@@ -140,7 +152,9 @@ type Querier interface {
 	SaveOTP(ctx context.Context, arg SaveOTPParams) (OtpVerification, error)
 	SearchClinics(ctx context.Context, arg SearchClinicsParams) ([]SearchClinicsRow, error)
 	SearchClinicsByLocation(ctx context.Context, arg SearchClinicsByLocationParams) ([]SearchClinicsByLocationRow, error)
+	SearchDataAccessLogs(ctx context.Context, arg SearchDataAccessLogsParams) ([]DataAccessLog, error)
 	SearchPatients(ctx context.Context, arg SearchPatientsParams) ([]SearchPatientsRow, error)
+	SearchUserActivities(ctx context.Context, arg SearchUserActivitiesParams) ([]UserActivity, error)
 	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error
