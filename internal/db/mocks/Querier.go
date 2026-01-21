@@ -500,6 +500,24 @@ func (_m *Querier) DeactivateClinicService(ctx context.Context, id pgtype.UUID) 
 	return r0
 }
 
+// DeleteAllSessionsExcept provides a mock function with given fields: ctx, arg
+func (_m *Querier) DeleteAllSessionsExcept(ctx context.Context, arg sqlc.DeleteAllSessionsExceptParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteAllSessionsExcept")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.DeleteAllSessionsExceptParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeleteExpiredOTPs provides a mock function with given fields: ctx
 func (_m *Querier) DeleteExpiredOTPs(ctx context.Context) error {
 	ret := _m.Called(ctx)
@@ -565,6 +583,24 @@ func (_m *Querier) DeleteSession(ctx context.Context, sessionToken string) error
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
 		r0 = rf(ctx, sessionToken)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteSessionByDevice provides a mock function with given fields: ctx, arg
+func (_m *Querier) DeleteSessionByDevice(ctx context.Context, arg sqlc.DeleteSessionByDeviceParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteSessionByDevice")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.DeleteSessionByDeviceParams) error); ok {
+		r0 = rf(ctx, arg)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1488,6 +1524,36 @@ func (_m *Querier) GetUserByVerificationToken(ctx context.Context, verificationT
 	return r0, r1
 }
 
+// GetUserSessions provides a mock function with given fields: ctx, userID
+func (_m *Querier) GetUserSessions(ctx context.Context, userID pgtype.UUID) ([]sqlc.UserSession, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUserSessions")
+	}
+
+	var r0 []sqlc.UserSession
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) ([]sqlc.UserSession, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) []sqlc.UserSession); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.UserSession)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetUsersByIDs provides a mock function with given fields: ctx, dollar_1
 func (_m *Querier) GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]sqlc.GetUsersByIDsRow, error) {
 	ret := _m.Called(ctx, dollar_1)
@@ -2100,6 +2166,24 @@ func (_m *Querier) UpdateSMSConversation(ctx context.Context, arg sqlc.UpdateSMS
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateSMSConversationParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateSession provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateSession(ctx context.Context, arg sqlc.UpdateSessionParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateSession")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateSessionParams) error); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		r0 = ret.Error(0)
