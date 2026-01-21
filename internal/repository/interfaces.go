@@ -131,29 +131,39 @@ type ConsentRepository interface {
 	NotifyConsentExpirations(ctx context.Context, daysBefore int) ([]uuid.UUID, error)
 }
 
+// ============================================
+// AUDIT REPOSITORY (POPIA Compliance)
+// Maps to: user_activities.sql & data_access_logs.sql
+// ============================================
+
 type AuditRepository interface {
-	// Activity Logging
-	LogActivity(ctx context.Context, activity core.UserActivity) error
+	// User Activity Logging
+	LogUserActivity(ctx context.Context, activity core.UserActivity) error
 	GetUserActivities(ctx context.Context, userID uuid.UUID, limit, offset int) ([]core.UserActivity, error)
 	GetActivitiesByType(ctx context.Context, activityType string, startDate, endDate time.Time) ([]core.UserActivity, error)
+	GetActivitiesByResource(ctx context.Context, resourceType string, resourceID uuid.UUID) ([]core.UserActivity, error)
 
-	// Data Access Logging (POPIA Compliance)
+	// Data Access Logging (POPIA Requirement)
 	LogDataAccess(ctx context.Context, access core.DataAccessLog) error
 	GetDataAccessLogs(ctx context.Context, accessedUserID uuid.UUID, limit, offset int) ([]core.DataAccessLog, error)
 	GetDataAccessLogsByAccessor(ctx context.Context, accessedByUserID uuid.UUID, limit, offset int) ([]core.DataAccessLog, error)
 	GetEmergencyAccessLogs(ctx context.Context, limit, offset int) ([]core.DataAccessLog, error)
+	GetAccessLogsByResourceType(ctx context.Context, resourceType string, startDate, endDate time.Time) ([]core.DataAccessLog, error)
 
-	// Audit Reports
-	//	GenerateAccessReport(ctx context.Context, userID uuid.UUID, startDate, endDate time.Time) (core.AccessReport, error)
-	//	GenerateComplianceReport(ctx context.Context, startDate, endDate time.Time) (core.ComplianceReport, error)
+	// Security Monitoring
+	GetSuspiciousActivities(ctx context.Context, threshold int) ([]core.UserActivity, error)
+	GetFailedLoginAttempts(ctx context.Context, userID *uuid.UUID, within time.Duration) ([]core.UserActivity, error)
+	GetUnauthorizedAccessAttempts(ctx context.Context, within time.Duration) ([]core.DataAccessLog, error)
 
 	// Retention & Cleanup
 	ArchiveOldLogs(ctx context.Context, olderThan time.Duration) error
 	DeleteArchivedLogs(ctx context.Context, olderThan time.Duration) error
+	ArchiveOldActivities(ctx context.Context, olderThan time.Duration) error
 
-	// Security Monitoring
-	GetSuspiciousActivities(ctx context.Context, threshold int) ([]core.UserActivity, error)
-	GetFailedLoginAttempts(ctx context.Context, within time.Duration) ([]core.UserActivity, error)
+	// Compliance Reporting
+	GenerateAccessReport(ctx context.Context, userID uuid.UUID, startDate, endDate time.Time) (interface{}, error)
+	GenerateActivityReport(ctx context.Context, startDate, endDate time.Time) (interface{}, error)
+	ExportUserAuditTrail(ctx context.Context, userID uuid.UUID) ([]byte, error)
 }
 
 // ============================================
