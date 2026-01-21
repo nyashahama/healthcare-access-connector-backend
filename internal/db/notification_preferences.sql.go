@@ -55,6 +55,15 @@ func (q *Queries) CreateNotificationPreferences(ctx context.Context, arg CreateN
 	return i, err
 }
 
+const deleteNotificationPreferences = `-- name: DeleteNotificationPreferences :exec
+DELETE FROM notification_preferences WHERE user_id = $1
+`
+
+func (q *Queries) DeleteNotificationPreferences(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteNotificationPreferences, userID)
+	return err
+}
+
 const getNotificationPreferences = `-- name: GetNotificationPreferences :one
 SELECT id, user_id, sms_enabled, email_enabled, push_enabled, whatsapp_enabled, appointment_reminders, appointment_reminder_hours_before, health_tips, health_tips_frequency, medication_reminders, prescription_updates, clinic_updates, newsletter, emergency_alerts, system_maintenance, notification_language, quiet_hours_start, quiet_hours_end, created_at, updated_at FROM notification_preferences WHERE user_id = $1
 `
@@ -88,6 +97,187 @@ func (q *Queries) GetNotificationPreferences(ctx context.Context, userID pgtype.
 	return i, err
 }
 
+const getUsersForHealthTips = `-- name: GetUsersForHealthTips :many
+SELECT user_id FROM notification_preferences 
+WHERE health_tips = true AND health_tips_frequency = $1
+`
+
+func (q *Queries) GetUsersForHealthTips(ctx context.Context, healthTipsFrequency pgtype.Text) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, getUsersForHealthTips, healthTipsFrequency)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var user_id pgtype.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUsersWithDisabledType = `-- name: GetUsersWithDisabledType :many
+SELECT user_id FROM notification_preferences 
+WHERE 
+    (CASE 
+        WHEN $1 = 'sms' THEN NOT sms_enabled
+        WHEN $1 = 'email' THEN NOT email_enabled
+        WHEN $1 = 'push' THEN NOT push_enabled
+        WHEN $1 = 'appointment_reminders' THEN NOT appointment_reminders
+        WHEN $1 = 'health_tips' THEN NOT health_tips
+        WHEN $1 = 'medication_reminders' THEN NOT medication_reminders
+        WHEN $1 = 'emergency_alerts' THEN NOT emergency_alerts
+        ELSE false
+    END)
+`
+
+func (q *Queries) GetUsersWithDisabledType(ctx context.Context, dollar_1 interface{}) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, getUsersWithDisabledType, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []pgtype.UUID{}
+	for rows.Next() {
+		var user_id pgtype.UUID
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateAppointmentReminders = `-- name: UpdateAppointmentReminders :exec
+UPDATE notification_preferences
+SET 
+    appointment_reminders = $2,
+    appointment_reminder_hours_before = $3,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateAppointmentRemindersParams struct {
+	UserID                         pgtype.UUID `json:"user_id"`
+	AppointmentReminders           pgtype.Bool `json:"appointment_reminders"`
+	AppointmentReminderHoursBefore pgtype.Int4 `json:"appointment_reminder_hours_before"`
+}
+
+func (q *Queries) UpdateAppointmentReminders(ctx context.Context, arg UpdateAppointmentRemindersParams) error {
+	_, err := q.db.Exec(ctx, updateAppointmentReminders, arg.UserID, arg.AppointmentReminders, arg.AppointmentReminderHoursBefore)
+	return err
+}
+
+const updateChannelSettings = `-- name: UpdateChannelSettings :exec
+UPDATE notification_preferences
+SET 
+    sms_enabled = $2,
+    email_enabled = $3,
+    push_enabled = $4,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateChannelSettingsParams struct {
+	UserID       pgtype.UUID `json:"user_id"`
+	SmsEnabled   pgtype.Bool `json:"sms_enabled"`
+	EmailEnabled pgtype.Bool `json:"email_enabled"`
+	PushEnabled  pgtype.Bool `json:"push_enabled"`
+}
+
+func (q *Queries) UpdateChannelSettings(ctx context.Context, arg UpdateChannelSettingsParams) error {
+	_, err := q.db.Exec(ctx, updateChannelSettings,
+		arg.UserID,
+		arg.SmsEnabled,
+		arg.EmailEnabled,
+		arg.PushEnabled,
+	)
+	return err
+}
+
+const updateEmergencyAlerts = `-- name: UpdateEmergencyAlerts :exec
+UPDATE notification_preferences
+SET 
+    emergency_alerts = $2,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateEmergencyAlertsParams struct {
+	UserID          pgtype.UUID `json:"user_id"`
+	EmergencyAlerts pgtype.Bool `json:"emergency_alerts"`
+}
+
+func (q *Queries) UpdateEmergencyAlerts(ctx context.Context, arg UpdateEmergencyAlertsParams) error {
+	_, err := q.db.Exec(ctx, updateEmergencyAlerts, arg.UserID, arg.EmergencyAlerts)
+	return err
+}
+
+const updateHealthTips = `-- name: UpdateHealthTips :exec
+UPDATE notification_preferences
+SET 
+    health_tips = $2,
+    health_tips_frequency = $3,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateHealthTipsParams struct {
+	UserID              pgtype.UUID `json:"user_id"`
+	HealthTips          pgtype.Bool `json:"health_tips"`
+	HealthTipsFrequency pgtype.Text `json:"health_tips_frequency"`
+}
+
+func (q *Queries) UpdateHealthTips(ctx context.Context, arg UpdateHealthTipsParams) error {
+	_, err := q.db.Exec(ctx, updateHealthTips, arg.UserID, arg.HealthTips, arg.HealthTipsFrequency)
+	return err
+}
+
+const updateMedicationReminders = `-- name: UpdateMedicationReminders :exec
+UPDATE notification_preferences
+SET 
+    medication_reminders = $2,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateMedicationRemindersParams struct {
+	UserID              pgtype.UUID `json:"user_id"`
+	MedicationReminders pgtype.Bool `json:"medication_reminders"`
+}
+
+func (q *Queries) UpdateMedicationReminders(ctx context.Context, arg UpdateMedicationRemindersParams) error {
+	_, err := q.db.Exec(ctx, updateMedicationReminders, arg.UserID, arg.MedicationReminders)
+	return err
+}
+
+const updateNotificationLanguage = `-- name: UpdateNotificationLanguage :exec
+UPDATE notification_preferences
+SET 
+    notification_language = $2,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateNotificationLanguageParams struct {
+	UserID               pgtype.UUID `json:"user_id"`
+	NotificationLanguage pgtype.Text `json:"notification_language"`
+}
+
+func (q *Queries) UpdateNotificationLanguage(ctx context.Context, arg UpdateNotificationLanguageParams) error {
+	_, err := q.db.Exec(ctx, updateNotificationLanguage, arg.UserID, arg.NotificationLanguage)
+	return err
+}
+
 const updateNotificationPreferences = `-- name: UpdateNotificationPreferences :exec
 UPDATE notification_preferences
 SET sms_enabled = $2, email_enabled = $3, push_enabled = $4,
@@ -118,5 +308,25 @@ func (q *Queries) UpdateNotificationPreferences(ctx context.Context, arg UpdateN
 		arg.MedicationReminders,
 		arg.EmergencyAlerts,
 	)
+	return err
+}
+
+const updateQuietHours = `-- name: UpdateQuietHours :exec
+UPDATE notification_preferences
+SET 
+    quiet_hours_start = $2,
+    quiet_hours_end = $3,
+    updated_at = CURRENT_TIMESTAMP
+WHERE user_id = $1
+`
+
+type UpdateQuietHoursParams struct {
+	UserID          pgtype.UUID `json:"user_id"`
+	QuietHoursStart pgtype.Time `json:"quiet_hours_start"`
+	QuietHoursEnd   pgtype.Time `json:"quiet_hours_end"`
+}
+
+func (q *Queries) UpdateQuietHours(ctx context.Context, arg UpdateQuietHoursParams) error {
+	_, err := q.db.Exec(ctx, updateQuietHours, arg.UserID, arg.QuietHoursStart, arg.QuietHoursEnd)
 	return err
 }

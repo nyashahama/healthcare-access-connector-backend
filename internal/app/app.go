@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -80,11 +79,11 @@ func New(cfg *config.Config) (*App, error) {
 	userRepo := repocore.NewUserRepository(pool)
 	otpRepo := repocore.NewOTPRepository(pool)
 	sessionRepo := repocore.NewSessionRepository(pool)
+	notificationRepo := repocore.NewNotificationRepository(pool)
 
 	// Initialize stubs for required but not yet implemented repositories
 	patientRepo := &stubPatientRepository{}
 	consentRepo := &stubConsentRepository{}
-	notificationRepo := &stubNotificationRepository{}
 
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
@@ -376,63 +375,5 @@ func (s *stubConsentRepository) ExportConsentData(ctx context.Context, userID uu
 }
 
 func (s *stubConsentRepository) NotifyConsentExpirations(ctx context.Context, daysBefore int) ([]uuid.UUID, error) {
-	return []uuid.UUID{}, nil
-}
-
-type stubNotificationRepository struct{}
-
-func (s *stubNotificationRepository) CreatePreferences(ctx context.Context, prefs core.NotificationPreferences) (core.NotificationPreferences, error) {
-	return prefs, nil
-}
-
-func (s *stubNotificationRepository) GetPreferences(ctx context.Context, userID uuid.UUID) (core.NotificationPreferences, error) {
-	return core.NotificationPreferences{}, nil
-}
-
-func (s *stubNotificationRepository) UpdatePreferences(ctx context.Context, prefs core.NotificationPreferences) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) DeletePreferences(ctx context.Context, userID uuid.UUID) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) UpdateEmailPreferences(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) UpdateSMSPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) UpdatePushPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) UpdateAppointmentReminders(ctx context.Context, userID uuid.UUID, enabled bool, hoursBefore int) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) UpdateMedicationReminders(ctx context.Context, userID uuid.UUID, enabled bool) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) UpdateHealthTips(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) UpdateEmergencyAlerts(ctx context.Context, userID uuid.UUID, enabled bool) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) SetQuietHours(ctx context.Context, userID uuid.UUID, startTime, endTime time.Time) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) UpdateNotificationLanguage(ctx context.Context, userID uuid.UUID, language string) error {
-	return nil
-}
-
-func (s *stubNotificationRepository) GetUsersWithDisabledNotifications(ctx context.Context, notificationType string) ([]uuid.UUID, error) {
 	return []uuid.UUID{}, nil
 }

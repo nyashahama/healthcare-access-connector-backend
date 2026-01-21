@@ -161,33 +161,26 @@ type AuditRepository interface {
 // ============================================
 
 type NotificationRepository interface {
-	// Preferences Management
-	CreatePreferences(ctx context.Context, prefs core.NotificationPreferences) (core.NotificationPreferences, error)
-	GetPreferences(ctx context.Context, userID uuid.UUID) (core.NotificationPreferences, error)
-	UpdatePreferences(ctx context.Context, prefs core.NotificationPreferences) error
-	DeletePreferences(ctx context.Context, userID uuid.UUID) error
+	// Core CRUD Operations
+	CreateNotificationPreferences(ctx context.Context, prefs core.NotificationPreferences) (core.NotificationPreferences, error)
+	GetNotificationPreferences(ctx context.Context, userID uuid.UUID) (core.NotificationPreferences, error)
+	UpdateNotificationPreferences(ctx context.Context, prefs core.NotificationPreferences) error
+	DeleteNotificationPreferences(ctx context.Context, userID uuid.UUID) error
 
-	// Channel-Specific Preferences
-	UpdateEmailPreferences(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error
-	UpdateSMSPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error
-	UpdatePushPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error
-
-	// Notification Types
+	// Channel-Specific Updates
+	UpdateChannelSettings(ctx context.Context, userID uuid.UUID, sms, email, push bool) error
 	UpdateAppointmentReminders(ctx context.Context, userID uuid.UUID, enabled bool, hoursBefore int) error
-	UpdateMedicationReminders(ctx context.Context, userID uuid.UUID, enabled bool) error
 	UpdateHealthTips(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error
+	UpdateMedicationReminders(ctx context.Context, userID uuid.UUID, enabled bool) error
 	UpdateEmergencyAlerts(ctx context.Context, userID uuid.UUID, enabled bool) error
 
-	// Quiet Hours
-	SetQuietHours(ctx context.Context, userID uuid.UUID, startTime, endTime time.Time) error
-	//	GetQuietHours(ctx context.Context, userID uuid.UUID) (core.QuietHours, error)
-
-	// Language & Localization
+	// Quiet Hours Management
+	SetQuietHours(ctx context.Context, userID uuid.UUID, startTime, endTime *time.Time) error
 	UpdateNotificationLanguage(ctx context.Context, userID uuid.UUID, language string) error
 
 	// Bulk Operations
 	GetUsersWithDisabledNotifications(ctx context.Context, notificationType string) ([]uuid.UUID, error)
-	// BulkUpdatePreferences(ctx context.Context, updates []core.NotificationPreferenceUpdate) error
+	GetUsersForHealthTips(ctx context.Context, frequency string) ([]uuid.UUID, error)
 }
 
 // ============================================

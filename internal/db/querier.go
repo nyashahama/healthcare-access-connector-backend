@@ -73,6 +73,7 @@ type Querier interface {
 	DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
+	DeleteNotificationPreferences(ctx context.Context, userID pgtype.UUID) error
 	DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error
 	DeleteSession(ctx context.Context, sessionToken string) error
 	DeleteSessionByDevice(ctx context.Context, arg DeleteSessionByDeviceParams) error
@@ -111,6 +112,8 @@ type Querier interface {
 	GetUserByVerificationToken(ctx context.Context, verificationToken pgtype.Text) (GetUserByVerificationTokenRow, error)
 	GetUserSessions(ctx context.Context, userID pgtype.UUID) ([]UserSession, error)
 	GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetUsersByIDsRow, error)
+	GetUsersForHealthTips(ctx context.Context, healthTipsFrequency pgtype.Text) ([]pgtype.UUID, error)
+	GetUsersWithDisabledType(ctx context.Context, dollar_1 interface{}) ([]pgtype.UUID, error)
 	InvalidateUserOTPs(ctx context.Context, arg InvalidateUserOTPsParams) error
 	ListClinicStaff(ctx context.Context, arg ListClinicStaffParams) ([]ListClinicStaffRow, error)
 	ListClinics(ctx context.Context, arg ListClinicsParams) ([]ListClinicsRow, error)
@@ -130,10 +133,16 @@ type Querier interface {
 	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error
+	UpdateAppointmentReminders(ctx context.Context, arg UpdateAppointmentRemindersParams) error
+	UpdateChannelSettings(ctx context.Context, arg UpdateChannelSettingsParams) error
 	UpdateClinic(ctx context.Context, arg UpdateClinicParams) error
 	UpdateClinicService(ctx context.Context, arg UpdateClinicServiceParams) error
 	UpdateClinicStaff(ctx context.Context, arg UpdateClinicStaffParams) error
 	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) error
+	UpdateEmergencyAlerts(ctx context.Context, arg UpdateEmergencyAlertsParams) error
+	UpdateHealthTips(ctx context.Context, arg UpdateHealthTipsParams) error
+	UpdateMedicationReminders(ctx context.Context, arg UpdateMedicationRemindersParams) error
+	UpdateNotificationLanguage(ctx context.Context, arg UpdateNotificationLanguageParams) error
 	UpdateNotificationPreferences(ctx context.Context, arg UpdateNotificationPreferencesParams) error
 	UpdatePatientAllergy(ctx context.Context, arg UpdatePatientAllergyParams) error
 	UpdatePatientCondition(ctx context.Context, arg UpdatePatientConditionParams) error
@@ -141,6 +150,7 @@ type Querier interface {
 	UpdatePatientMedication(ctx context.Context, arg UpdatePatientMedicationParams) error
 	UpdatePatientProfile(ctx context.Context, arg UpdatePatientProfileParams) error
 	UpdatePrivacyConsent(ctx context.Context, arg UpdatePrivacyConsentParams) error
+	UpdateQuietHours(ctx context.Context, arg UpdateQuietHoursParams) error
 	UpdateSMSConversation(ctx context.Context, arg UpdateSMSConversationParams) error
 	UpdateSession(ctx context.Context, arg UpdateSessionParams) error
 	UpdateSessionToken(ctx context.Context, arg UpdateSessionTokenParams) error

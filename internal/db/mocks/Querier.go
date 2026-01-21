@@ -554,6 +554,24 @@ func (_m *Querier) DeleteExpiredSessions(ctx context.Context) error {
 	return r0
 }
 
+// DeleteNotificationPreferences provides a mock function with given fields: ctx, userID
+func (_m *Querier) DeleteNotificationPreferences(ctx context.Context, userID pgtype.UUID) error {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNotificationPreferences")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) error); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeletePatientAllergy provides a mock function with given fields: ctx, id
 func (_m *Querier) DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error {
 	ret := _m.Called(ctx, id)
@@ -1584,6 +1602,66 @@ func (_m *Querier) GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([
 	return r0, r1
 }
 
+// GetUsersForHealthTips provides a mock function with given fields: ctx, healthTipsFrequency
+func (_m *Querier) GetUsersForHealthTips(ctx context.Context, healthTipsFrequency pgtype.Text) ([]pgtype.UUID, error) {
+	ret := _m.Called(ctx, healthTipsFrequency)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUsersForHealthTips")
+	}
+
+	var r0 []pgtype.UUID
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Text) ([]pgtype.UUID, error)); ok {
+		return rf(ctx, healthTipsFrequency)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Text) []pgtype.UUID); ok {
+		r0 = rf(ctx, healthTipsFrequency)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]pgtype.UUID)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.Text) error); ok {
+		r1 = rf(ctx, healthTipsFrequency)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetUsersWithDisabledType provides a mock function with given fields: ctx, dollar_1
+func (_m *Querier) GetUsersWithDisabledType(ctx context.Context, dollar_1 interface{}) ([]pgtype.UUID, error) {
+	ret := _m.Called(ctx, dollar_1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUsersWithDisabledType")
+	}
+
+	var r0 []pgtype.UUID
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, interface{}) ([]pgtype.UUID, error)); ok {
+		return rf(ctx, dollar_1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, interface{}) []pgtype.UUID); ok {
+		r0 = rf(ctx, dollar_1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]pgtype.UUID)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, interface{}) error); ok {
+		r1 = rf(ctx, dollar_1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // InvalidateUserOTPs provides a mock function with given fields: ctx, arg
 func (_m *Querier) InvalidateUserOTPs(ctx context.Context, arg sqlc.InvalidateUserOTPsParams) error {
 	ret := _m.Called(ctx, arg)
@@ -1958,6 +2036,42 @@ func (_m *Querier) SetVerificationToken(ctx context.Context, arg sqlc.SetVerific
 	return r0
 }
 
+// UpdateAppointmentReminders provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateAppointmentReminders(ctx context.Context, arg sqlc.UpdateAppointmentRemindersParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateAppointmentReminders")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateAppointmentRemindersParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateChannelSettings provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateChannelSettings(ctx context.Context, arg sqlc.UpdateChannelSettingsParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateChannelSettings")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateChannelSettingsParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateClinic provides a mock function with given fields: ctx, arg
 func (_m *Querier) UpdateClinic(ctx context.Context, arg sqlc.UpdateClinicParams) error {
 	ret := _m.Called(ctx, arg)
@@ -2022,6 +2136,78 @@ func (_m *Querier) UpdateCredential(ctx context.Context, arg sqlc.UpdateCredenti
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateCredentialParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateEmergencyAlerts provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateEmergencyAlerts(ctx context.Context, arg sqlc.UpdateEmergencyAlertsParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateEmergencyAlerts")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateEmergencyAlertsParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateHealthTips provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateHealthTips(ctx context.Context, arg sqlc.UpdateHealthTipsParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateHealthTips")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateHealthTipsParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateMedicationReminders provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateMedicationReminders(ctx context.Context, arg sqlc.UpdateMedicationRemindersParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateMedicationReminders")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateMedicationRemindersParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateNotificationLanguage provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateNotificationLanguage(ctx context.Context, arg sqlc.UpdateNotificationLanguageParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateNotificationLanguage")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateNotificationLanguageParams) error); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		r0 = ret.Error(0)
@@ -2148,6 +2334,24 @@ func (_m *Querier) UpdatePrivacyConsent(ctx context.Context, arg sqlc.UpdatePriv
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePrivacyConsentParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateQuietHours provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateQuietHours(ctx context.Context, arg sqlc.UpdateQuietHoursParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateQuietHours")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateQuietHoursParams) error); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		r0 = ret.Error(0)
