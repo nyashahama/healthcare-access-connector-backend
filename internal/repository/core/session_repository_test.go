@@ -8,10 +8,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	sqlc "github.com/nyashahama/healthcare-access-connector-backend/internal/db"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/db/mocks"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -162,6 +164,92 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 			if tt.expectedError != nil {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+				assertUserSessionEqual(t, tt.expectedSess, gotSess)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
+
+func TestSessionRepository_GetSession(t *testing.T) {
+	ctx := context.Background()
+	now := nowTime()
+	expires := now.Add(time.Hour * 24)
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	sessionID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+
+	tests := []struct {
+		name          string
+		sessionToken  string
+		mockSetup     func(*mocks.Querier)
+		expectedSess  core.UserSession
+		expectedError error
+	}{
+		{
+			name:         "successful get session",
+			sessionToken: "token123",
+			mockSetup: func(m *mocks.Querier) {
+				expectedRow := sqlc.GetSessionRow{
+					ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
+					UserID:       uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					SessionToken: "token123",
+					DeviceType:   pgtype.Text{String: "mobile", Valid: true},
+					IpAddress:    &ipAddr,
+					UserAgent:    pgtype.Text{String: "Mozilla/5.0", Valid: true},
+					ExpiresAt:    pgtype.Timestamp{Time: expires, Valid: true},
+					CreatedAt:    pgtype.Timestamp{Time: now, Valid: true},
+				}
+				m.On("GetSession", ctx, "token123").Return(expectedRow, nil)
+			},
+			expectedSess: core.UserSession{
+				ID:           sessionID,
+				UserID:       userID,
+				SessionToken: "token123",
+				DeviceType:   stringPtr("mobile"),
+				DeviceID:     nil, // Not selected in query
+				IPAddress:    &ipStr,
+				UserAgent:    stringPtr("Mozilla/5.0"),
+				ExpiresAt:    expires,
+				CreatedAt:    now,
+			},
+			expectedError: nil,
+		},
+		{
+			name:         "session not found",
+			sessionToken: "invalidtoken",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetSession", ctx, "invalidtoken").Return(sqlc.GetSessionRow{}, pgx.ErrNoRows)
+			},
+			expectedSess:  core.UserSession{},
+			expectedError: domain.ErrSessionNotFound,
+		},
+		{
+			name:         "database error",
+			sessionToken: "token123",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetSession", ctx, "token123").Return(sqlc.GetSessionRow{}, assert.AnError)
+			},
+			expectedSess:  core.UserSession{},
+			expectedError: fmt.Errorf("get session failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &sessionRepository{querier: mockQuerier}
+
+			gotSess, err := repo.GetSession(ctx, tt.sessionToken)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedError, err)
 			} else {
 				require.NoError(t, err)
 				assertUserSessionEqual(t, tt.expectedSess, gotSess)
