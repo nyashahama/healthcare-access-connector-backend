@@ -397,3 +397,73 @@ func TestSessionRepository_DeleteExpiredSessions(t *testing.T) {
 		})
 	}
 }
+
+func TestSessionRepository_UpdateSessionToken(t *testing.T) {
+	ctx := context.Background()
+	now := nowTime()
+	expires := now.Add(time.Hour * 24)
+	sessionID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		id            uuid.UUID
+		sessionToken  string
+		expiresAt     time.Time
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:         "successful update session token",
+			id:           sessionID,
+			sessionToken: "newtoken123",
+			expiresAt:    expires,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateSessionToken", ctx, mock.MatchedBy(func(p sqlc.UpdateSessionTokenParams) bool {
+					return p.ID.Bytes == sessionID &&
+						p.SessionToken == "newtoken123" &&
+						p.ExpiresAt.Time.Equal(expires)
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:         "session not found",
+			id:           sessionID,
+			sessionToken: "newtoken123",
+			expiresAt:    expires,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateSessionToken", ctx, mock.Anything).Return(pgx.ErrNoRows)
+			},
+			expectedError: domain.ErrSessionNotFound,
+		},
+		{
+			name:         "database error",
+			id:           sessionID,
+			sessionToken: "newtoken123",
+			expiresAt:    expires,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateSessionToken", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update session token failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &sessionRepository{querier: mockQuerier}
+
+			err := repo.UpdateSessionToken(ctx, tt.id, tt.sessionToken, tt.expiresAt)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedError, err)
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
