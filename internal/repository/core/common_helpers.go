@@ -1,6 +1,7 @@
 package core
 
 import (
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
@@ -107,4 +108,25 @@ func intPtrToPgtypeInt4(i *int) pgtype.Int4 {
 		return pgtype.Int4{Valid: false}
 	}
 	return pgtype.Int4{Int32: int32(*i), Valid: true}
+}
+
+// netipAddrToString converts *netip.Addr to *string
+func netipAddrToString(addr *netip.Addr) *string {
+	if addr == nil {
+		return nil
+	}
+	s := addr.String()
+	return &s
+}
+
+// stringToNetipAddr converts *string to *netip.Addr
+func stringToNetipAddr(s *string) (*netip.Addr, error) {
+	if s == nil {
+		return nil, nil
+	}
+	addr, err := netip.ParseAddr(*s)
+	if err != nil {
+		return nil, err
+	}
+	return &addr, nil
 }

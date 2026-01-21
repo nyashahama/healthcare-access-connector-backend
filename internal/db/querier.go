@@ -70,10 +70,12 @@ type Querier interface {
 	// User Management Queries
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateClinicService(ctx context.Context, id pgtype.UUID) error
+	DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error
 	DeleteSession(ctx context.Context, sessionToken string) error
+	DeleteSessionByDevice(ctx context.Context, arg DeleteSessionByDeviceParams) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
@@ -107,6 +109,7 @@ type Querier interface {
 	GetUserByPhone(ctx context.Context, phone pgtype.Text) (GetUserByPhoneRow, error)
 	GetUserByPhoneWithHash(ctx context.Context, phone pgtype.Text) (GetUserByPhoneWithHashRow, error)
 	GetUserByVerificationToken(ctx context.Context, verificationToken pgtype.Text) (GetUserByVerificationTokenRow, error)
+	GetUserSessions(ctx context.Context, userID pgtype.UUID) ([]UserSession, error)
 	GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetUsersByIDsRow, error)
 	InvalidateUserOTPs(ctx context.Context, arg InvalidateUserOTPsParams) error
 	ListClinicStaff(ctx context.Context, arg ListClinicStaffParams) ([]ListClinicStaffRow, error)
@@ -139,6 +142,7 @@ type Querier interface {
 	UpdatePatientProfile(ctx context.Context, arg UpdatePatientProfileParams) error
 	UpdatePrivacyConsent(ctx context.Context, arg UpdatePrivacyConsentParams) error
 	UpdateSMSConversation(ctx context.Context, arg UpdateSMSConversationParams) error
+	UpdateSession(ctx context.Context, arg UpdateSessionParams) error
 	UpdateSessionToken(ctx context.Context, arg UpdateSessionTokenParams) error
 	UpdateStaffStatus(ctx context.Context, arg UpdateStaffStatusParams) error
 	UpdateUser(ctx context.Context, arg UpdateUserParams) error

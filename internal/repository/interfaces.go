@@ -102,6 +102,90 @@ type UserRepository interface {
 }
 
 // ============================================
+// COMPLIANCE & AUDIT (POPIA/GDPR)
+// ============================================
+
+type ConsentRepository interface {
+	// Consent Management
+	CreateConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error)
+	GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error)
+	UpdateConsent(ctx context.Context, consent core.PrivacyConsent) error
+	WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error
+
+	// Consent Tracking
+	GetConsentHistory(ctx context.Context, userID uuid.UUID) ([]core.PrivacyConsent, error)
+	GetActiveConsentsByType(ctx context.Context, consentType string) ([]core.PrivacyConsent, error)
+	GetExpiredConsents(ctx context.Context) ([]core.PrivacyConsent, error)
+
+	// Compliance Reporting
+	//	GetConsentComplianceReport(ctx context.Context, startDate, endDate time.Time) (core.ComplianceReport, error)
+	ExportConsentData(ctx context.Context, userID uuid.UUID) ([]byte, error)
+
+	// Bulk Operations
+	//	BulkUpdateConsents(ctx context.Context, updates []core.PrivacyConsentUpdate) error
+	NotifyConsentExpirations(ctx context.Context, daysBefore int) ([]uuid.UUID, error)
+}
+
+type AuditRepository interface {
+	// Activity Logging
+	LogActivity(ctx context.Context, activity core.UserActivity) error
+	GetUserActivities(ctx context.Context, userID uuid.UUID, limit, offset int) ([]core.UserActivity, error)
+	GetActivitiesByType(ctx context.Context, activityType string, startDate, endDate time.Time) ([]core.UserActivity, error)
+
+	// Data Access Logging (POPIA Compliance)
+	LogDataAccess(ctx context.Context, access core.DataAccessLog) error
+	GetDataAccessLogs(ctx context.Context, accessedUserID uuid.UUID, limit, offset int) ([]core.DataAccessLog, error)
+	GetDataAccessLogsByAccessor(ctx context.Context, accessedByUserID uuid.UUID, limit, offset int) ([]core.DataAccessLog, error)
+	GetEmergencyAccessLogs(ctx context.Context, limit, offset int) ([]core.DataAccessLog, error)
+
+	// Audit Reports
+	//	GenerateAccessReport(ctx context.Context, userID uuid.UUID, startDate, endDate time.Time) (core.AccessReport, error)
+	//	GenerateComplianceReport(ctx context.Context, startDate, endDate time.Time) (core.ComplianceReport, error)
+
+	// Retention & Cleanup
+	ArchiveOldLogs(ctx context.Context, olderThan time.Duration) error
+	DeleteArchivedLogs(ctx context.Context, olderThan time.Duration) error
+
+	// Security Monitoring
+	GetSuspiciousActivities(ctx context.Context, threshold int) ([]core.UserActivity, error)
+	GetFailedLoginAttempts(ctx context.Context, within time.Duration) ([]core.UserActivity, error)
+}
+
+// ============================================
+// NOTIFICATION & COMMUNICATION
+// ============================================
+
+type NotificationRepository interface {
+	// Preferences Management
+	CreatePreferences(ctx context.Context, prefs core.NotificationPreferences) (core.NotificationPreferences, error)
+	GetPreferences(ctx context.Context, userID uuid.UUID) (core.NotificationPreferences, error)
+	UpdatePreferences(ctx context.Context, prefs core.NotificationPreferences) error
+	DeletePreferences(ctx context.Context, userID uuid.UUID) error
+
+	// Channel-Specific Preferences
+	UpdateEmailPreferences(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error
+	UpdateSMSPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error
+	UpdatePushPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error
+
+	// Notification Types
+	UpdateAppointmentReminders(ctx context.Context, userID uuid.UUID, enabled bool, hoursBefore int) error
+	UpdateMedicationReminders(ctx context.Context, userID uuid.UUID, enabled bool) error
+	UpdateHealthTips(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error
+	UpdateEmergencyAlerts(ctx context.Context, userID uuid.UUID, enabled bool) error
+
+	// Quiet Hours
+	SetQuietHours(ctx context.Context, userID uuid.UUID, startTime, endTime time.Time) error
+	//	GetQuietHours(ctx context.Context, userID uuid.UUID) (core.QuietHours, error)
+
+	// Language & Localization
+	UpdateNotificationLanguage(ctx context.Context, userID uuid.UUID, language string) error
+
+	// Bulk Operations
+	GetUsersWithDisabledNotifications(ctx context.Context, notificationType string) ([]uuid.UUID, error)
+	// BulkUpdatePreferences(ctx context.Context, updates []core.NotificationPreferenceUpdate) error
+}
+
+// ============================================
 // PATIENT MANAGEMENT (Comprehensive)
 // ============================================
 
@@ -232,90 +316,6 @@ type StaffRepository interface {
 	// SetStaffAvailability(ctx context.Context, availability providers.StaffAvailability) error
 	// GetStaffAvailability(ctx context.Context, staffID uuid.UUID, startDate, endDate time.Time) ([]providers.StaffAvailability, error)
 	// UpdateStaffAvailability(ctx context.Context, availability providers.StaffAvailability) error
-}
-
-// ============================================
-// COMPLIANCE & AUDIT (POPIA/GDPR)
-// ============================================
-
-type ConsentRepository interface {
-	// Consent Management
-	CreateConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error)
-	GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error)
-	UpdateConsent(ctx context.Context, consent core.PrivacyConsent) error
-	WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error
-
-	// Consent Tracking
-	GetConsentHistory(ctx context.Context, userID uuid.UUID) ([]core.PrivacyConsent, error)
-	GetActiveConsentsByType(ctx context.Context, consentType string) ([]core.PrivacyConsent, error)
-	GetExpiredConsents(ctx context.Context) ([]core.PrivacyConsent, error)
-
-	// Compliance Reporting
-	//	GetConsentComplianceReport(ctx context.Context, startDate, endDate time.Time) (core.ComplianceReport, error)
-	ExportConsentData(ctx context.Context, userID uuid.UUID) ([]byte, error)
-
-	// Bulk Operations
-	//	BulkUpdateConsents(ctx context.Context, updates []core.PrivacyConsentUpdate) error
-	NotifyConsentExpirations(ctx context.Context, daysBefore int) ([]uuid.UUID, error)
-}
-
-type AuditRepository interface {
-	// Activity Logging
-	LogActivity(ctx context.Context, activity core.UserActivity) error
-	GetUserActivities(ctx context.Context, userID uuid.UUID, limit, offset int) ([]core.UserActivity, error)
-	GetActivitiesByType(ctx context.Context, activityType string, startDate, endDate time.Time) ([]core.UserActivity, error)
-
-	// Data Access Logging (POPIA Compliance)
-	LogDataAccess(ctx context.Context, access core.DataAccessLog) error
-	GetDataAccessLogs(ctx context.Context, accessedUserID uuid.UUID, limit, offset int) ([]core.DataAccessLog, error)
-	GetDataAccessLogsByAccessor(ctx context.Context, accessedByUserID uuid.UUID, limit, offset int) ([]core.DataAccessLog, error)
-	GetEmergencyAccessLogs(ctx context.Context, limit, offset int) ([]core.DataAccessLog, error)
-
-	// Audit Reports
-	//	GenerateAccessReport(ctx context.Context, userID uuid.UUID, startDate, endDate time.Time) (core.AccessReport, error)
-	//	GenerateComplianceReport(ctx context.Context, startDate, endDate time.Time) (core.ComplianceReport, error)
-
-	// Retention & Cleanup
-	ArchiveOldLogs(ctx context.Context, olderThan time.Duration) error
-	DeleteArchivedLogs(ctx context.Context, olderThan time.Duration) error
-
-	// Security Monitoring
-	GetSuspiciousActivities(ctx context.Context, threshold int) ([]core.UserActivity, error)
-	GetFailedLoginAttempts(ctx context.Context, within time.Duration) ([]core.UserActivity, error)
-}
-
-// ============================================
-// NOTIFICATION & COMMUNICATION
-// ============================================
-
-type NotificationRepository interface {
-	// Preferences Management
-	CreatePreferences(ctx context.Context, prefs core.NotificationPreferences) (core.NotificationPreferences, error)
-	GetPreferences(ctx context.Context, userID uuid.UUID) (core.NotificationPreferences, error)
-	UpdatePreferences(ctx context.Context, prefs core.NotificationPreferences) error
-	DeletePreferences(ctx context.Context, userID uuid.UUID) error
-
-	// Channel-Specific Preferences
-	UpdateEmailPreferences(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error
-	UpdateSMSPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error
-	UpdatePushPreferences(ctx context.Context, userID uuid.UUID, enabled bool) error
-
-	// Notification Types
-	UpdateAppointmentReminders(ctx context.Context, userID uuid.UUID, enabled bool, hoursBefore int) error
-	UpdateMedicationReminders(ctx context.Context, userID uuid.UUID, enabled bool) error
-	UpdateHealthTips(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error
-	UpdateEmergencyAlerts(ctx context.Context, userID uuid.UUID, enabled bool) error
-
-	// Quiet Hours
-	SetQuietHours(ctx context.Context, userID uuid.UUID, startTime, endTime time.Time) error
-	//	GetQuietHours(ctx context.Context, userID uuid.UUID) (core.QuietHours, error)
-
-	// Language & Localization
-	UpdateNotificationLanguage(ctx context.Context, userID uuid.UUID, language string) error
-
-	// Bulk Operations
-	GetUsersWithDisabledNotifications(ctx context.Context, notificationType string) ([]uuid.UUID, error)
-	// BulkUpdatePreferences(ctx context.Context, updates []core.NotificationPreferenceUpdate) error
 }
 
 type SMSRepository interface {

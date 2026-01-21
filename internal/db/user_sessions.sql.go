@@ -61,6 +61,21 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (C
 	return i, err
 }
 
+const deleteAllSessionsExcept = `-- name: DeleteAllSessionsExcept :exec
+DELETE FROM user_sessions 
+WHERE user_id = $1 AND id != $2
+`
+
+type DeleteAllSessionsExceptParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	ID     pgtype.UUID `json:"id"`
+}
+
+func (q *Queries) DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error {
+	_, err := q.db.Exec(ctx, deleteAllSessionsExcept, arg.UserID, arg.ID)
+	return err
+}
+
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
 DELETE FROM user_sessions WHERE expires_at <= NOW()
 `
@@ -76,6 +91,21 @@ DELETE FROM user_sessions WHERE session_token = $1
 
 func (q *Queries) DeleteSession(ctx context.Context, sessionToken string) error {
 	_, err := q.db.Exec(ctx, deleteSession, sessionToken)
+	return err
+}
+
+const deleteSessionByDevice = `-- name: DeleteSessionByDevice :exec
+DELETE FROM user_sessions 
+WHERE user_id = $1 AND device_id = $2
+`
+
+type DeleteSessionByDeviceParams struct {
+	UserID   pgtype.UUID `json:"user_id"`
+	DeviceID pgtype.Text `json:"device_id"`
+}
+
+func (q *Queries) DeleteSessionByDevice(ctx context.Context, arg DeleteSessionByDeviceParams) error {
+	_, err := q.db.Exec(ctx, deleteSessionByDevice, arg.UserID, arg.DeviceID)
 	return err
 }
 
@@ -120,6 +150,76 @@ func (q *Queries) GetSession(ctx context.Context, sessionToken string) (GetSessi
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const getUserSessions = `-- name: GetUserSessions :many
+SELECT id, user_id, session_token, device_type, device_id, 
+    ip_address, user_agent, expires_at, created_at
+FROM user_sessions
+WHERE user_id = $1 AND expires_at > NOW()
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetUserSessions(ctx context.Context, userID pgtype.UUID) ([]UserSession, error) {
+	rows, err := q.db.Query(ctx, getUserSessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []UserSession{}
+	for rows.Next() {
+		var i UserSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.SessionToken,
+			&i.DeviceType,
+			&i.DeviceID,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.ExpiresAt,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateSession = `-- name: UpdateSession :exec
+UPDATE user_sessions
+SET 
+    device_type = COALESCE($2, device_type),
+    device_id = COALESCE($3, device_id),
+    ip_address = COALESCE($4, ip_address),
+    user_agent = COALESCE($5, user_agent),
+    expires_at = COALESCE($6, expires_at)
+WHERE id = $1
+`
+
+type UpdateSessionParams struct {
+	ID         pgtype.UUID      `json:"id"`
+	DeviceType pgtype.Text      `json:"device_type"`
+	DeviceID   pgtype.Text      `json:"device_id"`
+	IpAddress  *netip.Addr      `json:"ip_address"`
+	UserAgent  pgtype.Text      `json:"user_agent"`
+	ExpiresAt  pgtype.Timestamp `json:"expires_at"`
+}
+
+func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) error {
+	_, err := q.db.Exec(ctx, updateSession,
+		arg.ID,
+		arg.DeviceType,
+		arg.DeviceID,
+		arg.IpAddress,
+		arg.UserAgent,
+		arg.ExpiresAt,
+	)
+	return err
 }
 
 const updateSessionToken = `-- name: UpdateSessionToken :exec
