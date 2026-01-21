@@ -39,17 +39,22 @@ type AuthRepository interface {
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
 }
 
+// ============================================
+// SESSION REPOSITORY
+// Maps to: user_sessions.sql
+// ============================================
+
 type SessionRepository interface {
-	// Session CRUD
+	// Core CRUD Operations
 	CreateSession(ctx context.Context, session core.UserSession) (core.UserSession, error)
 	GetSession(ctx context.Context, sessionToken string) (core.UserSession, error)
-	GetUserSessions(ctx context.Context, userID uuid.UUID) ([]core.UserSession, error)
-	UpdateSession(ctx context.Context, session core.UserSession) error
 	DeleteSession(ctx context.Context, sessionToken string) error
 	DeleteUserSessions(ctx context.Context, userID uuid.UUID) error
 	DeleteExpiredSessions(ctx context.Context) error
+	UpdateSessionToken(ctx context.Context, id uuid.UUID, sessionToken string, expiresAt time.Time) error
 
-	// Security & Audit
+	// Additional methods for complete session management
+	GetUserSessions(ctx context.Context, userID uuid.UUID) ([]core.UserSession, error)
 	RevokeAllExceptCurrent(ctx context.Context, userID, currentSessionID uuid.UUID) error
 	InvalidateSessionByDevice(ctx context.Context, userID uuid.UUID, deviceID string) error
 }

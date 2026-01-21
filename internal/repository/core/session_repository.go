@@ -110,62 +110,6 @@ func (r *sessionRepository) GetSession(ctx context.Context, sessionToken string)
 	return r.mapToUserSessionFromGet(session), nil
 }
 
-func (r *sessionRepository) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]core.UserSession, error) {
-	start := time.Now()
-	defer func() {
-		sessionDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	sessions, err := r.querier.GetUserSessions(ctx, uuidToPgtypeUUID(userID))
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			sessionDBQueryTotal.WithLabelValues("get_user_sessions", "not_found").Inc()
-			return []core.UserSession{}, nil
-		}
-		sessionDBQueryTotal.WithLabelValues("get_user_sessions", "error").Inc()
-		return nil, r.handleError(err, "get user sessions")
-	}
-
-	sessionDBQueryTotal.WithLabelValues("get_user_sessions", "success").Inc()
-	return r.mapToUserSessions(sessions), nil
-}
-
-func (r *sessionRepository) UpdateSession(ctx context.Context, session core.UserSession) error {
-	start := time.Now()
-	defer func() {
-		sessionDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	// Convert IP address string to netip.Addr
-	var ipAddr *netip.Addr
-	if session.IPAddress != nil {
-		addr, err := netip.ParseAddr(*session.IPAddress)
-		if err == nil {
-			ipAddr = &addr
-		}
-	}
-
-	err := r.querier.UpdateSession(ctx, sqlc.UpdateSessionParams{
-		ID:         uuidToPgtypeUUID(session.ID),
-		DeviceType: pgtypeTextFromStringPtr(session.DeviceType),
-		DeviceID:   pgtypeTextFromStringPtr(session.DeviceID),
-		IpAddress:  ipAddr,
-		UserAgent:  pgtypeTextFromStringPtr(session.UserAgent),
-		ExpiresAt:  timeToPgtypeTimestamp(session.ExpiresAt),
-	})
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			sessionDBQueryTotal.WithLabelValues("update_session", "not_found").Inc()
-			return domain.ErrSessionNotFound
-		}
-		sessionDBQueryTotal.WithLabelValues("update_session", "error").Inc()
-		return r.handleError(err, "update session")
-	}
-
-	sessionDBQueryTotal.WithLabelValues("update_session", "success").Inc()
-	return nil
-}
-
 func (r *sessionRepository) DeleteSession(ctx context.Context, sessionToken string) error {
 	start := time.Now()
 	defer func() {
@@ -212,6 +156,50 @@ func (r *sessionRepository) DeleteExpiredSessions(ctx context.Context) error {
 
 	sessionDBQueryTotal.WithLabelValues("delete_expired_sessions", "success").Inc()
 	return nil
+}
+
+func (r *sessionRepository) UpdateSessionToken(ctx context.Context, id uuid.UUID, sessionToken string, expiresAt time.Time) error {
+	start := time.Now()
+	defer func() {
+		sessionDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.UpdateSessionToken(ctx, sqlc.UpdateSessionTokenParams{
+		ID:           uuidToPgtypeUUID(id),
+		SessionToken: sessionToken,
+		ExpiresAt:    timeToPgtypeTimestamp(expiresAt),
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			sessionDBQueryTotal.WithLabelValues("update_session_token", "not_found").Inc()
+			return domain.ErrSessionNotFound
+		}
+		sessionDBQueryTotal.WithLabelValues("update_session_token", "error").Inc()
+		return r.handleError(err, "update session token")
+	}
+
+	sessionDBQueryTotal.WithLabelValues("update_session_token", "success").Inc()
+	return nil
+}
+
+func (r *sessionRepository) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]core.UserSession, error) {
+	start := time.Now()
+	defer func() {
+		sessionDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	sessions, err := r.querier.GetUserSessions(ctx, uuidToPgtypeUUID(userID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			sessionDBQueryTotal.WithLabelValues("get_user_sessions", "not_found").Inc()
+			return []core.UserSession{}, nil
+		}
+		sessionDBQueryTotal.WithLabelValues("get_user_sessions", "error").Inc()
+		return nil, r.handleError(err, "get user sessions")
+	}
+
+	sessionDBQueryTotal.WithLabelValues("get_user_sessions", "success").Inc()
+	return r.mapToUserSessions(sessions), nil
 }
 
 func (r *sessionRepository) RevokeAllExceptCurrent(ctx context.Context, userID, currentSessionID uuid.UUID) error {

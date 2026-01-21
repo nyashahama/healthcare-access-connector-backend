@@ -79,10 +79,10 @@ func New(cfg *config.Config) (*App, error) {
 	authRepo := repocore.NewAuthRepository(pool)
 	userRepo := repocore.NewUserRepository(pool)
 	otpRepo := repocore.NewOTPRepository(pool)
+	sessionRepo := repocore.NewSessionRepository(pool)
 
 	// Initialize stubs for required but not yet implemented repositories
 	patientRepo := &stubPatientRepository{}
-	sessionRepo := &stubSessionRepository{}
 	consentRepo := &stubConsentRepository{}
 	notificationRepo := &stubNotificationRepository{}
 
@@ -339,44 +339,6 @@ func (s *stubPatientRepository) GetUpcomingImmunizations(ctx context.Context, pa
 
 func (s *stubPatientRepository) GetImmunizationHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
 	return []patients.PatientImmunization{}, nil
-}
-
-type stubSessionRepository struct{}
-
-func (s *stubSessionRepository) CreateSession(ctx context.Context, session core.UserSession) (core.UserSession, error) {
-	return session, nil
-}
-
-func (s *stubSessionRepository) GetSession(ctx context.Context, sessionToken string) (core.UserSession, error) {
-	return core.UserSession{}, nil
-}
-
-func (s *stubSessionRepository) GetUserSessions(ctx context.Context, userID uuid.UUID) ([]core.UserSession, error) {
-	return []core.UserSession{}, nil
-}
-
-func (s *stubSessionRepository) UpdateSession(ctx context.Context, session core.UserSession) error {
-	return nil
-}
-
-func (s *stubSessionRepository) DeleteSession(ctx context.Context, sessionToken string) error {
-	return nil
-}
-
-func (s *stubSessionRepository) DeleteUserSessions(ctx context.Context, userID uuid.UUID) error {
-	return nil
-}
-
-func (s *stubSessionRepository) DeleteExpiredSessions(ctx context.Context) error {
-	return nil
-}
-
-func (s *stubSessionRepository) RevokeAllExceptCurrent(ctx context.Context, userID, currentSessionID uuid.UUID) error {
-	return nil
-}
-
-func (s *stubSessionRepository) InvalidateSessionByDevice(ctx context.Context, userID uuid.UUID, deviceID string) error {
-	return nil
 }
 
 type stubConsentRepository struct{}
