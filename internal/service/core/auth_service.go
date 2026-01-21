@@ -26,20 +26,20 @@ import (
 )
 
 type authService struct {
-	authRepo      repository.AuthRepository
-	userRepo      repository.UserRepository
-	otpRepo       repository.OTPRepository
-	patientRepo   repository.PatientRepository
-	sessionRepo   repository.SessionRepository
-	consentRepo   repository.ConsentRepository
-	cache         cache.Service
-	broker        messaging.Broker
-	emailService  email.Service
-	logger        *zerolog.Logger
-	jwtSecret     string
-	jwtExpiry     time.Duration
-	smsEnabled    bool
-	bcryptCost    int
+	authRepo     repository.AuthRepository
+	userRepo     repository.UserRepository
+	otpRepo      repository.OTPRepository
+	patientRepo  repository.PatientRepository
+	sessionRepo  repository.SessionRepository
+	consentRepo  repository.ConsentRepository
+	cache        cache.Service
+	broker       messaging.Broker
+	emailService email.Service
+	logger       *zerolog.Logger
+	jwtSecret    string
+	jwtExpiry    time.Duration
+	smsEnabled   bool
+	bcryptCost   int
 
 	// Token generation pool
 	tokenPool sync.Pool
@@ -89,21 +89,21 @@ func NewAuthService(
 	}
 
 	service := &authService{
-		authRepo:       authRepo,
-		userRepo:       userRepo,
-		otpRepo:        otpRepo,
-		patientRepo:    patientRepo,
-		sessionRepo:    sessionRepo,
-		consentRepo:    consentRepo,
-		cache:          cache,
-		broker:         broker,
-		emailService:   emailService,
-		logger:         logger,
-		jwtSecret:      jwtSecret,
-		jwtExpiry:      jwtExpiry,
-		smsEnabled:     smsEnabled,
-		bcryptCost:     bcryptCost,
-		loginAttempts:  make(map[string]loginAttempt),
+		authRepo:      authRepo,
+		userRepo:      userRepo,
+		otpRepo:       otpRepo,
+		patientRepo:   patientRepo,
+		sessionRepo:   sessionRepo,
+		consentRepo:   consentRepo,
+		cache:         cache,
+		broker:        broker,
+		emailService:  emailService,
+		logger:        logger,
+		jwtSecret:     jwtSecret,
+		jwtExpiry:     jwtExpiry,
+		smsEnabled:    smsEnabled,
+		bcryptCost:    bcryptCost,
+		loginAttempts: make(map[string]loginAttempt),
 		tokenPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 32)
@@ -727,7 +727,7 @@ func (s *authService) handlePostRegistration(user core.User, email, phone, role 
 		UpdatedAt:                  user.CreatedAt,
 	}
 
-	if _, err := s.consentRepo.CreateConsent(ctx, consent); err != nil {
+	if _, err := s.consentRepo.CreatePrivacyConsent(ctx, consent); err != nil {
 		s.logger.Warn().Err(err).Msg("Failed to create consent record")
 	}
 

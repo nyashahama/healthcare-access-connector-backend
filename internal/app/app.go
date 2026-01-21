@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -342,15 +343,16 @@ func (s *stubPatientRepository) GetImmunizationHistory(ctx context.Context, pati
 
 type stubConsentRepository struct{}
 
-func (s *stubConsentRepository) CreateConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error) {
+// Core CRUD Operations
+func (s *stubConsentRepository) CreatePrivacyConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error) {
 	return consent, nil
 }
 
-func (s *stubConsentRepository) GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error) {
+func (s *stubConsentRepository) GetPrivacyConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error) {
 	return core.PrivacyConsent{}, nil
 }
 
-func (s *stubConsentRepository) UpdateConsent(ctx context.Context, consent core.PrivacyConsent) error {
+func (s *stubConsentRepository) UpdatePrivacyConsent(ctx context.Context, consent core.PrivacyConsent) error {
 	return nil
 }
 
@@ -358,6 +360,28 @@ func (s *stubConsentRepository) WithdrawConsent(ctx context.Context, userID uuid
 	return nil
 }
 
+// Consent Type Updates
+func (s *stubConsentRepository) UpdateHealthDataConsent(ctx context.Context, userID uuid.UUID, consent bool, version string) error {
+	return nil
+}
+
+func (s *stubConsentRepository) UpdateResearchConsent(ctx context.Context, userID uuid.UUID, consent bool) error {
+	return nil
+}
+
+func (s *stubConsentRepository) UpdateEmergencyAccessConsent(ctx context.Context, userID uuid.UUID, consent bool) error {
+	return nil
+}
+
+func (s *stubConsentRepository) UpdateCommunicationConsents(ctx context.Context, userID uuid.UUID, sms, email bool) error {
+	return nil
+}
+
+func (s *stubConsentRepository) UpdateDataSharingConsent(ctx context.Context, userID uuid.UUID, sharingPrefs map[string]interface{}) error {
+	return nil
+}
+
+// Compliance & Reporting
 func (s *stubConsentRepository) GetConsentHistory(ctx context.Context, userID uuid.UUID) ([]core.PrivacyConsent, error) {
 	return []core.PrivacyConsent{}, nil
 }
@@ -370,6 +394,11 @@ func (s *stubConsentRepository) GetExpiredConsents(ctx context.Context) ([]core.
 	return []core.PrivacyConsent{}, nil
 }
 
+func (s *stubConsentRepository) GetWithdrawnConsents(ctx context.Context, startDate, endDate time.Time) ([]core.PrivacyConsent, error) {
+	return []core.PrivacyConsent{}, nil
+}
+
+// Export for POPIA data subject access requests
 func (s *stubConsentRepository) ExportConsentData(ctx context.Context, userID uuid.UUID) ([]byte, error) {
 	return []byte{}, nil
 }

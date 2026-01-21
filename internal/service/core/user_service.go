@@ -273,7 +273,7 @@ func (s *userService) SearchUsers(ctx context.Context, query string, role string
 
 // GetConsent gets user consent settings
 func (s *userService) GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error) {
-	consent, err := s.consentRepo.GetConsent(ctx, userID)
+	consent, err := s.consentRepo.GetPrivacyConsent(ctx, userID)
 	if err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get consent")
 		return core.PrivacyConsent{}, domain.NewAppError(err, "Failed to get consent", 500)
@@ -288,7 +288,7 @@ func (s *userService) UpdateConsent(ctx context.Context, userID uuid.UUID, conse
 	consent.UserID = userID
 	consent.UpdatedAt = time.Now()
 
-	if err := s.consentRepo.UpdateConsent(ctx, consent); err != nil {
+	if err := s.consentRepo.UpdatePrivacyConsent(ctx, consent); err != nil {
 		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to update consent")
 		return domain.NewAppError(err, "Failed to update consent", 500)
 	}

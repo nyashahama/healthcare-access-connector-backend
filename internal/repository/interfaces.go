@@ -107,27 +107,32 @@ type UserRepository interface {
 }
 
 // ============================================
-// COMPLIANCE & AUDIT (POPIA/GDPR)
+// PRIVACY CONSENT REPOSITORY (POPIA Compliance)
+// Maps to: privacy_consents.sql
 // ============================================
 
 type ConsentRepository interface {
-	// Consent Management
-	CreateConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error)
-	GetConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error)
-	UpdateConsent(ctx context.Context, consent core.PrivacyConsent) error
+	// Core CRUD Operations
+	CreatePrivacyConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error)
+	GetPrivacyConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error)
+	UpdatePrivacyConsent(ctx context.Context, consent core.PrivacyConsent) error
 	WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error
 
-	// Consent Tracking
+	// Consent Type Updates
+	UpdateHealthDataConsent(ctx context.Context, userID uuid.UUID, consent bool, version string) error
+	UpdateResearchConsent(ctx context.Context, userID uuid.UUID, consent bool) error
+	UpdateEmergencyAccessConsent(ctx context.Context, userID uuid.UUID, consent bool) error
+	UpdateCommunicationConsents(ctx context.Context, userID uuid.UUID, sms, email bool) error
+	UpdateDataSharingConsent(ctx context.Context, userID uuid.UUID, sharingPrefs map[string]interface{}) error
+
+	// Compliance & Reporting
 	GetConsentHistory(ctx context.Context, userID uuid.UUID) ([]core.PrivacyConsent, error)
 	GetActiveConsentsByType(ctx context.Context, consentType string) ([]core.PrivacyConsent, error)
 	GetExpiredConsents(ctx context.Context) ([]core.PrivacyConsent, error)
+	GetWithdrawnConsents(ctx context.Context, startDate, endDate time.Time) ([]core.PrivacyConsent, error)
 
-	// Compliance Reporting
-	//	GetConsentComplianceReport(ctx context.Context, startDate, endDate time.Time) (core.ComplianceReport, error)
+	// Export for POPIA data subject access requests
 	ExportConsentData(ctx context.Context, userID uuid.UUID) ([]byte, error)
-
-	// Bulk Operations
-	//	BulkUpdateConsents(ctx context.Context, updates []core.PrivacyConsentUpdate) error
 	NotifyConsentExpirations(ctx context.Context, daysBefore int) ([]uuid.UUID, error)
 }
 
