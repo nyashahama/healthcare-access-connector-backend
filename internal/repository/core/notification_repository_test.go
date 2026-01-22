@@ -2,14 +2,17 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	sqlc "github.com/nyashahama/healthcare-access-connector-backend/internal/db"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/db/mocks"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -177,6 +180,118 @@ func TestNotificationRepository_CreateNotificationPreferences(t *testing.T) {
 			if tt.expectedError != nil {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+				assertNotificationPreferencesEqual(t, tt.expectedResult, result)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
+
+func TestNotificationRepository_GetNotificationPreferences(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	prefsID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name           string
+		userID         uuid.UUID
+		mockSetup      func(*mocks.Querier)
+		expectedResult core.NotificationPreferences
+		expectedError  error
+	}{
+		{
+			name:   "successful get notification preferences",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				prefsRow := sqlc.NotificationPreference{
+					ID:                             pgtype.UUID{Bytes: prefsID, Valid: true},
+					UserID:                         pgtype.UUID{Bytes: userID, Valid: true},
+					SmsEnabled:                     pgtype.Bool{Bool: true, Valid: true},
+					EmailEnabled:                   pgtype.Bool{Bool: true, Valid: true},
+					PushEnabled:                    pgtype.Bool{Bool: true, Valid: true},
+					WhatsappEnabled:                pgtype.Bool{Bool: false, Valid: true},
+					AppointmentReminders:           pgtype.Bool{Bool: true, Valid: true},
+					AppointmentReminderHoursBefore: pgtype.Int4{Int32: 24, Valid: true},
+					HealthTips:                     pgtype.Bool{Bool: true, Valid: true},
+					HealthTipsFrequency:            pgtype.Text{String: "weekly", Valid: true},
+					MedicationReminders:            pgtype.Bool{Bool: true, Valid: true},
+					PrescriptionUpdates:            pgtype.Bool{Bool: true, Valid: true},
+					ClinicUpdates:                  pgtype.Bool{Bool: true, Valid: true},
+					Newsletter:                     pgtype.Bool{Bool: false, Valid: true},
+					EmergencyAlerts:                pgtype.Bool{Bool: true, Valid: true},
+					SystemMaintenance:              pgtype.Bool{Bool: true, Valid: true},
+					NotificationLanguage:           pgtype.Text{String: "en", Valid: true},
+					QuietHoursStart:                pgtype.Time{Microseconds: 0, Valid: true},                    // 00:00:00
+					QuietHoursEnd:                  pgtype.Time{Microseconds: 8 * 3600 * 1_000_000, Valid: true}, // 08:00:00
+					CreatedAt:                      pgtype.Timestamp{Time: now.Add(-30 * 24 * time.Hour), Valid: true},
+					UpdatedAt:                      pgtype.Timestamp{Time: now, Valid: true},
+				}
+				m.On("GetNotificationPreferences", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(prefsRow, nil)
+			},
+			expectedResult: core.NotificationPreferences{
+				ID:                             prefsID,
+				UserID:                         userID,
+				SMSEnabled:                     true,
+				EmailEnabled:                   true,
+				PushEnabled:                    true,
+				WhatsappEnabled:                false,
+				AppointmentReminders:           true,
+				AppointmentReminderHoursBefore: 24,
+				HealthTips:                     true,
+				HealthTipsFrequency:            "weekly",
+				MedicationReminders:            true,
+				PrescriptionUpdates:            true,
+				ClinicUpdates:                  true,
+				Newsletter:                     false,
+				EmergencyAlerts:                true,
+				SystemMaintenance:              true,
+				NotificationLanguage:           "en",
+				QuietHoursStart:                stringPtr("00:00:00"),
+				QuietHoursEnd:                  stringPtr("08:00:00"),
+				CreatedAt:                      now.Add(-30 * 24 * time.Hour),
+				UpdatedAt:                      now,
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "preferences not found",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetNotificationPreferences", ctx, mock.Anything).Return(sqlc.NotificationPreference{}, pgx.ErrNoRows)
+			},
+			expectedResult: core.NotificationPreferences{},
+			expectedError:  domain.ErrPreferencesNotFound,
+		},
+		{
+			name:   "database error",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetNotificationPreferences", ctx, mock.Anything).Return(sqlc.NotificationPreference{}, assert.AnError)
+			},
+			expectedResult: core.NotificationPreferences{},
+			expectedError:  fmt.Errorf("get notification preferences failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &notificationRepository{querier: mockQuerier}
+
+			result, err := repo.GetNotificationPreferences(ctx, tt.userID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				if errors.Is(tt.expectedError, domain.ErrPreferencesNotFound) {
+					assert.ErrorIs(t, err, domain.ErrPreferencesNotFound)
+				} else {
+					assert.Contains(t, err.Error(), tt.expectedError.Error())
+				}
 			} else {
 				require.NoError(t, err)
 				assertNotificationPreferencesEqual(t, tt.expectedResult, result)
