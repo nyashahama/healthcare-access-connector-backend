@@ -896,3 +896,147 @@ func TestConsentRepository_GetConsentHistory(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_GetActiveConsentsByType(t *testing.T) {
+	ctx := context.Background()
+	userID1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	userID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	consentID1 := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
+	consentID2 := uuid.MustParse("423e4567-e89b-12d3-a456-426614174000")
+	now := time.Now()
+
+	tests := []struct {
+		name           string
+		consentType    string
+		mockSetup      func(*mocks.Querier)
+		expectedResult []core.PrivacyConsent
+		expectedError  error
+	}{
+		{
+			name:        "successful get active health data consents",
+			consentType: "health_data",
+			mockSetup: func(m *mocks.Querier) {
+				consentRows := []sqlc.PrivacyConsent{
+					{
+						ID:                pgtype.UUID{Bytes: consentID1, Valid: true},
+						UserID:            pgtype.UUID{Bytes: userID1, Valid: true},
+						HealthDataConsent: pgtype.Bool{Bool: true, Valid: true},
+						CreatedAt:         pgtype.Timestamp{Time: now.Add(-30 * 24 * time.Hour), Valid: true},
+					},
+					{
+						ID:                pgtype.UUID{Bytes: consentID2, Valid: true},
+						UserID:            pgtype.UUID{Bytes: userID2, Valid: true},
+						HealthDataConsent: pgtype.Bool{Bool: true, Valid: true},
+						CreatedAt:         pgtype.Timestamp{Time: now.Add(-15 * 24 * time.Hour), Valid: true},
+					},
+				}
+				m.On("GetActiveHealthDataConsents", ctx).Return(consentRows, nil)
+			},
+			expectedResult: []core.PrivacyConsent{
+				{
+					ID:                consentID1,
+					UserID:            userID1,
+					HealthDataConsent: true,
+					CreatedAt:         now.Add(-30 * 24 * time.Hour),
+				},
+				{
+					ID:                consentID2,
+					UserID:            userID2,
+					HealthDataConsent: true,
+					CreatedAt:         now.Add(-15 * 24 * time.Hour),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:        "successful get active research consents",
+			consentType: "research",
+			mockSetup: func(m *mocks.Querier) {
+				consentRows := []sqlc.PrivacyConsent{
+					{
+						ID:              pgtype.UUID{Bytes: consentID1, Valid: true},
+						UserID:          pgtype.UUID{Bytes: userID1, Valid: true},
+						ResearchConsent: pgtype.Bool{Bool: true, Valid: true},
+						CreatedAt:       pgtype.Timestamp{Time: now.Add(-20 * 24 * time.Hour), Valid: true},
+					},
+				}
+				m.On("GetActiveResearchConsents", ctx).Return(consentRows, nil)
+			},
+			expectedResult: []core.PrivacyConsent{
+				{
+					ID:              consentID1,
+					UserID:          userID1,
+					ResearchConsent: true,
+					CreatedAt:       now.Add(-20 * 24 * time.Hour),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:        "successful get active emergency access consents",
+			consentType: "emergency_access",
+			mockSetup: func(m *mocks.Querier) {
+				consentRows := []sqlc.PrivacyConsent{
+					{
+						ID:                     pgtype.UUID{Bytes: consentID1, Valid: true},
+						UserID:                 pgtype.UUID{Bytes: userID1, Valid: true},
+						EmergencyAccessConsent: pgtype.Bool{Bool: true, Valid: true},
+						CreatedAt:              pgtype.Timestamp{Time: now.Add(-10 * 24 * time.Hour), Valid: true},
+					},
+				}
+				m.On("GetActiveEmergencyAccessConsents", ctx).Return(consentRows, nil)
+			},
+			expectedResult: []core.PrivacyConsent{
+				{
+					ID:                     consentID1,
+					UserID:                 userID1,
+					EmergencyAccessConsent: true,
+					CreatedAt:              now.Add(-10 * 24 * time.Hour),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:        "invalid consent type",
+			consentType: "invalid_type",
+			mockSetup: func(m *mocks.Querier) {
+				// No mock setup needed since we return early
+			},
+			expectedResult: nil,
+			expectedError:  errors.New("invalid consent type"),
+		},
+		{
+			name:        "database error for health data consents",
+			consentType: "health_data",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetActiveHealthDataConsents", ctx).Return([]sqlc.PrivacyConsent{}, assert.AnError)
+			},
+			expectedResult: nil,
+			expectedError:  fmt.Errorf("get active consents by type failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			result, err := repo.GetActiveConsentsByType(ctx, tt.consentType)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedResult), len(result))
+				for i, expected := range tt.expectedResult {
+					assertPrivacyConsentEqual(t, expected, result[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
