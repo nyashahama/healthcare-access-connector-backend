@@ -521,7 +521,7 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 	}
 
 	// Update user status to active
-	if err := s.authRepo.UpdateUserStatus(ctx, user.ID, "active"); err != nil {
+	if err := s.userRepo.UpdateUserStatus(ctx, user.ID, "active"); err != nil {
 		s.logger.Warn().Err(err).Msg("Failed to update user status")
 	}
 

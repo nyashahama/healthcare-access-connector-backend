@@ -292,25 +292,6 @@ func (r *authRepository) UpdateUserPassword(ctx context.Context, id uuid.UUID, p
 	return nil
 }
 
-func (r *authRepository) UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error {
-	start := time.Now()
-	defer func() {
-		authDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	err := r.querier.UpdateUserStatus(ctx, sqlc.UpdateUserStatusParams{
-		ID:     uuidToPgtypeUUID(id),
-		Status: pgtype.Text{String: status, Valid: true},
-	})
-	if err != nil {
-		authDBQueryTotal.WithLabelValues("update_user_status", "error").Inc()
-		return r.handleError(err, "update user status")
-	}
-
-	authDBQueryTotal.WithLabelValues("update_user_status", "success").Inc()
-	return nil
-}
-
 func (r *authRepository) UpdateLastLogin(ctx context.Context, id uuid.UUID) error {
 	start := time.Now()
 	defer func() {

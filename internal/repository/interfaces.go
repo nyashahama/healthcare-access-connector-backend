@@ -35,7 +35,6 @@ type AuthRepository interface {
 	UpdateUserPassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 
 	// Session & Status
-	UpdateUserStatus(ctx context.Context, id uuid.UUID, status string) error
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
 }
 
