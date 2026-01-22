@@ -1257,3 +1257,74 @@ func TestConsentRepository_GetWithdrawnConsents(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_ExportConsentData(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	consentID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	now := time.Now()
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:   "successful export consent data",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				consentRow := sqlc.PrivacyConsent{
+					ID:                pgtype.UUID{Bytes: consentID, Valid: true},
+					UserID:            pgtype.UUID{Bytes: userID, Valid: true},
+					HealthDataConsent: pgtype.Bool{Bool: true, Valid: true},
+					CreatedAt:         pgtype.Timestamp{Time: now, Valid: true},
+				}
+				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(consentRow, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "consent not found",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(sqlc.PrivacyConsent{}, pgx.ErrNoRows)
+			},
+			expectedError: domain.ErrNotFound,
+		},
+		{
+			name:   "database error getting consent",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(sqlc.PrivacyConsent{}, assert.AnError)
+			},
+			expectedError: fmt.Errorf("get privacy consent failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			data, err := repo.ExportConsentData(ctx, tt.userID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				if errors.Is(tt.expectedError, domain.ErrNotFound) {
+					assert.ErrorIs(t, err, domain.ErrNotFound)
+				} else {
+					assert.Contains(t, err.Error(), tt.expectedError.Error())
+				}
+				assert.Nil(t, data)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, data)
+				assert.Greater(t, len(data), 0)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
