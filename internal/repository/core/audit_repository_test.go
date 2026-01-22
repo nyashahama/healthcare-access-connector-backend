@@ -1398,3 +1398,49 @@ func TestAuditRepository_ArchiveOldLogs(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_DeleteArchivedLogs(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		name          string
+		olderThan     time.Duration
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:      "successful delete archived logs",
+			olderThan: 365 * 24 * time.Hour,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("DeleteOldDataAccessLogs", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "database error",
+			olderThan: 365 * 24 * time.Hour,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("DeleteOldDataAccessLogs", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("delete archived logs failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			err := repo.DeleteArchivedLogs(ctx, tt.olderThan)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
