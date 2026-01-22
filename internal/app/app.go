@@ -5,14 +5,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
@@ -81,10 +79,10 @@ func New(cfg *config.Config) (*App, error) {
 	otpRepo := repocore.NewOTPRepository(pool)
 	sessionRepo := repocore.NewSessionRepository(pool)
 	notificationRepo := repocore.NewNotificationRepository(pool)
+	consentRepo := repocore.NewConsentRepository(pool)
 
 	// Initialize stubs for required but not yet implemented repositories
 	patientRepo := &stubPatientRepository{}
-	consentRepo := &stubConsentRepository{}
 
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
@@ -339,70 +337,4 @@ func (s *stubPatientRepository) GetUpcomingImmunizations(ctx context.Context, pa
 
 func (s *stubPatientRepository) GetImmunizationHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
 	return []patients.PatientImmunization{}, nil
-}
-
-type stubConsentRepository struct{}
-
-// Core CRUD Operations
-func (s *stubConsentRepository) CreatePrivacyConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error) {
-	return consent, nil
-}
-
-func (s *stubConsentRepository) GetPrivacyConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error) {
-	return core.PrivacyConsent{}, nil
-}
-
-func (s *stubConsentRepository) UpdatePrivacyConsent(ctx context.Context, consent core.PrivacyConsent) error {
-	return nil
-}
-
-func (s *stubConsentRepository) WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error {
-	return nil
-}
-
-// Consent Type Updates
-func (s *stubConsentRepository) UpdateHealthDataConsent(ctx context.Context, userID uuid.UUID, consent bool, version string) error {
-	return nil
-}
-
-func (s *stubConsentRepository) UpdateResearchConsent(ctx context.Context, userID uuid.UUID, consent bool) error {
-	return nil
-}
-
-func (s *stubConsentRepository) UpdateEmergencyAccessConsent(ctx context.Context, userID uuid.UUID, consent bool) error {
-	return nil
-}
-
-func (s *stubConsentRepository) UpdateCommunicationConsents(ctx context.Context, userID uuid.UUID, sms, email bool) error {
-	return nil
-}
-
-func (s *stubConsentRepository) UpdateDataSharingConsent(ctx context.Context, userID uuid.UUID, sharingPrefs map[string]interface{}) error {
-	return nil
-}
-
-// Compliance & Reporting
-func (s *stubConsentRepository) GetConsentHistory(ctx context.Context, userID uuid.UUID) ([]core.PrivacyConsent, error) {
-	return []core.PrivacyConsent{}, nil
-}
-
-func (s *stubConsentRepository) GetActiveConsentsByType(ctx context.Context, consentType string) ([]core.PrivacyConsent, error) {
-	return []core.PrivacyConsent{}, nil
-}
-
-func (s *stubConsentRepository) GetExpiredConsents(ctx context.Context) ([]core.PrivacyConsent, error) {
-	return []core.PrivacyConsent{}, nil
-}
-
-func (s *stubConsentRepository) GetWithdrawnConsents(ctx context.Context, startDate, endDate time.Time) ([]core.PrivacyConsent, error) {
-	return []core.PrivacyConsent{}, nil
-}
-
-// Export for POPIA data subject access requests
-func (s *stubConsentRepository) ExportConsentData(ctx context.Context, userID uuid.UUID) ([]byte, error) {
-	return []byte{}, nil
-}
-
-func (s *stubConsentRepository) NotifyConsentExpirations(ctx context.Context, daysBefore int) ([]uuid.UUID, error) {
-	return []uuid.UUID{}, nil
 }

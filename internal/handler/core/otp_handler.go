@@ -106,7 +106,7 @@ func (h *OTPHandler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify OTP
-	resetToken, err := h.otpService.VerifyOTP(ctx, req.Identifier, req.OTP)
+	resetToken, _, err := h.otpService.VerifyOTP(ctx, req.Identifier, req.OTP)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return

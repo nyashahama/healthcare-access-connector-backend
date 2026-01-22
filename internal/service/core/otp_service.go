@@ -134,7 +134,7 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 }
 
 // VerifyOTP verifies OTP and returns reset token
-func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (string, error) {
+func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (string, core.User, error) {
 	// Find user
 	var user core.User
 	var err error
@@ -147,9 +147,9 @@ func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (str
 
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			return "", domain.NewAppError(domain.ErrInvalidOTP, "Invalid OTP code", 400)
+			return "", core.User{}, domain.NewAppError(domain.ErrInvalidOTP, "Invalid OTP code", 400)
 		}
-		return "", domain.NewAppError(err, "OTP verification failed", 500)
+		return "", core.User{}, domain.NewAppError(err, "OTP verification failed", 500)
 	}
 
 	// Get OTP record
@@ -160,20 +160,20 @@ func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (str
 				Str("user_id", user.ID.String()).
 				Str("identifier", maskIdentifier(identifier)).
 				Msg("Invalid OTP attempt")
-			return "", domain.NewAppError(domain.ErrInvalidOTP, "Invalid OTP code", 400)
+			return "", core.User{}, domain.NewAppError(domain.ErrInvalidOTP, "Invalid OTP code", 400)
 		}
 		s.logger.Error().Err(err).Msg("Failed to get OTP")
-		return "", domain.NewAppError(err, "OTP verification failed", 500)
+		return "", core.User{}, domain.NewAppError(err, "OTP verification failed", 500)
 	}
 
 	// Check if OTP is expired
 	if time.Now().After(otpRecord.ExpiresAt) {
-		return "", domain.NewAppError(domain.ErrOTPExpired, "OTP has expired", 400)
+		return "", core.User{}, domain.NewAppError(domain.ErrOTPExpired, "OTP has expired", 400)
 	}
 
 	// Check if OTP already used
 	if otpRecord.UsedAt != nil {
-		return "", domain.NewAppError(domain.ErrOTPAlreadyUsed, "OTP has already been used", 400)
+		return "", core.User{}, domain.NewAppError(domain.ErrOTPAlreadyUsed, "OTP has already been used", 400)
 	}
 
 	// Mark OTP as used
@@ -189,26 +189,26 @@ func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (str
 	// Store reset token
 	if err := s.authRepo.SetPasswordResetToken(ctx, user.ID, resetToken, tokenExpires); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to set password reset token")
-		return "", domain.NewAppError(err, "Failed to process reset", 500)
+		return "", core.User{}, domain.NewAppError(err, "Failed to process reset", 500)
 	}
 
 	s.logger.Info().
 		Str("user_id", user.ID.String()).
 		Msg("OTP verified successfully")
 
-	return resetToken, nil
+	return resetToken, user, nil
 }
 
 // ResetPasswordWithOTP combines OTP verification and password reset
 func (s *otpService) ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error {
 	// Verify OTP first
-	resetToken, err := s.VerifyOTP(ctx, identifier, otp)
+	resetToken, user, err := s.VerifyOTP(ctx, identifier, otp)
 	if err != nil {
 		return err
 	}
 
 	// Now reset password using the token
-	return s.resetPasswordWithToken(ctx, resetToken, newPassword)
+	return s.resetPasswordWithToken(ctx, resetToken, newPassword, user)
 }
 
 // GetLatestActiveOTP gets the latest active OTP for a user
@@ -265,14 +265,21 @@ func (s *otpService) GetRecentOTPs(ctx context.Context, userID uuid.UUID, within
 }
 
 // Helper method to reset password with token
-func (s *otpService) resetPasswordWithToken(ctx context.Context, token, newPassword string) error {
-	user, _, err := s.authRepo.GetUserByPasswordResetToken(ctx, token)
+func (s *otpService) resetPasswordWithToken(ctx context.Context, token, newPassword string, user core.User) error {
+	// Validate the reset token (fetch to check validity and expiry)
+	fetchedUser, _, err := s.authRepo.GetUserByPasswordResetToken(ctx, token)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			return domain.NewAppError(domain.ErrInvalidToken, "Invalid or expired reset token", 400)
 		}
 		s.logger.Error().Err(err).Msg("Failed to get user by reset token")
 		return domain.NewAppError(err, "Password reset failed", 500)
+	}
+
+	// Extra security: Ensure the fetched user matches the expected user
+	if fetchedUser.ID != user.ID {
+		s.logger.Warn().Str("expected_user_id", user.ID.String()).Str("fetched_user_id", fetchedUser.ID.String()).Msg("User mismatch during password reset")
+		return domain.NewAppError(domain.ErrInvalidToken, "Invalid reset token", 400)
 	}
 
 	// Hash new password
