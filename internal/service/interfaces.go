@@ -75,6 +75,24 @@ type SessionService interface {
 	StartSessionCleanupJob(interval time.Duration)
 }
 
+// NotificationService defines the interface for notification management operations
+type NotificationService interface {
+	GetPreferences(ctx context.Context, userID uuid.UUID) (core.NotificationPreferences, error)
+	UpdatePreferences(ctx context.Context, prefs core.NotificationPreferences) error
+	CreatePreferences(ctx context.Context, prefs core.NotificationPreferences) (core.NotificationPreferences, error)
+	DeletePreferences(ctx context.Context, userID uuid.UUID) error
+	UpdateChannelSettings(ctx context.Context, userID uuid.UUID, sms, email, push bool) error
+	UpdateAppointmentReminders(ctx context.Context, userID uuid.UUID, enabled bool, hoursBefore int) error
+	UpdateHealthTips(ctx context.Context, userID uuid.UUID, enabled bool, frequency string) error
+	UpdateMedicationReminders(ctx context.Context, userID uuid.UUID, enabled bool) error
+	UpdateEmergencyAlerts(ctx context.Context, userID uuid.UUID, enabled bool) error
+	SetQuietHours(ctx context.Context, userID uuid.UUID, startTime, endTime *time.Time) error
+	UpdateNotificationLanguage(ctx context.Context, userID uuid.UUID, language string) error
+	GetUsersWithDisabledNotifications(ctx context.Context, notificationType string) ([]uuid.UUID, error)
+	GetUsersForHealthTips(ctx context.Context, frequency string) ([]uuid.UUID, error)
+	CanSendNotification(ctx context.Context, userID uuid.UUID, notificationType, channel string) (bool, error)
+}
+
 // PatientService handles patient operations
 type PatientService interface {
 	CreateMedicalInfo(ctx context.Context, patientID uuid.UUID, info patients.PatientMedicalInfo) error
