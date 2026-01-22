@@ -1038,3 +1038,91 @@ func TestAuditRepository_GetAccessLogsByResourceType(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_GetSuspiciousActivities(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+	activityDetails := map[string]interface{}{"key": "value"}
+	location := map[string]interface{}{"city": "Test City"}
+	activityDetailsBytes, _ := json.Marshal(activityDetails)
+	locationBytes, _ := json.Marshal(location)
+
+	tests := []struct {
+		name          string
+		threshold     int
+		mockSetup     func(*mocks.Querier)
+		expectedActs  []core.UserActivity
+		expectedError error
+	}{
+		{
+			name:      "successful get suspicious activities",
+			threshold: 50,
+			mockSetup: func(m *mocks.Querier) {
+				expectedRows := []sqlc.UserActivity{
+					{
+						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
+						UserID:          pgtype.UUID{Bytes: userID, Valid: true},
+						ActivityType:    "suspicious_login",
+						ActivityDetails: activityDetailsBytes,
+						IpAddress:       &ipAddr,
+						UserAgent:       pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:        locationBytes,
+						PerformedAt:     pgtype.Timestamp{Time: now, Valid: true},
+					},
+				}
+				m.On("GetRecentActivities", ctx, mock.MatchedBy(func(p sqlc.GetRecentActivitiesParams) bool {
+					return p.Limit == int32(50) && p.Offset == 0
+				})).Return(expectedRows, nil)
+			},
+			expectedActs: []core.UserActivity{
+				{
+					ID:              uuid.MustParse("323e4567-e89b-12d3-a456-426614174000"),
+					UserID:          &userID,
+					ActivityType:    "suspicious_login",
+					ActivityDetails: activityDetails,
+					IPAddress:       &ipStr,
+					UserAgent:       stringPtr("Mozilla/5.0"),
+					Location:        location,
+					PerformedAt:     now,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "database error",
+			threshold: 50,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetRecentActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
+			},
+			expectedActs:  nil,
+			expectedError: fmt.Errorf("get suspicious activities failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			gotActs, err := repo.GetSuspiciousActivities(ctx, tt.threshold)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, gotActs)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedActs), len(gotActs))
+				for i, expected := range tt.expectedActs {
+					assertUserActivityEqual(t, expected, gotActs[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
