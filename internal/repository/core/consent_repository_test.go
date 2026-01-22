@@ -1040,3 +1040,103 @@ func TestConsentRepository_GetActiveConsentsByType(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_GetExpiredConsents(t *testing.T) {
+	ctx := context.Background()
+	userID1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	userID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	consentID1 := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
+	consentID2 := uuid.MustParse("423e4567-e89b-12d3-a456-426614174000")
+	now := time.Now()
+
+	tests := []struct {
+		name           string
+		mockSetup      func(*mocks.Querier)
+		expectedResult []core.PrivacyConsent
+		expectedError  error
+	}{
+		{
+			name: "successful get expired consents",
+			mockSetup: func(m *mocks.Querier) {
+				consentRows := []sqlc.PrivacyConsent{
+					{
+						ID:                     pgtype.UUID{Bytes: consentID1, Valid: true},
+						UserID:                 pgtype.UUID{Bytes: userID1, Valid: true},
+						HealthDataConsent:      pgtype.Bool{Bool: false, Valid: true},
+						HealthDataConsentDate:  pgtype.Timestamp{Time: now.Add(-400 * 24 * time.Hour), Valid: true}, // Expired
+						EmergencyAccessConsent: pgtype.Bool{Bool: false, Valid: true},
+						CreatedAt:              pgtype.Timestamp{Time: now.Add(-500 * 24 * time.Hour), Valid: true},
+					},
+					{
+						ID:                     pgtype.UUID{Bytes: consentID2, Valid: true},
+						UserID:                 pgtype.UUID{Bytes: userID2, Valid: true},
+						HealthDataConsent:      pgtype.Bool{Bool: true, Valid: true},
+						HealthDataConsentDate:  pgtype.Timestamp{Time: now.Add(-400 * 24 * time.Hour), Valid: true}, // Expired but still consented
+						EmergencyAccessConsent: pgtype.Bool{Bool: false, Valid: true},
+						CreatedAt:              pgtype.Timestamp{Time: now.Add(-450 * 24 * time.Hour), Valid: true},
+					},
+				}
+				m.On("GetExpiredConsents", ctx).Return(consentRows, nil)
+			},
+			expectedResult: []core.PrivacyConsent{
+				{
+					ID:                     consentID1,
+					UserID:                 userID1,
+					HealthDataConsent:      false,
+					HealthDataConsentDate:  timePtr(now.Add(-400 * 24 * time.Hour)),
+					EmergencyAccessConsent: false,
+					CreatedAt:              now.Add(-500 * 24 * time.Hour),
+				},
+				{
+					ID:                     consentID2,
+					UserID:                 userID2,
+					HealthDataConsent:      true,
+					HealthDataConsentDate:  timePtr(now.Add(-400 * 24 * time.Hour)),
+					EmergencyAccessConsent: false,
+					CreatedAt:              now.Add(-450 * 24 * time.Hour),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "no expired consents found",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetExpiredConsents", ctx).Return([]sqlc.PrivacyConsent{}, nil)
+			},
+			expectedResult: []core.PrivacyConsent{},
+			expectedError:  nil,
+		},
+		{
+			name: "database error",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetExpiredConsents", ctx).Return([]sqlc.PrivacyConsent{}, assert.AnError)
+			},
+			expectedResult: nil,
+			expectedError:  fmt.Errorf("get expired consents failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			result, err := repo.GetExpiredConsents(ctx)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedResult), len(result))
+				for i, expected := range tt.expectedResult {
+					assertPrivacyConsentEqual(t, expected, result[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
