@@ -60,6 +60,21 @@ type OTPService interface {
 	GetRecentOTPs(ctx context.Context, userID uuid.UUID, within time.Duration) ([]core.OTPVerification, error)
 }
 
+// SessionService defines the interface for session management operations
+type SessionService interface {
+	GetSession(ctx context.Context, token string) (core.UserSession, error)
+	GetUserSessions(ctx context.Context, userID uuid.UUID) ([]core.UserSession, error)
+	RevokeSession(ctx context.Context, token string, userID uuid.UUID) error
+	RevokeAllSessions(ctx context.Context, userID uuid.UUID) error
+	RevokeAllExceptCurrent(ctx context.Context, userID, currentSessionID uuid.UUID) error
+	InvalidateSessionByDevice(ctx context.Context, userID uuid.UUID, deviceID string) error
+	UpdateSessionToken(ctx context.Context, sessionID uuid.UUID, newToken string, expiresAt time.Time) error
+	CleanupExpiredSessions(ctx context.Context) error
+	GetActiveSessionCount(ctx context.Context, userID uuid.UUID) (int, error)
+	ValidateAndExtendSession(ctx context.Context, token string, extendDuration time.Duration) (core.UserSession, error)
+	StartSessionCleanupJob(interval time.Duration)
+}
+
 // PatientService handles patient operations
 type PatientService interface {
 	CreateMedicalInfo(ctx context.Context, patientID uuid.UUID, info patients.PatientMedicalInfo) error
