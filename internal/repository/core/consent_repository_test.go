@@ -1328,3 +1328,77 @@ func TestConsentRepository_ExportConsentData(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_NotifyConsentExpirations(t *testing.T) {
+	ctx := context.Background()
+	userID1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	userID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	now := time.Now()
+	fmt.Print(now)
+
+	tests := []struct {
+		name           string
+		daysBefore     int
+		mockSetup      func(*mocks.Querier)
+		expectedResult []uuid.UUID
+		expectedError  error
+	}{
+		{
+			name:       "successful get consents expiring in 30 days",
+			daysBefore: 30,
+			mockSetup: func(m *mocks.Querier) {
+				userIDs := []pgtype.UUID{
+					{Bytes: userID1, Valid: true},
+					{Bytes: userID2, Valid: true},
+				}
+				// Use mock.Anything instead of exact time comparison since time.Now() in the method
+				// will be slightly different from the test setup time
+				m.On("GetConsentsExpiringBefore", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return(userIDs, nil)
+			},
+			expectedResult: []uuid.UUID{userID1, userID2},
+			expectedError:  nil,
+		},
+		{
+			name:       "no consents expiring",
+			daysBefore: 30,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetConsentsExpiringBefore", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return([]pgtype.UUID{}, nil)
+			},
+			expectedResult: []uuid.UUID{},
+			expectedError:  nil,
+		},
+		{
+			name:       "database error",
+			daysBefore: 30,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetConsentsExpiringBefore", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return([]pgtype.UUID{}, assert.AnError)
+			},
+			expectedResult: nil,
+			expectedError:  fmt.Errorf("notify consent expirations failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			result, err := repo.NotifyConsentExpirations(ctx, tt.daysBefore)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedResult), len(result))
+				for i, expected := range tt.expectedResult {
+					assert.Equal(t, expected, result[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
