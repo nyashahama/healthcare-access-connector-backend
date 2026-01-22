@@ -1490,3 +1490,115 @@ func TestAuditRepository_ArchiveOldActivities(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_GenerateAccessReport(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	startDate := now.Add(-30 * 24 * time.Hour)
+	endDate := now
+	accessedByUserID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	accessedResourceID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+	location := map[string]interface{}{"city": "Test City"}
+	locationBytes, _ := json.Marshal(location)
+
+	tests := []struct {
+		name           string
+		userID         uuid.UUID
+		startDate      time.Time
+		endDate        time.Time
+		mockSetup      func(*mocks.Querier)
+		expectedReport interface{}
+		expectedError  error
+	}{
+		{
+			name:      "successful generate access report",
+			userID:    userID,
+			startDate: startDate,
+			endDate:   endDate,
+			mockSetup: func(m *mocks.Querier) {
+				expectedRows := []sqlc.DataAccessLog{
+					{
+						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
+						AccessedByUserID:     pgtype.UUID{Bytes: accessedByUserID, Valid: true},
+						AccessedByRole:       pgtype.Text{String: "doctor", Valid: true},
+						AccessedUserID:       pgtype.UUID{Bytes: userID, Valid: true},
+						AccessedResourceType: pgtype.Text{String: "medical_record", Valid: true},
+						AccessedResourceID:   pgtype.UUID{Bytes: accessedResourceID, Valid: true},
+						AccessType:           pgtype.Text{String: "read", Valid: true},
+						AccessReason:         pgtype.Text{String: "routine check", Valid: true},
+						IsEmergencyAccess:    pgtype.Bool{Bool: false, Valid: true},
+						IpAddress:            &ipAddr,
+						UserAgent:            pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:             locationBytes,
+						AccessedAt:           pgtype.Timestamp{Time: now, Valid: true},
+					},
+				}
+				m.On("ExportDataAccessLogs", ctx, sqlc.ExportDataAccessLogsParams{
+					AccessedUserID: uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					AccessedAt:     timePtrToPgtypeTimestamp(&startDate),
+					AccessedAt_2:   timePtrToPgtypeTimestamp(&endDate),
+				}).Return(expectedRows, nil)
+			},
+			expectedReport: []core.DataAccessLog{
+				{
+					ID:                   uuid.MustParse("423e4567-e89b-12d3-a456-426614174000"),
+					AccessedByUserID:     &accessedByUserID,
+					AccessedByRole:       stringPtr("doctor"),
+					AccessedUserID:       userID,
+					AccessedResourceType: stringPtr("medical_record"),
+					AccessedResourceID:   &accessedResourceID,
+					AccessType:           "read",
+					AccessReason:         stringPtr("routine check"),
+					IsEmergencyAccess:    false,
+					IPAddress:            &ipStr,
+					UserAgent:            stringPtr("Mozilla/5.0"),
+					Location:             location,
+					AccessedAt:           now,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "database error",
+			userID:    userID,
+			startDate: startDate,
+			endDate:   endDate,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("ExportDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
+			},
+			expectedReport: nil,
+			expectedError:  fmt.Errorf("generate access report failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			gotReport, err := repo.GenerateAccessReport(ctx, tt.userID, tt.startDate, tt.endDate)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, gotReport)
+			} else {
+				require.NoError(t, err)
+				expectedReports, ok := tt.expectedReport.([]core.DataAccessLog)
+				require.True(t, ok, "expected report should be []core.DataAccessLog")
+				gotReports, ok := gotReport.([]core.DataAccessLog)
+				require.True(t, ok, "returned report should be []core.DataAccessLog")
+				require.Equal(t, len(expectedReports), len(gotReports))
+				for i, expected := range expectedReports {
+					assertDataAccessLogEqual(t, expected, gotReports[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
