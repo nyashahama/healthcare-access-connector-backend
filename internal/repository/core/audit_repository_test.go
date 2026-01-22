@@ -935,3 +935,106 @@ func TestAuditRepository_GetEmergencyAccessLogs(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_GetAccessLogsByResourceType(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	startDate := now.Add(-time.Hour * 24)
+	endDate := now
+	accessedUserID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	accessedByUserID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+	location := map[string]interface{}{"city": "Test City"}
+	locationBytes, _ := json.Marshal(location)
+
+	tests := []struct {
+		name          string
+		resourceType  string
+		startDate     time.Time
+		endDate       time.Time
+		mockSetup     func(*mocks.Querier)
+		expectedLogs  []core.DataAccessLog
+		expectedError error
+	}{
+		{
+			name:         "successful get access logs by resource type",
+			resourceType: "medical_record",
+			startDate:    startDate,
+			endDate:      endDate,
+			mockSetup: func(m *mocks.Querier) {
+				expectedRows := []sqlc.DataAccessLog{
+					{
+						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
+						AccessedByUserID:     pgtype.UUID{Bytes: accessedByUserID, Valid: true},
+						AccessedByRole:       pgtype.Text{String: "doctor", Valid: true},
+						AccessedUserID:       pgtype.UUID{Bytes: accessedUserID, Valid: true},
+						AccessedResourceType: pgtype.Text{String: "medical_record", Valid: true},
+						AccessType:           pgtype.Text{String: "read", Valid: true},
+						IpAddress:            &ipAddr,
+						UserAgent:            pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:             locationBytes,
+						AccessedAt:           pgtype.Timestamp{Time: now, Valid: true},
+					},
+				}
+				m.On("SearchDataAccessLogs", ctx, mock.MatchedBy(func(p sqlc.SearchDataAccessLogsParams) bool {
+					return p.Column4 == "medical_record" &&
+						p.Column6.Time.Equal(startDate) &&
+						p.Column7.Time.Equal(endDate) &&
+						p.Limit == 10000 &&
+						p.Offset == 0
+				})).Return(expectedRows, nil)
+			},
+			expectedLogs: []core.DataAccessLog{
+				{
+					ID:                   uuid.MustParse("423e4567-e89b-12d3-a456-426614174000"),
+					AccessedByUserID:     &accessedByUserID,
+					AccessedByRole:       stringPtr("doctor"),
+					AccessedUserID:       accessedUserID,
+					AccessedResourceType: stringPtr("medical_record"),
+					AccessType:           "read",
+					IPAddress:            &ipStr,
+					UserAgent:            stringPtr("Mozilla/5.0"),
+					Location:             location,
+					AccessedAt:           now,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:         "database error",
+			resourceType: "medical_record",
+			startDate:    startDate,
+			endDate:      endDate,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("SearchDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
+			},
+			expectedLogs:  nil,
+			expectedError: fmt.Errorf("get access logs by resource type failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			gotLogs, err := repo.GetAccessLogsByResourceType(ctx, tt.resourceType, tt.startDate, tt.endDate)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, gotLogs)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedLogs), len(gotLogs))
+				for i, expected := range tt.expectedLogs {
+					assertDataAccessLogEqual(t, expected, gotLogs[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
