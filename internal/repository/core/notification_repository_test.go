@@ -1067,3 +1067,85 @@ func TestNotificationRepository_GetUsersWithDisabledNotifications(t *testing.T) 
 		})
 	}
 }
+
+func TestNotificationRepository_GetUsersForHealthTips(t *testing.T) {
+	ctx := context.Background()
+	userID1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	userID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name           string
+		frequency      string
+		mockSetup      func(*mocks.Querier)
+		expectedResult []uuid.UUID
+		expectedError  error
+	}{
+		{
+			name:      "successful get users for daily health tips",
+			frequency: "daily",
+			mockSetup: func(m *mocks.Querier) {
+				userIDs := []pgtype.UUID{
+					{Bytes: userID1, Valid: true},
+					{Bytes: userID2, Valid: true},
+				}
+				m.On("GetUsersForHealthTips", ctx, pgtype.Text{String: "daily", Valid: true}).Return(userIDs, nil)
+			},
+			expectedResult: []uuid.UUID{userID1, userID2},
+			expectedError:  nil,
+		},
+		{
+			name:      "successful get users for weekly health tips",
+			frequency: "weekly",
+			mockSetup: func(m *mocks.Querier) {
+				userIDs := []pgtype.UUID{
+					{Bytes: userID1, Valid: true},
+				}
+				m.On("GetUsersForHealthTips", ctx, pgtype.Text{String: "weekly", Valid: true}).Return(userIDs, nil)
+			},
+			expectedResult: []uuid.UUID{userID1},
+			expectedError:  nil,
+		},
+		{
+			name:      "no users found for health tips frequency",
+			frequency: "monthly",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetUsersForHealthTips", ctx, pgtype.Text{String: "monthly", Valid: true}).Return([]pgtype.UUID{}, nil)
+			},
+			expectedResult: []uuid.UUID{},
+			expectedError:  nil,
+		},
+		{
+			name:      "database error",
+			frequency: "daily",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetUsersForHealthTips", ctx, pgtype.Text{String: "daily", Valid: true}).Return([]pgtype.UUID{}, assert.AnError)
+			},
+			expectedResult: nil,
+			expectedError:  fmt.Errorf("get users for health tips failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &notificationRepository{querier: mockQuerier}
+
+			result, err := repo.GetUsersForHealthTips(ctx, tt.frequency)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedResult), len(result))
+				for i, expected := range tt.expectedResult {
+					assert.Equal(t, expected, result[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
