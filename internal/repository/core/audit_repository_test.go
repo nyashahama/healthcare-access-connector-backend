@@ -528,3 +528,95 @@ func TestAuditRepository_GetActivitiesByResource(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_LogDataAccess(t *testing.T) {
+	ctx := context.Background()
+	accessedUserID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	accessedByUserID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	accessedResourceID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr, _ := netip.ParseAddr(ipStr)
+	fmt.Print(ipAddr)
+	location := map[string]interface{}{"city": "Test City"}
+	locationBytes, _ := json.Marshal(location)
+
+	tests := []struct {
+		name          string
+		log           core.DataAccessLog
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name: "successful log data access with all fields",
+			log: core.DataAccessLog{
+				AccessedByUserID:     &accessedByUserID,
+				AccessedByRole:       stringPtr("doctor"),
+				AccessedUserID:       accessedUserID,
+				AccessedResourceType: stringPtr("medical_record"),
+				AccessedResourceID:   &accessedResourceID,
+				AccessType:           "read",
+				AccessReason:         stringPtr("routine check"),
+				IsEmergencyAccess:    true,
+				IPAddress:            &ipStr,
+				UserAgent:            stringPtr("Mozilla/5.0"),
+				Location:             location,
+			},
+			mockSetup: func(m *mocks.Querier) {
+				m.On("LogDataAccess", ctx, mock.MatchedBy(func(p sqlc.LogDataAccessParams) bool {
+					return p.AccessedByUserID.Bytes == accessedByUserID &&
+						p.AccessedByRole.String == "doctor" &&
+						p.AccessedUserID.Bytes == accessedUserID &&
+						p.AccessedResourceType.String == "medical_record" &&
+						p.AccessedResourceID.Bytes == accessedResourceID &&
+						p.AccessType.String == "read" &&
+						p.AccessReason.String == "routine check" &&
+						p.IsEmergencyAccess.Bool == true &&
+						p.IpAddress.String() == ipStr &&
+						p.UserAgent.String == "Mozilla/5.0" &&
+						string(p.Location) == string(locationBytes)
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "marshal error for location",
+			log: core.DataAccessLog{
+				AccessedUserID: accessedUserID,
+				AccessType:     "read",
+				Location:       map[string]interface{}{"invalid": make(chan int)},
+			},
+			mockSetup:     func(m *mocks.Querier) {},
+			expectedError: errors.New("marshal location"),
+		},
+		{
+			name: "database error",
+			log: core.DataAccessLog{
+				AccessedUserID: accessedUserID,
+				AccessType:     "read",
+			},
+			mockSetup: func(m *mocks.Querier) {
+				m.On("LogDataAccess", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("log data access failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			err := repo.LogDataAccess(ctx, tt.log)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
