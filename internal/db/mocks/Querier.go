@@ -202,6 +202,62 @@ func (_m *Querier) BulkUpdateUserStatus(ctx context.Context, arg sqlc.BulkUpdate
 	return r0
 }
 
+// CountActiveConsents provides a mock function with given fields: ctx
+func (_m *Querier) CountActiveConsents(ctx context.Context) (int64, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountActiveConsents")
+	}
+
+	var r0 int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (int64, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) int64); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CountConsentsByType provides a mock function with given fields: ctx
+func (_m *Querier) CountConsentsByType(ctx context.Context) (sqlc.CountConsentsByTypeRow, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountConsentsByType")
+	}
+
+	var r0 sqlc.CountConsentsByTypeRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (sqlc.CountConsentsByTypeRow, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) sqlc.CountConsentsByTypeRow); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(sqlc.CountConsentsByTypeRow)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // CountUsersByRole provides a mock function with given fields: ctx, role
 func (_m *Querier) CountUsersByRole(ctx context.Context, role string) (int64, error) {
 	ret := _m.Called(ctx, role)
@@ -572,6 +628,42 @@ func (_m *Querier) DeleteNotificationPreferences(ctx context.Context, userID pgt
 	return r0
 }
 
+// DeleteOldDataAccessLogs provides a mock function with given fields: ctx, accessedAt
+func (_m *Querier) DeleteOldDataAccessLogs(ctx context.Context, accessedAt pgtype.Timestamp) error {
+	ret := _m.Called(ctx, accessedAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteOldDataAccessLogs")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Timestamp) error); ok {
+		r0 = rf(ctx, accessedAt)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeleteOldUserActivities provides a mock function with given fields: ctx, performedAt
+func (_m *Querier) DeleteOldUserActivities(ctx context.Context, performedAt pgtype.Timestamp) error {
+	ret := _m.Called(ctx, performedAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteOldUserActivities")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Timestamp) error); ok {
+		r0 = rf(ctx, performedAt)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeletePatientAllergy provides a mock function with given fields: ctx, id
 func (_m *Querier) DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error {
 	ret := _m.Called(ctx, id)
@@ -583,6 +675,24 @@ func (_m *Querier) DeletePatientAllergy(ctx context.Context, id pgtype.UUID) err
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) error); ok {
 		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeletePrivacyConsent provides a mock function with given fields: ctx, userID
+func (_m *Querier) DeletePrivacyConsent(ctx context.Context, userID pgtype.UUID) error {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePrivacyConsent")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) error); ok {
+		r0 = rf(ctx, userID)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -678,6 +788,246 @@ func (_m *Querier) DeleteUserSessions(ctx context.Context, userID pgtype.UUID) e
 	}
 
 	return r0
+}
+
+// ExportDataAccessLogs provides a mock function with given fields: ctx, arg
+func (_m *Querier) ExportDataAccessLogs(ctx context.Context, arg sqlc.ExportDataAccessLogsParams) ([]sqlc.DataAccessLog, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExportDataAccessLogs")
+	}
+
+	var r0 []sqlc.DataAccessLog
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.ExportDataAccessLogsParams) ([]sqlc.DataAccessLog, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.ExportDataAccessLogsParams) []sqlc.DataAccessLog); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.DataAccessLog)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.ExportDataAccessLogsParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ExportUserActivities provides a mock function with given fields: ctx, arg
+func (_m *Querier) ExportUserActivities(ctx context.Context, arg sqlc.ExportUserActivitiesParams) ([]sqlc.UserActivity, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExportUserActivities")
+	}
+
+	var r0 []sqlc.UserActivity
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.ExportUserActivitiesParams) ([]sqlc.UserActivity, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.ExportUserActivitiesParams) []sqlc.UserActivity); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.UserActivity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.ExportUserActivitiesParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetAccessLogsByAccessedByUser provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetAccessLogsByAccessedByUser(ctx context.Context, arg sqlc.GetAccessLogsByAccessedByUserParams) ([]sqlc.DataAccessLog, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccessLogsByAccessedByUser")
+	}
+
+	var r0 []sqlc.DataAccessLog
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetAccessLogsByAccessedByUserParams) ([]sqlc.DataAccessLog, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetAccessLogsByAccessedByUserParams) []sqlc.DataAccessLog); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.DataAccessLog)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetAccessLogsByAccessedByUserParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetActiveEmergencyAccessConsents provides a mock function with given fields: ctx
+func (_m *Querier) GetActiveEmergencyAccessConsents(ctx context.Context) ([]sqlc.PrivacyConsent, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActiveEmergencyAccessConsents")
+	}
+
+	var r0 []sqlc.PrivacyConsent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]sqlc.PrivacyConsent, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []sqlc.PrivacyConsent); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.PrivacyConsent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetActiveHealthDataConsents provides a mock function with given fields: ctx
+func (_m *Querier) GetActiveHealthDataConsents(ctx context.Context) ([]sqlc.PrivacyConsent, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActiveHealthDataConsents")
+	}
+
+	var r0 []sqlc.PrivacyConsent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]sqlc.PrivacyConsent, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []sqlc.PrivacyConsent); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.PrivacyConsent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetActiveResearchConsents provides a mock function with given fields: ctx
+func (_m *Querier) GetActiveResearchConsents(ctx context.Context) ([]sqlc.PrivacyConsent, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActiveResearchConsents")
+	}
+
+	var r0 []sqlc.PrivacyConsent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]sqlc.PrivacyConsent, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []sqlc.PrivacyConsent); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.PrivacyConsent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetActivitiesByResource provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetActivitiesByResource(ctx context.Context, arg sqlc.GetActivitiesByResourceParams) ([]sqlc.UserActivity, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActivitiesByResource")
+	}
+
+	var r0 []sqlc.UserActivity
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetActivitiesByResourceParams) ([]sqlc.UserActivity, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetActivitiesByResourceParams) []sqlc.UserActivity); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.UserActivity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetActivitiesByResourceParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetActivitiesByType provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetActivitiesByType(ctx context.Context, arg sqlc.GetActivitiesByTypeParams) ([]sqlc.UserActivity, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActivitiesByType")
+	}
+
+	var r0 []sqlc.UserActivity
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetActivitiesByTypeParams) ([]sqlc.UserActivity, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetActivitiesByTypeParams) []sqlc.UserActivity); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.UserActivity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetActivitiesByTypeParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // GetClinicByID provides a mock function with given fields: ctx, id
@@ -794,6 +1144,94 @@ func (_m *Querier) GetClinicStaffByUserID(ctx context.Context, userID pgtype.UUI
 	return r0, r1
 }
 
+// GetConsentByID provides a mock function with given fields: ctx, id
+func (_m *Querier) GetConsentByID(ctx context.Context, id pgtype.UUID) (sqlc.PrivacyConsent, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConsentByID")
+	}
+
+	var r0 sqlc.PrivacyConsent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) (sqlc.PrivacyConsent, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) sqlc.PrivacyConsent); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(sqlc.PrivacyConsent)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetConsentHistory provides a mock function with given fields: ctx, userID
+func (_m *Querier) GetConsentHistory(ctx context.Context, userID pgtype.UUID) ([]sqlc.PrivacyConsent, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConsentHistory")
+	}
+
+	var r0 []sqlc.PrivacyConsent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) ([]sqlc.PrivacyConsent, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) []sqlc.PrivacyConsent); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.PrivacyConsent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetConsentsExpiringBefore provides a mock function with given fields: ctx, healthDataConsentDate
+func (_m *Querier) GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error) {
+	ret := _m.Called(ctx, healthDataConsentDate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConsentsExpiringBefore")
+	}
+
+	var r0 []pgtype.UUID
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Timestamp) ([]pgtype.UUID, error)); ok {
+		return rf(ctx, healthDataConsentDate)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Timestamp) []pgtype.UUID); ok {
+		r0 = rf(ctx, healthDataConsentDate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]pgtype.UUID)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.Timestamp) error); ok {
+		r1 = rf(ctx, healthDataConsentDate)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetConversationMessages provides a mock function with given fields: ctx, arg
 func (_m *Querier) GetConversationMessages(ctx context.Context, arg sqlc.GetConversationMessagesParams) ([]sqlc.GetConversationMessagesRow, error) {
 	ret := _m.Called(ctx, arg)
@@ -825,28 +1263,88 @@ func (_m *Querier) GetConversationMessages(ctx context.Context, arg sqlc.GetConv
 }
 
 // GetDataAccessLogs provides a mock function with given fields: ctx, arg
-func (_m *Querier) GetDataAccessLogs(ctx context.Context, arg sqlc.GetDataAccessLogsParams) ([]sqlc.GetDataAccessLogsRow, error) {
+func (_m *Querier) GetDataAccessLogs(ctx context.Context, arg sqlc.GetDataAccessLogsParams) ([]sqlc.DataAccessLog, error) {
 	ret := _m.Called(ctx, arg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetDataAccessLogs")
 	}
 
-	var r0 []sqlc.GetDataAccessLogsRow
+	var r0 []sqlc.DataAccessLog
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetDataAccessLogsParams) ([]sqlc.GetDataAccessLogsRow, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetDataAccessLogsParams) ([]sqlc.DataAccessLog, error)); ok {
 		return rf(ctx, arg)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetDataAccessLogsParams) []sqlc.GetDataAccessLogsRow); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetDataAccessLogsParams) []sqlc.DataAccessLog); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]sqlc.GetDataAccessLogsRow)
+			r0 = ret.Get(0).([]sqlc.DataAccessLog)
 		}
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetDataAccessLogsParams) error); ok {
 		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetEmergencyAccessLogs provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetEmergencyAccessLogs(ctx context.Context, arg sqlc.GetEmergencyAccessLogsParams) ([]sqlc.DataAccessLog, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEmergencyAccessLogs")
+	}
+
+	var r0 []sqlc.DataAccessLog
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetEmergencyAccessLogsParams) ([]sqlc.DataAccessLog, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetEmergencyAccessLogsParams) []sqlc.DataAccessLog); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.DataAccessLog)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetEmergencyAccessLogsParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetExpiredConsents provides a mock function with given fields: ctx
+func (_m *Querier) GetExpiredConsents(ctx context.Context) ([]sqlc.PrivacyConsent, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetExpiredConsents")
+	}
+
+	var r0 []sqlc.PrivacyConsent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]sqlc.PrivacyConsent, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []sqlc.PrivacyConsent); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.PrivacyConsent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1198,6 +1696,36 @@ func (_m *Querier) GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (s
 	return r0, r1
 }
 
+// GetRecentActivities provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetRecentActivities(ctx context.Context, arg sqlc.GetRecentActivitiesParams) ([]sqlc.UserActivity, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRecentActivities")
+	}
+
+	var r0 []sqlc.UserActivity
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetRecentActivitiesParams) ([]sqlc.UserActivity, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetRecentActivitiesParams) []sqlc.UserActivity); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.UserActivity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetRecentActivitiesParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetRecentOTPs provides a mock function with given fields: ctx, arg
 func (_m *Querier) GetRecentOTPs(ctx context.Context, arg sqlc.GetRecentOTPsParams) ([]sqlc.OtpVerification, error) {
 	ret := _m.Called(ctx, arg)
@@ -1345,23 +1873,23 @@ func (_m *Querier) GetUpcomingImmunizations(ctx context.Context, patientID pgtyp
 }
 
 // GetUserActivities provides a mock function with given fields: ctx, arg
-func (_m *Querier) GetUserActivities(ctx context.Context, arg sqlc.GetUserActivitiesParams) ([]sqlc.GetUserActivitiesRow, error) {
+func (_m *Querier) GetUserActivities(ctx context.Context, arg sqlc.GetUserActivitiesParams) ([]sqlc.UserActivity, error) {
 	ret := _m.Called(ctx, arg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUserActivities")
 	}
 
-	var r0 []sqlc.GetUserActivitiesRow
+	var r0 []sqlc.UserActivity
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetUserActivitiesParams) ([]sqlc.GetUserActivitiesRow, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetUserActivitiesParams) ([]sqlc.UserActivity, error)); ok {
 		return rf(ctx, arg)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetUserActivitiesParams) []sqlc.GetUserActivitiesRow); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetUserActivitiesParams) []sqlc.UserActivity); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]sqlc.GetUserActivitiesRow)
+			r0 = ret.Get(0).([]sqlc.UserActivity)
 		}
 	}
 
@@ -1662,6 +2190,36 @@ func (_m *Querier) GetUsersWithDisabledType(ctx context.Context, dollar_1 interf
 	return r0, r1
 }
 
+// GetWithdrawnConsents provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetWithdrawnConsents(ctx context.Context, arg sqlc.GetWithdrawnConsentsParams) ([]sqlc.PrivacyConsent, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetWithdrawnConsents")
+	}
+
+	var r0 []sqlc.PrivacyConsent
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetWithdrawnConsentsParams) ([]sqlc.PrivacyConsent, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetWithdrawnConsentsParams) []sqlc.PrivacyConsent); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.PrivacyConsent)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetWithdrawnConsentsParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // InvalidateUserOTPs provides a mock function with given fields: ctx, arg
 func (_m *Querier) InvalidateUserOTPs(ctx context.Context, arg sqlc.InvalidateUserOTPsParams) error {
 	ret := _m.Called(ctx, arg)
@@ -1940,6 +2498,36 @@ func (_m *Querier) SearchClinicsByLocation(ctx context.Context, arg sqlc.SearchC
 	return r0, r1
 }
 
+// SearchDataAccessLogs provides a mock function with given fields: ctx, arg
+func (_m *Querier) SearchDataAccessLogs(ctx context.Context, arg sqlc.SearchDataAccessLogsParams) ([]sqlc.DataAccessLog, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SearchDataAccessLogs")
+	}
+
+	var r0 []sqlc.DataAccessLog
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.SearchDataAccessLogsParams) ([]sqlc.DataAccessLog, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.SearchDataAccessLogsParams) []sqlc.DataAccessLog); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.DataAccessLog)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.SearchDataAccessLogsParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SearchPatients provides a mock function with given fields: ctx, arg
 func (_m *Querier) SearchPatients(ctx context.Context, arg sqlc.SearchPatientsParams) ([]sqlc.SearchPatientsRow, error) {
 	ret := _m.Called(ctx, arg)
@@ -1962,6 +2550,36 @@ func (_m *Querier) SearchPatients(ctx context.Context, arg sqlc.SearchPatientsPa
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, sqlc.SearchPatientsParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SearchUserActivities provides a mock function with given fields: ctx, arg
+func (_m *Querier) SearchUserActivities(ctx context.Context, arg sqlc.SearchUserActivitiesParams) ([]sqlc.UserActivity, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SearchUserActivities")
+	}
+
+	var r0 []sqlc.UserActivity
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.SearchUserActivitiesParams) ([]sqlc.UserActivity, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.SearchUserActivitiesParams) []sqlc.UserActivity); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.UserActivity)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.SearchUserActivitiesParams) error); ok {
 		r1 = rf(ctx, arg)
 	} else {
 		r1 = ret.Error(1)
@@ -2126,6 +2744,24 @@ func (_m *Querier) UpdateClinicStaff(ctx context.Context, arg sqlc.UpdateClinicS
 	return r0
 }
 
+// UpdateCommunicationConsents provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateCommunicationConsents(ctx context.Context, arg sqlc.UpdateCommunicationConsentsParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateCommunicationConsents")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateCommunicationConsentsParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateCredential provides a mock function with given fields: ctx, arg
 func (_m *Querier) UpdateCredential(ctx context.Context, arg sqlc.UpdateCredentialParams) error {
 	ret := _m.Called(ctx, arg)
@@ -2144,6 +2780,42 @@ func (_m *Querier) UpdateCredential(ctx context.Context, arg sqlc.UpdateCredenti
 	return r0
 }
 
+// UpdateDataSharingConsent provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateDataSharingConsent(ctx context.Context, arg sqlc.UpdateDataSharingConsentParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateDataSharingConsent")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateDataSharingConsentParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateEmergencyAccessConsent provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateEmergencyAccessConsent(ctx context.Context, arg sqlc.UpdateEmergencyAccessConsentParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateEmergencyAccessConsent")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateEmergencyAccessConsentParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdateEmergencyAlerts provides a mock function with given fields: ctx, arg
 func (_m *Querier) UpdateEmergencyAlerts(ctx context.Context, arg sqlc.UpdateEmergencyAlertsParams) error {
 	ret := _m.Called(ctx, arg)
@@ -2154,6 +2826,24 @@ func (_m *Querier) UpdateEmergencyAlerts(ctx context.Context, arg sqlc.UpdateEme
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateEmergencyAlertsParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateHealthDataConsent provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateHealthDataConsent(ctx context.Context, arg sqlc.UpdateHealthDataConsentParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateHealthDataConsent")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateHealthDataConsentParams) error); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		r0 = ret.Error(0)
@@ -2352,6 +3042,24 @@ func (_m *Querier) UpdateQuietHours(ctx context.Context, arg sqlc.UpdateQuietHou
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateQuietHoursParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdateResearchConsent provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdateResearchConsent(ctx context.Context, arg sqlc.UpdateResearchConsentParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateResearchConsent")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateResearchConsentParams) error); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		r0 = ret.Error(0)
