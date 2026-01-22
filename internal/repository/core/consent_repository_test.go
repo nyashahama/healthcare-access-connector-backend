@@ -2,15 +2,18 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	sqlc "github.com/nyashahama/healthcare-access-connector-backend/internal/db"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/db/mocks"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -184,6 +187,118 @@ func TestConsentRepository_CreatePrivacyConsent(t *testing.T) {
 			if tt.expectedError != nil {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+				assertPrivacyConsentEqual(t, tt.expectedResult, result)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
+
+func TestConsentRepository_GetPrivacyConsent(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+	consentID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	dataSharingConsent := map[string]interface{}{"provider": "hospital", "share": true}
+	specialCategoriesConsent := map[string]interface{}{"genetic": true, "biometric": false}
+	dataSharingBytes := []byte(`{"provider":"hospital","share":true}`)
+	specialCategoriesBytes := []byte(`{"genetic":true,"biometric":false}`)
+
+	tests := []struct {
+		name           string
+		userID         uuid.UUID
+		mockSetup      func(*mocks.Querier)
+		expectedResult core.PrivacyConsent
+		expectedError  error
+	}{
+		{
+			name:   "successful get privacy consent",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				consentRow := sqlc.PrivacyConsent{
+					ID:                         pgtype.UUID{Bytes: consentID, Valid: true},
+					UserID:                     pgtype.UUID{Bytes: userID, Valid: true},
+					HealthDataConsent:          pgtype.Bool{Bool: true, Valid: true},
+					HealthDataConsentDate:      pgtype.Timestamp{Time: now.Add(-30 * 24 * time.Hour), Valid: true},
+					HealthDataConsentVersion:   pgtype.Text{String: "v1.0", Valid: true},
+					ResearchConsent:            pgtype.Bool{Bool: false, Valid: true},
+					ResearchConsentDate:        pgtype.Timestamp{Time: now.Add(-15 * 24 * time.Hour), Valid: true},
+					EmergencyAccessConsent:     pgtype.Bool{Bool: true, Valid: true},
+					EmergencyAccessConsentDate: pgtype.Timestamp{Time: now.Add(-10 * 24 * time.Hour), Valid: true},
+					SmsCommunicationConsent:    pgtype.Bool{Bool: true, Valid: true},
+					EmailCommunicationConsent:  pgtype.Bool{Bool: false, Valid: true},
+					DataSharingConsent:         dataSharingBytes,
+					SpecialCategoriesConsent:   specialCategoriesBytes,
+					ConsentWithdrawn:           pgtype.Bool{Bool: false, Valid: true},
+					IpAddress:                  &ipAddr,
+					UserAgent:                  pgtype.Text{String: "Mozilla/5.0", Valid: true},
+					CreatedAt:                  pgtype.Timestamp{Time: now.Add(-60 * 24 * time.Hour), Valid: true},
+					UpdatedAt:                  pgtype.Timestamp{Time: now, Valid: true},
+				}
+				m.On("GetPrivacyConsent", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(consentRow, nil)
+			},
+			expectedResult: core.PrivacyConsent{
+				ID:                         consentID,
+				UserID:                     userID,
+				HealthDataConsent:          true,
+				HealthDataConsentDate:      timePtr(now.Add(-30 * 24 * time.Hour)),
+				HealthDataConsentVersion:   stringPtr("v1.0"),
+				ResearchConsent:            false,
+				ResearchConsentDate:        timePtr(now.Add(-15 * 24 * time.Hour)),
+				EmergencyAccessConsent:     true,
+				EmergencyAccessConsentDate: timePtr(now.Add(-10 * 24 * time.Hour)),
+				SMSCommunicationConsent:    true,
+				EmailCommunicationConsent:  false,
+				DataSharingConsent:         dataSharingConsent,
+				SpecialCategoriesConsent:   specialCategoriesConsent,
+				ConsentWithdrawn:           false,
+				IPAddress:                  &ipStr,
+				UserAgent:                  stringPtr("Mozilla/5.0"),
+				CreatedAt:                  now.Add(-60 * 24 * time.Hour),
+				UpdatedAt:                  now,
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "consent not found",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(sqlc.PrivacyConsent{}, pgx.ErrNoRows)
+			},
+			expectedResult: core.PrivacyConsent{},
+			expectedError:  domain.ErrNotFound,
+		},
+		{
+			name:   "database error",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(sqlc.PrivacyConsent{}, assert.AnError)
+			},
+			expectedResult: core.PrivacyConsent{},
+			expectedError:  fmt.Errorf("get privacy consent failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			result, err := repo.GetPrivacyConsent(ctx, tt.userID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				if errors.Is(tt.expectedError, domain.ErrNotFound) {
+					assert.ErrorIs(t, err, domain.ErrNotFound)
+				} else {
+					assert.Contains(t, err.Error(), tt.expectedError.Error())
+				}
 			} else {
 				require.NoError(t, err)
 				assertPrivacyConsentEqual(t, tt.expectedResult, result)
