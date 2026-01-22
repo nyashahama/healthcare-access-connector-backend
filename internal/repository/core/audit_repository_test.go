@@ -1602,3 +1602,120 @@ func TestAuditRepository_GenerateAccessReport(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_GenerateActivityReport(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	startDate := now.Add(-30 * 24 * time.Hour)
+	endDate := now
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+	activityDetails := map[string]interface{}{"key": "value"}
+	location := map[string]interface{}{"city": "Test City"}
+	activityDetailsBytes, _ := json.Marshal(activityDetails)
+	locationBytes, _ := json.Marshal(location)
+
+	tests := []struct {
+		name           string
+		startDate      time.Time
+		endDate        time.Time
+		mockSetup      func(*mocks.Querier)
+		expectedReport interface{}
+		expectedError  error
+	}{
+		{
+			name:      "successful generate activity report",
+			startDate: startDate,
+			endDate:   endDate,
+			mockSetup: func(m *mocks.Querier) {
+				expectedRows := []sqlc.UserActivity{
+					{
+						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
+						UserID:          pgtype.UUID{Bytes: userID, Valid: true},
+						ActivityType:    "login",
+						ActivityDetails: activityDetailsBytes,
+						IpAddress:       &ipAddr,
+						UserAgent:       pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:        locationBytes,
+						PerformedAt:     pgtype.Timestamp{Time: now, Valid: true},
+					},
+					{
+						ID:              uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
+						UserID:          pgtype.UUID{Bytes: userID, Valid: true},
+						ActivityType:    "logout",
+						ActivityDetails: activityDetailsBytes,
+						IpAddress:       &ipAddr,
+						UserAgent:       pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:        locationBytes,
+						PerformedAt:     pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+					},
+				}
+				m.On("SearchUserActivities", ctx, mock.MatchedBy(func(p sqlc.SearchUserActivitiesParams) bool {
+					return p.Limit == 10000 && p.Offset == 0
+				})).Return(expectedRows, nil)
+			},
+			expectedReport: []core.UserActivity{
+				{
+					ID:              uuid.MustParse("323e4567-e89b-12d3-a456-426614174000"),
+					UserID:          &userID,
+					ActivityType:    "login",
+					ActivityDetails: activityDetails,
+					IPAddress:       &ipStr,
+					UserAgent:       stringPtr("Mozilla/5.0"),
+					Location:        location,
+					PerformedAt:     now,
+				},
+				{
+					ID:              uuid.MustParse("423e4567-e89b-12d3-a456-426614174000"),
+					UserID:          &userID,
+					ActivityType:    "logout",
+					ActivityDetails: activityDetails,
+					IPAddress:       &ipStr,
+					UserAgent:       stringPtr("Mozilla/5.0"),
+					Location:        location,
+					PerformedAt:     now.Add(-time.Hour),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "database error",
+			startDate: startDate,
+			endDate:   endDate,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("SearchUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
+			},
+			expectedReport: nil,
+			expectedError:  fmt.Errorf("generate activity report failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			gotReport, err := repo.GenerateActivityReport(ctx, tt.startDate, tt.endDate)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, gotReport)
+			} else {
+				require.NoError(t, err)
+				expectedReports, ok := tt.expectedReport.([]core.UserActivity)
+				require.True(t, ok, "expected report should be []core.UserActivity")
+				gotReports, ok := gotReport.([]core.UserActivity)
+				require.True(t, ok, "returned report should be []core.UserActivity")
+				require.Equal(t, len(expectedReports), len(gotReports))
+				for i, expected := range expectedReports {
+					assertUserActivityEqual(t, expected, gotReports[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
