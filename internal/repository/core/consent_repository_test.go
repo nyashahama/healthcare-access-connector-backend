@@ -446,3 +446,75 @@ func TestConsentRepository_WithdrawConsent(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_UpdateHealthDataConsent(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		consent       bool
+		version       string
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:    "successful update health data consent (grant)",
+			userID:  userID,
+			consent: true,
+			version: "v2.0",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateHealthDataConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateHealthDataConsentParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.HealthDataConsent.Bool == true &&
+						p.HealthDataConsentVersion.String == "v2.0"
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "successful update health data consent (withdraw)",
+			userID:  userID,
+			consent: false,
+			version: "v2.0",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateHealthDataConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateHealthDataConsentParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.HealthDataConsent.Bool == false &&
+						p.HealthDataConsentVersion.String == "v2.0"
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "database error",
+			userID:  userID,
+			consent: true,
+			version: "v1.0",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateHealthDataConsent", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update health data consent failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			err := repo.UpdateHealthDataConsent(ctx, tt.userID, tt.consent, tt.version)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
