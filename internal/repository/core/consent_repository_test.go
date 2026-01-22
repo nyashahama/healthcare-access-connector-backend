@@ -646,3 +646,89 @@ func TestConsentRepository_UpdateEmergencyAccessConsent(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_UpdateCommunicationConsents(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		sms           bool
+		email         bool
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:   "successful update communication consents (both true)",
+			userID: userID,
+			sms:    true,
+			email:  true,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateCommunicationConsents", ctx, mock.MatchedBy(func(p sqlc.UpdateCommunicationConsentsParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.SmsCommunicationConsent.Bool == true &&
+						p.EmailCommunicationConsent.Bool == true
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "successful update communication consents (sms true, email false)",
+			userID: userID,
+			sms:    true,
+			email:  false,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateCommunicationConsents", ctx, mock.MatchedBy(func(p sqlc.UpdateCommunicationConsentsParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.SmsCommunicationConsent.Bool == true &&
+						p.EmailCommunicationConsent.Bool == false
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "successful update communication consents (both false)",
+			userID: userID,
+			sms:    false,
+			email:  false,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateCommunicationConsents", ctx, mock.MatchedBy(func(p sqlc.UpdateCommunicationConsentsParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.SmsCommunicationConsent.Bool == false &&
+						p.EmailCommunicationConsent.Bool == false
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "database error",
+			userID: userID,
+			sms:    true,
+			email:  true,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateCommunicationConsents", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update communication consents failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			err := repo.UpdateCommunicationConsents(ctx, tt.userID, tt.sms, tt.email)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
