@@ -932,3 +932,56 @@ func TestNotificationRepository_SetQuietHours(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationRepository_UpdateNotificationLanguage(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		language      string
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:     "successful update notification language",
+			userID:   userID,
+			language: "fr",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateNotificationLanguage", ctx, mock.MatchedBy(func(p sqlc.UpdateNotificationLanguageParams) bool {
+					return p.UserID.Bytes == userID && p.NotificationLanguage.String == "fr"
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:     "database error",
+			userID:   userID,
+			language: "es",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateNotificationLanguage", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update notification language failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &notificationRepository{querier: mockQuerier}
+
+			err := repo.UpdateNotificationLanguage(ctx, tt.userID, tt.language)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
