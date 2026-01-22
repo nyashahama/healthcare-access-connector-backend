@@ -1719,3 +1719,153 @@ func TestAuditRepository_GenerateActivityReport(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_ExportUserAuditTrail(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	accessedByUserID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	resourceID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+	activityDetails := map[string]interface{}{"key": "value"}
+	location := map[string]interface{}{"city": "Test City"}
+	activityDetailsBytes, _ := json.Marshal(activityDetails)
+	locationBytes, _ := json.Marshal(location)
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		mockSetup     func(*mocks.Querier)
+		expectedJSON  []byte
+		expectedError error
+	}{
+		{
+			name:   "successful export user audit trail",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				// Mock user activities
+				activityRows := []sqlc.UserActivity{
+					{
+						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
+						UserID:          pgtype.UUID{Bytes: userID, Valid: true},
+						ActivityType:    "login",
+						ActivityDetails: activityDetailsBytes,
+						IpAddress:       &ipAddr,
+						UserAgent:       pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:        locationBytes,
+						PerformedAt:     pgtype.Timestamp{Time: now, Valid: true},
+					},
+				}
+				m.On("ExportUserActivities", ctx, mock.MatchedBy(func(p sqlc.ExportUserActivitiesParams) bool {
+					return p.UserID.Bytes == userID
+				})).Return(activityRows, nil)
+
+				// Mock data access logs
+				logRows := []sqlc.DataAccessLog{
+					{
+						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
+						AccessedByUserID:     pgtype.UUID{Bytes: accessedByUserID, Valid: true},
+						AccessedByRole:       pgtype.Text{String: "doctor", Valid: true},
+						AccessedUserID:       pgtype.UUID{Bytes: userID, Valid: true},
+						AccessedResourceType: pgtype.Text{String: "medical_record", Valid: true},
+						AccessedResourceID:   pgtype.UUID{Bytes: resourceID, Valid: true},
+						AccessType:           pgtype.Text{String: "read", Valid: true},
+						IpAddress:            &ipAddr,
+						UserAgent:            pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:             locationBytes,
+						AccessedAt:           pgtype.Timestamp{Time: now.Add(-time.Hour), Valid: true},
+					},
+				}
+				m.On("ExportDataAccessLogs", ctx, mock.MatchedBy(func(p sqlc.ExportDataAccessLogsParams) bool {
+					return p.AccessedUserID.Bytes == userID
+				})).Return(logRows, nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "database error on user activities export",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("ExportUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
+			},
+			expectedError: fmt.Errorf("export user activities for audit trail failed: %w", assert.AnError),
+		},
+		{
+			name:   "database error on data access logs export",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				activityRows := []sqlc.UserActivity{
+					{
+						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
+						UserID:          pgtype.UUID{Bytes: userID, Valid: true},
+						ActivityType:    "login",
+						ActivityDetails: activityDetailsBytes,
+						IpAddress:       &ipAddr,
+						UserAgent:       pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:        locationBytes,
+						PerformedAt:     pgtype.Timestamp{Time: now, Valid: true},
+					},
+				}
+				m.On("ExportUserActivities", ctx, mock.Anything).Return(activityRows, nil)
+				m.On("ExportDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
+			},
+			expectedError: fmt.Errorf("export data access logs for audit trail failed: %w", assert.AnError),
+		},
+		{
+			name:   "invalid JSON in activity details is silently ignored",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				// Return an activity with invalid JSON in ActivityDetails
+				invalidActivity := sqlc.UserActivity{
+					ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
+					UserID:          pgtype.UUID{Bytes: userID, Valid: true},
+					ActivityType:    "login",
+					ActivityDetails: []byte(`{"invalid": "data"`), // Invalid JSON
+					IpAddress:       &ipAddr,
+					UserAgent:       pgtype.Text{String: "Mozilla/5.0", Valid: true},
+					Location:        locationBytes,
+					PerformedAt:     pgtype.Timestamp{Time: now, Valid: true},
+				}
+				m.On("ExportUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{invalidActivity}, nil)
+				m.On("ExportDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, nil)
+			},
+			expectedError: nil, // No error because invalid JSON is silently ignored in mapToUserActivity
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			gotJSON, err := repo.ExportUserAuditTrail(ctx, tt.userID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, gotJSON)
+			} else {
+				require.NoError(t, err)
+				assert.NotEmpty(t, gotJSON)
+
+				// Verify JSON can be unmarshaled
+				var auditTrail struct {
+					UserActivities []core.UserActivity  `json:"user_activities"`
+					DataAccessLogs []core.DataAccessLog `json:"data_access_logs"`
+				}
+				err = json.Unmarshal(gotJSON, &auditTrail)
+				require.NoError(t, err)
+
+				// If we have the "invalid JSON" test case, the activity details should be empty
+				if tt.name == "invalid JSON in activity details is silently ignored" {
+					assert.Len(t, auditTrail.UserActivities, 1)
+					assert.Empty(t, auditTrail.UserActivities[0].ActivityDetails)
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
