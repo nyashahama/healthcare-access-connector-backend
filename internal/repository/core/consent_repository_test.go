@@ -307,3 +307,77 @@ func TestConsentRepository_GetPrivacyConsent(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_UpdatePrivacyConsent(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	dataSharingConsent := map[string]interface{}{"provider": "hospital", "share": true}
+
+	tests := []struct {
+		name          string
+		consent       core.PrivacyConsent
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name: "successful update privacy consent",
+			consent: core.PrivacyConsent{
+				UserID:                    userID,
+				HealthDataConsent:         true,
+				ResearchConsent:           false,
+				SMSCommunicationConsent:   true,
+				EmailCommunicationConsent: false,
+				DataSharingConsent:        dataSharingConsent,
+			},
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdatePrivacyConsent", ctx, mock.MatchedBy(func(p sqlc.UpdatePrivacyConsentParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.HealthDataConsent.Bool == true &&
+						p.ResearchConsent.Bool == false &&
+						p.SmsCommunicationConsent.Bool == true &&
+						p.EmailCommunicationConsent.Bool == false &&
+						string(p.DataSharingConsent) == `{"provider":"hospital","share":true}`
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name: "error converting data sharing consent to JSON",
+			consent: core.PrivacyConsent{
+				UserID:             userID,
+				DataSharingConsent: map[string]interface{}{"invalid": make(chan int)}, // Unmarshallable
+			},
+			mockSetup:     func(m *mocks.Querier) {},
+			expectedError: errors.New("convert data sharing consent"),
+		},
+		{
+			name: "database error",
+			consent: core.PrivacyConsent{
+				UserID: userID,
+			},
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdatePrivacyConsent", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update privacy consent failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			err := repo.UpdatePrivacyConsent(ctx, tt.consent)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
