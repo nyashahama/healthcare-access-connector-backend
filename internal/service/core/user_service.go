@@ -91,60 +91,37 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, updat
 		return domain.NewAppError(err, "User not found", 404)
 	}
 
-	// Prepare user update
-	updatedUser := user
-
 	// Update user fields based on updates map
 	if email, ok := updates["email"].(string); ok && email != "" {
 		// Validate email format
 		if !strings.Contains(email, "@") {
 			return domain.NewAppError(domain.ErrValidation, "Invalid email format", 400)
 		}
-		// Update email via dedicated method
-		if err := s.UpdateUserEmail(ctx, userID, email); err != nil {
-			return err
-		}
-		updatedUser.Email = &email
+		user.Email = &email
 	}
 
 	if phone, ok := updates["phone"].(string); ok && phone != "" {
-		// Update phone via dedicated method
-		if err := s.UpdateUserPhone(ctx, userID, phone); err != nil {
-			return err
-		}
-		updatedUser.Phone = &phone
+		user.Phone = &phone
 	}
 
-	// Update other user fields directly
 	if role, ok := updates["role"].(string); ok && role != "" {
-		// Only system admins can change roles
-		// This should be validated at the handler level
-		if err := s.UpdateUserRole(ctx, userID, role); err != nil {
-			return err
-		}
-		updatedUser.Role = role
+		user.Role = role
 	}
 
 	if status, ok := updates["status"].(string); ok && status != "" {
-		if err := s.UpdateUserStatus(ctx, userID, status); err != nil {
-			return err
-		}
-		updatedUser.Status = status
+		user.Status = status
 	}
 
 	if smsOnly, ok := updates["is_sms_only"].(bool); ok {
-		updatedUser.IsSMSOnly = smsOnly
+		user.IsSMSOnly = smsOnly
 	}
 
 	if profilePct, ok := updates["profile_completion_pct"].(int); ok {
-		if err := s.UpdateUserProfileCompletion(ctx, userID, profilePct); err != nil {
-			return err
-		}
-		updatedUser.ProfileCompletionPct = profilePct
+		user.ProfileCompletionPct = profilePct
 	}
 
 	// Update user in repository
-	if err := s.userRepo.UpdateUser(ctx, updatedUser); err != nil {
+	if err := s.userRepo.UpdateUser(ctx, user); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to update user")
 		return domain.NewAppError(err, "Failed to update profile", 500)
 	}
@@ -155,14 +132,15 @@ func (s *userService) UpdateProfile(ctx context.Context, userID uuid.UUID, updat
 	// Update patient profile if user is a patient
 	if user.Role == "patient" {
 		profile, err := s.patientRepo.GetPatientProfileByUserID(ctx, userID)
-		if err == nil {
-			// Update profile fields based on updates map
-			s.updatePatientProfileFromMap(&profile, updates)
-
-			if err := s.patientRepo.UpdatePatientProfile(ctx, profile); err != nil {
-				s.logger.Error().Err(err).Msg("Failed to update patient profile")
-				// Don't return error, just log it
-			}
+		if err != nil && !errors.Is(err, domain.ErrPatientNotFound) {
+			s.logger.Error().Err(err).Msg("Failed to get patient profile")
+			return domain.NewAppError(err, "Failed to update patient profile", 500)
+		}
+		// Update profile fields based on updates map
+		s.updatePatientProfileFromMap(&profile, updates)
+		if err := s.patientRepo.UpdatePatientProfile(ctx, profile); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to update patient profile")
+			return domain.NewAppError(err, "Failed to update patient profile", 500)
 		}
 	}
 
