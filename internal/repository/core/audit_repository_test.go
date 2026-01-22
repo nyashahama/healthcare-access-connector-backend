@@ -620,3 +620,120 @@ func TestAuditRepository_LogDataAccess(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_GetDataAccessLogs(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	accessedUserID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	accessedByUserID := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	accessedResourceID := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+	location := map[string]interface{}{"city": "Test City"}
+	locationBytes, _ := json.Marshal(location)
+
+	tests := []struct {
+		name           string
+		accessedUserID uuid.UUID
+		limit          int
+		offset         int
+		mockSetup      func(*mocks.Querier)
+		expectedLogs   []core.DataAccessLog
+		expectedError  error
+	}{
+		{
+			name:           "successful get data access logs",
+			accessedUserID: accessedUserID,
+			limit:          10,
+			offset:         0,
+			mockSetup: func(m *mocks.Querier) {
+				expectedRows := []sqlc.DataAccessLog{
+					{
+						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
+						AccessedByUserID:     pgtype.UUID{Bytes: accessedByUserID, Valid: true},
+						AccessedByRole:       pgtype.Text{String: "doctor", Valid: true},
+						AccessedUserID:       pgtype.UUID{Bytes: accessedUserID, Valid: true},
+						AccessedResourceType: pgtype.Text{String: "medical_record", Valid: true},
+						AccessedResourceID:   pgtype.UUID{Bytes: accessedResourceID, Valid: true},
+						AccessType:           pgtype.Text{String: "read", Valid: true},
+						AccessReason:         pgtype.Text{String: "routine check", Valid: true},
+						IsEmergencyAccess:    pgtype.Bool{Bool: false, Valid: true},
+						IpAddress:            &ipAddr,
+						UserAgent:            pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:             locationBytes,
+						AccessedAt:           pgtype.Timestamp{Time: now, Valid: true},
+					},
+				}
+				m.On("GetDataAccessLogs", ctx, sqlc.GetDataAccessLogsParams{
+					AccessedUserID: uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					Limit:          int32(10),
+					Offset:         int32(0),
+				}).Return(expectedRows, nil)
+			},
+			expectedLogs: []core.DataAccessLog{
+				{
+					ID:                   uuid.MustParse("423e4567-e89b-12d3-a456-426614174000"),
+					AccessedByUserID:     &accessedByUserID,
+					AccessedByRole:       stringPtr("doctor"),
+					AccessedUserID:       accessedUserID,
+					AccessedResourceType: stringPtr("medical_record"),
+					AccessedResourceID:   &accessedResourceID,
+					AccessType:           "read",
+					AccessReason:         stringPtr("routine check"),
+					IsEmergencyAccess:    false,
+					IPAddress:            &ipStr,
+					UserAgent:            stringPtr("Mozilla/5.0"),
+					Location:             location,
+					AccessedAt:           now,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:           "no logs found",
+			accessedUserID: accessedUserID,
+			limit:          10,
+			offset:         0,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, nil)
+			},
+			expectedLogs:  []core.DataAccessLog{},
+			expectedError: nil,
+		},
+		{
+			name:           "database error",
+			accessedUserID: accessedUserID,
+			limit:          10,
+			offset:         0,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
+			},
+			expectedLogs:  nil,
+			expectedError: fmt.Errorf("get data access logs failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			gotLogs, err := repo.GetDataAccessLogs(ctx, tt.accessedUserID, tt.limit, tt.offset)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, gotLogs)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedLogs), len(gotLogs))
+				for i, expected := range tt.expectedLogs {
+					assertDataAccessLogEqual(t, expected, gotLogs[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
