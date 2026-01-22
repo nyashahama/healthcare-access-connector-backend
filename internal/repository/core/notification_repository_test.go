@@ -572,3 +572,75 @@ func TestNotificationRepository_UpdateChannelSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationRepository_UpdateAppointmentReminders(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		enabled       bool
+		hoursBefore   int
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:        "successful update appointment reminders (enabled with custom hours)",
+			userID:      userID,
+			enabled:     true,
+			hoursBefore: 48,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateAppointmentReminders", ctx, mock.MatchedBy(func(p sqlc.UpdateAppointmentRemindersParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.AppointmentReminders.Bool == true &&
+						p.AppointmentReminderHoursBefore.Int32 == 48
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:        "successful update appointment reminders (disabled)",
+			userID:      userID,
+			enabled:     false,
+			hoursBefore: 24,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateAppointmentReminders", ctx, mock.MatchedBy(func(p sqlc.UpdateAppointmentRemindersParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.AppointmentReminders.Bool == false &&
+						p.AppointmentReminderHoursBefore.Int32 == 24
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:        "database error",
+			userID:      userID,
+			enabled:     true,
+			hoursBefore: 24,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateAppointmentReminders", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update appointment reminders failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &notificationRepository{querier: mockQuerier}
+
+			err := repo.UpdateAppointmentReminders(ctx, tt.userID, tt.enabled, tt.hoursBefore)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
