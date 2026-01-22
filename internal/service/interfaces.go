@@ -116,6 +116,26 @@ type AuditService interface {
 	StartCleanupJob(archiveInterval, deleteInterval time.Duration)
 }
 
+// ConsentService defines the interface for consent management operations
+type ConsentService interface {
+	GetPrivacyConsent(ctx context.Context, userID uuid.UUID) (core.PrivacyConsent, error)
+	CreatePrivacyConsent(ctx context.Context, consent core.PrivacyConsent) (core.PrivacyConsent, error)
+	UpdatePrivacyConsent(ctx context.Context, consent core.PrivacyConsent) error
+	WithdrawConsent(ctx context.Context, userID uuid.UUID, reason string) error
+	UpdateHealthDataConsent(ctx context.Context, userID uuid.UUID, consent bool, version string) error
+	UpdateResearchConsent(ctx context.Context, userID uuid.UUID, consent bool) error
+	UpdateEmergencyAccessConsent(ctx context.Context, userID uuid.UUID, consent bool) error
+	UpdateCommunicationConsents(ctx context.Context, userID uuid.UUID, sms, email bool) error
+	UpdateDataSharingConsent(ctx context.Context, userID uuid.UUID, sharingPrefs map[string]interface{}) error
+	GetConsentHistory(ctx context.Context, userID uuid.UUID) ([]core.PrivacyConsent, error)
+	GetActiveConsentsByType(ctx context.Context, consentType string) ([]core.PrivacyConsent, error)
+	GetExpiredConsents(ctx context.Context) ([]core.PrivacyConsent, error)
+	GetWithdrawnConsents(ctx context.Context, startDate, endDate time.Time) ([]core.PrivacyConsent, error)
+	ExportConsentData(ctx context.Context, userID uuid.UUID) ([]byte, error)
+	NotifyConsentExpirations(ctx context.Context, daysBefore int) ([]uuid.UUID, error)
+	StartConsentExpirationJob(interval time.Duration, notifyDaysBefore int)
+}
+
 // PatientService handles patient operations
 type PatientService interface {
 	CreateMedicalInfo(ctx context.Context, patientID uuid.UUID, info patients.PatientMedicalInfo) error
