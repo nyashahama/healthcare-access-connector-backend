@@ -844,3 +844,91 @@ func TestNotificationRepository_UpdateEmergencyAlerts(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationRepository_SetQuietHours(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	startTime := time.Date(2023, 1, 1, 22, 0, 0, 0, time.UTC) // 22:00:00
+	endTime := time.Date(2023, 1, 2, 7, 0, 0, 0, time.UTC)    // 07:00:00
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		startTime     *time.Time
+		endTime       *time.Time
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:      "successful set quiet hours with both times",
+			userID:    userID,
+			startTime: &startTime,
+			endTime:   &endTime,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateQuietHours", ctx, mock.MatchedBy(func(p sqlc.UpdateQuietHoursParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.QuietHoursStart.Valid &&
+						p.QuietHoursEnd.Valid
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "successful set quiet hours with only start time",
+			userID:    userID,
+			startTime: &startTime,
+			endTime:   nil,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateQuietHours", ctx, mock.MatchedBy(func(p sqlc.UpdateQuietHoursParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.QuietHoursStart.Valid &&
+						!p.QuietHoursEnd.Valid
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "successful set quiet hours with only end time",
+			userID:    userID,
+			startTime: nil,
+			endTime:   &endTime,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateQuietHours", ctx, mock.MatchedBy(func(p sqlc.UpdateQuietHoursParams) bool {
+					return p.UserID.Bytes == userID &&
+						!p.QuietHoursStart.Valid &&
+						p.QuietHoursEnd.Valid
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "database error",
+			userID:    userID,
+			startTime: &startTime,
+			endTime:   &endTime,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateQuietHours", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("set quiet hours failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &notificationRepository{querier: mockQuerier}
+
+			err := repo.SetQuietHours(ctx, tt.userID, tt.startTime, tt.endTime)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
