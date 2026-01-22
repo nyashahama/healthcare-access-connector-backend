@@ -300,3 +300,149 @@ func TestNotificationRepository_GetNotificationPreferences(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationRepository_UpdateNotificationPreferences(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		prefs         core.NotificationPreferences
+		mockSetup     func(*mocks.Querier)
+		expectedError string // Change to string to check error message
+	}{
+		{
+			name: "successful update existing notification preferences",
+			prefs: core.NotificationPreferences{
+				UserID:               userID,
+				SMSEnabled:           false,
+				EmailEnabled:         true,
+				PushEnabled:          true,
+				AppointmentReminders: true,
+				HealthTips:           false,
+				MedicationReminders:  true,
+				EmergencyAlerts:      true,
+			},
+			mockSetup: func(m *mocks.Querier) {
+				// First call to GetNotificationPreferences (to check existence)
+				existingPrefsRow := sqlc.NotificationPreference{
+					ID:                   uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
+					UserID:               uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					SmsEnabled:           pgtype.Bool{Bool: true, Valid: true},
+					EmailEnabled:         pgtype.Bool{Bool: false, Valid: true},
+					PushEnabled:          pgtype.Bool{Bool: true, Valid: true},
+					AppointmentReminders: pgtype.Bool{Bool: false, Valid: true},
+					HealthTips:           pgtype.Bool{Bool: true, Valid: true},
+					MedicationReminders:  pgtype.Bool{Bool: false, Valid: true},
+					EmergencyAlerts:      pgtype.Bool{Bool: false, Valid: true},
+				}
+				m.On("GetNotificationPreferences", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(existingPrefsRow, nil)
+
+				// Call to UpdateNotificationPreferences
+				m.On("UpdateNotificationPreferences", ctx, mock.MatchedBy(func(p sqlc.UpdateNotificationPreferencesParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.SmsEnabled.Bool == false && // Changed from true
+						p.EmailEnabled.Bool == true && // Changed from false
+						p.PushEnabled.Bool == true && // Same
+						p.AppointmentReminders.Bool == true && // Changed from false
+						p.HealthTips.Bool == false && // Changed from true
+						p.MedicationReminders.Bool == true && // Changed from false
+						p.EmergencyAlerts.Bool == true // Changed from false
+				})).Return(nil)
+			},
+			expectedError: "",
+		},
+		{
+			name: "successful create new preferences when none exist",
+			prefs: core.NotificationPreferences{
+				UserID:               userID,
+				SMSEnabled:           true,
+				EmailEnabled:         true,
+				PushEnabled:          true,
+				AppointmentReminders: true,
+				HealthTips:           true,
+			},
+			mockSetup: func(m *mocks.Querier) {
+				// First call to GetNotificationPreferences returns not found
+				m.On("GetNotificationPreferences", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(sqlc.NotificationPreference{}, pgx.ErrNoRows)
+
+				// Then create new preferences
+				createdRow := sqlc.CreateNotificationPreferencesRow{
+					ID:        uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
+					UserID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					CreatedAt: pgtype.Timestamp{Time: time.Now(), Valid: true},
+				}
+				m.On("CreateNotificationPreferences", ctx, mock.Anything).Return(createdRow, nil)
+			},
+			expectedError: "",
+		},
+		{
+			name: "error getting existing preferences",
+			prefs: core.NotificationPreferences{
+				UserID: userID,
+			},
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetNotificationPreferences", ctx, mock.Anything).Return(sqlc.NotificationPreference{}, assert.AnError)
+			},
+			expectedError: "get notification preferences for update failed",
+		},
+		{
+			name: "error updating preferences after successful get",
+			prefs: core.NotificationPreferences{
+				UserID:     userID,
+				SMSEnabled: true,
+			},
+			mockSetup: func(m *mocks.Querier) {
+				existingPrefsRow := sqlc.NotificationPreference{
+					ID:         uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
+					UserID:     uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					SmsEnabled: pgtype.Bool{Bool: false, Valid: true},
+				}
+				m.On("GetNotificationPreferences", ctx, mock.Anything).Return(existingPrefsRow, nil)
+				m.On("UpdateNotificationPreferences", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: "update notification preferences failed",
+		},
+		{
+			name: "error creating new preferences when none exist",
+			prefs: core.NotificationPreferences{
+				UserID:               userID,
+				SMSEnabled:           true,
+				EmailEnabled:         true,
+				PushEnabled:          true,
+				AppointmentReminders: true,
+				HealthTips:           true,
+			},
+			mockSetup: func(m *mocks.Querier) {
+				// First call to GetNotificationPreferences returns not found
+				m.On("GetNotificationPreferences", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(sqlc.NotificationPreference{}, pgx.ErrNoRows)
+
+				// Then create new preferences fails
+				m.On("CreateNotificationPreferences", ctx, mock.Anything).Return(sqlc.CreateNotificationPreferencesRow{}, assert.AnError)
+			},
+			expectedError: "create notification preferences during update failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &notificationRepository{querier: mockQuerier}
+
+			err := repo.UpdateNotificationPreferences(ctx, tt.prefs)
+
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				// Check that the error contains the expected error message
+				assert.Contains(t, err.Error(), tt.expectedError)
+				// Also check it contains the assert.AnError message
+				assert.Contains(t, err.Error(), "assert.AnError")
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
