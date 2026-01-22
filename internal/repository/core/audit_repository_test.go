@@ -1126,3 +1126,134 @@ func TestAuditRepository_GetSuspiciousActivities(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditRepository_GetFailedLoginAttempts(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	ipStr := "192.168.1.1"
+	ipAddr := netip.MustParseAddr(ipStr)
+	activityDetails := map[string]interface{}{"reason": "invalid password"}
+	location := map[string]interface{}{"city": "Test City"}
+	activityDetailsBytes, _ := json.Marshal(activityDetails)
+	locationBytes, _ := json.Marshal(location)
+
+	tests := []struct {
+		name          string
+		userID        *uuid.UUID
+		within        time.Duration
+		mockSetup     func(*mocks.Querier)
+		expectedActs  []core.UserActivity
+		expectedError error
+	}{
+		{
+			name:   "successful get failed login attempts for specific user",
+			userID: &userID,
+			within: 24 * time.Hour,
+			mockSetup: func(m *mocks.Querier) {
+				expectedRows := []sqlc.UserActivity{
+					{
+						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
+						UserID:          pgtype.UUID{Bytes: userID, Valid: true},
+						ActivityType:    "login_failure",
+						ActivityDetails: activityDetailsBytes,
+						IpAddress:       &ipAddr,
+						UserAgent:       pgtype.Text{String: "Mozilla/5.0", Valid: true},
+						Location:        locationBytes,
+						PerformedAt:     pgtype.Timestamp{Time: now, Valid: true},
+					},
+				}
+				m.On("SearchUserActivities", ctx, mock.MatchedBy(func(p sqlc.SearchUserActivitiesParams) bool {
+					return p.Column1.Valid &&
+						p.Column1.Bytes == userID &&
+						p.Column2 == "login_failure" &&
+						p.Limit == 1000 &&
+						p.Offset == 0
+				})).Return(expectedRows, nil)
+			},
+			expectedActs: []core.UserActivity{
+				{
+					ID:              uuid.MustParse("323e4567-e89b-12d3-a456-426614174000"),
+					UserID:          &userID,
+					ActivityType:    "login_failure",
+					ActivityDetails: activityDetails,
+					IPAddress:       &ipStr,
+					UserAgent:       stringPtr("Mozilla/5.0"),
+					Location:        location,
+					PerformedAt:     now,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "successful get failed login attempts for all users",
+			userID: nil,
+			within: 24 * time.Hour,
+			mockSetup: func(m *mocks.Querier) {
+				expectedRows := []sqlc.UserActivity{
+					{
+						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
+						UserID:          pgtype.UUID{Bytes: userID, Valid: true},
+						ActivityType:    "login_failure",
+						ActivityDetails: activityDetailsBytes,
+						IpAddress:       &ipAddr,
+						Location:        locationBytes,
+						PerformedAt:     pgtype.Timestamp{Time: now, Valid: true},
+					},
+				}
+				m.On("SearchUserActivities", ctx, mock.MatchedBy(func(p sqlc.SearchUserActivitiesParams) bool {
+					return !p.Column1.Valid &&
+						p.Column2 == "login_failure" &&
+						p.Limit == 1000 &&
+						p.Offset == 0
+				})).Return(expectedRows, nil)
+			},
+			expectedActs: []core.UserActivity{
+				{
+					ID:              uuid.MustParse("323e4567-e89b-12d3-a456-426614174000"),
+					UserID:          &userID,
+					ActivityType:    "login_failure",
+					ActivityDetails: activityDetails,
+					IPAddress:       &ipStr,
+					Location:        location,
+					PerformedAt:     now,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "database error",
+			userID: &userID,
+			within: 24 * time.Hour,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("SearchUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
+			},
+			expectedActs:  nil,
+			expectedError: fmt.Errorf("get failed login attempts failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &auditRepository{querier: mockQuerier}
+
+			gotActs, err := repo.GetFailedLoginAttempts(ctx, tt.userID, tt.within)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, gotActs)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedActs), len(gotActs))
+				for i, expected := range tt.expectedActs {
+					assertUserActivityEqual(t, expected, gotActs[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
