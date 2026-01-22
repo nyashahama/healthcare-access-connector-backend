@@ -1140,3 +1140,120 @@ func TestConsentRepository_GetExpiredConsents(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_GetWithdrawnConsents(t *testing.T) {
+	ctx := context.Background()
+	userID1 := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	userID2 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	consentID1 := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
+	consentID2 := uuid.MustParse("423e4567-e89b-12d3-a456-426614174000")
+	now := time.Now()
+	startDate := now.Add(-30 * 24 * time.Hour)
+	endDate := now
+
+	tests := []struct {
+		name           string
+		startDate      time.Time
+		endDate        time.Time
+		mockSetup      func(*mocks.Querier)
+		expectedResult []core.PrivacyConsent
+		expectedError  error
+	}{
+		{
+			name:      "successful get withdrawn consents",
+			startDate: startDate,
+			endDate:   endDate,
+			mockSetup: func(m *mocks.Querier) {
+				consentRows := []sqlc.PrivacyConsent{
+					{
+						ID:                   pgtype.UUID{Bytes: consentID1, Valid: true},
+						UserID:               pgtype.UUID{Bytes: userID1, Valid: true},
+						HealthDataConsent:    pgtype.Bool{Bool: false, Valid: true},
+						ConsentWithdrawn:     pgtype.Bool{Bool: true, Valid: true},
+						ConsentWithdrawnDate: pgtype.Timestamp{Time: now.Add(-20 * 24 * time.Hour), Valid: true},
+						WithdrawalReason:     pgtype.Text{String: "Privacy concerns", Valid: true},
+						CreatedAt:            pgtype.Timestamp{Time: now.Add(-100 * 24 * time.Hour), Valid: true},
+					},
+					{
+						ID:                   pgtype.UUID{Bytes: consentID2, Valid: true},
+						UserID:               pgtype.UUID{Bytes: userID2, Valid: true},
+						HealthDataConsent:    pgtype.Bool{Bool: false, Valid: true},
+						ConsentWithdrawn:     pgtype.Bool{Bool: true, Valid: true},
+						ConsentWithdrawnDate: pgtype.Timestamp{Time: now.Add(-10 * 24 * time.Hour), Valid: true},
+						WithdrawalReason:     pgtype.Text{String: "Switching providers", Valid: true},
+						CreatedAt:            pgtype.Timestamp{Time: now.Add(-80 * 24 * time.Hour), Valid: true},
+					},
+				}
+				m.On("GetWithdrawnConsents", ctx, mock.MatchedBy(func(p sqlc.GetWithdrawnConsentsParams) bool {
+					return p.ConsentWithdrawnDate.Time.Equal(startDate) &&
+						p.ConsentWithdrawnDate_2.Time.Equal(endDate)
+				})).Return(consentRows, nil)
+			},
+			expectedResult: []core.PrivacyConsent{
+				{
+					ID:                   consentID1,
+					UserID:               userID1,
+					HealthDataConsent:    false,
+					ConsentWithdrawn:     true,
+					ConsentWithdrawnDate: timePtr(now.Add(-20 * 24 * time.Hour)),
+					WithdrawalReason:     stringPtr("Privacy concerns"),
+					CreatedAt:            now.Add(-100 * 24 * time.Hour),
+				},
+				{
+					ID:                   consentID2,
+					UserID:               userID2,
+					HealthDataConsent:    false,
+					ConsentWithdrawn:     true,
+					ConsentWithdrawnDate: timePtr(now.Add(-10 * 24 * time.Hour)),
+					WithdrawalReason:     stringPtr("Switching providers"),
+					CreatedAt:            now.Add(-80 * 24 * time.Hour),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "no withdrawn consents found in date range",
+			startDate: startDate,
+			endDate:   endDate,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetWithdrawnConsents", ctx, mock.Anything).Return([]sqlc.PrivacyConsent{}, nil)
+			},
+			expectedResult: []core.PrivacyConsent{},
+			expectedError:  nil,
+		},
+		{
+			name:      "database error",
+			startDate: startDate,
+			endDate:   endDate,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetWithdrawnConsents", ctx, mock.Anything).Return([]sqlc.PrivacyConsent{}, assert.AnError)
+			},
+			expectedResult: nil,
+			expectedError:  fmt.Errorf("get withdrawn consents failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			result, err := repo.GetWithdrawnConsents(ctx, tt.startDate, tt.endDate)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedResult), len(result))
+				for i, expected := range tt.expectedResult {
+					assertPrivacyConsentEqual(t, expected, result[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
