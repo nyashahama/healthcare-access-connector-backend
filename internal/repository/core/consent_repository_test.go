@@ -381,3 +381,68 @@ func TestConsentRepository_UpdatePrivacyConsent(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_WithdrawConsent(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		reason        string
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:   "successful withdraw consent with reason",
+			userID: userID,
+			reason: "Moving to another provider",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("WithdrawConsent", ctx, sqlc.WithdrawConsentParams{
+					UserID:           uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
+					WithdrawalReason: pgtype.Text{String: "Moving to another provider", Valid: true},
+				}).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "successful withdraw consent without reason",
+			userID: userID,
+			reason: "",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("WithdrawConsent", ctx, mock.MatchedBy(func(p sqlc.WithdrawConsentParams) bool {
+					return p.UserID.Bytes == userID && !p.WithdrawalReason.Valid
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "database error",
+			userID: userID,
+			reason: "test",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("WithdrawConsent", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("withdraw consent failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			err := repo.WithdrawConsent(ctx, tt.userID, tt.reason)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
