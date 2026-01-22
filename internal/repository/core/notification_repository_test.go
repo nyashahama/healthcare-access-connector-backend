@@ -644,3 +644,75 @@ func TestNotificationRepository_UpdateAppointmentReminders(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationRepository_UpdateHealthTips(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		enabled       bool
+		frequency     string
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:      "successful update health tips (enabled with daily frequency)",
+			userID:    userID,
+			enabled:   true,
+			frequency: "daily",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateHealthTips", ctx, mock.MatchedBy(func(p sqlc.UpdateHealthTipsParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.HealthTips.Bool == true &&
+						p.HealthTipsFrequency.String == "daily"
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "successful update health tips (disabled)",
+			userID:    userID,
+			enabled:   false,
+			frequency: "weekly",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateHealthTips", ctx, mock.MatchedBy(func(p sqlc.UpdateHealthTipsParams) bool {
+					return p.UserID.Bytes == userID &&
+						p.HealthTips.Bool == false &&
+						p.HealthTipsFrequency.String == "weekly"
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:      "database error",
+			userID:    userID,
+			enabled:   true,
+			frequency: "weekly",
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateHealthTips", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update health tips failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &notificationRepository{querier: mockQuerier}
+
+			err := repo.UpdateHealthTips(ctx, tt.userID, tt.enabled, tt.frequency)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
