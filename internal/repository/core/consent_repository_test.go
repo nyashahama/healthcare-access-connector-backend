@@ -794,3 +794,105 @@ func TestConsentRepository_UpdateDataSharingConsent(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_GetConsentHistory(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	consentID1 := uuid.MustParse("223e4567-e89b-12d3-a456-426614174000")
+	consentID2 := uuid.MustParse("323e4567-e89b-12d3-a456-426614174000")
+	now := time.Now()
+
+	tests := []struct {
+		name           string
+		userID         uuid.UUID
+		mockSetup      func(*mocks.Querier)
+		expectedResult []core.PrivacyConsent
+		expectedError  error
+	}{
+		{
+			name:   "successful get consent history",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				consentRows := []sqlc.PrivacyConsent{
+					{
+						ID:                pgtype.UUID{Bytes: consentID1, Valid: true},
+						UserID:            pgtype.UUID{Bytes: userID, Valid: true},
+						HealthDataConsent: pgtype.Bool{Bool: true, Valid: true},
+						CreatedAt:         pgtype.Timestamp{Time: now.Add(-30 * 24 * time.Hour), Valid: true},
+						UpdatedAt:         pgtype.Timestamp{Time: now.Add(-20 * 24 * time.Hour), Valid: true},
+					},
+					{
+						ID:                pgtype.UUID{Bytes: consentID2, Valid: true},
+						UserID:            pgtype.UUID{Bytes: userID, Valid: true},
+						HealthDataConsent: pgtype.Bool{Bool: false, Valid: true},
+						ConsentWithdrawn:  pgtype.Bool{Bool: true, Valid: true},
+						CreatedAt:         pgtype.Timestamp{Time: now.Add(-10 * 24 * time.Hour), Valid: true},
+						UpdatedAt:         pgtype.Timestamp{Time: now.Add(-5 * 24 * time.Hour), Valid: true},
+					},
+				}
+				m.On("GetConsentHistory", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(consentRows, nil)
+			},
+			expectedResult: []core.PrivacyConsent{
+				{
+					ID:                consentID1,
+					UserID:            userID,
+					HealthDataConsent: true,
+					ConsentWithdrawn:  false,
+					CreatedAt:         now.Add(-30 * 24 * time.Hour),
+					UpdatedAt:         now.Add(-20 * 24 * time.Hour),
+				},
+				{
+					ID:                consentID2,
+					UserID:            userID,
+					HealthDataConsent: false,
+					ConsentWithdrawn:  true,
+					CreatedAt:         now.Add(-10 * 24 * time.Hour),
+					UpdatedAt:         now.Add(-5 * 24 * time.Hour),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:   "no consent history found",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetConsentHistory", ctx, mock.Anything).Return([]sqlc.PrivacyConsent{}, nil)
+			},
+			expectedResult: []core.PrivacyConsent{},
+			expectedError:  nil,
+		},
+		{
+			name:   "database error",
+			userID: userID,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("GetConsentHistory", ctx, mock.Anything).Return([]sqlc.PrivacyConsent{}, assert.AnError)
+			},
+			expectedResult: nil,
+			expectedError:  fmt.Errorf("get consent history failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			result, err := repo.GetConsentHistory(ctx, tt.userID)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, len(tt.expectedResult), len(result))
+				for i, expected := range tt.expectedResult {
+					assertPrivacyConsentEqual(t, expected, result[i])
+				}
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
