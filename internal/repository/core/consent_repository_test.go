@@ -582,3 +582,67 @@ func TestConsentRepository_UpdateResearchConsent(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_UpdateEmergencyAccessConsent(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		consent       bool
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:    "successful update emergency access consent (grant)",
+			userID:  userID,
+			consent: true,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateEmergencyAccessConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateEmergencyAccessConsentParams) bool {
+					return p.UserID.Bytes == userID && p.EmergencyAccessConsent.Bool == true
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "successful update emergency access consent (withdraw)",
+			userID:  userID,
+			consent: false,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateEmergencyAccessConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateEmergencyAccessConsentParams) bool {
+					return p.UserID.Bytes == userID && p.EmergencyAccessConsent.Bool == false
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "database error",
+			userID:  userID,
+			consent: true,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateEmergencyAccessConsent", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update emergency access consent failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			err := repo.UpdateEmergencyAccessConsent(ctx, tt.userID, tt.consent)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
