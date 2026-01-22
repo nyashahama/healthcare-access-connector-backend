@@ -716,3 +716,67 @@ func TestNotificationRepository_UpdateHealthTips(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationRepository_UpdateMedicationReminders(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		enabled       bool
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:    "successful update medication reminders (enabled)",
+			userID:  userID,
+			enabled: true,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateMedicationReminders", ctx, mock.MatchedBy(func(p sqlc.UpdateMedicationRemindersParams) bool {
+					return p.UserID.Bytes == userID && p.MedicationReminders.Bool == true
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "successful update medication reminders (disabled)",
+			userID:  userID,
+			enabled: false,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateMedicationReminders", ctx, mock.MatchedBy(func(p sqlc.UpdateMedicationRemindersParams) bool {
+					return p.UserID.Bytes == userID && p.MedicationReminders.Bool == false
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "database error",
+			userID:  userID,
+			enabled: true,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateMedicationReminders", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update medication reminders failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &notificationRepository{querier: mockQuerier}
+
+			err := repo.UpdateMedicationReminders(ctx, tt.userID, tt.enabled)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
