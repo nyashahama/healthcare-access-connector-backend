@@ -732,3 +732,65 @@ func TestConsentRepository_UpdateCommunicationConsents(t *testing.T) {
 		})
 	}
 }
+
+func TestConsentRepository_UpdateDataSharingConsent(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	sharingPrefs := map[string]interface{}{"provider": "research_institute", "share": true, "anonymized": true}
+
+	tests := []struct {
+		name          string
+		userID        uuid.UUID
+		sharingPrefs  map[string]interface{}
+		mockSetup     func(*mocks.Querier)
+		expectedError error
+	}{
+		{
+			name:         "successful update data sharing consent",
+			userID:       userID,
+			sharingPrefs: sharingPrefs,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateDataSharingConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateDataSharingConsentParams) bool {
+					return p.UserID.Bytes == userID &&
+						string(p.DataSharingConsent) == `{"anonymized":true,"provider":"research_institute","share":true}`
+				})).Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:          "error converting sharing preferences to JSON",
+			userID:        userID,
+			sharingPrefs:  map[string]interface{}{"invalid": make(chan int)},
+			mockSetup:     func(m *mocks.Querier) {},
+			expectedError: errors.New("convert data sharing preferences"),
+		},
+		{
+			name:         "database error",
+			userID:       userID,
+			sharingPrefs: sharingPrefs,
+			mockSetup: func(m *mocks.Querier) {
+				m.On("UpdateDataSharingConsent", ctx, mock.Anything).Return(assert.AnError)
+			},
+			expectedError: fmt.Errorf("update data sharing consent failed: %w", assert.AnError),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockQuerier := mocks.NewQuerier(t)
+			tt.mockSetup(mockQuerier)
+
+			repo := &consentRepository{querier: mockQuerier}
+
+			err := repo.UpdateDataSharingConsent(ctx, tt.userID, tt.sharingPrefs)
+
+			if tt.expectedError != nil {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError.Error())
+			} else {
+				require.NoError(t, err)
+			}
+			mockQuerier.AssertExpectations(t)
+		})
+	}
+}
