@@ -255,11 +255,22 @@ func (r *sessionRepository) handleError(err error, operation string) error {
 }
 
 // Helper mapping functions
-func (r *sessionRepository) mapToUserSession(row sqlc.CreateSessionRow) core.UserSession {
+func (r *sessionRepository) mapToUserSession(row sqlc.UserSession) core.UserSession {
+	// Convert netip.Addr to string pointer
+	var ipAddr *string
+	if row.IpAddress != nil {
+		addrStr := row.IpAddress.String()
+		ipAddr = &addrStr
+	}
+
 	return core.UserSession{
 		ID:           pgtypeUUIDToUUID(row.ID),
 		UserID:       pgtypeUUIDToUUID(row.UserID),
 		SessionToken: row.SessionToken,
+		DeviceType:   pgtypeTextToStringPtr(row.DeviceType),
+		DeviceID:     pgtypeTextToStringPtr(row.DeviceID),
+		IPAddress:    ipAddr,
+		UserAgent:    pgtypeTextToStringPtr(row.UserAgent),
 		ExpiresAt:    row.ExpiresAt.Time,
 		CreatedAt:    row.CreatedAt.Time,
 	}

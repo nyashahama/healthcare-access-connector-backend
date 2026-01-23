@@ -88,13 +88,19 @@ func New(cfg *config.Config) (*App, error) {
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
 
+	sessionService := servicecore.NewSessionService(
+		sessionRepo,
+		userRepo,
+		cacheService,
+		logger,
+	)
 	// Initialize services
 	authService := servicecore.NewAuthService(
 		authRepo,
 		userRepo,
 		otpRepo,
 		patientRepo,
-		sessionRepo,
+		sessionService,
 		consentRepo,
 		cacheService,
 		broker,
@@ -124,13 +130,6 @@ func New(cfg *config.Config) (*App, error) {
 		logger,
 		cfg.SMSEnabled,
 		cfg.BcryptCost,
-	)
-
-	sessionService := servicecore.NewSessionService(
-		sessionRepo,
-		userRepo,
-		cacheService,
-		logger,
 	)
 
 	consentService := servicecore.NewConsentService(

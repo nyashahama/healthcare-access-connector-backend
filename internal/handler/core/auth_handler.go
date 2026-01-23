@@ -3,7 +3,10 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -102,12 +105,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ipAddress := getIPAddress(r)
+	userAgent := r.UserAgent()
+
 	// Authenticate user
-	token, expiresAt, user, err := h.authService.Login(ctx, req.Identifier, req.Password)
+	token, expiresAt, user, err := h.authService.Login(ctx, req.Identifier, req.Password, ipAddress, userAgent)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
+
+	fmt.Println("the ip addresss is", ipAddress)
 
 	response := core.LoginResponse{
 		Token:     token,
@@ -163,8 +171,11 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ipAddress := getIPAddress(r)
+	userAgent := r.UserAgent()
+
 	// Refresh token
-	newToken, expiresAt, user, err := h.authService.RefreshToken(ctx, tokenString)
+	newToken, expiresAt, user, err := h.authService.RefreshToken(ctx, tokenString, ipAddress, userAgent)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -353,4 +364,18 @@ func extractToken(r *http.Request) string {
 		return bearerToken[7:]
 	}
 	return ""
+}
+
+func getIPAddress(r *http.Request) string {
+	// Check for X-Forwarded-For header (if behind proxy)
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		// Get the first IP in the chain
+		ips := strings.Split(forwarded, ",")
+		return strings.TrimSpace(ips[0])
+	}
+
+	// Fall back to RemoteAddr
+	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return ip
 }

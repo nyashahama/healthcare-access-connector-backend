@@ -5,7 +5,8 @@ INSERT INTO user_sessions (
     ip_address, user_agent, expires_at
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, session_token, expires_at, created_at;
+RETURNING id, user_id, session_token, device_type, device_id, 
+    ip_address, user_agent, expires_at, created_at;
 
 -- name: GetSession :one
 SELECT id, user_id, session_token, device_type, ip_address, 

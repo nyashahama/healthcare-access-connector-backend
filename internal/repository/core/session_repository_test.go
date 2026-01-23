@@ -63,7 +63,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 				ExpiresAt:    expires,
 			},
 			mockSetup: func(m *mocks.Querier) {
-				expectedRow := sqlc.CreateSessionRow{
+				expectedRow := sqlc.UserSession{
 					ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:       uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					SessionToken: "token123",
@@ -97,20 +97,24 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 				ExpiresAt:    expires,
 			},
 			mockSetup: func(m *mocks.Querier) {
-				expectedRow := sqlc.CreateSessionRow{
+				expectedRow := sqlc.UserSession{
 					ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:       uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					SessionToken: "token456",
-					CreatedAt:    pgtype.Timestamp{Time: now, Valid: true},
+					DeviceType:   pgtype.Text{String: "", Valid: false},
+					DeviceID:     pgtype.Text{String: "", Valid: false},
+					IpAddress:    nil,
+					UserAgent:    pgtype.Text{String: "", Valid: false},
 					ExpiresAt:    pgtype.Timestamp{Time: expires, Valid: true},
+					CreatedAt:    pgtype.Timestamp{Time: now, Valid: true},
 				}
 				m.On("CreateSession", ctx, mock.MatchedBy(func(p sqlc.CreateSessionParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.SessionToken == "token456" &&
-						!p.DeviceType.Valid &&
-						!p.DeviceID.Valid &&
-						p.IpAddress == nil &&
-						!p.UserAgent.Valid &&
+						!p.DeviceType.Valid && // Should be invalid/empty
+						!p.DeviceID.Valid && // Should be invalid/empty
+						p.IpAddress == nil && // Should be nil
+						!p.UserAgent.Valid && // Should be invalid/empty
 						p.ExpiresAt.Time.Equal(expires)
 				})).Return(expectedRow, nil)
 			},
@@ -118,6 +122,10 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 				ID:           sessionID,
 				UserID:       userID,
 				SessionToken: "token456",
+				DeviceType:   nil,
+				DeviceID:     nil,
+				IPAddress:    nil,
+				UserAgent:    nil,
 				CreatedAt:    now,
 				ExpiresAt:    expires,
 			},
@@ -131,7 +139,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 				ExpiresAt:    expires,
 			},
 			mockSetup: func(m *mocks.Querier) {
-				m.On("CreateSession", ctx, mock.Anything).Return(sqlc.CreateSessionRow{}, assert.AnError)
+				m.On("CreateSession", ctx, mock.Anything).Return(sqlc.UserSession{}, assert.AnError)
 			},
 			expectedSess:  core.UserSession{},
 			expectedError: fmt.Errorf("create session failed: %w", assert.AnError),
@@ -145,7 +153,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 			},
 			mockSetup: func(m *mocks.Querier) {
 				pgErr := &pgconn.PgError{Code: "23503"}
-				m.On("CreateSession", ctx, mock.Anything).Return(sqlc.CreateSessionRow{}, pgErr)
+				m.On("CreateSession", ctx, mock.Anything).Return(sqlc.UserSession{}, pgErr)
 			},
 			expectedSess:  core.UserSession{},
 			expectedError: fmt.Errorf("foreign key violation: %w", &pgconn.PgError{Code: "23503"}),

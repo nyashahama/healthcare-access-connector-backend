@@ -37,6 +37,50 @@ func NewSessionService(
 	}
 }
 
+func (s *sessionService) CreateSession(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time, ipAddress, userAgent, deviceType string) (core.UserSession, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Msg("CreateSession completed")
+	}()
+
+	session := core.UserSession{
+		ID:           uuid.New(),
+		UserID:       userID,
+		SessionToken: token,
+		DeviceType:   stringPtr(deviceType),
+		IPAddress:    stringPtr(ipAddress),
+		UserAgent:    stringPtr(userAgent),
+		ExpiresAt:    expiresAt,
+		CreatedAt:    time.Now(),
+	}
+
+	createdSession, err := s.sessionRepo.CreateSession(ctx, session)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to create session")
+		return core.UserSession{}, domain.NewAppError(err, "Failed to create session", 500)
+	}
+
+	// Cache the session
+	cacheKey := fmt.Sprintf("session:%s", token)
+	if err := s.cache.Set(ctx, cacheKey, createdSession, 5*time.Minute); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to cache session")
+	}
+
+	// Invalidate user sessions cache
+	s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String()))
+
+	s.logger.Info().
+		Str("session_id", createdSession.ID.String()).
+		Str("user_id", userID.String()).
+		Str("ip_address", ipAddress).
+		Msg("Session created successfully")
+
+	return createdSession, nil
+}
+
 // GetSession retrieves a session by token
 func (s *sessionService) GetSession(ctx context.Context, token string) (core.UserSession, error) {
 	start := time.Now()

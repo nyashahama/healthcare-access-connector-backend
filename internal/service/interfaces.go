@@ -13,10 +13,10 @@ import (
 // AuthService handles auth operations
 type AuthService interface {
 	Register(ctx context.Context, email, phone, password, role string) (core.User, error)
-	Login(ctx context.Context, identifier, password string) (string, time.Time, core.User, error)
+	Login(ctx context.Context, identifier, password, ipAddress, userAgent string) (string, time.Time, core.User, error)
 	Logout(ctx context.Context, tokenString string, userID uuid.UUID) error
 	ValidateToken(ctx context.Context, token string) (*TokenClaims, error)
-	RefreshToken(ctx context.Context, tokenString string) (string, time.Time, core.User, error)
+	RefreshToken(ctx context.Context, tokenString string, ipAddress, userAgent string) (string, time.Time, core.User, error)
 	VerifyEmail(ctx context.Context, token string) error
 	RequestPasswordReset(ctx context.Context, identifier string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
@@ -62,6 +62,7 @@ type OTPService interface {
 
 // SessionService defines the interface for session management operations
 type SessionService interface {
+	CreateSession(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time, ipAddress, userAgent, deviceType string) (core.UserSession, error)
 	GetSession(ctx context.Context, token string) (core.UserSession, error)
 	GetUserSessions(ctx context.Context, userID uuid.UUID) ([]core.UserSession, error)
 	RevokeSession(ctx context.Context, token string, userID uuid.UUID) error

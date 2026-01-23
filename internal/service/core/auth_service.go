@@ -30,7 +30,7 @@ type authService struct {
 	userRepo     repository.UserRepository
 	otpRepo      repository.OTPRepository
 	patientRepo  repository.PatientProfileRepository
-	sessionRepo  repository.SessionRepository
+	sessionSvc   service.SessionService // Changed from sessionRepo
 	consentRepo  repository.ConsentRepository
 	cache        cache.Service
 	broker       messaging.Broker
@@ -61,7 +61,7 @@ func NewAuthService(
 	userRepo repository.UserRepository,
 	otpRepo repository.OTPRepository,
 	patientRepo repository.PatientProfileRepository,
-	sessionRepo repository.SessionRepository,
+	sessionSvc service.SessionService,
 	consentRepo repository.ConsentRepository,
 	cache cache.Service,
 	broker messaging.Broker,
@@ -93,7 +93,7 @@ func NewAuthService(
 		userRepo:      userRepo,
 		otpRepo:       otpRepo,
 		patientRepo:   patientRepo,
-		sessionRepo:   sessionRepo,
+		sessionSvc:    sessionSvc,
 		consentRepo:   consentRepo,
 		cache:         cache,
 		broker:        broker,
@@ -202,7 +202,7 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 }
 
 // Login handles user login
-func (s *authService) Login(ctx context.Context, identifier, password string) (string, time.Time, core.User, error) {
+func (s *authService) Login(ctx context.Context, identifier, password, ipAddress, userAgent string) (string, time.Time, core.User, error) {
 	start := time.Now()
 	defer func() {
 		s.logger.Debug().
@@ -311,17 +311,8 @@ func (s *authService) Login(ctx context.Context, identifier, password string) (s
 		return "", time.Time{}, core.User{}, domain.NewAppError(err, "Token generation failed", 500)
 	}
 
-	// Create session
-	session := core.UserSession{
-		ID:           uuid.New(),
-		UserID:       user.ID,
-		SessionToken: token,
-		DeviceType:   stringPtr("web"),
-		ExpiresAt:    expiresAt,
-		CreatedAt:    time.Now(),
-	}
-
-	if _, err := s.sessionRepo.CreateSession(ctx, session); err != nil {
+	deviceType := "web"
+	if _, err := s.sessionSvc.CreateSession(ctx, user.ID, token, expiresAt, ipAddress, userAgent, deviceType); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to create session record")
 		return "", time.Time{}, core.User{}, domain.NewAppError(err, "Session creation failed", 500)
 	}
@@ -409,7 +400,7 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*s
 	}
 
 	// Check if session exists
-	session, err := s.sessionRepo.GetSession(ctx, tokenString)
+	session, err := s.sessionSvc.GetSession(ctx, tokenString)
 	if err != nil || session.ExpiresAt.Before(time.Now()) {
 		return nil, domain.NewAppError(domain.ErrInvalidSession, "Session expired or invalid", 401)
 	}
@@ -432,7 +423,7 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*s
 }
 
 // RefreshToken refreshes JWT token
-func (s *authService) RefreshToken(ctx context.Context, tokenString string) (string, time.Time, core.User, error) {
+func (s *authService) RefreshToken(ctx context.Context, tokenString string, ipAddress, userAgent string) (string, time.Time, core.User, error) {
 	claims, err := s.ValidateToken(ctx, tokenString)
 	if err != nil && !errors.Is(err, domain.ErrExpiredToken) {
 		return "", time.Time{}, core.User{}, err
@@ -449,22 +440,14 @@ func (s *authService) RefreshToken(ctx context.Context, tokenString string) (str
 		return "", time.Time{}, core.User{}, domain.NewAppError(err, "Failed to generate new token", 500)
 	}
 
-	// Delete old session
-	if err := s.sessionRepo.DeleteSession(ctx, tokenString); err != nil {
+	// Delete old session using session service
+	if err := s.sessionSvc.RevokeSession(ctx, tokenString, user.ID); err != nil {
 		s.logger.Warn().Err(err).Msg("Failed to delete old session")
 	}
 
-	// Create new session
-	newSession := core.UserSession{
-		ID:           uuid.New(),
-		UserID:       user.ID,
-		SessionToken: newToken,
-		DeviceType:   stringPtr("web"),
-		ExpiresAt:    expiresAt,
-		CreatedAt:    time.Now(),
-	}
-
-	if _, err := s.sessionRepo.CreateSession(ctx, newSession); err != nil {
+	// Create new session using session service
+	deviceType := "web"
+	if _, err := s.sessionSvc.CreateSession(ctx, user.ID, newToken, expiresAt, ipAddress, userAgent, deviceType); err != nil {
 		s.logger.Warn().Err(err).Msg("Failed to create new session record")
 	}
 
@@ -478,7 +461,7 @@ func (s *authService) RefreshToken(ctx context.Context, tokenString string) (str
 
 // Logout handles user logout
 func (s *authService) Logout(ctx context.Context, tokenString string, userID uuid.UUID) error {
-	if err := s.sessionRepo.DeleteSession(ctx, tokenString); err != nil {
+	if err := s.sessionSvc.RevokeSession(ctx, tokenString, userID); err != nil {
 		s.logger.Warn().Err(err).Msg("Failed to delete session")
 		return domain.NewAppError(err, "Logout failed", 500)
 	}
@@ -627,7 +610,7 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	// Delete all user sessions
-	if err := s.sessionRepo.DeleteUserSessions(ctx, user.ID); err != nil {
+	if err := s.sessionSvc.RevokeAllSessions(ctx, user.ID); err != nil {
 		s.logger.Warn().Err(err).Msg("Failed to delete user sessions")
 	}
 
@@ -896,4 +879,16 @@ func maskIdentifier(identifier string) string {
 		return "***"
 	}
 	return "***" + identifier[len(identifier)-4:]
+}
+
+func maskIP(ip string) string {
+	if ip == "" {
+		return "unknown"
+	}
+	// Simple IP masking: show only first octet for IPv4
+	parts := strings.Split(ip, ".")
+	if len(parts) >= 1 {
+		return parts[0] + ".***.***.***"
+	}
+	return "***"
 }

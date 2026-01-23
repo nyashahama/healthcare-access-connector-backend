@@ -18,7 +18,8 @@ INSERT INTO user_sessions (
     ip_address, user_agent, expires_at
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, session_token, expires_at, created_at
+RETURNING id, user_id, session_token, device_type, device_id, 
+    ip_address, user_agent, expires_at, created_at
 `
 
 type CreateSessionParams struct {
@@ -31,16 +32,8 @@ type CreateSessionParams struct {
 	ExpiresAt    pgtype.Timestamp `json:"expires_at"`
 }
 
-type CreateSessionRow struct {
-	ID           pgtype.UUID      `json:"id"`
-	UserID       pgtype.UUID      `json:"user_id"`
-	SessionToken string           `json:"session_token"`
-	ExpiresAt    pgtype.Timestamp `json:"expires_at"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-}
-
 // Session Management Queries
-func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (CreateSessionRow, error) {
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error) {
 	row := q.db.QueryRow(ctx, createSession,
 		arg.UserID,
 		arg.SessionToken,
@@ -50,11 +43,15 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (C
 		arg.UserAgent,
 		arg.ExpiresAt,
 	)
-	var i CreateSessionRow
+	var i UserSession
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
 		&i.SessionToken,
+		&i.DeviceType,
+		&i.DeviceID,
+		&i.IpAddress,
+		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.CreatedAt,
 	)

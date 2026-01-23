@@ -633,22 +633,22 @@ func (_m *Querier) CreateSMSConversation(ctx context.Context, arg sqlc.CreateSMS
 }
 
 // CreateSession provides a mock function with given fields: ctx, arg
-func (_m *Querier) CreateSession(ctx context.Context, arg sqlc.CreateSessionParams) (sqlc.CreateSessionRow, error) {
+func (_m *Querier) CreateSession(ctx context.Context, arg sqlc.CreateSessionParams) (sqlc.UserSession, error) {
 	ret := _m.Called(ctx, arg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateSession")
 	}
 
-	var r0 sqlc.CreateSessionRow
+	var r0 sqlc.UserSession
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.CreateSessionParams) (sqlc.CreateSessionRow, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.CreateSessionParams) (sqlc.UserSession, error)); ok {
 		return rf(ctx, arg)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.CreateSessionParams) sqlc.CreateSessionRow); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.CreateSessionParams) sqlc.UserSession); ok {
 		r0 = rf(ctx, arg)
 	} else {
-		r0 = ret.Get(0).(sqlc.CreateSessionRow)
+		r0 = ret.Get(0).(sqlc.UserSession)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, sqlc.CreateSessionParams) error); ok {

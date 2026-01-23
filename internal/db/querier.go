@@ -74,7 +74,7 @@ type Querier interface {
 	// ============================================
 	CreateSMSConversation(ctx context.Context, arg CreateSMSConversationParams) (CreateSMSConversationRow, error)
 	// Session Management Queries
-	CreateSession(ctx context.Context, arg CreateSessionParams) (CreateSessionRow, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error)
 	// User Management Queries
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateClinicService(ctx context.Context, id pgtype.UUID) error
