@@ -201,63 +201,73 @@ type NotificationRepository interface {
 // PATIENT MANAGEMENT (Comprehensive)
 // ============================================
 
-type PatientRepository interface {
-	// Patient Profile
+// ============================================
+// PATIENT PROFILE REPOSITORY
+// Maps to: patient_profiles.sql
+// ============================================
+
+type PatientProfileRepository interface {
+	// Core CRUD Operations
 	CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error)
 	GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
 	GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error)
+	GetPatientProfileByNationalID(ctx context.Context, nationalID string) (patients.PatientProfile, error)
 	UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error
 	DeletePatientProfile(ctx context.Context, id uuid.UUID) error
+	DeletePatientProfileByUserID(ctx context.Context, userID uuid.UUID) error
 
-	// Search & Filtering
-	SearchPatients(ctx context.Context, query string, province string, limit, offset int) ([]patients.PatientProfile, error)
-	// FilterPatients(ctx context.Context, filters patients.PatientFilters) ([]patients.PatientProfile, error)
-	GetPatientsByClinic(ctx context.Context, clinicID uuid.UUID, limit, offset int) ([]patients.PatientProfile, error)
-
-	// Medical Information
-	CreateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) error
-	GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (patients.PatientMedicalInfo, error)
-	UpdateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) error
-	DeleteMedicalInfo(ctx context.Context, patientID uuid.UUID) error
-
-	// Allergies
-	AddAllergy(ctx context.Context, allergy patients.PatientAllergy) (patients.PatientAllergy, error)
-	GetAllergy(ctx context.Context, id uuid.UUID) (patients.PatientAllergy, error)
-	GetAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
-	UpdateAllergy(ctx context.Context, allergy patients.PatientAllergy) error
-	DeleteAllergy(ctx context.Context, id uuid.UUID) error
-
-	// Medications
-	AddMedication(ctx context.Context, med patients.PatientMedication) (patients.PatientMedication, error)
-	GetMedication(ctx context.Context, id uuid.UUID) (patients.PatientMedication, error)
-	GetMedications(ctx context.Context, patientID uuid.UUID, status string) ([]patients.PatientMedication, error)
-	UpdateMedication(ctx context.Context, med patients.PatientMedication) error
-	DeleteMedication(ctx context.Context, id uuid.UUID) error
-	GetActiveMedications(ctx context.Context, patientID uuid.UUID) ([]patients.PatientMedication, error)
-
-	// Conditions
-	AddCondition(ctx context.Context, condition patients.PatientCondition) (patients.PatientCondition, error)
-	GetCondition(ctx context.Context, id uuid.UUID) (patients.PatientCondition, error)
-	GetConditions(ctx context.Context, patientID uuid.UUID, status string) ([]patients.PatientCondition, error)
-	UpdateCondition(ctx context.Context, condition patients.PatientCondition) error
-	DeleteCondition(ctx context.Context, id uuid.UUID) error
-	GetActiveConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
-
-	// Immunizations
-	AddImmunization(ctx context.Context, imm patients.PatientImmunization) (patients.PatientImmunization, error)
-	GetImmunization(ctx context.Context, id uuid.UUID) (patients.PatientImmunization, error)
-	GetImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
-	UpdateImmunization(ctx context.Context, imm patients.PatientImmunization) error
-	DeleteImmunization(ctx context.Context, id uuid.UUID) error
-	GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
-	GetImmunizationHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
-
-	// Documents & Attachments
-	// AddDocument(ctx context.Context, doc patients.PatientDocument) (patients.PatientDocument, error)
-	// GetDocument(ctx context.Context, id uuid.UUID) (patients.PatientDocument, error)
-	// GetDocuments(ctx context.Context, patientID uuid.UUID, docType string) ([]patients.PatientDocument, error)
-	// UpdateDocument(ctx context.Context, doc patients.PatientDocument) error
-	// DeleteDocument(ctx context.Context, id uuid.UUID) error
+	// Profile Management
+	// UpdatePatientPersonalInfo(ctx context.Context, userID uuid.UUID, firstName, lastName, preferredName string, dateOfBirth *time.Time, gender, pronouns *string) error
+	// UpdatePatientContactInfo(ctx context.Context, userID uuid.UUID, address, city, province, postalCode, country, communicationMethod *string) error
+	// UpdatePatientLanguagePreferences(ctx context.Context, userID uuid.UUID, languagePrefs []string, homeLanguage *string, requiresInterpreter bool) error
+	// UpdatePatientMedicalAidInfo(ctx context.Context, userID uuid.UUID, medicalAidNumber, provider *string, hasMedicalAid bool) error
+	// UpdatePatientDemographicInfo(ctx context.Context, userID uuid.UUID, employmentStatus, educationLevel, incomeRange *string) error
+	// UpdatePatientProfilePicture(ctx context.Context, userID uuid.UUID, profilePictureURL *string) error
+	// UpdatePatientTimezone(ctx context.Context, userID uuid.UUID, timezone string) error
+	// UpdatePatientMarketingPreferences(ctx context.Context, userID uuid.UUID, acceptsMarketing bool) error
+	// UpdatePatientReferralInfo(ctx context.Context, userID uuid.UUID, referredBy *uuid.UUID, referralCode *string) error
+	//
+	// // Search & Listing
+	// SearchPatients(ctx context.Context, query string, province, city *string, hasMedicalAid, gender *string, limit, offset int) ([]patients.PatientProfile, error)
+	// SearchPatientsByName(ctx context.Context, name string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByProvince(ctx context.Context, province string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByCity(ctx context.Context, city string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsWithMedicalAid(ctx context.Context, provider *string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsWithoutMedicalAid(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByLanguage(ctx context.Context, language string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsRequiringInterpreter(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByCommunicationMethod(ctx context.Context, method string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByReferrer(ctx context.Context, referrerID uuid.UUID, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByReferralCode(ctx context.Context, referralCode string) ([]patients.PatientProfile, error)
+	// GetPatientsAcceptingMarketing(ctx context.Context, province *string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByAgeRange(ctx context.Context, startDate, endDate time.Time, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByGender(ctx context.Context, gender string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByIncomeRange(ctx context.Context, incomeRange string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientsByEmploymentStatus(ctx context.Context, employmentStatus string, limit, offset int) ([]patients.PatientProfile, error)
+	// GetPatientProfilesByUserIDs(ctx context.Context, userIDs []uuid.UUID) ([]patients.PatientProfile, error)
+	//
+	// // Profile Completeness
+	// GetIncompleteProfiles(ctx context.Context, checkMedicalAid bool, limit, offset int) ([]patients.PatientProfile, error)
+	// GetRecentlyUpdatedProfiles(ctx context.Context, since time.Time, limit, offset int) ([]patients.PatientProfile, error)
+	// GetStaleProfiles(ctx context.Context, olderThan time.Time, limit, offset int) ([]patients.PatientProfile, error)
+	//
+	// // Advanced Search
+	// AdvancedPatientSearch(ctx context.Context, params patients.AdvancedSearchParams) ([]patients.PatientProfile, error)
+	//
+	// // Analytics & Reporting
+	// CountPatientsByProvince(ctx context.Context) (map[string]int64, error)
+	// CountPatientsByMedicalAidStatus(ctx context.Context) (map[string]int64, error)
+	// CountPatientsByCommunicationMethod(ctx context.Context) (map[string]int64, error)
+	// GetPatientDemographicsSummary(ctx context.Context) (patients.PatientDemographicsSummary, error)
+	//
+	// // Validation & Utilities
+	// ValidatePatientExists(ctx context.Context, userID uuid.UUID) (bool, error)
+	// GetPatientFullName(ctx context.Context, userID uuid.UUID) (string, error)
+	// ExportPatientData(ctx context.Context, userID uuid.UUID) ([]patients.PatientProfile, error)
+	//
+	// // Bulk Operations
+	// BulkUpdatePatientProvince(ctx context.Context, profileIDs []uuid.UUID, province string) error
+	// BulkUpdateCommunicationMethod(ctx context.Context, profileIDs []uuid.UUID, method string) error
 }
 
 // ============================================

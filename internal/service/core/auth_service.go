@@ -29,7 +29,7 @@ type authService struct {
 	authRepo     repository.AuthRepository
 	userRepo     repository.UserRepository
 	otpRepo      repository.OTPRepository
-	patientRepo  repository.PatientRepository
+	patientRepo  repository.PatientProfileRepository
 	sessionRepo  repository.SessionRepository
 	consentRepo  repository.ConsentRepository
 	cache        cache.Service
@@ -60,7 +60,7 @@ func NewAuthService(
 	authRepo repository.AuthRepository,
 	userRepo repository.UserRepository,
 	otpRepo repository.OTPRepository,
-	patientRepo repository.PatientRepository,
+	patientRepo repository.PatientProfileRepository,
 	sessionRepo repository.SessionRepository,
 	consentRepo repository.ConsentRepository,
 	cache cache.Service,

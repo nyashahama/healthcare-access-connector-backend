@@ -184,6 +184,72 @@ func (_m *Querier) AddProfessionalCredential(ctx context.Context, arg sqlc.AddPr
 	return r0, r1
 }
 
+// AdvancedPatientSearch provides a mock function with given fields: ctx, arg
+func (_m *Querier) AdvancedPatientSearch(ctx context.Context, arg sqlc.AdvancedPatientSearchParams) ([]sqlc.AdvancedPatientSearchRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AdvancedPatientSearch")
+	}
+
+	var r0 []sqlc.AdvancedPatientSearchRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.AdvancedPatientSearchParams) ([]sqlc.AdvancedPatientSearchRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.AdvancedPatientSearchParams) []sqlc.AdvancedPatientSearchRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.AdvancedPatientSearchRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.AdvancedPatientSearchParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BulkUpdateCommunicationMethod provides a mock function with given fields: ctx, arg
+func (_m *Querier) BulkUpdateCommunicationMethod(ctx context.Context, arg sqlc.BulkUpdateCommunicationMethodParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BulkUpdateCommunicationMethod")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.BulkUpdateCommunicationMethodParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// BulkUpdatePatientProvince provides a mock function with given fields: ctx, arg
+func (_m *Querier) BulkUpdatePatientProvince(ctx context.Context, arg sqlc.BulkUpdatePatientProvinceParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BulkUpdatePatientProvince")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.BulkUpdatePatientProvinceParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // BulkUpdateUserStatus provides a mock function with given fields: ctx, arg
 func (_m *Querier) BulkUpdateUserStatus(ctx context.Context, arg sqlc.BulkUpdateUserStatusParams) error {
 	ret := _m.Called(ctx, arg)
@@ -247,6 +313,90 @@ func (_m *Querier) CountConsentsByType(ctx context.Context) (sqlc.CountConsentsB
 		r0 = rf(ctx)
 	} else {
 		r0 = ret.Get(0).(sqlc.CountConsentsByTypeRow)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CountPatientsByCommunicationMethod provides a mock function with given fields: ctx
+func (_m *Querier) CountPatientsByCommunicationMethod(ctx context.Context) (sqlc.CountPatientsByCommunicationMethodRow, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountPatientsByCommunicationMethod")
+	}
+
+	var r0 sqlc.CountPatientsByCommunicationMethodRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (sqlc.CountPatientsByCommunicationMethodRow, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) sqlc.CountPatientsByCommunicationMethodRow); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(sqlc.CountPatientsByCommunicationMethodRow)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CountPatientsByMedicalAidStatus provides a mock function with given fields: ctx
+func (_m *Querier) CountPatientsByMedicalAidStatus(ctx context.Context) (sqlc.CountPatientsByMedicalAidStatusRow, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountPatientsByMedicalAidStatus")
+	}
+
+	var r0 sqlc.CountPatientsByMedicalAidStatusRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (sqlc.CountPatientsByMedicalAidStatusRow, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) sqlc.CountPatientsByMedicalAidStatusRow); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(sqlc.CountPatientsByMedicalAidStatusRow)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// CountPatientsByProvince provides a mock function with given fields: ctx
+func (_m *Querier) CountPatientsByProvince(ctx context.Context) (sqlc.CountPatientsByProvinceRow, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CountPatientsByProvince")
+	}
+
+	var r0 sqlc.CountPatientsByProvinceRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (sqlc.CountPatientsByProvinceRow, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) sqlc.CountPatientsByProvinceRow); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(sqlc.CountPatientsByProvinceRow)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
@@ -682,6 +832,42 @@ func (_m *Querier) DeletePatientAllergy(ctx context.Context, id pgtype.UUID) err
 	return r0
 }
 
+// DeletePatientProfile provides a mock function with given fields: ctx, id
+func (_m *Querier) DeletePatientProfile(ctx context.Context, id pgtype.UUID) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePatientProfile")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DeletePatientProfileByUserID provides a mock function with given fields: ctx, userID
+func (_m *Querier) DeletePatientProfileByUserID(ctx context.Context, userID pgtype.UUID) error {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePatientProfileByUserID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) error); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // DeletePrivacyConsent provides a mock function with given fields: ctx, userID
 func (_m *Querier) DeletePrivacyConsent(ctx context.Context, userID pgtype.UUID) error {
 	ret := _m.Called(ctx, userID)
@@ -813,6 +999,36 @@ func (_m *Querier) ExportDataAccessLogs(ctx context.Context, arg sqlc.ExportData
 
 	if rf, ok := ret.Get(1).(func(context.Context, sqlc.ExportDataAccessLogsParams) error); ok {
 		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ExportPatientData provides a mock function with given fields: ctx, userID
+func (_m *Querier) ExportPatientData(ctx context.Context, userID pgtype.UUID) ([]sqlc.ExportPatientDataRow, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ExportPatientData")
+	}
+
+	var r0 []sqlc.ExportPatientDataRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) ([]sqlc.ExportPatientDataRow, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) []sqlc.ExportPatientDataRow); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.ExportPatientDataRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, userID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1352,6 +1568,36 @@ func (_m *Querier) GetExpiredConsents(ctx context.Context) ([]sqlc.PrivacyConsen
 	return r0, r1
 }
 
+// GetIncompleteProfiles provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetIncompleteProfiles(ctx context.Context, arg sqlc.GetIncompleteProfilesParams) ([]sqlc.GetIncompleteProfilesRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetIncompleteProfiles")
+	}
+
+	var r0 []sqlc.GetIncompleteProfilesRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetIncompleteProfilesParams) ([]sqlc.GetIncompleteProfilesRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetIncompleteProfilesParams) []sqlc.GetIncompleteProfilesRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetIncompleteProfilesRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetIncompleteProfilesParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetLatestActiveOTP provides a mock function with given fields: ctx, arg
 func (_m *Querier) GetLatestActiveOTP(ctx context.Context, arg sqlc.GetLatestActiveOTPParams) (sqlc.OtpVerification, error) {
 	ret := _m.Called(ctx, arg)
@@ -1524,6 +1770,64 @@ func (_m *Querier) GetPatientConditions(ctx context.Context, arg sqlc.GetPatient
 	return r0, r1
 }
 
+// GetPatientDemographicsSummary provides a mock function with given fields: ctx
+func (_m *Querier) GetPatientDemographicsSummary(ctx context.Context) (sqlc.GetPatientDemographicsSummaryRow, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientDemographicsSummary")
+	}
+
+	var r0 sqlc.GetPatientDemographicsSummaryRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (sqlc.GetPatientDemographicsSummaryRow, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) sqlc.GetPatientDemographicsSummaryRow); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Get(0).(sqlc.GetPatientDemographicsSummaryRow)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientFullName provides a mock function with given fields: ctx, userID
+func (_m *Querier) GetPatientFullName(ctx context.Context, userID pgtype.UUID) (interface{}, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientFullName")
+	}
+
+	var r0 interface{}
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) (interface{}, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) interface{}); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(interface{})
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetPatientImmunizations provides a mock function with given fields: ctx, patientID
 func (_m *Querier) GetPatientImmunizations(ctx context.Context, patientID pgtype.UUID) ([]sqlc.GetPatientImmunizationsRow, error) {
 	ret := _m.Called(ctx, patientID)
@@ -1640,6 +1944,34 @@ func (_m *Querier) GetPatientProfileByID(ctx context.Context, id pgtype.UUID) (s
 	return r0, r1
 }
 
+// GetPatientProfileByNationalID provides a mock function with given fields: ctx, nationalIDNumber
+func (_m *Querier) GetPatientProfileByNationalID(ctx context.Context, nationalIDNumber pgtype.Text) (sqlc.GetPatientProfileByNationalIDRow, error) {
+	ret := _m.Called(ctx, nationalIDNumber)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientProfileByNationalID")
+	}
+
+	var r0 sqlc.GetPatientProfileByNationalIDRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Text) (sqlc.GetPatientProfileByNationalIDRow, error)); ok {
+		return rf(ctx, nationalIDNumber)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Text) sqlc.GetPatientProfileByNationalIDRow); ok {
+		r0 = rf(ctx, nationalIDNumber)
+	} else {
+		r0 = ret.Get(0).(sqlc.GetPatientProfileByNationalIDRow)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.Text) error); ok {
+		r1 = rf(ctx, nationalIDNumber)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetPatientProfileByUserID provides a mock function with given fields: ctx, userID
 func (_m *Querier) GetPatientProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.PatientProfile, error) {
 	ret := _m.Called(ctx, userID)
@@ -1661,6 +1993,456 @@ func (_m *Querier) GetPatientProfileByUserID(ctx context.Context, userID pgtype.
 
 	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
 		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientProfilesByUserIDs provides a mock function with given fields: ctx, dollar_1
+func (_m *Querier) GetPatientProfilesByUserIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]sqlc.GetPatientProfilesByUserIDsRow, error) {
+	ret := _m.Called(ctx, dollar_1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientProfilesByUserIDs")
+	}
+
+	var r0 []sqlc.GetPatientProfilesByUserIDsRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, []pgtype.UUID) ([]sqlc.GetPatientProfilesByUserIDsRow, error)); ok {
+		return rf(ctx, dollar_1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, []pgtype.UUID) []sqlc.GetPatientProfilesByUserIDsRow); ok {
+		r0 = rf(ctx, dollar_1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientProfilesByUserIDsRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, []pgtype.UUID) error); ok {
+		r1 = rf(ctx, dollar_1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsAcceptingMarketing provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsAcceptingMarketing(ctx context.Context, arg sqlc.GetPatientsAcceptingMarketingParams) ([]sqlc.GetPatientsAcceptingMarketingRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsAcceptingMarketing")
+	}
+
+	var r0 []sqlc.GetPatientsAcceptingMarketingRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsAcceptingMarketingParams) ([]sqlc.GetPatientsAcceptingMarketingRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsAcceptingMarketingParams) []sqlc.GetPatientsAcceptingMarketingRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsAcceptingMarketingRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsAcceptingMarketingParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByAgeRange provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByAgeRange(ctx context.Context, arg sqlc.GetPatientsByAgeRangeParams) ([]sqlc.GetPatientsByAgeRangeRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByAgeRange")
+	}
+
+	var r0 []sqlc.GetPatientsByAgeRangeRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByAgeRangeParams) ([]sqlc.GetPatientsByAgeRangeRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByAgeRangeParams) []sqlc.GetPatientsByAgeRangeRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByAgeRangeRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByAgeRangeParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByCity provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByCity(ctx context.Context, arg sqlc.GetPatientsByCityParams) ([]sqlc.GetPatientsByCityRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByCity")
+	}
+
+	var r0 []sqlc.GetPatientsByCityRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByCityParams) ([]sqlc.GetPatientsByCityRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByCityParams) []sqlc.GetPatientsByCityRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByCityRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByCityParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByCommunicationMethod provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByCommunicationMethod(ctx context.Context, arg sqlc.GetPatientsByCommunicationMethodParams) ([]sqlc.GetPatientsByCommunicationMethodRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByCommunicationMethod")
+	}
+
+	var r0 []sqlc.GetPatientsByCommunicationMethodRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByCommunicationMethodParams) ([]sqlc.GetPatientsByCommunicationMethodRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByCommunicationMethodParams) []sqlc.GetPatientsByCommunicationMethodRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByCommunicationMethodRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByCommunicationMethodParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByEmploymentStatus provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByEmploymentStatus(ctx context.Context, arg sqlc.GetPatientsByEmploymentStatusParams) ([]sqlc.GetPatientsByEmploymentStatusRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByEmploymentStatus")
+	}
+
+	var r0 []sqlc.GetPatientsByEmploymentStatusRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByEmploymentStatusParams) ([]sqlc.GetPatientsByEmploymentStatusRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByEmploymentStatusParams) []sqlc.GetPatientsByEmploymentStatusRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByEmploymentStatusRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByEmploymentStatusParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByGender provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByGender(ctx context.Context, arg sqlc.GetPatientsByGenderParams) ([]sqlc.GetPatientsByGenderRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByGender")
+	}
+
+	var r0 []sqlc.GetPatientsByGenderRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByGenderParams) ([]sqlc.GetPatientsByGenderRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByGenderParams) []sqlc.GetPatientsByGenderRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByGenderRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByGenderParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByIncomeRange provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByIncomeRange(ctx context.Context, arg sqlc.GetPatientsByIncomeRangeParams) ([]sqlc.GetPatientsByIncomeRangeRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByIncomeRange")
+	}
+
+	var r0 []sqlc.GetPatientsByIncomeRangeRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByIncomeRangeParams) ([]sqlc.GetPatientsByIncomeRangeRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByIncomeRangeParams) []sqlc.GetPatientsByIncomeRangeRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByIncomeRangeRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByIncomeRangeParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByLanguage provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByLanguage(ctx context.Context, arg sqlc.GetPatientsByLanguageParams) ([]sqlc.GetPatientsByLanguageRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByLanguage")
+	}
+
+	var r0 []sqlc.GetPatientsByLanguageRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByLanguageParams) ([]sqlc.GetPatientsByLanguageRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByLanguageParams) []sqlc.GetPatientsByLanguageRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByLanguageRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByLanguageParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByProvince provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByProvince(ctx context.Context, arg sqlc.GetPatientsByProvinceParams) ([]sqlc.GetPatientsByProvinceRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByProvince")
+	}
+
+	var r0 []sqlc.GetPatientsByProvinceRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByProvinceParams) ([]sqlc.GetPatientsByProvinceRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByProvinceParams) []sqlc.GetPatientsByProvinceRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByProvinceRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByProvinceParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByReferralCode provides a mock function with given fields: ctx, referralCode
+func (_m *Querier) GetPatientsByReferralCode(ctx context.Context, referralCode pgtype.Text) ([]sqlc.GetPatientsByReferralCodeRow, error) {
+	ret := _m.Called(ctx, referralCode)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByReferralCode")
+	}
+
+	var r0 []sqlc.GetPatientsByReferralCodeRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Text) ([]sqlc.GetPatientsByReferralCodeRow, error)); ok {
+		return rf(ctx, referralCode)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.Text) []sqlc.GetPatientsByReferralCodeRow); ok {
+		r0 = rf(ctx, referralCode)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByReferralCodeRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.Text) error); ok {
+		r1 = rf(ctx, referralCode)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsByReferrer provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsByReferrer(ctx context.Context, arg sqlc.GetPatientsByReferrerParams) ([]sqlc.GetPatientsByReferrerRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsByReferrer")
+	}
+
+	var r0 []sqlc.GetPatientsByReferrerRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByReferrerParams) ([]sqlc.GetPatientsByReferrerRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsByReferrerParams) []sqlc.GetPatientsByReferrerRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsByReferrerRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsByReferrerParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsRequiringInterpreter provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsRequiringInterpreter(ctx context.Context, arg sqlc.GetPatientsRequiringInterpreterParams) ([]sqlc.GetPatientsRequiringInterpreterRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsRequiringInterpreter")
+	}
+
+	var r0 []sqlc.GetPatientsRequiringInterpreterRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsRequiringInterpreterParams) ([]sqlc.GetPatientsRequiringInterpreterRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsRequiringInterpreterParams) []sqlc.GetPatientsRequiringInterpreterRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsRequiringInterpreterRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsRequiringInterpreterParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsWithMedicalAid provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsWithMedicalAid(ctx context.Context, arg sqlc.GetPatientsWithMedicalAidParams) ([]sqlc.GetPatientsWithMedicalAidRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsWithMedicalAid")
+	}
+
+	var r0 []sqlc.GetPatientsWithMedicalAidRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsWithMedicalAidParams) ([]sqlc.GetPatientsWithMedicalAidRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsWithMedicalAidParams) []sqlc.GetPatientsWithMedicalAidRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsWithMedicalAidRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsWithMedicalAidParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPatientsWithoutMedicalAid provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetPatientsWithoutMedicalAid(ctx context.Context, arg sqlc.GetPatientsWithoutMedicalAidParams) ([]sqlc.GetPatientsWithoutMedicalAidRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPatientsWithoutMedicalAid")
+	}
+
+	var r0 []sqlc.GetPatientsWithoutMedicalAidRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsWithoutMedicalAidParams) ([]sqlc.GetPatientsWithoutMedicalAidRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetPatientsWithoutMedicalAidParams) []sqlc.GetPatientsWithoutMedicalAidRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetPatientsWithoutMedicalAidRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetPatientsWithoutMedicalAidParams) error); ok {
+		r1 = rf(ctx, arg)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1756,6 +2538,36 @@ func (_m *Querier) GetRecentOTPs(ctx context.Context, arg sqlc.GetRecentOTPsPara
 	return r0, r1
 }
 
+// GetRecentlyUpdatedProfiles provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetRecentlyUpdatedProfiles(ctx context.Context, arg sqlc.GetRecentlyUpdatedProfilesParams) ([]sqlc.GetRecentlyUpdatedProfilesRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRecentlyUpdatedProfiles")
+	}
+
+	var r0 []sqlc.GetRecentlyUpdatedProfilesRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetRecentlyUpdatedProfilesParams) ([]sqlc.GetRecentlyUpdatedProfilesRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetRecentlyUpdatedProfilesParams) []sqlc.GetRecentlyUpdatedProfilesRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetRecentlyUpdatedProfilesRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetRecentlyUpdatedProfilesParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetSMSConversationByPhone provides a mock function with given fields: ctx, phoneNumber
 func (_m *Querier) GetSMSConversationByPhone(ctx context.Context, phoneNumber string) (sqlc.SmsConversation, error) {
 	ret := _m.Called(ctx, phoneNumber)
@@ -1835,6 +2647,36 @@ func (_m *Querier) GetStaffCredentials(ctx context.Context, staffID pgtype.UUID)
 
 	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
 		r1 = rf(ctx, staffID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetStaleProfiles provides a mock function with given fields: ctx, arg
+func (_m *Querier) GetStaleProfiles(ctx context.Context, arg sqlc.GetStaleProfilesParams) ([]sqlc.GetStaleProfilesRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetStaleProfiles")
+	}
+
+	var r0 []sqlc.GetStaleProfilesRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetStaleProfilesParams) ([]sqlc.GetStaleProfilesRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetStaleProfilesParams) []sqlc.GetStaleProfilesRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.GetStaleProfilesRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetStaleProfilesParams) error); ok {
+		r1 = rf(ctx, arg)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -2558,6 +3400,36 @@ func (_m *Querier) SearchPatients(ctx context.Context, arg sqlc.SearchPatientsPa
 	return r0, r1
 }
 
+// SearchPatientsByName provides a mock function with given fields: ctx, arg
+func (_m *Querier) SearchPatientsByName(ctx context.Context, arg sqlc.SearchPatientsByNameParams) ([]sqlc.SearchPatientsByNameRow, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SearchPatientsByName")
+	}
+
+	var r0 []sqlc.SearchPatientsByNameRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.SearchPatientsByNameParams) ([]sqlc.SearchPatientsByNameRow, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.SearchPatientsByNameParams) []sqlc.SearchPatientsByNameRow); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.SearchPatientsByNameRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.SearchPatientsByNameParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // SearchUserActivities provides a mock function with given fields: ctx, arg
 func (_m *Querier) SearchUserActivities(ctx context.Context, arg sqlc.SearchUserActivitiesParams) ([]sqlc.UserActivity, error) {
 	ret := _m.Called(ctx, arg)
@@ -2960,6 +3832,96 @@ func (_m *Querier) UpdatePatientCondition(ctx context.Context, arg sqlc.UpdatePa
 	return r0
 }
 
+// UpdatePatientContactInfo provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientContactInfo(ctx context.Context, arg sqlc.UpdatePatientContactInfoParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientContactInfo")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientContactInfoParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdatePatientDemographicInfo provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientDemographicInfo(ctx context.Context, arg sqlc.UpdatePatientDemographicInfoParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientDemographicInfo")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientDemographicInfoParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdatePatientLanguagePreferences provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientLanguagePreferences(ctx context.Context, arg sqlc.UpdatePatientLanguagePreferencesParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientLanguagePreferences")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientLanguagePreferencesParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdatePatientMarketingPreferences provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientMarketingPreferences(ctx context.Context, arg sqlc.UpdatePatientMarketingPreferencesParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientMarketingPreferences")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientMarketingPreferencesParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdatePatientMedicalAidInfo provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientMedicalAidInfo(ctx context.Context, arg sqlc.UpdatePatientMedicalAidInfoParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientMedicalAidInfo")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientMedicalAidInfoParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdatePatientMedicalInfo provides a mock function with given fields: ctx, arg
 func (_m *Querier) UpdatePatientMedicalInfo(ctx context.Context, arg sqlc.UpdatePatientMedicalInfoParams) error {
 	ret := _m.Called(ctx, arg)
@@ -2996,6 +3958,24 @@ func (_m *Querier) UpdatePatientMedication(ctx context.Context, arg sqlc.UpdateP
 	return r0
 }
 
+// UpdatePatientPersonalInfo provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientPersonalInfo(ctx context.Context, arg sqlc.UpdatePatientPersonalInfoParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientPersonalInfo")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientPersonalInfoParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // UpdatePatientProfile provides a mock function with given fields: ctx, arg
 func (_m *Querier) UpdatePatientProfile(ctx context.Context, arg sqlc.UpdatePatientProfileParams) error {
 	ret := _m.Called(ctx, arg)
@@ -3006,6 +3986,60 @@ func (_m *Querier) UpdatePatientProfile(ctx context.Context, arg sqlc.UpdatePati
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientProfileParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdatePatientProfilePicture provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientProfilePicture(ctx context.Context, arg sqlc.UpdatePatientProfilePictureParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientProfilePicture")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientProfilePictureParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdatePatientReferralInfo provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientReferralInfo(ctx context.Context, arg sqlc.UpdatePatientReferralInfoParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientReferralInfo")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientReferralInfoParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UpdatePatientTimezone provides a mock function with given fields: ctx, arg
+func (_m *Querier) UpdatePatientTimezone(ctx context.Context, arg sqlc.UpdatePatientTimezoneParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePatientTimezone")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdatePatientTimezoneParams) error); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		r0 = ret.Error(0)
@@ -3300,6 +4334,34 @@ func (_m *Querier) UpdateUserStatus(ctx context.Context, arg sqlc.UpdateUserStat
 	}
 
 	return r0
+}
+
+// ValidatePatientExists provides a mock function with given fields: ctx, userID
+func (_m *Querier) ValidatePatientExists(ctx context.Context, userID pgtype.UUID) (bool, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ValidatePatientExists")
+	}
+
+	var r0 bool
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) (bool, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) bool); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // VerifyClinic provides a mock function with given fields: ctx, arg

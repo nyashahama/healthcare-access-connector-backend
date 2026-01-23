@@ -21,7 +21,7 @@ import (
 type userService struct {
 	userRepo         repository.UserRepository
 	authRepo         repository.AuthRepository
-	patientRepo      repository.PatientRepository
+	patientRepo      repository.PatientProfileRepository
 	consentRepo      repository.ConsentRepository
 	notificationRepo repository.NotificationRepository
 	sessionRepo      repository.SessionRepository
@@ -33,7 +33,7 @@ type userService struct {
 func NewUserService(
 	userRepo repository.UserRepository,
 	authRepo repository.AuthRepository,
-	patientRepo repository.PatientRepository,
+	patientRepo repository.PatientProfileRepository,
 	consentRepo repository.ConsentRepository,
 	notificationRepo repository.NotificationRepository,
 	sessionRepo repository.SessionRepository,

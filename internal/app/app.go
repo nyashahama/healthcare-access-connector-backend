@@ -6,18 +6,17 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
+	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	servicecore "github.com/nyashahama/healthcare-access-connector-backend/internal/service/core"
 	"github.com/rs/zerolog"
@@ -74,6 +73,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	// Initialize repositories
+	/*core */
 	authRepo := repocore.NewAuthRepository(pool)
 	userRepo := repocore.NewUserRepository(pool)
 	otpRepo := repocore.NewOTPRepository(pool)
@@ -82,8 +82,8 @@ func New(cfg *config.Config) (*App, error) {
 	consentRepo := repocore.NewConsentRepository(pool)
 	auditRepo := repocore.NewAuditRepository(pool)
 
-	// Initialize stubs for required but not yet implemented repositories
-	patientRepo := &stubPatientRepository{}
+	/* patients*/
+	patientRepo := repopatients.NewPatientRepository(pool)
 
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
@@ -228,151 +228,4 @@ func initDatabase(dbURL string, logger *zerolog.Logger) (*pgxpool.Pool, error) {
 
 	logger.Info().Msg("Database connection established")
 	return pool, nil
-}
-
-// =========================================
-// STUB REPOSITORY IMPLEMENTATIONS
-// These are temporary until actual implementations are ready
-// =========================================
-
-type stubPatientRepository struct{}
-
-func (s *stubPatientRepository) CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error) {
-	return profile, nil
-}
-
-func (s *stubPatientRepository) GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error) {
-	return patients.PatientProfile{}, nil
-}
-
-func (s *stubPatientRepository) GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error) {
-	return patients.PatientProfile{}, nil
-}
-
-func (s *stubPatientRepository) GetPatientsByClinic(ctx context.Context, clinicID uuid.UUID, limit, offset int) ([]patients.PatientProfile, error) {
-	return []patients.PatientProfile{}, nil
-}
-
-func (s *stubPatientRepository) UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error {
-	return nil
-}
-
-func (s *stubPatientRepository) DeletePatientProfile(ctx context.Context, id uuid.UUID) error {
-	return nil
-}
-
-func (s *stubPatientRepository) SearchPatients(ctx context.Context, query string, province string, limit, offset int) ([]patients.PatientProfile, error) {
-	return []patients.PatientProfile{}, nil
-}
-
-func (s *stubPatientRepository) CreateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) error {
-	return nil
-}
-
-func (s *stubPatientRepository) GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (patients.PatientMedicalInfo, error) {
-	return patients.PatientMedicalInfo{}, nil
-}
-
-func (s *stubPatientRepository) UpdateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) error {
-	return nil
-}
-
-func (s *stubPatientRepository) DeleteMedicalInfo(ctx context.Context, patientID uuid.UUID) error {
-	return nil
-}
-
-func (s *stubPatientRepository) AddAllergy(ctx context.Context, allergy patients.PatientAllergy) (patients.PatientAllergy, error) {
-	return patients.PatientAllergy{}, nil
-}
-
-func (s *stubPatientRepository) GetAllergy(ctx context.Context, id uuid.UUID) (patients.PatientAllergy, error) {
-	return patients.PatientAllergy{}, nil
-}
-
-func (s *stubPatientRepository) GetAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error) {
-	return []patients.PatientAllergy{}, nil
-}
-
-func (s *stubPatientRepository) UpdateAllergy(ctx context.Context, allergy patients.PatientAllergy) error {
-	return nil
-}
-
-func (s *stubPatientRepository) DeleteAllergy(ctx context.Context, id uuid.UUID) error {
-	return nil
-}
-
-func (s *stubPatientRepository) AddMedication(ctx context.Context, med patients.PatientMedication) (patients.PatientMedication, error) {
-	return patients.PatientMedication{}, nil
-}
-
-func (s *stubPatientRepository) GetMedication(ctx context.Context, id uuid.UUID) (patients.PatientMedication, error) {
-	return patients.PatientMedication{}, nil
-}
-
-func (s *stubPatientRepository) GetMedications(ctx context.Context, patientID uuid.UUID, status string) ([]patients.PatientMedication, error) {
-	return []patients.PatientMedication{}, nil
-}
-
-func (s *stubPatientRepository) UpdateMedication(ctx context.Context, med patients.PatientMedication) error {
-	return nil
-}
-
-func (s *stubPatientRepository) DeleteMedication(ctx context.Context, id uuid.UUID) error {
-	return nil
-}
-
-func (s *stubPatientRepository) GetActiveMedications(ctx context.Context, patientID uuid.UUID) ([]patients.PatientMedication, error) {
-	return []patients.PatientMedication{}, nil
-}
-
-func (s *stubPatientRepository) AddCondition(ctx context.Context, condition patients.PatientCondition) (patients.PatientCondition, error) {
-	return patients.PatientCondition{}, nil
-}
-
-func (s *stubPatientRepository) GetCondition(ctx context.Context, id uuid.UUID) (patients.PatientCondition, error) {
-	return patients.PatientCondition{}, nil
-}
-
-func (s *stubPatientRepository) GetConditions(ctx context.Context, patientID uuid.UUID, status string) ([]patients.PatientCondition, error) {
-	return []patients.PatientCondition{}, nil
-}
-
-func (s *stubPatientRepository) UpdateCondition(ctx context.Context, condition patients.PatientCondition) error {
-	return nil
-}
-
-func (s *stubPatientRepository) DeleteCondition(ctx context.Context, id uuid.UUID) error {
-	return nil
-}
-
-func (s *stubPatientRepository) GetActiveConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error) {
-	return []patients.PatientCondition{}, nil
-}
-
-func (s *stubPatientRepository) AddImmunization(ctx context.Context, imm patients.PatientImmunization) (patients.PatientImmunization, error) {
-	return patients.PatientImmunization{}, nil
-}
-
-func (s *stubPatientRepository) GetImmunization(ctx context.Context, id uuid.UUID) (patients.PatientImmunization, error) {
-	return patients.PatientImmunization{}, nil
-}
-
-func (s *stubPatientRepository) GetImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
-	return []patients.PatientImmunization{}, nil
-}
-
-func (s *stubPatientRepository) UpdateImmunization(ctx context.Context, imm patients.PatientImmunization) error {
-	return nil
-}
-
-func (s *stubPatientRepository) DeleteImmunization(ctx context.Context, id uuid.UUID) error {
-	return nil
-}
-
-func (s *stubPatientRepository) GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
-	return []patients.PatientImmunization{}, nil
-}
-
-func (s *stubPatientRepository) GetImmunizationHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error) {
-	return []patients.PatientImmunization{}, nil
 }

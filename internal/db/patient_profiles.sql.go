@@ -11,6 +11,210 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const advancedPatientSearch = `-- name: AdvancedPatientSearch :many
+SELECT id, user_id, first_name, last_name, preferred_name,
+    date_of_birth, gender, city, province, 
+    preferred_communication_method, has_medical_aid,
+    medical_aid_provider, employment_status, created_at
+FROM patient_profiles
+WHERE ($1::VARCHAR IS NULL OR 
+       first_name ILIKE '%' || $1 || '%' OR 
+       last_name ILIKE '%' || $1 || '%' OR
+       preferred_name ILIKE '%' || $1 || '%')
+    AND ($2::VARCHAR IS NULL OR province = $2)
+    AND ($3::VARCHAR IS NULL OR city = $3)
+    AND ($4::BOOLEAN IS NULL OR has_medical_aid = $4)
+    AND ($5::VARCHAR IS NULL OR gender = $5)
+    AND ($6::VARCHAR IS NULL OR preferred_communication_method = $6)
+    AND ($7::VARCHAR IS NULL OR employment_status = $7)
+    AND ($8::VARCHAR IS NULL OR medical_aid_provider = $8)
+    AND ($9::BOOLEAN IS NULL OR requires_interpreter = $9)
+    AND ($10::BOOLEAN IS NULL OR accepts_marketing_emails = $10)
+ORDER BY last_name, first_name
+LIMIT $11 OFFSET $12
+`
+
+type AdvancedPatientSearchParams struct {
+	Column1  string `json:"column_1"`
+	Column2  string `json:"column_2"`
+	Column3  string `json:"column_3"`
+	Column4  bool   `json:"column_4"`
+	Column5  string `json:"column_5"`
+	Column6  string `json:"column_6"`
+	Column7  string `json:"column_7"`
+	Column8  string `json:"column_8"`
+	Column9  bool   `json:"column_9"`
+	Column10 bool   `json:"column_10"`
+	Limit    int32  `json:"limit"`
+	Offset   int32  `json:"offset"`
+}
+
+type AdvancedPatientSearchRow struct {
+	ID                           pgtype.UUID      `json:"id"`
+	UserID                       pgtype.UUID      `json:"user_id"`
+	FirstName                    string           `json:"first_name"`
+	LastName                     string           `json:"last_name"`
+	PreferredName                pgtype.Text      `json:"preferred_name"`
+	DateOfBirth                  pgtype.Date      `json:"date_of_birth"`
+	Gender                       pgtype.Text      `json:"gender"`
+	City                         pgtype.Text      `json:"city"`
+	Province                     pgtype.Text      `json:"province"`
+	PreferredCommunicationMethod pgtype.Text      `json:"preferred_communication_method"`
+	HasMedicalAid                pgtype.Bool      `json:"has_medical_aid"`
+	MedicalAidProvider           pgtype.Text      `json:"medical_aid_provider"`
+	EmploymentStatus             pgtype.Text      `json:"employment_status"`
+	CreatedAt                    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) AdvancedPatientSearch(ctx context.Context, arg AdvancedPatientSearchParams) ([]AdvancedPatientSearchRow, error) {
+	rows, err := q.db.Query(ctx, advancedPatientSearch,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Column6,
+		arg.Column7,
+		arg.Column8,
+		arg.Column9,
+		arg.Column10,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AdvancedPatientSearchRow{}
+	for rows.Next() {
+		var i AdvancedPatientSearchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PreferredName,
+			&i.DateOfBirth,
+			&i.Gender,
+			&i.City,
+			&i.Province,
+			&i.PreferredCommunicationMethod,
+			&i.HasMedicalAid,
+			&i.MedicalAidProvider,
+			&i.EmploymentStatus,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const bulkUpdateCommunicationMethod = `-- name: BulkUpdateCommunicationMethod :exec
+UPDATE patient_profiles
+SET preferred_communication_method = $2, updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkUpdateCommunicationMethodParams struct {
+	Column1                      []pgtype.UUID `json:"column_1"`
+	PreferredCommunicationMethod pgtype.Text   `json:"preferred_communication_method"`
+}
+
+func (q *Queries) BulkUpdateCommunicationMethod(ctx context.Context, arg BulkUpdateCommunicationMethodParams) error {
+	_, err := q.db.Exec(ctx, bulkUpdateCommunicationMethod, arg.Column1, arg.PreferredCommunicationMethod)
+	return err
+}
+
+const bulkUpdatePatientProvince = `-- name: BulkUpdatePatientProvince :exec
+UPDATE patient_profiles
+SET province = $2, updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkUpdatePatientProvinceParams struct {
+	Column1  []pgtype.UUID `json:"column_1"`
+	Province pgtype.Text   `json:"province"`
+}
+
+func (q *Queries) BulkUpdatePatientProvince(ctx context.Context, arg BulkUpdatePatientProvinceParams) error {
+	_, err := q.db.Exec(ctx, bulkUpdatePatientProvince, arg.Column1, arg.Province)
+	return err
+}
+
+const countPatientsByCommunicationMethod = `-- name: CountPatientsByCommunicationMethod :one
+SELECT 
+    COUNT(*) FILTER (WHERE preferred_communication_method = 'sms') as sms_count,
+    COUNT(*) FILTER (WHERE preferred_communication_method = 'email') as email_count,
+    COUNT(*) FILTER (WHERE preferred_communication_method = 'whatsapp') as whatsapp_count,
+    COUNT(*) FILTER (WHERE preferred_communication_method = 'call') as call_count
+FROM patient_profiles
+`
+
+type CountPatientsByCommunicationMethodRow struct {
+	SmsCount      int64 `json:"sms_count"`
+	EmailCount    int64 `json:"email_count"`
+	WhatsappCount int64 `json:"whatsapp_count"`
+	CallCount     int64 `json:"call_count"`
+}
+
+func (q *Queries) CountPatientsByCommunicationMethod(ctx context.Context) (CountPatientsByCommunicationMethodRow, error) {
+	row := q.db.QueryRow(ctx, countPatientsByCommunicationMethod)
+	var i CountPatientsByCommunicationMethodRow
+	err := row.Scan(
+		&i.SmsCount,
+		&i.EmailCount,
+		&i.WhatsappCount,
+		&i.CallCount,
+	)
+	return i, err
+}
+
+const countPatientsByMedicalAidStatus = `-- name: CountPatientsByMedicalAidStatus :one
+SELECT 
+    COUNT(*) FILTER (WHERE has_medical_aid = true) as with_medical_aid,
+    COUNT(*) FILTER (WHERE has_medical_aid = false) as without_medical_aid,
+    COUNT(*) as total_patients
+FROM patient_profiles
+`
+
+type CountPatientsByMedicalAidStatusRow struct {
+	WithMedicalAid    int64 `json:"with_medical_aid"`
+	WithoutMedicalAid int64 `json:"without_medical_aid"`
+	TotalPatients     int64 `json:"total_patients"`
+}
+
+func (q *Queries) CountPatientsByMedicalAidStatus(ctx context.Context) (CountPatientsByMedicalAidStatusRow, error) {
+	row := q.db.QueryRow(ctx, countPatientsByMedicalAidStatus)
+	var i CountPatientsByMedicalAidStatusRow
+	err := row.Scan(&i.WithMedicalAid, &i.WithoutMedicalAid, &i.TotalPatients)
+	return i, err
+}
+
+const countPatientsByProvince = `-- name: CountPatientsByProvince :one
+SELECT province, COUNT(*) as patient_count
+FROM patient_profiles
+WHERE province IS NOT NULL
+GROUP BY province
+ORDER BY patient_count DESC
+`
+
+type CountPatientsByProvinceRow struct {
+	Province     pgtype.Text `json:"province"`
+	PatientCount int64       `json:"patient_count"`
+}
+
+func (q *Queries) CountPatientsByProvince(ctx context.Context) (CountPatientsByProvinceRow, error) {
+	row := q.db.QueryRow(ctx, countPatientsByProvince)
+	var i CountPatientsByProvinceRow
+	err := row.Scan(&i.Province, &i.PatientCount)
+	return i, err
+}
+
 const createPatientProfile = `-- name: CreatePatientProfile :one
 
 INSERT INTO patient_profiles (
@@ -19,12 +223,15 @@ INSERT INTO patient_profiles (
     postal_code, country, language_preferences, home_language, 
     requires_interpreter, preferred_communication_method, 
     medical_aid_number, medical_aid_provider, has_medical_aid, 
-    national_id_number, timezone
+    national_id_number, employment_status, education_level,
+    household_income_range, timezone, referred_by, referral_code,
+    accepts_marketing_emails
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
 RETURNING id, user_id, first_name, last_name, preferred_name, 
     date_of_birth, gender, city, province, country, 
-    preferred_communication_method, created_at, updated_at
+    preferred_communication_method, has_medical_aid, timezone,
+    created_at, updated_at
 `
 
 type CreatePatientProfileParams struct {
@@ -48,7 +255,13 @@ type CreatePatientProfileParams struct {
 	MedicalAidProvider           pgtype.Text `json:"medical_aid_provider"`
 	HasMedicalAid                pgtype.Bool `json:"has_medical_aid"`
 	NationalIDNumber             pgtype.Text `json:"national_id_number"`
+	EmploymentStatus             pgtype.Text `json:"employment_status"`
+	EducationLevel               pgtype.Text `json:"education_level"`
+	HouseholdIncomeRange         pgtype.Text `json:"household_income_range"`
 	Timezone                     pgtype.Text `json:"timezone"`
+	ReferredBy                   pgtype.UUID `json:"referred_by"`
+	ReferralCode                 pgtype.Text `json:"referral_code"`
+	AcceptsMarketingEmails       pgtype.Bool `json:"accepts_marketing_emails"`
 }
 
 type CreatePatientProfileRow struct {
@@ -63,6 +276,8 @@ type CreatePatientProfileRow struct {
 	Province                     pgtype.Text      `json:"province"`
 	Country                      pgtype.Text      `json:"country"`
 	PreferredCommunicationMethod pgtype.Text      `json:"preferred_communication_method"`
+	HasMedicalAid                pgtype.Bool      `json:"has_medical_aid"`
+	Timezone                     pgtype.Text      `json:"timezone"`
 	CreatedAt                    pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                    pgtype.Timestamp `json:"updated_at"`
 }
@@ -92,7 +307,13 @@ func (q *Queries) CreatePatientProfile(ctx context.Context, arg CreatePatientPro
 		arg.MedicalAidProvider,
 		arg.HasMedicalAid,
 		arg.NationalIDNumber,
+		arg.EmploymentStatus,
+		arg.EducationLevel,
+		arg.HouseholdIncomeRange,
 		arg.Timezone,
+		arg.ReferredBy,
+		arg.ReferralCode,
+		arg.AcceptsMarketingEmails,
 	)
 	var i CreatePatientProfileRow
 	err := row.Scan(
@@ -107,14 +328,232 @@ func (q *Queries) CreatePatientProfile(ctx context.Context, arg CreatePatientPro
 		&i.Province,
 		&i.Country,
 		&i.PreferredCommunicationMethod,
+		&i.HasMedicalAid,
+		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
+const deletePatientProfile = `-- name: DeletePatientProfile :exec
+DELETE FROM patient_profiles WHERE id = $1
+`
+
+func (q *Queries) DeletePatientProfile(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deletePatientProfile, id)
+	return err
+}
+
+const deletePatientProfileByUserID = `-- name: DeletePatientProfileByUserID :exec
+DELETE FROM patient_profiles WHERE user_id = $1
+`
+
+func (q *Queries) DeletePatientProfileByUserID(ctx context.Context, userID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deletePatientProfileByUserID, userID)
+	return err
+}
+
+const exportPatientData = `-- name: ExportPatientData :many
+SELECT id, user_id, first_name, last_name, preferred_name, 
+    date_of_birth, gender, primary_address, city, province, 
+    postal_code, country, preferred_communication_method,
+    medical_aid_provider, has_medical_aid, employment_status,
+    created_at, updated_at
+FROM patient_profiles
+WHERE user_id = $1
+`
+
+type ExportPatientDataRow struct {
+	ID                           pgtype.UUID      `json:"id"`
+	UserID                       pgtype.UUID      `json:"user_id"`
+	FirstName                    string           `json:"first_name"`
+	LastName                     string           `json:"last_name"`
+	PreferredName                pgtype.Text      `json:"preferred_name"`
+	DateOfBirth                  pgtype.Date      `json:"date_of_birth"`
+	Gender                       pgtype.Text      `json:"gender"`
+	PrimaryAddress               pgtype.Text      `json:"primary_address"`
+	City                         pgtype.Text      `json:"city"`
+	Province                     pgtype.Text      `json:"province"`
+	PostalCode                   pgtype.Text      `json:"postal_code"`
+	Country                      pgtype.Text      `json:"country"`
+	PreferredCommunicationMethod pgtype.Text      `json:"preferred_communication_method"`
+	MedicalAidProvider           pgtype.Text      `json:"medical_aid_provider"`
+	HasMedicalAid                pgtype.Bool      `json:"has_medical_aid"`
+	EmploymentStatus             pgtype.Text      `json:"employment_status"`
+	CreatedAt                    pgtype.Timestamp `json:"created_at"`
+	UpdatedAt                    pgtype.Timestamp `json:"updated_at"`
+}
+
+func (q *Queries) ExportPatientData(ctx context.Context, userID pgtype.UUID) ([]ExportPatientDataRow, error) {
+	rows, err := q.db.Query(ctx, exportPatientData, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ExportPatientDataRow{}
+	for rows.Next() {
+		var i ExportPatientDataRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PreferredName,
+			&i.DateOfBirth,
+			&i.Gender,
+			&i.PrimaryAddress,
+			&i.City,
+			&i.Province,
+			&i.PostalCode,
+			&i.Country,
+			&i.PreferredCommunicationMethod,
+			&i.MedicalAidProvider,
+			&i.HasMedicalAid,
+			&i.EmploymentStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getIncompleteProfiles = `-- name: GetIncompleteProfiles :many
+SELECT id, user_id, first_name, last_name, 
+    date_of_birth, primary_address, medical_aid_number,
+    last_profile_update, created_at
+FROM patient_profiles
+WHERE date_of_birth IS NULL 
+   OR primary_address IS NULL 
+   OR city IS NULL 
+   OR province IS NULL
+   OR ($1 AND medical_aid_number IS NULL)
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type GetIncompleteProfilesParams struct {
+	Column1 interface{} `json:"column_1"`
+	Limit   int32       `json:"limit"`
+	Offset  int32       `json:"offset"`
+}
+
+type GetIncompleteProfilesRow struct {
+	ID                pgtype.UUID      `json:"id"`
+	UserID            pgtype.UUID      `json:"user_id"`
+	FirstName         string           `json:"first_name"`
+	LastName          string           `json:"last_name"`
+	DateOfBirth       pgtype.Date      `json:"date_of_birth"`
+	PrimaryAddress    pgtype.Text      `json:"primary_address"`
+	MedicalAidNumber  pgtype.Text      `json:"medical_aid_number"`
+	LastProfileUpdate pgtype.Timestamp `json:"last_profile_update"`
+	CreatedAt         pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetIncompleteProfiles(ctx context.Context, arg GetIncompleteProfilesParams) ([]GetIncompleteProfilesRow, error) {
+	rows, err := q.db.Query(ctx, getIncompleteProfiles, arg.Column1, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetIncompleteProfilesRow{}
+	for rows.Next() {
+		var i GetIncompleteProfilesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.DateOfBirth,
+			&i.PrimaryAddress,
+			&i.MedicalAidNumber,
+			&i.LastProfileUpdate,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientDemographicsSummary = `-- name: GetPatientDemographicsSummary :one
+SELECT 
+    COUNT(*) as total_patients,
+    COUNT(DISTINCT province) as provinces_covered,
+    COUNT(DISTINCT city) as cities_covered,
+    COUNT(*) FILTER (WHERE has_medical_aid = true) as with_medical_aid,
+    COUNT(*) FILTER (WHERE requires_interpreter = true) as requiring_interpreter,
+    COUNT(*) FILTER (WHERE accepts_marketing_emails = true) as marketing_opt_in,
+    AVG(EXTRACT(YEAR FROM AGE(date_of_birth))) as average_age
+FROM patient_profiles
+WHERE date_of_birth IS NOT NULL
+`
+
+type GetPatientDemographicsSummaryRow struct {
+	TotalPatients        int64   `json:"total_patients"`
+	ProvincesCovered     int64   `json:"provinces_covered"`
+	CitiesCovered        int64   `json:"cities_covered"`
+	WithMedicalAid       int64   `json:"with_medical_aid"`
+	RequiringInterpreter int64   `json:"requiring_interpreter"`
+	MarketingOptIn       int64   `json:"marketing_opt_in"`
+	AverageAge           float64 `json:"average_age"`
+}
+
+func (q *Queries) GetPatientDemographicsSummary(ctx context.Context) (GetPatientDemographicsSummaryRow, error) {
+	row := q.db.QueryRow(ctx, getPatientDemographicsSummary)
+	var i GetPatientDemographicsSummaryRow
+	err := row.Scan(
+		&i.TotalPatients,
+		&i.ProvincesCovered,
+		&i.CitiesCovered,
+		&i.WithMedicalAid,
+		&i.RequiringInterpreter,
+		&i.MarketingOptIn,
+		&i.AverageAge,
+	)
+	return i, err
+}
+
+const getPatientFullName = `-- name: GetPatientFullName :one
+SELECT 
+    CASE 
+        WHEN preferred_name IS NOT NULL AND preferred_name != '' 
+        THEN preferred_name || ' ' || last_name
+        ELSE first_name || ' ' || last_name
+    END as full_name
+FROM patient_profiles
+WHERE user_id = $1
+`
+
+func (q *Queries) GetPatientFullName(ctx context.Context, userID pgtype.UUID) (interface{}, error) {
+	row := q.db.QueryRow(ctx, getPatientFullName, userID)
+	var full_name interface{}
+	err := row.Scan(&full_name)
+	return full_name, err
+}
+
 const getPatientProfileByID = `-- name: GetPatientProfileByID :one
-SELECT id, user_id, first_name, last_name, preferred_name, date_of_birth, gender, preferred_gender_pronouns, primary_address, city, province, postal_code, country, language_preferences, home_language, requires_interpreter, preferred_communication_method, medical_aid_number, medical_aid_provider, has_medical_aid, national_id_number, employment_status, education_level, household_income_range, profile_picture_url, timezone, last_profile_update, referred_by, referral_code, accepts_marketing_emails, created_at, updated_at FROM patient_profiles WHERE id = $1
+SELECT id, user_id, first_name, last_name, preferred_name, date_of_birth, 
+    gender, preferred_gender_pronouns, primary_address, city, province, 
+    postal_code, country, language_preferences, home_language, 
+    requires_interpreter, preferred_communication_method, 
+    medical_aid_number, medical_aid_provider, has_medical_aid, 
+    national_id_number, employment_status, education_level, 
+    household_income_range, profile_picture_url, timezone, 
+    last_profile_update, referred_by, referral_code, 
+    accepts_marketing_emails, created_at, updated_at
+FROM patient_profiles
+WHERE id = $1
 `
 
 func (q *Queries) GetPatientProfileByID(ctx context.Context, id pgtype.UUID) (PatientProfile, error) {
@@ -151,6 +590,48 @@ func (q *Queries) GetPatientProfileByID(ctx context.Context, id pgtype.UUID) (Pa
 		&i.ReferredBy,
 		&i.ReferralCode,
 		&i.AcceptsMarketingEmails,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPatientProfileByNationalID = `-- name: GetPatientProfileByNationalID :one
+SELECT id, user_id, first_name, last_name, preferred_name, date_of_birth, 
+    gender, city, province, has_medical_aid, created_at, updated_at
+FROM patient_profiles
+WHERE national_id_number = $1
+`
+
+type GetPatientProfileByNationalIDRow struct {
+	ID            pgtype.UUID      `json:"id"`
+	UserID        pgtype.UUID      `json:"user_id"`
+	FirstName     string           `json:"first_name"`
+	LastName      string           `json:"last_name"`
+	PreferredName pgtype.Text      `json:"preferred_name"`
+	DateOfBirth   pgtype.Date      `json:"date_of_birth"`
+	Gender        pgtype.Text      `json:"gender"`
+	City          pgtype.Text      `json:"city"`
+	Province      pgtype.Text      `json:"province"`
+	HasMedicalAid pgtype.Bool      `json:"has_medical_aid"`
+	CreatedAt     pgtype.Timestamp `json:"created_at"`
+	UpdatedAt     pgtype.Timestamp `json:"updated_at"`
+}
+
+func (q *Queries) GetPatientProfileByNationalID(ctx context.Context, nationalIDNumber pgtype.Text) (GetPatientProfileByNationalIDRow, error) {
+	row := q.db.QueryRow(ctx, getPatientProfileByNationalID, nationalIDNumber)
+	var i GetPatientProfileByNationalIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.FirstName,
+		&i.LastName,
+		&i.PreferredName,
+		&i.DateOfBirth,
+		&i.Gender,
+		&i.City,
+		&i.Province,
+		&i.HasMedicalAid,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -211,25 +692,202 @@ func (q *Queries) GetPatientProfileByUserID(ctx context.Context, userID pgtype.U
 	return i, err
 }
 
-const searchPatients = `-- name: SearchPatients :many
-SELECT id, user_id, first_name, last_name, city, province, 
-    preferred_communication_method, created_at
+const getPatientProfilesByUserIDs = `-- name: GetPatientProfilesByUserIDs :many
+SELECT id, user_id, first_name, last_name, preferred_name,
+    date_of_birth, gender, city, province, 
+    preferred_communication_method, has_medical_aid, created_at
 FROM patient_profiles
-WHERE 
-    (first_name ILIKE '%' || $1 || '%' OR last_name ILIKE '%' || $1 || '%')
-    AND ($2::VARCHAR IS NULL OR province = $2)
-ORDER BY created_at DESC
+WHERE user_id = ANY($1::uuid[])
+ORDER BY last_name, first_name
+`
+
+type GetPatientProfilesByUserIDsRow struct {
+	ID                           pgtype.UUID      `json:"id"`
+	UserID                       pgtype.UUID      `json:"user_id"`
+	FirstName                    string           `json:"first_name"`
+	LastName                     string           `json:"last_name"`
+	PreferredName                pgtype.Text      `json:"preferred_name"`
+	DateOfBirth                  pgtype.Date      `json:"date_of_birth"`
+	Gender                       pgtype.Text      `json:"gender"`
+	City                         pgtype.Text      `json:"city"`
+	Province                     pgtype.Text      `json:"province"`
+	PreferredCommunicationMethod pgtype.Text      `json:"preferred_communication_method"`
+	HasMedicalAid                pgtype.Bool      `json:"has_medical_aid"`
+	CreatedAt                    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientProfilesByUserIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetPatientProfilesByUserIDsRow, error) {
+	rows, err := q.db.Query(ctx, getPatientProfilesByUserIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientProfilesByUserIDsRow{}
+	for rows.Next() {
+		var i GetPatientProfilesByUserIDsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PreferredName,
+			&i.DateOfBirth,
+			&i.Gender,
+			&i.City,
+			&i.Province,
+			&i.PreferredCommunicationMethod,
+			&i.HasMedicalAid,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsAcceptingMarketing = `-- name: GetPatientsAcceptingMarketing :many
+SELECT id, user_id, first_name, last_name, 
+    preferred_communication_method, language_preferences,
+    city, province, created_at
+FROM patient_profiles
+WHERE accepts_marketing_emails = true
+    AND ($1::VARCHAR IS NULL OR province = $1)
+ORDER BY last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsAcceptingMarketingParams struct {
+	Column1 string `json:"column_1"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+type GetPatientsAcceptingMarketingRow struct {
+	ID                           pgtype.UUID      `json:"id"`
+	UserID                       pgtype.UUID      `json:"user_id"`
+	FirstName                    string           `json:"first_name"`
+	LastName                     string           `json:"last_name"`
+	PreferredCommunicationMethod pgtype.Text      `json:"preferred_communication_method"`
+	LanguagePreferences          []string         `json:"language_preferences"`
+	City                         pgtype.Text      `json:"city"`
+	Province                     pgtype.Text      `json:"province"`
+	CreatedAt                    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsAcceptingMarketing(ctx context.Context, arg GetPatientsAcceptingMarketingParams) ([]GetPatientsAcceptingMarketingRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsAcceptingMarketing, arg.Column1, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsAcceptingMarketingRow{}
+	for rows.Next() {
+		var i GetPatientsAcceptingMarketingRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PreferredCommunicationMethod,
+			&i.LanguagePreferences,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByAgeRange = `-- name: GetPatientsByAgeRange :many
+SELECT id, user_id, first_name, last_name, 
+    date_of_birth, gender, city, province, created_at
+FROM patient_profiles
+WHERE date_of_birth IS NOT NULL
+    AND date_of_birth BETWEEN $1 AND $2
+ORDER BY date_of_birth DESC
 LIMIT $3 OFFSET $4
 `
 
-type SearchPatientsParams struct {
-	Column1 pgtype.Text `json:"column_1"`
-	Column2 string      `json:"column_2"`
-	Limit   int32       `json:"limit"`
-	Offset  int32       `json:"offset"`
+type GetPatientsByAgeRangeParams struct {
+	DateOfBirth   pgtype.Date `json:"date_of_birth"`
+	DateOfBirth_2 pgtype.Date `json:"date_of_birth_2"`
+	Limit         int32       `json:"limit"`
+	Offset        int32       `json:"offset"`
 }
 
-type SearchPatientsRow struct {
+type GetPatientsByAgeRangeRow struct {
+	ID          pgtype.UUID      `json:"id"`
+	UserID      pgtype.UUID      `json:"user_id"`
+	FirstName   string           `json:"first_name"`
+	LastName    string           `json:"last_name"`
+	DateOfBirth pgtype.Date      `json:"date_of_birth"`
+	Gender      pgtype.Text      `json:"gender"`
+	City        pgtype.Text      `json:"city"`
+	Province    pgtype.Text      `json:"province"`
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsByAgeRange(ctx context.Context, arg GetPatientsByAgeRangeParams) ([]GetPatientsByAgeRangeRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByAgeRange,
+		arg.DateOfBirth,
+		arg.DateOfBirth_2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByAgeRangeRow{}
+	for rows.Next() {
+		var i GetPatientsByAgeRangeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.DateOfBirth,
+			&i.Gender,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByCity = `-- name: GetPatientsByCity :many
+SELECT id, user_id, first_name, last_name, city, province,
+    preferred_communication_method, created_at
+FROM patient_profiles
+WHERE city = $1
+ORDER BY last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByCityParams struct {
+	City   pgtype.Text `json:"city"`
+	Limit  int32       `json:"limit"`
+	Offset int32       `json:"offset"`
+}
+
+type GetPatientsByCityRow struct {
 	ID                           pgtype.UUID      `json:"id"`
 	UserID                       pgtype.UUID      `json:"user_id"`
 	FirstName                    string           `json:"first_name"`
@@ -240,20 +898,15 @@ type SearchPatientsRow struct {
 	CreatedAt                    pgtype.Timestamp `json:"created_at"`
 }
 
-func (q *Queries) SearchPatients(ctx context.Context, arg SearchPatientsParams) ([]SearchPatientsRow, error) {
-	rows, err := q.db.Query(ctx, searchPatients,
-		arg.Column1,
-		arg.Column2,
-		arg.Limit,
-		arg.Offset,
-	)
+func (q *Queries) GetPatientsByCity(ctx context.Context, arg GetPatientsByCityParams) ([]GetPatientsByCityRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByCity, arg.City, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []SearchPatientsRow{}
+	items := []GetPatientsByCityRow{}
 	for rows.Next() {
-		var i SearchPatientsRow
+		var i GetPatientsByCityRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.UserID,
@@ -274,15 +927,1055 @@ func (q *Queries) SearchPatients(ctx context.Context, arg SearchPatientsParams) 
 	return items, nil
 }
 
+const getPatientsByCommunicationMethod = `-- name: GetPatientsByCommunicationMethod :many
+SELECT id, user_id, first_name, last_name, 
+    preferred_communication_method, city, province, created_at
+FROM patient_profiles
+WHERE preferred_communication_method = $1
+ORDER BY last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByCommunicationMethodParams struct {
+	PreferredCommunicationMethod pgtype.Text `json:"preferred_communication_method"`
+	Limit                        int32       `json:"limit"`
+	Offset                       int32       `json:"offset"`
+}
+
+type GetPatientsByCommunicationMethodRow struct {
+	ID                           pgtype.UUID      `json:"id"`
+	UserID                       pgtype.UUID      `json:"user_id"`
+	FirstName                    string           `json:"first_name"`
+	LastName                     string           `json:"last_name"`
+	PreferredCommunicationMethod pgtype.Text      `json:"preferred_communication_method"`
+	City                         pgtype.Text      `json:"city"`
+	Province                     pgtype.Text      `json:"province"`
+	CreatedAt                    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsByCommunicationMethod(ctx context.Context, arg GetPatientsByCommunicationMethodParams) ([]GetPatientsByCommunicationMethodRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByCommunicationMethod, arg.PreferredCommunicationMethod, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByCommunicationMethodRow{}
+	for rows.Next() {
+		var i GetPatientsByCommunicationMethodRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PreferredCommunicationMethod,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByEmploymentStatus = `-- name: GetPatientsByEmploymentStatus :many
+SELECT id, user_id, first_name, last_name, 
+    employment_status, education_level,
+    city, province, created_at
+FROM patient_profiles
+WHERE employment_status = $1
+ORDER BY last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByEmploymentStatusParams struct {
+	EmploymentStatus pgtype.Text `json:"employment_status"`
+	Limit            int32       `json:"limit"`
+	Offset           int32       `json:"offset"`
+}
+
+type GetPatientsByEmploymentStatusRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	UserID           pgtype.UUID      `json:"user_id"`
+	FirstName        string           `json:"first_name"`
+	LastName         string           `json:"last_name"`
+	EmploymentStatus pgtype.Text      `json:"employment_status"`
+	EducationLevel   pgtype.Text      `json:"education_level"`
+	City             pgtype.Text      `json:"city"`
+	Province         pgtype.Text      `json:"province"`
+	CreatedAt        pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsByEmploymentStatus(ctx context.Context, arg GetPatientsByEmploymentStatusParams) ([]GetPatientsByEmploymentStatusRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByEmploymentStatus, arg.EmploymentStatus, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByEmploymentStatusRow{}
+	for rows.Next() {
+		var i GetPatientsByEmploymentStatusRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.EmploymentStatus,
+			&i.EducationLevel,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByGender = `-- name: GetPatientsByGender :many
+SELECT id, user_id, first_name, last_name, 
+    gender, date_of_birth, city, province, created_at
+FROM patient_profiles
+WHERE gender = $1
+ORDER BY last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByGenderParams struct {
+	Gender pgtype.Text `json:"gender"`
+	Limit  int32       `json:"limit"`
+	Offset int32       `json:"offset"`
+}
+
+type GetPatientsByGenderRow struct {
+	ID          pgtype.UUID      `json:"id"`
+	UserID      pgtype.UUID      `json:"user_id"`
+	FirstName   string           `json:"first_name"`
+	LastName    string           `json:"last_name"`
+	Gender      pgtype.Text      `json:"gender"`
+	DateOfBirth pgtype.Date      `json:"date_of_birth"`
+	City        pgtype.Text      `json:"city"`
+	Province    pgtype.Text      `json:"province"`
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsByGender(ctx context.Context, arg GetPatientsByGenderParams) ([]GetPatientsByGenderRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByGender, arg.Gender, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByGenderRow{}
+	for rows.Next() {
+		var i GetPatientsByGenderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Gender,
+			&i.DateOfBirth,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByIncomeRange = `-- name: GetPatientsByIncomeRange :many
+SELECT id, user_id, first_name, last_name, 
+    household_income_range, employment_status,
+    city, province, created_at
+FROM patient_profiles
+WHERE household_income_range = $1
+ORDER BY last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByIncomeRangeParams struct {
+	HouseholdIncomeRange pgtype.Text `json:"household_income_range"`
+	Limit                int32       `json:"limit"`
+	Offset               int32       `json:"offset"`
+}
+
+type GetPatientsByIncomeRangeRow struct {
+	ID                   pgtype.UUID      `json:"id"`
+	UserID               pgtype.UUID      `json:"user_id"`
+	FirstName            string           `json:"first_name"`
+	LastName             string           `json:"last_name"`
+	HouseholdIncomeRange pgtype.Text      `json:"household_income_range"`
+	EmploymentStatus     pgtype.Text      `json:"employment_status"`
+	City                 pgtype.Text      `json:"city"`
+	Province             pgtype.Text      `json:"province"`
+	CreatedAt            pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsByIncomeRange(ctx context.Context, arg GetPatientsByIncomeRangeParams) ([]GetPatientsByIncomeRangeRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByIncomeRange, arg.HouseholdIncomeRange, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByIncomeRangeRow{}
+	for rows.Next() {
+		var i GetPatientsByIncomeRangeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.HouseholdIncomeRange,
+			&i.EmploymentStatus,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByLanguage = `-- name: GetPatientsByLanguage :many
+SELECT id, user_id, first_name, last_name, 
+    home_language, language_preferences, city, province
+FROM patient_profiles
+WHERE home_language = $1 OR $1 = ANY(language_preferences)
+ORDER BY last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByLanguageParams struct {
+	HomeLanguage pgtype.Text `json:"home_language"`
+	Limit        int32       `json:"limit"`
+	Offset       int32       `json:"offset"`
+}
+
+type GetPatientsByLanguageRow struct {
+	ID                  pgtype.UUID `json:"id"`
+	UserID              pgtype.UUID `json:"user_id"`
+	FirstName           string      `json:"first_name"`
+	LastName            string      `json:"last_name"`
+	HomeLanguage        pgtype.Text `json:"home_language"`
+	LanguagePreferences []string    `json:"language_preferences"`
+	City                pgtype.Text `json:"city"`
+	Province            pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsByLanguage(ctx context.Context, arg GetPatientsByLanguageParams) ([]GetPatientsByLanguageRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByLanguage, arg.HomeLanguage, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByLanguageRow{}
+	for rows.Next() {
+		var i GetPatientsByLanguageRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.HomeLanguage,
+			&i.LanguagePreferences,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByProvince = `-- name: GetPatientsByProvince :many
+SELECT id, user_id, first_name, last_name, city, province,
+    preferred_communication_method, created_at
+FROM patient_profiles
+WHERE province = $1
+ORDER BY city, last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByProvinceParams struct {
+	Province pgtype.Text `json:"province"`
+	Limit    int32       `json:"limit"`
+	Offset   int32       `json:"offset"`
+}
+
+type GetPatientsByProvinceRow struct {
+	ID                           pgtype.UUID      `json:"id"`
+	UserID                       pgtype.UUID      `json:"user_id"`
+	FirstName                    string           `json:"first_name"`
+	LastName                     string           `json:"last_name"`
+	City                         pgtype.Text      `json:"city"`
+	Province                     pgtype.Text      `json:"province"`
+	PreferredCommunicationMethod pgtype.Text      `json:"preferred_communication_method"`
+	CreatedAt                    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsByProvince(ctx context.Context, arg GetPatientsByProvinceParams) ([]GetPatientsByProvinceRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByProvince, arg.Province, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByProvinceRow{}
+	for rows.Next() {
+		var i GetPatientsByProvinceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.City,
+			&i.Province,
+			&i.PreferredCommunicationMethod,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByReferralCode = `-- name: GetPatientsByReferralCode :many
+SELECT id, user_id, first_name, last_name, 
+    referred_by, city, province, created_at
+FROM patient_profiles
+WHERE referral_code = $1
+ORDER BY created_at DESC
+`
+
+type GetPatientsByReferralCodeRow struct {
+	ID         pgtype.UUID      `json:"id"`
+	UserID     pgtype.UUID      `json:"user_id"`
+	FirstName  string           `json:"first_name"`
+	LastName   string           `json:"last_name"`
+	ReferredBy pgtype.UUID      `json:"referred_by"`
+	City       pgtype.Text      `json:"city"`
+	Province   pgtype.Text      `json:"province"`
+	CreatedAt  pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsByReferralCode(ctx context.Context, referralCode pgtype.Text) ([]GetPatientsByReferralCodeRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByReferralCode, referralCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByReferralCodeRow{}
+	for rows.Next() {
+		var i GetPatientsByReferralCodeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.ReferredBy,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByReferrer = `-- name: GetPatientsByReferrer :many
+SELECT id, user_id, first_name, last_name, 
+    referral_code, city, province, created_at
+FROM patient_profiles
+WHERE referred_by = $1
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByReferrerParams struct {
+	ReferredBy pgtype.UUID `json:"referred_by"`
+	Limit      int32       `json:"limit"`
+	Offset     int32       `json:"offset"`
+}
+
+type GetPatientsByReferrerRow struct {
+	ID           pgtype.UUID      `json:"id"`
+	UserID       pgtype.UUID      `json:"user_id"`
+	FirstName    string           `json:"first_name"`
+	LastName     string           `json:"last_name"`
+	ReferralCode pgtype.Text      `json:"referral_code"`
+	City         pgtype.Text      `json:"city"`
+	Province     pgtype.Text      `json:"province"`
+	CreatedAt    pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsByReferrer(ctx context.Context, arg GetPatientsByReferrerParams) ([]GetPatientsByReferrerRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByReferrer, arg.ReferredBy, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByReferrerRow{}
+	for rows.Next() {
+		var i GetPatientsByReferrerRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.ReferralCode,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsRequiringInterpreter = `-- name: GetPatientsRequiringInterpreter :many
+SELECT id, user_id, first_name, last_name, 
+    home_language, language_preferences, 
+    preferred_communication_method, city, province
+FROM patient_profiles
+WHERE requires_interpreter = true
+ORDER BY province, city, last_name
+LIMIT $1 OFFSET $2
+`
+
+type GetPatientsRequiringInterpreterParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetPatientsRequiringInterpreterRow struct {
+	ID                           pgtype.UUID `json:"id"`
+	UserID                       pgtype.UUID `json:"user_id"`
+	FirstName                    string      `json:"first_name"`
+	LastName                     string      `json:"last_name"`
+	HomeLanguage                 pgtype.Text `json:"home_language"`
+	LanguagePreferences          []string    `json:"language_preferences"`
+	PreferredCommunicationMethod pgtype.Text `json:"preferred_communication_method"`
+	City                         pgtype.Text `json:"city"`
+	Province                     pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsRequiringInterpreter(ctx context.Context, arg GetPatientsRequiringInterpreterParams) ([]GetPatientsRequiringInterpreterRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsRequiringInterpreter, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsRequiringInterpreterRow{}
+	for rows.Next() {
+		var i GetPatientsRequiringInterpreterRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.HomeLanguage,
+			&i.LanguagePreferences,
+			&i.PreferredCommunicationMethod,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsWithMedicalAid = `-- name: GetPatientsWithMedicalAid :many
+SELECT id, user_id, first_name, last_name, 
+    medical_aid_provider, medical_aid_number,
+    city, province, created_at
+FROM patient_profiles
+WHERE has_medical_aid = true
+    AND ($1::VARCHAR IS NULL OR medical_aid_provider = $1)
+ORDER BY medical_aid_provider, last_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsWithMedicalAidParams struct {
+	Column1 string `json:"column_1"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+type GetPatientsWithMedicalAidRow struct {
+	ID                 pgtype.UUID      `json:"id"`
+	UserID             pgtype.UUID      `json:"user_id"`
+	FirstName          string           `json:"first_name"`
+	LastName           string           `json:"last_name"`
+	MedicalAidProvider pgtype.Text      `json:"medical_aid_provider"`
+	MedicalAidNumber   pgtype.Text      `json:"medical_aid_number"`
+	City               pgtype.Text      `json:"city"`
+	Province           pgtype.Text      `json:"province"`
+	CreatedAt          pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsWithMedicalAid(ctx context.Context, arg GetPatientsWithMedicalAidParams) ([]GetPatientsWithMedicalAidRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsWithMedicalAid, arg.Column1, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsWithMedicalAidRow{}
+	for rows.Next() {
+		var i GetPatientsWithMedicalAidRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.MedicalAidProvider,
+			&i.MedicalAidNumber,
+			&i.City,
+			&i.Province,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsWithoutMedicalAid = `-- name: GetPatientsWithoutMedicalAid :many
+SELECT id, user_id, first_name, last_name, 
+    city, province, household_income_range, created_at
+FROM patient_profiles
+WHERE has_medical_aid = false
+ORDER BY province, city, last_name
+LIMIT $1 OFFSET $2
+`
+
+type GetPatientsWithoutMedicalAidParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetPatientsWithoutMedicalAidRow struct {
+	ID                   pgtype.UUID      `json:"id"`
+	UserID               pgtype.UUID      `json:"user_id"`
+	FirstName            string           `json:"first_name"`
+	LastName             string           `json:"last_name"`
+	City                 pgtype.Text      `json:"city"`
+	Province             pgtype.Text      `json:"province"`
+	HouseholdIncomeRange pgtype.Text      `json:"household_income_range"`
+	CreatedAt            pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetPatientsWithoutMedicalAid(ctx context.Context, arg GetPatientsWithoutMedicalAidParams) ([]GetPatientsWithoutMedicalAidRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsWithoutMedicalAid, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsWithoutMedicalAidRow{}
+	for rows.Next() {
+		var i GetPatientsWithoutMedicalAidRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.City,
+			&i.Province,
+			&i.HouseholdIncomeRange,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecentlyUpdatedProfiles = `-- name: GetRecentlyUpdatedProfiles :many
+SELECT id, user_id, first_name, last_name, 
+    last_profile_update, updated_at
+FROM patient_profiles
+WHERE last_profile_update >= $1
+ORDER BY last_profile_update DESC
+LIMIT $2 OFFSET $3
+`
+
+type GetRecentlyUpdatedProfilesParams struct {
+	LastProfileUpdate pgtype.Timestamp `json:"last_profile_update"`
+	Limit             int32            `json:"limit"`
+	Offset            int32            `json:"offset"`
+}
+
+type GetRecentlyUpdatedProfilesRow struct {
+	ID                pgtype.UUID      `json:"id"`
+	UserID            pgtype.UUID      `json:"user_id"`
+	FirstName         string           `json:"first_name"`
+	LastName          string           `json:"last_name"`
+	LastProfileUpdate pgtype.Timestamp `json:"last_profile_update"`
+	UpdatedAt         pgtype.Timestamp `json:"updated_at"`
+}
+
+func (q *Queries) GetRecentlyUpdatedProfiles(ctx context.Context, arg GetRecentlyUpdatedProfilesParams) ([]GetRecentlyUpdatedProfilesRow, error) {
+	rows, err := q.db.Query(ctx, getRecentlyUpdatedProfiles, arg.LastProfileUpdate, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRecentlyUpdatedProfilesRow{}
+	for rows.Next() {
+		var i GetRecentlyUpdatedProfilesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.LastProfileUpdate,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaleProfiles = `-- name: GetStaleProfiles :many
+SELECT id, user_id, first_name, last_name, 
+    last_profile_update, created_at
+FROM patient_profiles
+WHERE last_profile_update < $1 
+   OR last_profile_update IS NULL
+ORDER BY last_profile_update ASC NULLS FIRST
+LIMIT $2 OFFSET $3
+`
+
+type GetStaleProfilesParams struct {
+	LastProfileUpdate pgtype.Timestamp `json:"last_profile_update"`
+	Limit             int32            `json:"limit"`
+	Offset            int32            `json:"offset"`
+}
+
+type GetStaleProfilesRow struct {
+	ID                pgtype.UUID      `json:"id"`
+	UserID            pgtype.UUID      `json:"user_id"`
+	FirstName         string           `json:"first_name"`
+	LastName          string           `json:"last_name"`
+	LastProfileUpdate pgtype.Timestamp `json:"last_profile_update"`
+	CreatedAt         pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetStaleProfiles(ctx context.Context, arg GetStaleProfilesParams) ([]GetStaleProfilesRow, error) {
+	rows, err := q.db.Query(ctx, getStaleProfiles, arg.LastProfileUpdate, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaleProfilesRow{}
+	for rows.Next() {
+		var i GetStaleProfilesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.LastProfileUpdate,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchPatients = `-- name: SearchPatients :many
+SELECT id, user_id, first_name, last_name, preferred_name, 
+    date_of_birth, gender, city, province, 
+    preferred_communication_method, has_medical_aid,
+    created_at, updated_at
+FROM patient_profiles
+WHERE 
+    ($1 = '' OR 
+     first_name ILIKE '%' || $1 || '%' OR 
+     last_name ILIKE '%' || $1 || '%' OR
+     preferred_name ILIKE '%' || $1 || '%')
+    AND ($2::VARCHAR IS NULL OR province = $2)
+    AND ($3::VARCHAR IS NULL OR city = $3)
+    AND ($4::BOOLEAN IS NULL OR has_medical_aid = $4)
+    AND ($5::VARCHAR IS NULL OR gender = $5)
+ORDER BY last_name, first_name
+LIMIT $6 OFFSET $7
+`
+
+type SearchPatientsParams struct {
+	Column1 interface{} `json:"column_1"`
+	Column2 string      `json:"column_2"`
+	Column3 string      `json:"column_3"`
+	Column4 bool        `json:"column_4"`
+	Column5 string      `json:"column_5"`
+	Limit   int32       `json:"limit"`
+	Offset  int32       `json:"offset"`
+}
+
+type SearchPatientsRow struct {
+	ID                           pgtype.UUID      `json:"id"`
+	UserID                       pgtype.UUID      `json:"user_id"`
+	FirstName                    string           `json:"first_name"`
+	LastName                     string           `json:"last_name"`
+	PreferredName                pgtype.Text      `json:"preferred_name"`
+	DateOfBirth                  pgtype.Date      `json:"date_of_birth"`
+	Gender                       pgtype.Text      `json:"gender"`
+	City                         pgtype.Text      `json:"city"`
+	Province                     pgtype.Text      `json:"province"`
+	PreferredCommunicationMethod pgtype.Text      `json:"preferred_communication_method"`
+	HasMedicalAid                pgtype.Bool      `json:"has_medical_aid"`
+	CreatedAt                    pgtype.Timestamp `json:"created_at"`
+	UpdatedAt                    pgtype.Timestamp `json:"updated_at"`
+}
+
+func (q *Queries) SearchPatients(ctx context.Context, arg SearchPatientsParams) ([]SearchPatientsRow, error) {
+	rows, err := q.db.Query(ctx, searchPatients,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchPatientsRow{}
+	for rows.Next() {
+		var i SearchPatientsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PreferredName,
+			&i.DateOfBirth,
+			&i.Gender,
+			&i.City,
+			&i.Province,
+			&i.PreferredCommunicationMethod,
+			&i.HasMedicalAid,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchPatientsByName = `-- name: SearchPatientsByName :many
+SELECT id, user_id, first_name, last_name, preferred_name,
+    city, province, date_of_birth, created_at
+FROM patient_profiles
+WHERE first_name ILIKE '%' || $1 || '%' 
+   OR last_name ILIKE '%' || $1 || '%'
+   OR preferred_name ILIKE '%' || $1 || '%'
+ORDER BY last_name, first_name
+LIMIT $2 OFFSET $3
+`
+
+type SearchPatientsByNameParams struct {
+	Column1 pgtype.Text `json:"column_1"`
+	Limit   int32       `json:"limit"`
+	Offset  int32       `json:"offset"`
+}
+
+type SearchPatientsByNameRow struct {
+	ID            pgtype.UUID      `json:"id"`
+	UserID        pgtype.UUID      `json:"user_id"`
+	FirstName     string           `json:"first_name"`
+	LastName      string           `json:"last_name"`
+	PreferredName pgtype.Text      `json:"preferred_name"`
+	City          pgtype.Text      `json:"city"`
+	Province      pgtype.Text      `json:"province"`
+	DateOfBirth   pgtype.Date      `json:"date_of_birth"`
+	CreatedAt     pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) SearchPatientsByName(ctx context.Context, arg SearchPatientsByNameParams) ([]SearchPatientsByNameRow, error) {
+	rows, err := q.db.Query(ctx, searchPatientsByName, arg.Column1, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchPatientsByNameRow{}
+	for rows.Next() {
+		var i SearchPatientsByNameRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PreferredName,
+			&i.City,
+			&i.Province,
+			&i.DateOfBirth,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updatePatientContactInfo = `-- name: UpdatePatientContactInfo :exec
+UPDATE patient_profiles
+SET primary_address = $2,
+    city = $3,
+    province = $4,
+    postal_code = $5,
+    country = $6,
+    preferred_communication_method = $7,
+    last_profile_update = NOW(),
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientContactInfoParams struct {
+	UserID                       pgtype.UUID `json:"user_id"`
+	PrimaryAddress               pgtype.Text `json:"primary_address"`
+	City                         pgtype.Text `json:"city"`
+	Province                     pgtype.Text `json:"province"`
+	PostalCode                   pgtype.Text `json:"postal_code"`
+	Country                      pgtype.Text `json:"country"`
+	PreferredCommunicationMethod pgtype.Text `json:"preferred_communication_method"`
+}
+
+func (q *Queries) UpdatePatientContactInfo(ctx context.Context, arg UpdatePatientContactInfoParams) error {
+	_, err := q.db.Exec(ctx, updatePatientContactInfo,
+		arg.UserID,
+		arg.PrimaryAddress,
+		arg.City,
+		arg.Province,
+		arg.PostalCode,
+		arg.Country,
+		arg.PreferredCommunicationMethod,
+	)
+	return err
+}
+
+const updatePatientDemographicInfo = `-- name: UpdatePatientDemographicInfo :exec
+UPDATE patient_profiles
+SET employment_status = $2,
+    education_level = $3,
+    household_income_range = $4,
+    last_profile_update = NOW(),
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientDemographicInfoParams struct {
+	UserID               pgtype.UUID `json:"user_id"`
+	EmploymentStatus     pgtype.Text `json:"employment_status"`
+	EducationLevel       pgtype.Text `json:"education_level"`
+	HouseholdIncomeRange pgtype.Text `json:"household_income_range"`
+}
+
+func (q *Queries) UpdatePatientDemographicInfo(ctx context.Context, arg UpdatePatientDemographicInfoParams) error {
+	_, err := q.db.Exec(ctx, updatePatientDemographicInfo,
+		arg.UserID,
+		arg.EmploymentStatus,
+		arg.EducationLevel,
+		arg.HouseholdIncomeRange,
+	)
+	return err
+}
+
+const updatePatientLanguagePreferences = `-- name: UpdatePatientLanguagePreferences :exec
+UPDATE patient_profiles
+SET language_preferences = $2,
+    home_language = $3,
+    requires_interpreter = $4,
+    last_profile_update = NOW(),
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientLanguagePreferencesParams struct {
+	UserID              pgtype.UUID `json:"user_id"`
+	LanguagePreferences []string    `json:"language_preferences"`
+	HomeLanguage        pgtype.Text `json:"home_language"`
+	RequiresInterpreter pgtype.Bool `json:"requires_interpreter"`
+}
+
+func (q *Queries) UpdatePatientLanguagePreferences(ctx context.Context, arg UpdatePatientLanguagePreferencesParams) error {
+	_, err := q.db.Exec(ctx, updatePatientLanguagePreferences,
+		arg.UserID,
+		arg.LanguagePreferences,
+		arg.HomeLanguage,
+		arg.RequiresInterpreter,
+	)
+	return err
+}
+
+const updatePatientMarketingPreferences = `-- name: UpdatePatientMarketingPreferences :exec
+UPDATE patient_profiles
+SET accepts_marketing_emails = $2,
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientMarketingPreferencesParams struct {
+	UserID                 pgtype.UUID `json:"user_id"`
+	AcceptsMarketingEmails pgtype.Bool `json:"accepts_marketing_emails"`
+}
+
+func (q *Queries) UpdatePatientMarketingPreferences(ctx context.Context, arg UpdatePatientMarketingPreferencesParams) error {
+	_, err := q.db.Exec(ctx, updatePatientMarketingPreferences, arg.UserID, arg.AcceptsMarketingEmails)
+	return err
+}
+
+const updatePatientMedicalAidInfo = `-- name: UpdatePatientMedicalAidInfo :exec
+UPDATE patient_profiles
+SET medical_aid_number = $2,
+    medical_aid_provider = $3,
+    has_medical_aid = $4,
+    last_profile_update = NOW(),
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientMedicalAidInfoParams struct {
+	UserID             pgtype.UUID `json:"user_id"`
+	MedicalAidNumber   pgtype.Text `json:"medical_aid_number"`
+	MedicalAidProvider pgtype.Text `json:"medical_aid_provider"`
+	HasMedicalAid      pgtype.Bool `json:"has_medical_aid"`
+}
+
+func (q *Queries) UpdatePatientMedicalAidInfo(ctx context.Context, arg UpdatePatientMedicalAidInfoParams) error {
+	_, err := q.db.Exec(ctx, updatePatientMedicalAidInfo,
+		arg.UserID,
+		arg.MedicalAidNumber,
+		arg.MedicalAidProvider,
+		arg.HasMedicalAid,
+	)
+	return err
+}
+
+const updatePatientPersonalInfo = `-- name: UpdatePatientPersonalInfo :exec
+UPDATE patient_profiles
+SET first_name = $2,
+    last_name = $3,
+    preferred_name = $4,
+    date_of_birth = $5,
+    gender = $6,
+    preferred_gender_pronouns = $7,
+    last_profile_update = NOW(),
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientPersonalInfoParams struct {
+	UserID                  pgtype.UUID `json:"user_id"`
+	FirstName               string      `json:"first_name"`
+	LastName                string      `json:"last_name"`
+	PreferredName           pgtype.Text `json:"preferred_name"`
+	DateOfBirth             pgtype.Date `json:"date_of_birth"`
+	Gender                  pgtype.Text `json:"gender"`
+	PreferredGenderPronouns pgtype.Text `json:"preferred_gender_pronouns"`
+}
+
+func (q *Queries) UpdatePatientPersonalInfo(ctx context.Context, arg UpdatePatientPersonalInfoParams) error {
+	_, err := q.db.Exec(ctx, updatePatientPersonalInfo,
+		arg.UserID,
+		arg.FirstName,
+		arg.LastName,
+		arg.PreferredName,
+		arg.DateOfBirth,
+		arg.Gender,
+		arg.PreferredGenderPronouns,
+	)
+	return err
+}
+
 const updatePatientProfile = `-- name: UpdatePatientProfile :exec
 UPDATE patient_profiles
-SET first_name = $2, last_name = $3, preferred_name = $4, 
-    date_of_birth = $5, gender = $6, primary_address = $7, 
-    city = $8, province = $9, postal_code = $10, 
-    preferred_communication_method = $11, 
-    medical_aid_number = $12, medical_aid_provider = $13, 
-    has_medical_aid = $14, employment_status = $15, 
-    last_profile_update = NOW()
+SET first_name = COALESCE($2, first_name),
+    last_name = COALESCE($3, last_name),
+    preferred_name = COALESCE($4, preferred_name),
+    date_of_birth = COALESCE($5, date_of_birth),
+    gender = COALESCE($6, gender),
+    preferred_gender_pronouns = COALESCE($7, preferred_gender_pronouns),
+    primary_address = COALESCE($8, primary_address),
+    city = COALESCE($9, city),
+    province = COALESCE($10, province),
+    postal_code = COALESCE($11, postal_code),
+    country = COALESCE($12, country),
+    preferred_communication_method = COALESCE($13, preferred_communication_method),
+    employment_status = COALESCE($14, employment_status),
+    education_level = COALESCE($15, education_level),
+    household_income_range = COALESCE($16, household_income_range),
+    last_profile_update = NOW(),
+    updated_at = NOW()
 WHERE id = $1
 `
 
@@ -293,15 +1986,16 @@ type UpdatePatientProfileParams struct {
 	PreferredName                pgtype.Text `json:"preferred_name"`
 	DateOfBirth                  pgtype.Date `json:"date_of_birth"`
 	Gender                       pgtype.Text `json:"gender"`
+	PreferredGenderPronouns      pgtype.Text `json:"preferred_gender_pronouns"`
 	PrimaryAddress               pgtype.Text `json:"primary_address"`
 	City                         pgtype.Text `json:"city"`
 	Province                     pgtype.Text `json:"province"`
 	PostalCode                   pgtype.Text `json:"postal_code"`
+	Country                      pgtype.Text `json:"country"`
 	PreferredCommunicationMethod pgtype.Text `json:"preferred_communication_method"`
-	MedicalAidNumber             pgtype.Text `json:"medical_aid_number"`
-	MedicalAidProvider           pgtype.Text `json:"medical_aid_provider"`
-	HasMedicalAid                pgtype.Bool `json:"has_medical_aid"`
 	EmploymentStatus             pgtype.Text `json:"employment_status"`
+	EducationLevel               pgtype.Text `json:"education_level"`
+	HouseholdIncomeRange         pgtype.Text `json:"household_income_range"`
 }
 
 func (q *Queries) UpdatePatientProfile(ctx context.Context, arg UpdatePatientProfileParams) error {
@@ -312,15 +2006,84 @@ func (q *Queries) UpdatePatientProfile(ctx context.Context, arg UpdatePatientPro
 		arg.PreferredName,
 		arg.DateOfBirth,
 		arg.Gender,
+		arg.PreferredGenderPronouns,
 		arg.PrimaryAddress,
 		arg.City,
 		arg.Province,
 		arg.PostalCode,
+		arg.Country,
 		arg.PreferredCommunicationMethod,
-		arg.MedicalAidNumber,
-		arg.MedicalAidProvider,
-		arg.HasMedicalAid,
 		arg.EmploymentStatus,
+		arg.EducationLevel,
+		arg.HouseholdIncomeRange,
 	)
 	return err
+}
+
+const updatePatientProfilePicture = `-- name: UpdatePatientProfilePicture :exec
+UPDATE patient_profiles
+SET profile_picture_url = $2,
+    last_profile_update = NOW(),
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientProfilePictureParams struct {
+	UserID            pgtype.UUID `json:"user_id"`
+	ProfilePictureUrl pgtype.Text `json:"profile_picture_url"`
+}
+
+func (q *Queries) UpdatePatientProfilePicture(ctx context.Context, arg UpdatePatientProfilePictureParams) error {
+	_, err := q.db.Exec(ctx, updatePatientProfilePicture, arg.UserID, arg.ProfilePictureUrl)
+	return err
+}
+
+const updatePatientReferralInfo = `-- name: UpdatePatientReferralInfo :exec
+UPDATE patient_profiles
+SET referred_by = $2,
+    referral_code = $3,
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientReferralInfoParams struct {
+	UserID       pgtype.UUID `json:"user_id"`
+	ReferredBy   pgtype.UUID `json:"referred_by"`
+	ReferralCode pgtype.Text `json:"referral_code"`
+}
+
+func (q *Queries) UpdatePatientReferralInfo(ctx context.Context, arg UpdatePatientReferralInfoParams) error {
+	_, err := q.db.Exec(ctx, updatePatientReferralInfo, arg.UserID, arg.ReferredBy, arg.ReferralCode)
+	return err
+}
+
+const updatePatientTimezone = `-- name: UpdatePatientTimezone :exec
+UPDATE patient_profiles
+SET timezone = $2,
+    last_profile_update = NOW(),
+    updated_at = NOW()
+WHERE user_id = $1
+`
+
+type UpdatePatientTimezoneParams struct {
+	UserID   pgtype.UUID `json:"user_id"`
+	Timezone pgtype.Text `json:"timezone"`
+}
+
+func (q *Queries) UpdatePatientTimezone(ctx context.Context, arg UpdatePatientTimezoneParams) error {
+	_, err := q.db.Exec(ctx, updatePatientTimezone, arg.UserID, arg.Timezone)
+	return err
+}
+
+const validatePatientExists = `-- name: ValidatePatientExists :one
+SELECT EXISTS(
+    SELECT 1 FROM patient_profiles WHERE user_id = $1
+) as exists
+`
+
+func (q *Queries) ValidatePatientExists(ctx context.Context, userID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, validatePatientExists, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
 }

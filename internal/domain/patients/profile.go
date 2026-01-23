@@ -41,3 +41,30 @@ type PatientProfile struct {
 	CreatedAt                    time.Time  `json:"created_at"`
 	UpdatedAt                    time.Time  `json:"updated_at"`
 }
+
+// AdvancedSearchParams encapsulates all search parameters
+type AdvancedSearchParams struct {
+	Query                  *string
+	Province               *string
+	City                   *string
+	HasMedicalAid          *bool
+	Gender                 *string
+	CommunicationMethod    *string
+	EmploymentStatus       *string
+	MedicalAidProvider     *string
+	RequiresInterpreter    *bool
+	AcceptsMarketingEmails *bool
+	Limit                  int
+	Offset                 int
+}
+
+// PatientDemographicsSummary provides aggregated patient data
+type PatientDemographicsSummary struct {
+	TotalPatients        int64   `json:"total_patients"`
+	ProvincesCovered     int64   `json:"provinces_covered"`
+	CitiesCovered        int64   `json:"cities_covered"`
+	WithMedicalAid       int64   `json:"with_medical_aid"`
+	RequiringInterpreter int64   `json:"requiring_interpreter"`
+	MarketingOptIn       int64   `json:"marketing_opt_in"`
+	AverageAge           float64 `json:"average_age"`
+}
