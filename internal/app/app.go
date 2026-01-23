@@ -80,6 +80,7 @@ func New(cfg *config.Config) (*App, error) {
 	sessionRepo := repocore.NewSessionRepository(pool)
 	notificationRepo := repocore.NewNotificationRepository(pool)
 	consentRepo := repocore.NewConsentRepository(pool)
+	auditRepo := repocore.NewAuditRepository(pool)
 
 	// Initialize stubs for required but not yet implemented repositories
 	patientRepo := &stubPatientRepository{}
@@ -125,10 +126,43 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.BcryptCost,
 	)
 
+	sessionService := servicecore.NewSessionService(
+		sessionRepo,
+		userRepo,
+		cacheService,
+		logger,
+	)
+
+	consentService := servicecore.NewConsentService(
+		consentRepo,
+		userRepo,
+		auditRepo,
+		cacheService,
+		logger,
+	)
+
+	notificationService := servicecore.NewNotificationService(
+		notificationRepo,
+		userRepo,
+		cacheService,
+		logger,
+	)
+
+	auditService := servicecore.NewAuditService(
+		auditRepo,
+		userRepo,
+		cacheService,
+		logger,
+	)
+
 	// Initialize handlers
 	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
 	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
 	otpHandler := handlercore.NewOTPHandler(otpService, logger, cfg.Timeout)
+	auditHandler := handlercore.NewAuditHandler(auditService, logger, cfg.Timeout)
+	consentHandler := handlercore.NewConsentHandler(consentService, logger, cfg.Timeout)
+	notificationHandler := handlercore.NewNotificationHandler(notificationService, logger, cfg.Timeout)
+	sessionHandler := handlercore.NewSessionHandler(sessionService, logger, cfg.Timeout)
 	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService)
 
 	// Initialize server with all handlers
@@ -138,6 +172,10 @@ func New(cfg *config.Config) (*App, error) {
 		authHandler,
 		userHandler,
 		otpHandler,
+		auditHandler,
+		consentHandler,
+		notificationHandler,
+		sessionHandler,
 		healthHandler,
 		authService,
 		txManager,

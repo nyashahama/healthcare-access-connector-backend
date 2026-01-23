@@ -45,14 +45,18 @@ var (
 )
 
 type Server struct {
-	httpServer    *http.Server
-	config        *config.Config
-	logger        *zerolog.Logger
-	authHandler   *handlercore.AuthHandler
-	userHandler   *handlercore.UserHandler
-	otpHandler    *handlercore.OTPHandler
-	healthHandler *handler.HealthHandler
-	authService   service.AuthService
+	httpServer          *http.Server
+	config              *config.Config
+	logger              *zerolog.Logger
+	authHandler         *handlercore.AuthHandler
+	userHandler         *handlercore.UserHandler
+	otpHandler          *handlercore.OTPHandler
+	auditHandler        *handlercore.AuditHandler
+	consentHandler      *handlercore.ConsentHandler
+	notificationHandler *handlercore.NotificationHandler
+	sessionHandler      *handlercore.SessionHandler
+	healthHandler       *handler.HealthHandler
+	authService         service.AuthService
 }
 
 // NewServer creates a new HTTP server
@@ -62,18 +66,26 @@ func NewServer(
 	authHandler *handlercore.AuthHandler,
 	userHandler *handlercore.UserHandler,
 	otpHandler *handlercore.OTPHandler,
+	auditHandler *handlercore.AuditHandler,
+	consentHandler *handlercore.ConsentHandler,
+	notificationHandler *handlercore.NotificationHandler,
+	sessionHandler *handlercore.SessionHandler,
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
 	txManager repository.TxManager,
 ) *Server {
 	return &Server{
-		config:        cfg,
-		logger:        logger,
-		authHandler:   authHandler,
-		userHandler:   userHandler,
-		otpHandler:    otpHandler,
-		healthHandler: healthHandler,
-		authService:   authService,
+		config:              cfg,
+		logger:              logger,
+		authHandler:         authHandler,
+		userHandler:         userHandler,
+		otpHandler:          otpHandler,
+		auditHandler:        auditHandler,
+		consentHandler:      consentHandler,
+		notificationHandler: notificationHandler,
+		sessionHandler:      sessionHandler,
+		healthHandler:       healthHandler,
+		authService:         authService,
 	}
 }
 
@@ -196,12 +208,72 @@ func (s *Server) setupRoutes() http.Handler {
 				r.Get("/count", s.userHandler.CountUsers)
 			})
 
+			// Session management routes
+			r.Route("/sessions", func(r chi.Router) {
+				r.Get("/{token}", s.sessionHandler.GetSession)
+				r.Get("/users/{id}", s.sessionHandler.GetUserSessions)
+				r.Delete("/users/{id}", s.sessionHandler.RevokeSession)
+				r.Delete("/users/{id}/all", s.sessionHandler.RevokeAllSessions)
+				r.Delete("/users/{id}/except-current", s.sessionHandler.RevokeAllExceptCurrent)
+				r.Delete("/users/{id}/device", s.sessionHandler.InvalidateSessionByDevice)
+				r.Put("/{token}/validate", s.sessionHandler.ValidateAndExtendSession)
+				r.Get("/users/{id}/count", s.sessionHandler.GetActiveSessionCount)
+				r.Put("/{id}/token", s.sessionHandler.UpdateSessionToken)
+			})
+
+			// Consent management routes
+			r.Route("/consent", func(r chi.Router) {
+				r.Route("/users/{id}", func(r chi.Router) {
+					r.Get("/privacy", s.consentHandler.GetPrivacyConsent)
+					r.Post("/privacy", s.consentHandler.CreatePrivacyConsent)
+					r.Put("/privacy", s.consentHandler.UpdatePrivacyConsent)
+					r.Post("/withdraw", s.consentHandler.WithdrawConsent)
+					r.Put("/health-data", s.consentHandler.UpdateHealthDataConsent)
+					r.Put("/research", s.consentHandler.UpdateResearchConsent)
+					r.Put("/emergency-access", s.consentHandler.UpdateEmergencyAccessConsent)
+					r.Put("/communication", s.consentHandler.UpdateCommunicationConsents)
+					r.Get("/history", s.consentHandler.GetConsentHistory)
+					r.Get("/export", s.consentHandler.ExportConsentData)
+				})
+			})
+
+			// Notification preferences routes
+			r.Route("/notifications", func(r chi.Router) {
+				r.Route("/users/{id}", func(r chi.Router) {
+					r.Get("/preferences", s.notificationHandler.GetPreferences)
+					r.Post("/preferences", s.notificationHandler.CreatePreferences)
+					r.Put("/preferences", s.notificationHandler.UpdatePreferences)
+					r.Put("/channels", s.notificationHandler.UpdateChannelSettings)
+					r.Put("/appointment-reminders", s.notificationHandler.UpdateAppointmentReminders)
+					r.Put("/health-tips", s.notificationHandler.UpdateHealthTips)
+					r.Put("/quiet-hours", s.notificationHandler.SetQuietHours)
+				})
+			})
+
 			// OTP management routes (for testing/admin)
 			r.Route("/otp", func(r chi.Router) {
 				r.Get("/latest", s.otpHandler.GetLatestActiveOTP)
 				r.Delete("/invalidate", s.otpHandler.InvalidateUserOTPs)
 				r.Get("/attempts", s.otpHandler.GetOTPAttemptCount)
 				r.Get("/recent", s.otpHandler.GetRecentOTPs)
+			})
+
+			// Audit trails routes
+			r.Route("/audit", func(r chi.Router) {
+				// User-specific audit routes
+				r.Route("/users/{id}", func(r chi.Router) {
+					r.Get("/activities", s.auditHandler.GetUserActivities)
+					r.Get("/access-logs", s.auditHandler.GetDataAccessLogs)
+					r.Get("/export", s.auditHandler.ExportUserAuditTrail)
+					r.Post("/access-report", s.auditHandler.GenerateAccessReport)
+				})
+
+				// General audit routes
+				r.Get("/activities/{type}", s.auditHandler.GetActivitiesByType)
+				r.Get("/emergency-access-logs", s.auditHandler.GetEmergencyAccessLogs)
+				r.Get("/suspicious-activities", s.auditHandler.GetSuspiciousActivities)
+				r.Get("/failed-login-attempts", s.auditHandler.GetFailedLoginAttempts)
+				r.Post("/activity-report", s.auditHandler.GenerateActivityReport)
 			})
 
 			// Admin-only routes
@@ -215,6 +287,19 @@ func (s *Server) setupRoutes() http.Handler {
 
 				// Admin OTP management
 				r.Delete("/otp/expired", s.otpHandler.DeleteExpiredOTPs)
+
+				// Admin session management
+				r.Delete("/sessions/expired", s.sessionHandler.CleanupExpiredSessions)
+
+				// Admin consent management
+				r.Post("/consent/notify-expirations", s.consentHandler.NotifyConsentExpirations)
+				r.Get("/consent/active-by-type", s.consentHandler.GetActiveConsentsByType)
+				r.Get("/consent/expired", s.consentHandler.GetExpiredConsents)
+				r.Get("/consent/withdrawn", s.consentHandler.GetWithdrawnConsents)
+
+				// Admin notification management
+				r.Get("/notifications/can-send", s.notificationHandler.CanSendNotification)
+				r.Get("/notifications/disabled-users", s.notificationHandler.GetUsersWithDisabledNotifications)
 			})
 		})
 	})

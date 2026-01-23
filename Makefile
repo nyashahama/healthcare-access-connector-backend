@@ -9,6 +9,27 @@ GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
 RESET  := $(shell tput -Txterm sgr0)
 
+# Load environment variables from .env file
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
+# Detect current environment from .env symlink
+CURRENT_ENV := $(shell if [ -L .env ]; then \
+	target=$(readlink .env); \
+	if [ "$target" = ".env.production" ]; then \
+		echo "production"; \
+	else \
+		echo "development"; \
+	fi; \
+else \
+	echo "development"; \
+fi)
+
+# Set DB_URL from environment variable or use default
+DB_URL ?= $(DATABASE_URL)
+
 # Default target
 help:
 	@echo '${GREEN}Healthcare Access Connector - Development Commands${RESET}'
@@ -26,11 +47,14 @@ help:
 	@echo "  make docker-rebuild   - Force rebuild and restart all services"
 	@echo ""
 	@echo "Database:"
-	@echo "  make db-migrate       - Run database migrations"
+	@echo "  make db-migrate       - Run database migrations (auto-detects environment)"
+	@echo "  make db-migrate-dev   - Run migrations on development database"
+	@echo "  make db-migrate-prod  - Run migrations on production database"
 	@echo "  make db-seed          - Seed database with test data"
-	@echo "  make migrate-up       - Run migrations (alias)"
+	@echo "  make migrate-up       - Run migrations (alias, auto-detects environment)"
 	@echo "  make migrate-down     - Rollback last migration"
 	@echo "  make migrate-create   - Create new migration (name=migration_name)"
+	@echo "  make migrate-status   - Show migration status"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test             - Run all tests"
@@ -63,6 +87,9 @@ help:
 	@echo "  - Redis:              localhost:6379"
 	@echo "  - PostgreSQL:         localhost:5432"
 	@echo "  - NATS:               localhost:4222"
+	@echo ""
+	@echo "Override database URL:"
+	@echo "  make db-migrate DB_URL=\"your-connection-string\""
 
 # Development mode - uses local services
 dev: 
@@ -128,21 +155,67 @@ docker-rebuild:
 	@sleep 5
 	@echo "${GREEN}✓ Rebuild complete!${RESET}"
 
-# Database migrations
+# Database migrations - auto-detects environment
 db-migrate:
+	@if [ -z "$(DB_URL)" ]; then \
+		echo "${YELLOW}Error: DATABASE_URL not set in .env file${RESET}"; \
+		echo "Please ensure DATABASE_URL is set in your .env file"; \
+		exit 1; \
+	fi
 	@echo "${GREEN}Running database migrations...${RESET}"
-	migrate -path database/migrations -database "postgresql://postgres:admin@localhost:5432/healthcare_db?sslmode=disable" up
+	@echo "Environment: ${YELLOW}$(CURRENT_ENV)${RESET}"
+	@echo ""
+	migrate -path database/migrations -database "$(DB_URL)" up
+
+# Run migrations with confirmation for production
+db-migrate-prod:
+	@if [ ! -L .env ] || [ "$(readlink .env)" != ".env.production" ]; then \
+		echo "${YELLOW}⚠️  Warning: .env is not pointing to .env.production${RESET}"; \
+		echo "Run 'make switch-prod' first or use DB_URL override"; \
+		exit 1; \
+	fi
+	@echo "${YELLOW}⚠️  WARNING: Running migrations on PRODUCTION database!${RESET}"
+	@echo ""
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $REPLY =~ ^[Yy]$ ]]; then \
+		$(MAKE) db-migrate; \
+	else \
+		echo "${YELLOW}Migration cancelled.${RESET}"; \
+	fi
 
 migrate-up: db-migrate
 
 migrate-down:
+	@if [ -z "$(DB_URL)" ]; then \
+		echo "${YELLOW}Error: DATABASE_URL not set in .env file${RESET}"; \
+		exit 1; \
+	fi
 	@echo "${YELLOW}Warning: This will rollback the last migration${RESET}"
-	migrate -path database/migrations -database "postgresql://postgres:admin@localhost:5432/healthcare_db?sslmode=disable" down 1
+	@echo "Environment: ${YELLOW}$(CURRENT_ENV)${RESET}"
+	@echo ""
+	@read -p "Continue? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $REPLY =~ ^[Yy]$ ]]; then \
+		migrate -path database/migrations -database "$(DB_URL)" down 1; \
+	else \
+		echo "${YELLOW}Rollback cancelled.${RESET}"; \
+	fi
 
 migrate-create:
 	@if [ -z "$(name)" ]; then echo "${YELLOW}Error: name is required. Usage: make migrate-create name=migration_name${RESET}"; exit 1; fi
 	@echo "${GREEN}Creating migration: $(name)${RESET}"
 	migrate create -ext sql -dir database/migrations -seq $(name)
+
+migrate-status:
+	@if [ -z "$(DB_URL)" ]; then \
+		echo "${YELLOW}Error: DATABASE_URL not set in .env file${RESET}"; \
+		exit 1; \
+	fi
+	@echo "${GREEN}Migration Status${RESET}"
+	@echo "Environment: ${YELLOW}$(CURRENT_ENV)${RESET}"
+	@echo ""
+	migrate -path database/migrations -database "$(DB_URL)" version
 
 # Seed database with test data
 db-seed:
@@ -251,30 +324,23 @@ setup: install-tools
 # Environment management
 env-status:
 	@echo "${GREEN}Current Environment Status:${RESET}"
+	@echo ""
 	@if [ -L .env ]; then \
 		target=$(readlink .env); \
-		echo "  .env is a symlink pointing to: $target"; \
+		echo "  .env symlink → $target"; \
 		if [ "$target" = ".env.development" ]; then \
-			echo "${GREEN}  → DEVELOPMENT mode${RESET}"; \
+			echo "  Environment: ${GREEN}DEVELOPMENT${RESET}"; \
 		elif [ "$target" = ".env.production" ]; then \
-			echo "${YELLOW}  → PRODUCTION mode${RESET}"; \
+			echo "  Environment: ${YELLOW}PRODUCTION${RESET}"; \
 		fi; \
 	elif [ -f .env ]; then \
 		echo "${YELLOW}  .env is a regular file (not a symlink)${RESET}"; \
 	else \
 		echo "${YELLOW}  .env does not exist${RESET}"; \
 	fi
-
-switch-dev:
-	@echo "${GREEN}Switching to DEVELOPMENT environment...${RESET}"
-	@rm -f .env
-	@ln -sf .env.development .env
-	@echo "${GREEN}✓ Now using .env.development${RESET}"
-	@echo "Run 'make dev' to start in development mode"
-
-switch-prod:
-	@echo "${YELLOW}Switching to PRODUCTION environment...${RESET}"
-	@rm -f .env
-	@ln -sf .env.production .env
-	@echo "${YELLOW}✓ Now using .env.production${RESET}"
-	@echo "Run 'make prod' to start in production mode"
+	@echo ""
+	@if [ -n "$(DATABASE_URL)" ]; then \
+		echo "  DATABASE_URL: Set ✓"; \
+	else \
+		echo "  DATABASE_URL: ${YELLOW}Not set ✗${RESET}"; \
+	fi
