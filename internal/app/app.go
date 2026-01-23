@@ -73,17 +73,17 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	// Initialize repositories
+	/* patients*/
+	patientRepo := repopatients.NewPatientRepository(pool)
+
 	/*core */
 	authRepo := repocore.NewAuthRepository(pool)
-	userRepo := repocore.NewUserRepository(pool)
+	userRepo := repocore.NewUserRepository(pool, patientRepo)
 	otpRepo := repocore.NewOTPRepository(pool)
 	sessionRepo := repocore.NewSessionRepository(pool)
 	notificationRepo := repocore.NewNotificationRepository(pool)
 	consentRepo := repocore.NewConsentRepository(pool)
 	auditRepo := repocore.NewAuditRepository(pool)
-
-	/* patients*/
-	patientRepo := repopatients.NewPatientRepository(pool)
 
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)

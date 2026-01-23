@@ -40,18 +40,20 @@ var (
 )
 
 type userRepository struct {
-	querier sqlc.Querier
+	querier            sqlc.Querier
+	patientProfileRepo repository.PatientProfileRepository
 }
 
 // NewUserRepository creates a new user repository using a pool
-func NewUserRepository(pool *pgxpool.Pool) repository.UserRepository {
-	return NewUserRepositoryWithQuerier(sqlc.New(pool))
+func NewUserRepository(pool *pgxpool.Pool, patientProfileRepo repository.PatientProfileRepository) repository.UserRepository {
+	return NewUserRepositoryWithQuerier(sqlc.New(pool), patientProfileRepo)
 }
 
 // NewUserRepositoryWithQuerier creates a new user repository using a provided querier (for transactions)
-func NewUserRepositoryWithQuerier(querier sqlc.Querier) repository.UserRepository {
+func NewUserRepositoryWithQuerier(querier sqlc.Querier, patientProfileRepo repository.PatientProfileRepository) repository.UserRepository {
 	return &userRepository{
-		querier: querier,
+		querier:            querier,
+		patientProfileRepo: patientProfileRepo,
 	}
 }
 
@@ -229,10 +231,21 @@ func (r *userRepository) GetUserProfile(ctx context.Context, userID uuid.UUID) (
 		return core.User{}, patients.PatientProfile{}, err
 	}
 
-	// TODO: When patient profile repository is implemented, fetch patient profile here
-	// For now, return empty patient profile
+	// Get patient profile using the injected patient profile repository
+	patientProfile, err := r.patientProfileRepo.GetPatientProfileByUserID(ctx, userID)
+	if err != nil {
+		// Check if error is "not found" - that's acceptable for users who aren't patients
+		if errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrPatientNotFound) {
+			// Return user with empty patient profile
+			userDBQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
+			return user, patients.PatientProfile{}, nil
+		}
+		userDBQueryTotal.WithLabelValues("get_user_profile", "error").Inc()
+		return core.User{}, patients.PatientProfile{}, fmt.Errorf("get patient profile: %w", err)
+	}
+
 	userDBQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
-	return user, patients.PatientProfile{}, nil
+	return user, patientProfile, nil
 }
 
 func (r *userRepository) UpdateUserEmail(ctx context.Context, id uuid.UUID, email string) error {
