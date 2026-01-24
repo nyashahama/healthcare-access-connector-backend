@@ -57,7 +57,6 @@ func (h *PatientHandler) RegisterRoutes(router chi.Router) {
 	})
 }
 
-// In patient_handler.go - modify CreatePatientProfile
 func (h *PatientHandler) CreatePatientProfile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
