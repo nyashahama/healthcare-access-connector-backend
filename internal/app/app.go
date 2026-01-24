@@ -13,12 +13,14 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
+	handlerpatients "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
 	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	servicecore "github.com/nyashahama/healthcare-access-connector-backend/internal/service/core"
+	servicepatients "github.com/nyashahama/healthcare-access-connector-backend/internal/service/patients"
 	"github.com/rs/zerolog"
 )
 
@@ -154,6 +156,14 @@ func New(cfg *config.Config) (*App, error) {
 		logger,
 	)
 
+	patientService := servicepatients.NewPatientService(
+		patientRepo,
+		userRepo,
+		notificationRepo,
+		cacheService,
+		logger,
+	)
+
 	// Initialize handlers
 	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
 	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
@@ -163,6 +173,13 @@ func New(cfg *config.Config) (*App, error) {
 	notificationHandler := handlercore.NewNotificationHandler(notificationService, logger, cfg.Timeout)
 	sessionHandler := handlercore.NewSessionHandler(sessionService, logger, cfg.Timeout)
 	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService)
+
+	// Initialize patient handler
+	patientHandler := handlerpatients.NewPatientHandler(
+		patientService,
+		logger,
+		cfg.Timeout,
+	)
 
 	// Initialize server with all handlers
 	srv := server.NewServer(
@@ -175,6 +192,7 @@ func New(cfg *config.Config) (*App, error) {
 		consentHandler,
 		notificationHandler,
 		sessionHandler,
+		patientHandler,
 		healthHandler,
 		authService,
 		txManager,

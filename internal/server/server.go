@@ -13,6 +13,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -55,6 +56,7 @@ type Server struct {
 	consentHandler      *handlercore.ConsentHandler
 	notificationHandler *handlercore.NotificationHandler
 	sessionHandler      *handlercore.SessionHandler
+	patientHandler      *patients.PatientHandler
 	healthHandler       *handler.HealthHandler
 	authService         service.AuthService
 }
@@ -70,6 +72,7 @@ func NewServer(
 	consentHandler *handlercore.ConsentHandler,
 	notificationHandler *handlercore.NotificationHandler,
 	sessionHandler *handlercore.SessionHandler,
+	patientHandler *patients.PatientHandler,
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
 	txManager repository.TxManager,
@@ -84,6 +87,7 @@ func NewServer(
 		consentHandler:      consentHandler,
 		notificationHandler: notificationHandler,
 		sessionHandler:      sessionHandler,
+		patientHandler:      patientHandler,
 		healthHandler:       healthHandler,
 		authService:         authService,
 	}
@@ -208,6 +212,12 @@ func (s *Server) setupRoutes() http.Handler {
 				r.Get("/count", s.userHandler.CountUsers)
 			})
 
+			// Patient profile routes
+			r.Route("/patients", func(r chi.Router) {
+				// Register patient routes from patient handler
+				s.patientHandler.RegisterRoutes(r)
+			})
+
 			// Session management routes
 			r.Route("/sessions", func(r chi.Router) {
 				r.Get("/{token}", s.sessionHandler.GetSession)
@@ -284,6 +294,9 @@ func (s *Server) setupRoutes() http.Handler {
 				r.Put("/users/{id}/role", s.userHandler.UpdateUserRole)
 				r.Put("/users/{id}/status", s.userHandler.UpdateUserStatus)
 				r.Put("/users/bulk/status", s.userHandler.BulkUpdateStatus)
+
+				// Admin patient management
+				r.Get("/patients/demographics", s.patientHandler.GetDemographicsSummary)
 
 				// Admin OTP management
 				r.Delete("/otp/expired", s.otpHandler.DeleteExpiredOTPs)

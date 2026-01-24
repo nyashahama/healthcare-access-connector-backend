@@ -139,16 +139,16 @@ type ConsentService interface {
 
 // PatientService handles patient operations
 type PatientService interface {
-	CreateMedicalInfo(ctx context.Context, patientID uuid.UUID, info patients.PatientMedicalInfo) error
-	GetMedicalInfo(ctx context.Context, patientID uuid.UUID) (patients.PatientMedicalInfo, error)
-	AddAllergy(ctx context.Context, allergy patients.PatientAllergy) error
-	GetAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
-	AddMedication(ctx context.Context, medication patients.PatientMedication) error
-	GetMedications(ctx context.Context, patientID uuid.UUID) ([]patients.PatientMedication, error)
-	AddCondition(ctx context.Context, condition patients.PatientCondition) error
-	GetConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
-	AddImmunization(ctx context.Context, immunization patients.PatientImmunization) error
-	GetImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+	CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error)
+	GetPatientProfile(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
+	GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error)
+	GetPatientProfileByNationalID(ctx context.Context, nationalID string) (patients.PatientProfile, error)
+	UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error
+	DeletePatientProfile(ctx context.Context, id uuid.UUID) error
+	DeletePatientProfileByUserID(ctx context.Context, userID uuid.UUID) error
+	SearchPatients(ctx context.Context, params patients.AdvancedSearchParams) ([]patients.PatientProfile, error)
+	GetDemographicsSummary(ctx context.Context) (patients.PatientDemographicsSummary, error)
+	GetPatientByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
 }
 
 // ClinicService handles clinic operations

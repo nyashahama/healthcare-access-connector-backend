@@ -15,6 +15,7 @@ var (
 	ErrForbidden    = errors.New("forbidden")
 	ErrValidation   = errors.New("validation failed")
 	ErrInternal     = errors.New("internal server error")
+	ErrDuplicate    = errors.New("duplicate resource") // Added duplicate error
 
 	// User errors
 	ErrDuplicateEmail     = errors.New("email already exists")
@@ -211,7 +212,8 @@ func HTTPStatusCode(err error) int {
 		return http.StatusBadRequest
 
 	// 409 Conflict
-	case errors.Is(err, ErrDuplicateEmail),
+	case errors.Is(err, ErrDuplicate), // Added to conflict errors
+		errors.Is(err, ErrDuplicateEmail),
 		errors.Is(err, ErrDuplicatePhone),
 		errors.Is(err, ErrDuplicateUsername),
 		errors.Is(err, ErrPatientProfileExists),
@@ -251,6 +253,10 @@ func ErrorMessage(err error) string {
 
 	// Return safe messages for known errors
 	switch {
+	// General errors
+	case errors.Is(err, ErrDuplicate):
+		return "Resource already exists"
+
 	// User errors
 	case errors.Is(err, ErrUserNotFound):
 		return "User not found"
@@ -262,6 +268,8 @@ func ErrorMessage(err error) string {
 		return "Email address is already registered"
 	case errors.Is(err, ErrDuplicatePhone):
 		return "Phone number is already registered"
+	case errors.Is(err, ErrDuplicateUsername):
+		return "Username is already taken"
 	case errors.Is(err, ErrPasswordTooWeak):
 		return "Password does not meet security requirements"
 	case errors.Is(err, ErrUserNotVerified):
@@ -383,4 +391,14 @@ func IsConsentError(err error) bool {
 		errors.Is(err, ErrConsentWithdrawn) ||
 		errors.Is(err, ErrHealthDataConsentRequired) ||
 		errors.Is(err, ErrSMSConsentRequired)
+}
+
+// IsDuplicateError checks if an error is a duplicate resource error
+func IsDuplicateError(err error) bool {
+	return errors.Is(err, ErrDuplicate) ||
+		errors.Is(err, ErrDuplicateEmail) ||
+		errors.Is(err, ErrDuplicatePhone) ||
+		errors.Is(err, ErrDuplicateUsername) ||
+		errors.Is(err, ErrPatientProfileExists) ||
+		errors.Is(err, ErrClinicAlreadyVerified)
 }

@@ -121,6 +121,22 @@ func (v *Validator) ValidateLength(field, value string, min, max int) {
 	}
 }
 
+// ValidateMinLength validates minimum string length
+func (v *Validator) ValidateMinLength(field, value string, min int) {
+	length := len(strings.TrimSpace(value))
+	if length < min {
+		v.AddError(field, fmt.Sprintf("must be at least %d characters", min))
+	}
+}
+
+// ValidateMaxLength validates maximum string length
+func (v *Validator) ValidateMaxLength(field, value string, max int) {
+	length := len(strings.TrimSpace(value))
+	if length > max {
+		v.AddError(field, fmt.Sprintf("must be at most %d characters", max))
+	}
+}
+
 // ValidateNumeric validates that string contains only digits
 func (v *Validator) ValidateNumeric(field, value string) {
 	numericRegex := regexp.MustCompile(`^[0-9]+$`)
@@ -158,4 +174,17 @@ func (v *Validator) ValidateEnum(field, value string, allowedValues []string) {
 	}
 
 	v.AddError(field, fmt.Sprintf("must be one of: %s", strings.Join(allowedValues, ", ")))
+}
+
+// ValidateUUID validates UUID format
+func (v *Validator) ValidateUUID(field, uuidStr string) {
+	if uuidStr == "" {
+		v.AddError(field, "is required")
+		return
+	}
+
+	uuidRegex := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	if !uuidRegex.MatchString(strings.ToLower(uuidStr)) {
+		v.AddError(field, "must be a valid UUID format")
+	}
 }
