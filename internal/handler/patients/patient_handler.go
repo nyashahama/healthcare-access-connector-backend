@@ -57,7 +57,7 @@ func (h *PatientHandler) RegisterRoutes(router chi.Router) {
 	})
 }
 
-// CreatePatientProfile handles creation of a new patient profile
+// In patient_handler.go - modify CreatePatientProfile
 func (h *PatientHandler) CreatePatientProfile(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -86,10 +86,32 @@ func (h *PatientHandler) CreatePatientProfile(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Convert to domain model
-	profile := pat_dto.ToDomainPatientProfile(req)
+	// Check if profile already exists
+	existing, err := h.patientService.GetPatientProfile(ctx, req.UserID)
+	if err == nil {
+		// Profile exists, update it instead
+		profile := pat_dto.ToDomainPatientProfile(req)
+		profile.ID = existing.ID               // Keep the existing ID
+		profile.CreatedAt = existing.CreatedAt // Keep original creation time
 
-	// Create patient profile
+		if err := h.patientService.UpdatePatientProfile(ctx, profile); err != nil {
+			handler.RespondError(w, h.logger, err)
+			return
+		}
+
+		// Get updated profile
+		updated, err := h.patientService.GetPatientProfile(ctx, req.UserID)
+		if err != nil {
+			handler.RespondError(w, h.logger, err)
+			return
+		}
+
+		handler.RespondJSON(w, http.StatusOK, pat_dto.ToPatientProfileResponse(updated))
+		return
+	}
+
+	// Profile doesn't exist, create new one
+	profile := pat_dto.ToDomainPatientProfile(req)
 	created, err := h.patientService.CreatePatientProfile(ctx, profile)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
