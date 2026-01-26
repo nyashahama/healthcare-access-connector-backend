@@ -107,6 +107,33 @@ func (r *clinicRepository) GetClinicByID(ctx context.Context, id uuid.UUID) (pro
 	return r.mapToClinicFromGetByID(c), nil
 }
 
+func (r *clinicRepository) ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error) {
+	start := time.Now()
+	defer func() {
+		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	clinics, err := r.querier.ListClinics(ctx, sqlc.ListClinicsParams{
+		Column1: *filters.ClinicType,
+		Column2: *filters.Province,
+		Column3: *filters.City,
+		Column4: *filters.VerificationStatus,
+		Limit:   int32(limit),
+		Offset:  int32(offset),
+	})
+	if err != nil {
+		clinicDBQueryTotal.WithLabelValues("list clinics", "not found")
+		return nil, fmt.Errorf("list clinics: %w", err)
+	}
+
+	result := make([]providers.Clinic, len(clinics))
+	for i, c := range clinics {
+		result[i] = r.mapToClinicFromList(c)
+	}
+
+	return result, nil
+}
+
 // handleError converts database errors to domain errors
 func (r *clinicRepository) handleError(err error, operation string) error {
 	var pgErr *pgconn.PgError

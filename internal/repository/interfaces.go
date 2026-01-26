@@ -282,7 +282,7 @@ type ClinicRepository interface {
 
 	// Read
 	GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
-	// ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
+	ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
 	// SearchClinics(ctx context.Context, query string, province *string, city *string, limit, offset int) ([]providers.Clinic, error)
 	// SearchClinicsByLocation(ctx context.Context, latitude, longitude, radiusKm float64) ([]providers.Clinic, error)
 	//
