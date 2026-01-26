@@ -40,6 +40,7 @@ type Querier interface {
 	BulkUpdatePatientProvince(ctx context.Context, arg BulkUpdatePatientProvinceParams) error
 	BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error
 	CountActiveConsents(ctx context.Context) (int64, error)
+	CountClinics(ctx context.Context, arg CountClinicsParams) (int64, error)
 	CountConsentsByType(ctx context.Context) (CountConsentsByTypeRow, error)
 	CountPatientsByCommunicationMethod(ctx context.Context) (CountPatientsByCommunicationMethodRow, error)
 	CountPatientsByMedicalAidStatus(ctx context.Context) (CountPatientsByMedicalAidStatusRow, error)
@@ -79,6 +80,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateClinicService(ctx context.Context, id pgtype.UUID) error
 	DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error
+	DeleteClinic(ctx context.Context, id pgtype.UUID) error
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteNotificationPreferences(ctx context.Context, userID pgtype.UUID) error
@@ -106,6 +108,7 @@ type Querier interface {
 	GetClinicServices(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicServicesRow, error)
 	GetClinicStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff, error)
 	GetClinicStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error)
+	GetClinicsByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Clinic, error)
 	GetConsentByID(ctx context.Context, id pgtype.UUID) (PrivacyConsent, error)
 	GetConsentHistory(ctx context.Context, userID pgtype.UUID) ([]PrivacyConsent, error)
 	GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error)
@@ -192,8 +195,10 @@ type Querier interface {
 	UpdateAppointmentReminders(ctx context.Context, arg UpdateAppointmentRemindersParams) error
 	UpdateChannelSettings(ctx context.Context, arg UpdateChannelSettingsParams) error
 	UpdateClinic(ctx context.Context, arg UpdateClinicParams) error
+	UpdateClinicRating(ctx context.Context, arg UpdateClinicRatingParams) error
 	UpdateClinicService(ctx context.Context, arg UpdateClinicServiceParams) error
 	UpdateClinicStaff(ctx context.Context, arg UpdateClinicStaffParams) error
+	UpdateClinicStatus(ctx context.Context, arg UpdateClinicStatusParams) error
 	UpdateCommunicationConsents(ctx context.Context, arg UpdateCommunicationConsentsParams) error
 	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) error
 	UpdateDataSharingConsent(ctx context.Context, arg UpdateDataSharingConsentParams) error

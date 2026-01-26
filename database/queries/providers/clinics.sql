@@ -81,4 +81,26 @@ WHERE
     )) <= $3
 ORDER BY distance_km ASC;
 
+-- name: CountClinics :one
+SELECT COUNT(*) FROM clinics
+WHERE ($1::VARCHAR IS NULL OR clinic_type = $1)
+    AND ($2::VARCHAR IS NULL OR province = $2)
+    AND ($3::VARCHAR IS NULL OR verification_status = $3);
 
+-- name: UpdateClinicStatus :exec
+UPDATE clinics
+SET verification_status = $2, updated_at = NOW()
+WHERE id = $1;
+
+-- name: UpdateClinicRating :exec
+UPDATE clinics
+SET rating = $2, review_count = $3, updated_at = NOW()
+WHERE id = $1;
+
+-- name: GetClinicsByIDs :many
+SELECT * FROM clinics
+WHERE id = ANY($1::uuid[])
+ORDER BY clinic_name;
+
+-- name: DeleteClinic :exec
+DELETE FROM clinics WHERE id = $1;

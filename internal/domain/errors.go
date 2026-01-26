@@ -40,11 +40,12 @@ var (
 	ErrImmunizationNotFound = errors.New("immunization record not found")
 
 	// Clinic errors
-	ErrClinicNotFound        = errors.New("clinic not found")
-	ErrClinicNotVerified     = errors.New("clinic is not verified")
-	ErrClinicAlreadyVerified = errors.New("clinic is already verified")
-	ErrServiceNotFound       = errors.New("clinic service not found")
-	ErrServiceNotAvailable   = errors.New("service is not available")
+	ErrClinicNotFound              = errors.New("clinic not found")
+	ErrClinicNotVerified           = errors.New("clinic is not verified")
+	ErrClinicAlreadyVerified       = errors.New("clinic is already verified")
+	ErrServiceNotFound             = errors.New("clinic service not found")
+	ErrServiceNotAvailable         = errors.New("service is not available")
+	ErrDuplicateRegistrationNumber = errors.New("registration number already exists")
 
 	// Staff errors
 	ErrStaffNotFound         = errors.New("staff member not found")
@@ -214,6 +215,7 @@ func HTTPStatusCode(err error) int {
 	// 409 Conflict
 	case errors.Is(err, ErrDuplicate), // Added to conflict errors
 		errors.Is(err, ErrDuplicateEmail),
+		errors.Is(err, ErrDuplicateRegistrationNumber),
 		errors.Is(err, ErrDuplicatePhone),
 		errors.Is(err, ErrDuplicateUsername),
 		errors.Is(err, ErrPatientProfileExists),
@@ -266,6 +268,8 @@ func ErrorMessage(err error) string {
 		return "Invalid or expired token"
 	case errors.Is(err, ErrDuplicateEmail):
 		return "Email address is already registered"
+	case errors.Is(err, ErrDuplicateRegistrationNumber):
+		return "Registration number already exists"
 	case errors.Is(err, ErrDuplicatePhone):
 		return "Phone number is already registered"
 	case errors.Is(err, ErrDuplicateUsername):
@@ -397,6 +401,7 @@ func IsConsentError(err error) bool {
 func IsDuplicateError(err error) bool {
 	return errors.Is(err, ErrDuplicate) ||
 		errors.Is(err, ErrDuplicateEmail) ||
+		errors.Is(err, ErrDuplicateRegistrationNumber) ||
 		errors.Is(err, ErrDuplicatePhone) ||
 		errors.Is(err, ErrDuplicateUsername) ||
 		errors.Is(err, ErrPatientProfileExists) ||

@@ -276,29 +276,19 @@ type PatientProfileRepository interface {
 
 type ClinicRepository interface {
 	// Clinic CRUD
+
+	// Create
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
+
+	// Read
 	GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
-	UpdateClinic(ctx context.Context, clinic providers.Clinic) error
-	DeleteClinic(ctx context.Context, id uuid.UUID) error
-
-	// Verification & Status
-	VerifyClinic(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID, notes string) error
-	UpdateClinicStatus(ctx context.Context, id uuid.UUID, status string) error
-	GetPendingVerifications(ctx context.Context, limit, offset int) ([]providers.Clinic, error)
-
-	// Search & Discovery
-	ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
-	SearchClinics(ctx context.Context, query string, province string, city string, limit, offset int) ([]providers.Clinic, error)
-	SearchClinicsByLocation(ctx context.Context, lat, lng float64, radiusKm float64) ([]providers.Clinic, error)
-	GetFeaturedClinics(ctx context.Context, limit int) ([]providers.Clinic, error)
-	GetClinicsByService(ctx context.Context, serviceID uuid.UUID) ([]providers.Clinic, error)
-
-	// Clinic Services
-	AddClinicService(ctx context.Context, service providers.ClinicService) (providers.ClinicService, error)
-	GetClinicService(ctx context.Context, id uuid.UUID) (providers.ClinicService, error)
-	GetClinicServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
-	UpdateClinicService(ctx context.Context, service providers.ClinicService) error
-	DeactivateClinicService(ctx context.Context, id uuid.UUID) error
+	// ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
+	// SearchClinics(ctx context.Context, query string, province *string, city *string, limit, offset int) ([]providers.Clinic, error)
+	// SearchClinicsByLocation(ctx context.Context, latitude, longitude, radiusKm float64) ([]providers.Clinic, error)
+	//
+	// // Update
+	// UpdateClinic(ctx context.Context, clinic providers.Clinic) error
+	// VerifyClinic(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID, notes string) error
 
 	// Operating Hours
 	// SetOperatingHours(ctx context.Context, hours providers.OperatingHours) error

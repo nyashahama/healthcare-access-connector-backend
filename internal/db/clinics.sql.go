@@ -11,6 +11,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countClinics = `-- name: CountClinics :one
+SELECT COUNT(*) FROM clinics
+WHERE ($1::VARCHAR IS NULL OR clinic_type = $1)
+    AND ($2::VARCHAR IS NULL OR province = $2)
+    AND ($3::VARCHAR IS NULL OR verification_status = $3)
+`
+
+type CountClinicsParams struct {
+	Column1 string `json:"column_1"`
+	Column2 string `json:"column_2"`
+	Column3 string `json:"column_3"`
+}
+
+func (q *Queries) CountClinics(ctx context.Context, arg CountClinicsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countClinics, arg.Column1, arg.Column2, arg.Column3)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createClinic = `-- name: CreateClinic :one
 
 INSERT INTO clinics (
@@ -90,6 +110,15 @@ func (q *Queries) CreateClinic(ctx context.Context, arg CreateClinicParams) (Cre
 	return i, err
 }
 
+const deleteClinic = `-- name: DeleteClinic :exec
+DELETE FROM clinics WHERE id = $1
+`
+
+func (q *Queries) DeleteClinic(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteClinic, id)
+	return err
+}
+
 const getClinicByID = `-- name: GetClinicByID :one
 SELECT id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at FROM clinics WHERE id = $1
 `
@@ -149,6 +178,82 @@ func (q *Queries) GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, er
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getClinicsByIDs = `-- name: GetClinicsByIDs :many
+SELECT id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at FROM clinics
+WHERE id = ANY($1::uuid[])
+ORDER BY clinic_name
+`
+
+func (q *Queries) GetClinicsByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]Clinic, error) {
+	rows, err := q.db.Query(ctx, getClinicsByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Clinic{}
+	for rows.Next() {
+		var i Clinic
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.RegistrationNumber,
+			&i.AccreditationNumber,
+			&i.PrimaryPhone,
+			&i.SecondaryPhone,
+			&i.EmergencyPhone,
+			&i.Email,
+			&i.Website,
+			&i.PhysicalAddress,
+			&i.City,
+			&i.Province,
+			&i.PostalCode,
+			&i.Country,
+			&i.Latitude,
+			&i.Longitude,
+			&i.GooglePlaceID,
+			&i.Description,
+			&i.YearEstablished,
+			&i.OwnershipType,
+			&i.BedCount,
+			&i.OperatingHours,
+			&i.Services,
+			&i.Specialties,
+			&i.LanguagesSpoken,
+			&i.Facilities,
+			&i.AcceptsMedicalAid,
+			&i.MedicalAidProviders,
+			&i.PaymentMethods,
+			&i.FeeStructure,
+			&i.AccreditationBody,
+			&i.AccreditationExpiry,
+			&i.Certifications,
+			&i.IsVerified,
+			&i.VerificationStatus,
+			&i.VerificationNotes,
+			&i.VerifiedBy,
+			&i.VerificationDate,
+			&i.PatientCapacity,
+			&i.AverageWaitTimeMinutes,
+			&i.Rating,
+			&i.ReviewCount,
+			&i.ContactPersonName,
+			&i.ContactPersonRole,
+			&i.ContactPersonPhone,
+			&i.ContactPersonEmail,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listClinics = `-- name: ListClinics :many
@@ -406,6 +511,39 @@ func (q *Queries) UpdateClinic(ctx context.Context, arg UpdateClinicParams) erro
 		arg.Specialties,
 		arg.AcceptsMedicalAid,
 	)
+	return err
+}
+
+const updateClinicRating = `-- name: UpdateClinicRating :exec
+UPDATE clinics
+SET rating = $2, review_count = $3, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateClinicRatingParams struct {
+	ID          pgtype.UUID    `json:"id"`
+	Rating      pgtype.Numeric `json:"rating"`
+	ReviewCount pgtype.Int4    `json:"review_count"`
+}
+
+func (q *Queries) UpdateClinicRating(ctx context.Context, arg UpdateClinicRatingParams) error {
+	_, err := q.db.Exec(ctx, updateClinicRating, arg.ID, arg.Rating, arg.ReviewCount)
+	return err
+}
+
+const updateClinicStatus = `-- name: UpdateClinicStatus :exec
+UPDATE clinics
+SET verification_status = $2, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateClinicStatusParams struct {
+	ID                 pgtype.UUID `json:"id"`
+	VerificationStatus pgtype.Text `json:"verification_status"`
+}
+
+func (q *Queries) UpdateClinicStatus(ctx context.Context, arg UpdateClinicStatusParams) error {
+	_, err := q.db.Exec(ctx, updateClinicStatus, arg.ID, arg.VerificationStatus)
 	return err
 }
 

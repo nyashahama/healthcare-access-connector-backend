@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"net/netip"
 	"time"
 
@@ -129,4 +130,32 @@ func stringToNetipAddr(s *string) (*netip.Addr, error) {
 		return nil, err
 	}
 	return &addr, nil
+}
+
+// Helper function to convert pgtype.Time to *string
+func pgtypeTimeToStringPtr(t pgtype.Time) *string {
+	if !t.Valid {
+		return nil
+	}
+	// Convert microseconds since midnight to HH:MM:SS format
+	hours := t.Microseconds / (3600 * 1_000_000)
+	minutes := (t.Microseconds % (3600 * 1_000_000)) / (60 * 1_000_000)
+	seconds := (t.Microseconds % (60 * 1_000_000)) / 1_000_000
+
+	s := fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+	return &s
+}
+
+// Helper function to convert *time.Time to pgtype.Time
+func timePtrToPgtypeTime(t *time.Time) pgtype.Time {
+	if t == nil {
+		return pgtype.Time{Valid: false}
+	}
+	// Get the time components
+	hour, min, sec := t.Clock()
+	nsec := t.Nanosecond()
+
+	// Calculate microseconds since midnight
+	microseconds := (int64(hour)*3600+int64(min)*60+int64(sec))*1_000_000 + int64(nsec)/1000
+	return pgtype.Time{Microseconds: microseconds, Valid: true}
 }
