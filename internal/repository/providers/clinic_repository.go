@@ -122,13 +122,42 @@ func (r *clinicRepository) ListClinics(ctx context.Context, filters providers.Cl
 		Offset:  int32(offset),
 	})
 	if err != nil {
-		clinicDBQueryTotal.WithLabelValues("list clinics", "not found")
+		clinicDBQueryTotal.WithLabelValues("list clinics", "not found").Inc()
 		return nil, fmt.Errorf("list clinics: %w", err)
 	}
+
+	clinicDBQueryTotal.WithLabelValues("list clinics", "success").Inc()
 
 	result := make([]providers.Clinic, len(clinics))
 	for i, c := range clinics {
 		result[i] = r.mapToClinicFromList(c)
+	}
+
+	return result, nil
+}
+
+func (r *clinicRepository) SearchClinics(ctx context.Context, query string, province *string, city *string, limit, offset int) ([]providers.Clinic, error) {
+	start := time.Now()
+	defer func() {
+		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	clinics, err := r.querier.SearchClinics(ctx, sqlc.SearchClinicsParams{
+		Column1: pgtype.Text{String: query, Valid: true},
+		Column2: *province,
+		Column3: *city,
+		Limit:   int32(limit),
+		Offset:  int32(offset),
+	})
+	if err != nil {
+		clinicDBQueryTotal.WithLabelValues("search clinics", "not found").Inc()
+		return nil, fmt.Errorf("search clinics :%w", err)
+	}
+	clinicDBQueryTotal.WithLabelValues("search clinics", "success").Inc()
+
+	result := make([]providers.Clinic, len(clinics))
+	for i, c := range clinics {
+		result[i] = r.mapToClinicFromSearch(c)
 	}
 
 	return result, nil
@@ -250,5 +279,20 @@ func (r *clinicRepository) mapToClinicFromSearch(row sqlc.SearchClinicsRow) prov
 		PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
 		Rating:          rating,
 		ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+	}
+}
+
+func (r *clinicRepository) mapToClinicFromSearchByLocation(row sqlc.SearchClinicsByLocationRow) providers.Clinic {
+	return providers.Clinic{
+		ID:              pgtypeUUIDToUUID(row.ID),
+		ClinicName:      row.ClinicName,
+		ClinicType:      row.ClinicType,
+		PhysicalAddress: row.PhysicalAddress,
+		City:            pgtypeTextToStringPtr(row.City),
+		Province:        pgtypeTextToStringPtr(row.Province),
+		PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+		Latitude:        pgtypeNumericToFloat64Ptr(row.Latitude),
+		Longitude:       pgtypeNumericToFloat64Ptr(row.Latitude),
+		Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
 	}
 }
