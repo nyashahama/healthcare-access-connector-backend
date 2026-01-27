@@ -11,6 +11,82 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bulkUpdateVerificationStatus = `-- name: BulkUpdateVerificationStatus :exec
+UPDATE clinics
+SET verification_status = $2, updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkUpdateVerificationStatusParams struct {
+	Column1            []pgtype.UUID `json:"column_1"`
+	VerificationStatus pgtype.Text   `json:"verification_status"`
+}
+
+func (q *Queries) BulkUpdateVerificationStatus(ctx context.Context, arg BulkUpdateVerificationStatusParams) error {
+	_, err := q.db.Exec(ctx, bulkUpdateVerificationStatus, arg.Column1, arg.VerificationStatus)
+	return err
+}
+
+const checkEmailExists = `-- name: CheckEmailExists :one
+SELECT EXISTS(
+    SELECT 1 FROM clinics 
+    WHERE email = $1
+    AND ($2::uuid IS NULL OR id != $2)
+) as exists
+`
+
+type CheckEmailExistsParams struct {
+	Email   pgtype.Text `json:"email"`
+	Column2 pgtype.UUID `json:"column_2"`
+}
+
+func (q *Queries) CheckEmailExists(ctx context.Context, arg CheckEmailExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkEmailExists, arg.Email, arg.Column2)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const checkPhoneExists = `-- name: CheckPhoneExists :one
+SELECT EXISTS(
+    SELECT 1 FROM clinics 
+    WHERE primary_phone = $1
+    AND ($2::uuid IS NULL OR id != $2)
+) as exists
+`
+
+type CheckPhoneExistsParams struct {
+	PrimaryPhone pgtype.Text `json:"primary_phone"`
+	Column2      pgtype.UUID `json:"column_2"`
+}
+
+func (q *Queries) CheckPhoneExists(ctx context.Context, arg CheckPhoneExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkPhoneExists, arg.PrimaryPhone, arg.Column2)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const checkRegistrationNumberExists = `-- name: CheckRegistrationNumberExists :one
+SELECT EXISTS(
+    SELECT 1 FROM clinics 
+    WHERE registration_number = $1
+    AND ($2::uuid IS NULL OR id != $2)
+) as exists
+`
+
+type CheckRegistrationNumberExistsParams struct {
+	RegistrationNumber pgtype.Text `json:"registration_number"`
+	Column2            pgtype.UUID `json:"column_2"`
+}
+
+func (q *Queries) CheckRegistrationNumberExists(ctx context.Context, arg CheckRegistrationNumberExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkRegistrationNumberExists, arg.RegistrationNumber, arg.Column2)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const countClinics = `-- name: CountClinics :one
 SELECT COUNT(*) FROM clinics
 WHERE ($1::VARCHAR IS NULL OR clinic_type = $1)
@@ -110,6 +186,19 @@ func (q *Queries) CreateClinic(ctx context.Context, arg CreateClinicParams) (Cre
 	return i, err
 }
 
+const deactivateClinic = `-- name: DeactivateClinic :exec
+UPDATE clinics
+SET verification_status = 'rejected', 
+    is_verified = FALSE,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) DeactivateClinic(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deactivateClinic, id)
+	return err
+}
+
 const deleteClinic = `-- name: DeleteClinic :exec
 DELETE FROM clinics WHERE id = $1
 `
@@ -180,6 +269,206 @@ func (q *Queries) GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, er
 	return i, err
 }
 
+const getClinicByRegistrationNumber = `-- name: GetClinicByRegistrationNumber :one
+SELECT id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at FROM clinics 
+WHERE registration_number = $1
+LIMIT 1
+`
+
+func (q *Queries) GetClinicByRegistrationNumber(ctx context.Context, registrationNumber pgtype.Text) (Clinic, error) {
+	row := q.db.QueryRow(ctx, getClinicByRegistrationNumber, registrationNumber)
+	var i Clinic
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicName,
+		&i.ClinicType,
+		&i.RegistrationNumber,
+		&i.AccreditationNumber,
+		&i.PrimaryPhone,
+		&i.SecondaryPhone,
+		&i.EmergencyPhone,
+		&i.Email,
+		&i.Website,
+		&i.PhysicalAddress,
+		&i.City,
+		&i.Province,
+		&i.PostalCode,
+		&i.Country,
+		&i.Latitude,
+		&i.Longitude,
+		&i.GooglePlaceID,
+		&i.Description,
+		&i.YearEstablished,
+		&i.OwnershipType,
+		&i.BedCount,
+		&i.OperatingHours,
+		&i.Services,
+		&i.Specialties,
+		&i.LanguagesSpoken,
+		&i.Facilities,
+		&i.AcceptsMedicalAid,
+		&i.MedicalAidProviders,
+		&i.PaymentMethods,
+		&i.FeeStructure,
+		&i.AccreditationBody,
+		&i.AccreditationExpiry,
+		&i.Certifications,
+		&i.IsVerified,
+		&i.VerificationStatus,
+		&i.VerificationNotes,
+		&i.VerifiedBy,
+		&i.VerificationDate,
+		&i.PatientCapacity,
+		&i.AverageWaitTimeMinutes,
+		&i.Rating,
+		&i.ReviewCount,
+		&i.ContactPersonName,
+		&i.ContactPersonRole,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getClinicMetrics = `-- name: GetClinicMetrics :one
+SELECT 
+    COUNT(*) as total_clinics,
+    COUNT(*) FILTER (WHERE verification_status = 'verified') as verified_clinics,
+    COUNT(*) FILTER (WHERE verification_status = 'pending') as pending_clinics,
+    COUNT(*) FILTER (WHERE verification_status = 'rejected') as rejected_clinics,
+    AVG(rating) FILTER (WHERE rating IS NOT NULL) as average_rating,
+    SUM(review_count) as total_reviews
+FROM clinics
+`
+
+type GetClinicMetricsRow struct {
+	TotalClinics    int64   `json:"total_clinics"`
+	VerifiedClinics int64   `json:"verified_clinics"`
+	PendingClinics  int64   `json:"pending_clinics"`
+	RejectedClinics int64   `json:"rejected_clinics"`
+	AverageRating   float64 `json:"average_rating"`
+	TotalReviews    int64   `json:"total_reviews"`
+}
+
+func (q *Queries) GetClinicMetrics(ctx context.Context) (GetClinicMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getClinicMetrics)
+	var i GetClinicMetricsRow
+	err := row.Scan(
+		&i.TotalClinics,
+		&i.VerifiedClinics,
+		&i.PendingClinics,
+		&i.RejectedClinics,
+		&i.AverageRating,
+		&i.TotalReviews,
+	)
+	return i, err
+}
+
+const getClinicStatistics = `-- name: GetClinicStatistics :one
+SELECT 
+    c.id,
+    c.review_count,
+    c.rating,
+    COUNT(DISTINCT cs.id) FILTER (WHERE cs.status = 'active') as active_staff_count,
+    COUNT(DISTINCT cs.id) as total_staff_count
+FROM clinics c
+LEFT JOIN clinic_staff cs ON c.id = cs.clinic_id
+WHERE c.id = $1
+GROUP BY c.id, c.review_count, c.rating
+`
+
+type GetClinicStatisticsRow struct {
+	ID               pgtype.UUID    `json:"id"`
+	ReviewCount      pgtype.Int4    `json:"review_count"`
+	Rating           pgtype.Numeric `json:"rating"`
+	ActiveStaffCount int64          `json:"active_staff_count"`
+	TotalStaffCount  int64          `json:"total_staff_count"`
+}
+
+func (q *Queries) GetClinicStatistics(ctx context.Context, id pgtype.UUID) (GetClinicStatisticsRow, error) {
+	row := q.db.QueryRow(ctx, getClinicStatistics, id)
+	var i GetClinicStatisticsRow
+	err := row.Scan(
+		&i.ID,
+		&i.ReviewCount,
+		&i.Rating,
+		&i.ActiveStaffCount,
+		&i.TotalStaffCount,
+	)
+	return i, err
+}
+
+const getClinicsAcceptingMedicalAid = `-- name: GetClinicsAcceptingMedicalAid :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, rating, review_count,
+    medical_aid_providers
+FROM clinics
+WHERE verification_status = 'verified'
+    AND accepts_medical_aid = TRUE
+    AND ($1::VARCHAR IS NULL OR province = $1)
+    AND ($2::jsonb IS NULL OR medical_aid_providers @> $2)
+ORDER BY rating DESC NULLS LAST
+LIMIT $3 OFFSET $4
+`
+
+type GetClinicsAcceptingMedicalAidParams struct {
+	Column1 string `json:"column_1"`
+	Column2 []byte `json:"column_2"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+type GetClinicsAcceptingMedicalAidRow struct {
+	ID                  pgtype.UUID    `json:"id"`
+	ClinicName          string         `json:"clinic_name"`
+	ClinicType          string         `json:"clinic_type"`
+	City                pgtype.Text    `json:"city"`
+	Province            pgtype.Text    `json:"province"`
+	PhysicalAddress     string         `json:"physical_address"`
+	PrimaryPhone        pgtype.Text    `json:"primary_phone"`
+	Rating              pgtype.Numeric `json:"rating"`
+	ReviewCount         pgtype.Int4    `json:"review_count"`
+	MedicalAidProviders []byte         `json:"medical_aid_providers"`
+}
+
+func (q *Queries) GetClinicsAcceptingMedicalAid(ctx context.Context, arg GetClinicsAcceptingMedicalAidParams) ([]GetClinicsAcceptingMedicalAidRow, error) {
+	rows, err := q.db.Query(ctx, getClinicsAcceptingMedicalAid,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicsAcceptingMedicalAidRow{}
+	for rows.Next() {
+		var i GetClinicsAcceptingMedicalAidRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.City,
+			&i.Province,
+			&i.PhysicalAddress,
+			&i.PrimaryPhone,
+			&i.Rating,
+			&i.ReviewCount,
+			&i.MedicalAidProviders,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getClinicsByIDs = `-- name: GetClinicsByIDs :many
 SELECT id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at FROM clinics
 WHERE id = ANY($1::uuid[])
@@ -245,6 +534,530 @@ func (q *Queries) GetClinicsByIDs(ctx context.Context, dollar_1 []pgtype.UUID) (
 			&i.ContactPersonEmail,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicsByOwnership = `-- name: GetClinicsByOwnership :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, ownership_type, rating, review_count
+FROM clinics
+WHERE ownership_type = $1
+    AND verification_status = 'verified'
+ORDER BY rating DESC NULLS LAST
+LIMIT $2 OFFSET $3
+`
+
+type GetClinicsByOwnershipParams struct {
+	OwnershipType pgtype.Text `json:"ownership_type"`
+	Limit         int32       `json:"limit"`
+	Offset        int32       `json:"offset"`
+}
+
+type GetClinicsByOwnershipRow struct {
+	ID              pgtype.UUID    `json:"id"`
+	ClinicName      string         `json:"clinic_name"`
+	ClinicType      string         `json:"clinic_type"`
+	City            pgtype.Text    `json:"city"`
+	Province        pgtype.Text    `json:"province"`
+	PhysicalAddress string         `json:"physical_address"`
+	OwnershipType   pgtype.Text    `json:"ownership_type"`
+	Rating          pgtype.Numeric `json:"rating"`
+	ReviewCount     pgtype.Int4    `json:"review_count"`
+}
+
+func (q *Queries) GetClinicsByOwnership(ctx context.Context, arg GetClinicsByOwnershipParams) ([]GetClinicsByOwnershipRow, error) {
+	rows, err := q.db.Query(ctx, getClinicsByOwnership, arg.OwnershipType, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicsByOwnershipRow{}
+	for rows.Next() {
+		var i GetClinicsByOwnershipRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.City,
+			&i.Province,
+			&i.PhysicalAddress,
+			&i.OwnershipType,
+			&i.Rating,
+			&i.ReviewCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicsByProvince = `-- name: GetClinicsByProvince :many
+SELECT province, COUNT(*) as count
+FROM clinics
+WHERE verification_status = 'verified'
+    AND province IS NOT NULL
+GROUP BY province
+ORDER BY count DESC
+`
+
+type GetClinicsByProvinceRow struct {
+	Province pgtype.Text `json:"province"`
+	Count    int64       `json:"count"`
+}
+
+func (q *Queries) GetClinicsByProvince(ctx context.Context) ([]GetClinicsByProvinceRow, error) {
+	rows, err := q.db.Query(ctx, getClinicsByProvince)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicsByProvinceRow{}
+	for rows.Next() {
+		var i GetClinicsByProvinceRow
+		if err := rows.Scan(&i.Province, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicsByService = `-- name: GetClinicsByService :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, rating, review_count
+FROM clinics
+WHERE verification_status = 'verified'
+    AND services @> $1::jsonb
+    AND ($2::VARCHAR IS NULL OR province = $2)
+ORDER BY rating DESC NULLS LAST
+LIMIT $3 OFFSET $4
+`
+
+type GetClinicsByServiceParams struct {
+	Column1 []byte `json:"column_1"`
+	Column2 string `json:"column_2"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+type GetClinicsByServiceRow struct {
+	ID              pgtype.UUID    `json:"id"`
+	ClinicName      string         `json:"clinic_name"`
+	ClinicType      string         `json:"clinic_type"`
+	City            pgtype.Text    `json:"city"`
+	Province        pgtype.Text    `json:"province"`
+	PhysicalAddress string         `json:"physical_address"`
+	PrimaryPhone    pgtype.Text    `json:"primary_phone"`
+	Rating          pgtype.Numeric `json:"rating"`
+	ReviewCount     pgtype.Int4    `json:"review_count"`
+}
+
+func (q *Queries) GetClinicsByService(ctx context.Context, arg GetClinicsByServiceParams) ([]GetClinicsByServiceRow, error) {
+	rows, err := q.db.Query(ctx, getClinicsByService,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicsByServiceRow{}
+	for rows.Next() {
+		var i GetClinicsByServiceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.City,
+			&i.Province,
+			&i.PhysicalAddress,
+			&i.PrimaryPhone,
+			&i.Rating,
+			&i.ReviewCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicsBySpecialty = `-- name: GetClinicsBySpecialty :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, rating, review_count
+FROM clinics
+WHERE verification_status = 'verified'
+    AND specialties @> $1::jsonb
+    AND ($2::VARCHAR IS NULL OR province = $2)
+ORDER BY rating DESC NULLS LAST
+LIMIT $3 OFFSET $4
+`
+
+type GetClinicsBySpecialtyParams struct {
+	Column1 []byte `json:"column_1"`
+	Column2 string `json:"column_2"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+type GetClinicsBySpecialtyRow struct {
+	ID              pgtype.UUID    `json:"id"`
+	ClinicName      string         `json:"clinic_name"`
+	ClinicType      string         `json:"clinic_type"`
+	City            pgtype.Text    `json:"city"`
+	Province        pgtype.Text    `json:"province"`
+	PhysicalAddress string         `json:"physical_address"`
+	PrimaryPhone    pgtype.Text    `json:"primary_phone"`
+	Rating          pgtype.Numeric `json:"rating"`
+	ReviewCount     pgtype.Int4    `json:"review_count"`
+}
+
+func (q *Queries) GetClinicsBySpecialty(ctx context.Context, arg GetClinicsBySpecialtyParams) ([]GetClinicsBySpecialtyRow, error) {
+	rows, err := q.db.Query(ctx, getClinicsBySpecialty,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicsBySpecialtyRow{}
+	for rows.Next() {
+		var i GetClinicsBySpecialtyRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.City,
+			&i.Province,
+			&i.PhysicalAddress,
+			&i.PrimaryPhone,
+			&i.Rating,
+			&i.ReviewCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicsByType = `-- name: GetClinicsByType :many
+SELECT clinic_type, COUNT(*) as count
+FROM clinics
+WHERE verification_status = 'verified'
+GROUP BY clinic_type
+ORDER BY count DESC
+`
+
+type GetClinicsByTypeRow struct {
+	ClinicType string `json:"clinic_type"`
+	Count      int64  `json:"count"`
+}
+
+func (q *Queries) GetClinicsByType(ctx context.Context) ([]GetClinicsByTypeRow, error) {
+	rows, err := q.db.Query(ctx, getClinicsByType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicsByTypeRow{}
+	for rows.Next() {
+		var i GetClinicsByTypeRow
+		if err := rows.Scan(&i.ClinicType, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getNearbyClinicsByService = `-- name: GetNearbyClinicsByService :many
+SELECT 
+    id, 
+    clinic_name, 
+    clinic_type, 
+    physical_address, 
+    city, 
+    province, 
+    primary_phone, 
+    latitude, 
+    longitude, 
+    rating,
+    services,
+    CAST((6371 * acos(
+        cos(radians($1)) * cos(radians(latitude)) * 
+        cos(radians(longitude) - radians($2)) + 
+        sin(radians($1)) * sin(radians(latitude))
+    )) AS NUMERIC(10,2)) AS distance_km
+FROM clinics
+WHERE 
+    latitude IS NOT NULL 
+    AND longitude IS NOT NULL
+    AND verification_status = 'verified'
+    AND services @> $3::jsonb
+    AND (6371 * acos(
+        cos(radians($1)) * cos(radians(latitude)) * 
+        cos(radians(longitude) - radians($2)) + 
+        sin(radians($1)) * sin(radians(latitude))
+    )) <= $4
+ORDER BY distance_km ASC
+`
+
+type GetNearbyClinicsByServiceParams struct {
+	Radians   float64        `json:"radians"`
+	Radians_2 float64        `json:"radians_2"`
+	Column3   []byte         `json:"column_3"`
+	Latitude  pgtype.Numeric `json:"latitude"`
+}
+
+type GetNearbyClinicsByServiceRow struct {
+	ID              pgtype.UUID    `json:"id"`
+	ClinicName      string         `json:"clinic_name"`
+	ClinicType      string         `json:"clinic_type"`
+	PhysicalAddress string         `json:"physical_address"`
+	City            pgtype.Text    `json:"city"`
+	Province        pgtype.Text    `json:"province"`
+	PrimaryPhone    pgtype.Text    `json:"primary_phone"`
+	Latitude        pgtype.Numeric `json:"latitude"`
+	Longitude       pgtype.Numeric `json:"longitude"`
+	Rating          pgtype.Numeric `json:"rating"`
+	Services        []byte         `json:"services"`
+	DistanceKm      pgtype.Numeric `json:"distance_km"`
+}
+
+func (q *Queries) GetNearbyClinicsByService(ctx context.Context, arg GetNearbyClinicsByServiceParams) ([]GetNearbyClinicsByServiceRow, error) {
+	rows, err := q.db.Query(ctx, getNearbyClinicsByService,
+		arg.Radians,
+		arg.Radians_2,
+		arg.Column3,
+		arg.Latitude,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetNearbyClinicsByServiceRow{}
+	for rows.Next() {
+		var i GetNearbyClinicsByServiceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.PhysicalAddress,
+			&i.City,
+			&i.Province,
+			&i.PrimaryPhone,
+			&i.Latitude,
+			&i.Longitude,
+			&i.Rating,
+			&i.Services,
+			&i.DistanceKm,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecentlyAddedClinics = `-- name: GetRecentlyAddedClinics :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, rating, review_count, created_at
+FROM clinics
+WHERE verification_status = 'verified'
+    AND ($1::VARCHAR IS NULL OR province = $1)
+ORDER BY created_at DESC
+LIMIT $2
+`
+
+type GetRecentlyAddedClinicsParams struct {
+	Column1 string `json:"column_1"`
+	Limit   int32  `json:"limit"`
+}
+
+type GetRecentlyAddedClinicsRow struct {
+	ID              pgtype.UUID      `json:"id"`
+	ClinicName      string           `json:"clinic_name"`
+	ClinicType      string           `json:"clinic_type"`
+	City            pgtype.Text      `json:"city"`
+	Province        pgtype.Text      `json:"province"`
+	PhysicalAddress string           `json:"physical_address"`
+	PrimaryPhone    pgtype.Text      `json:"primary_phone"`
+	Rating          pgtype.Numeric   `json:"rating"`
+	ReviewCount     pgtype.Int4      `json:"review_count"`
+	CreatedAt       pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetRecentlyAddedClinics(ctx context.Context, arg GetRecentlyAddedClinicsParams) ([]GetRecentlyAddedClinicsRow, error) {
+	rows, err := q.db.Query(ctx, getRecentlyAddedClinics, arg.Column1, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRecentlyAddedClinicsRow{}
+	for rows.Next() {
+		var i GetRecentlyAddedClinicsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.City,
+			&i.Province,
+			&i.PhysicalAddress,
+			&i.PrimaryPhone,
+			&i.Rating,
+			&i.ReviewCount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTopRatedClinics = `-- name: GetTopRatedClinics :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, rating, review_count
+FROM clinics
+WHERE verification_status = 'verified'
+    AND rating IS NOT NULL
+    AND ($1::VARCHAR IS NULL OR province = $1)
+ORDER BY rating DESC, review_count DESC
+LIMIT $2
+`
+
+type GetTopRatedClinicsParams struct {
+	Column1 string `json:"column_1"`
+	Limit   int32  `json:"limit"`
+}
+
+type GetTopRatedClinicsRow struct {
+	ID              pgtype.UUID    `json:"id"`
+	ClinicName      string         `json:"clinic_name"`
+	ClinicType      string         `json:"clinic_type"`
+	City            pgtype.Text    `json:"city"`
+	Province        pgtype.Text    `json:"province"`
+	PhysicalAddress string         `json:"physical_address"`
+	PrimaryPhone    pgtype.Text    `json:"primary_phone"`
+	Rating          pgtype.Numeric `json:"rating"`
+	ReviewCount     pgtype.Int4    `json:"review_count"`
+}
+
+func (q *Queries) GetTopRatedClinics(ctx context.Context, arg GetTopRatedClinicsParams) ([]GetTopRatedClinicsRow, error) {
+	rows, err := q.db.Query(ctx, getTopRatedClinics, arg.Column1, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetTopRatedClinicsRow{}
+	for rows.Next() {
+		var i GetTopRatedClinicsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.City,
+			&i.Province,
+			&i.PhysicalAddress,
+			&i.PrimaryPhone,
+			&i.Rating,
+			&i.ReviewCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVerifiedClinics = `-- name: GetVerifiedClinics :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, email, rating, review_count, created_at
+FROM clinics
+WHERE verification_status = 'verified'
+ORDER BY rating DESC NULLS LAST
+LIMIT $1 OFFSET $2
+`
+
+type GetVerifiedClinicsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetVerifiedClinicsRow struct {
+	ID              pgtype.UUID      `json:"id"`
+	ClinicName      string           `json:"clinic_name"`
+	ClinicType      string           `json:"clinic_type"`
+	City            pgtype.Text      `json:"city"`
+	Province        pgtype.Text      `json:"province"`
+	PhysicalAddress string           `json:"physical_address"`
+	PrimaryPhone    pgtype.Text      `json:"primary_phone"`
+	Email           pgtype.Text      `json:"email"`
+	Rating          pgtype.Numeric   `json:"rating"`
+	ReviewCount     pgtype.Int4      `json:"review_count"`
+	CreatedAt       pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetVerifiedClinics(ctx context.Context, arg GetVerifiedClinicsParams) ([]GetVerifiedClinicsRow, error) {
+	rows, err := q.db.Query(ctx, getVerifiedClinics, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetVerifiedClinicsRow{}
+	for rows.Next() {
+		var i GetVerifiedClinicsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.City,
+			&i.Province,
+			&i.PhysicalAddress,
+			&i.PrimaryPhone,
+			&i.Email,
+			&i.Rating,
+			&i.ReviewCount,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -336,6 +1149,18 @@ func (q *Queries) ListClinics(ctx context.Context, arg ListClinicsParams) ([]Lis
 	return items, nil
 }
 
+const reactivateClinic = `-- name: ReactivateClinic :exec
+UPDATE clinics
+SET verification_status = 'pending', 
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) ReactivateClinic(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, reactivateClinic, id)
+	return err
+}
+
 const searchClinics = `-- name: SearchClinics :many
 SELECT id, clinic_name, clinic_type, city, province, 
     physical_address, primary_phone, rating, review_count
@@ -384,6 +1209,87 @@ func (q *Queries) SearchClinics(ctx context.Context, arg SearchClinicsParams) ([
 	items := []SearchClinicsRow{}
 	for rows.Next() {
 		var i SearchClinicsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.City,
+			&i.Province,
+			&i.PhysicalAddress,
+			&i.PrimaryPhone,
+			&i.Rating,
+			&i.ReviewCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchClinicsAdvanced = `-- name: SearchClinicsAdvanced :many
+SELECT id, clinic_name, clinic_type, city, province, 
+    physical_address, primary_phone, rating, review_count
+FROM clinics
+WHERE 
+    verification_status = 'verified'
+    AND (
+        clinic_name ILIKE '%' || $1 || '%'
+        OR physical_address ILIKE '%' || $1 || '%'
+        OR city ILIKE '%' || $1 || '%'
+    )
+    AND ($2::VARCHAR IS NULL OR province = $2)
+    AND ($3::VARCHAR IS NULL OR city = $3)
+    AND ($4::VARCHAR IS NULL OR clinic_type = $4)
+    AND ($5::BOOLEAN IS NULL OR accepts_medical_aid = $5)
+ORDER BY 
+    CASE WHEN clinic_name ILIKE $1 THEN 1 ELSE 2 END,
+    rating DESC NULLS LAST
+LIMIT $6 OFFSET $7
+`
+
+type SearchClinicsAdvancedParams struct {
+	Column1 pgtype.Text `json:"column_1"`
+	Column2 string      `json:"column_2"`
+	Column3 string      `json:"column_3"`
+	Column4 string      `json:"column_4"`
+	Column5 bool        `json:"column_5"`
+	Limit   int32       `json:"limit"`
+	Offset  int32       `json:"offset"`
+}
+
+type SearchClinicsAdvancedRow struct {
+	ID              pgtype.UUID    `json:"id"`
+	ClinicName      string         `json:"clinic_name"`
+	ClinicType      string         `json:"clinic_type"`
+	City            pgtype.Text    `json:"city"`
+	Province        pgtype.Text    `json:"province"`
+	PhysicalAddress string         `json:"physical_address"`
+	PrimaryPhone    pgtype.Text    `json:"primary_phone"`
+	Rating          pgtype.Numeric `json:"rating"`
+	ReviewCount     pgtype.Int4    `json:"review_count"`
+}
+
+func (q *Queries) SearchClinicsAdvanced(ctx context.Context, arg SearchClinicsAdvancedParams) ([]SearchClinicsAdvancedRow, error) {
+	rows, err := q.db.Query(ctx, searchClinicsAdvanced,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Column5,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchClinicsAdvancedRow{}
+	for rows.Next() {
+		var i SearchClinicsAdvancedRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ClinicName,
@@ -523,6 +1429,91 @@ func (q *Queries) UpdateClinic(ctx context.Context, arg UpdateClinicParams) erro
 	return err
 }
 
+const updateClinicContact = `-- name: UpdateClinicContact :exec
+UPDATE clinics
+SET primary_phone = $2, secondary_phone = $3, emergency_phone = $4,
+    email = $5, website = $6, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateClinicContactParams struct {
+	ID             pgtype.UUID `json:"id"`
+	PrimaryPhone   pgtype.Text `json:"primary_phone"`
+	SecondaryPhone pgtype.Text `json:"secondary_phone"`
+	EmergencyPhone pgtype.Text `json:"emergency_phone"`
+	Email          pgtype.Text `json:"email"`
+	Website        pgtype.Text `json:"website"`
+}
+
+func (q *Queries) UpdateClinicContact(ctx context.Context, arg UpdateClinicContactParams) error {
+	_, err := q.db.Exec(ctx, updateClinicContact,
+		arg.ID,
+		arg.PrimaryPhone,
+		arg.SecondaryPhone,
+		arg.EmergencyPhone,
+		arg.Email,
+		arg.Website,
+	)
+	return err
+}
+
+const updateClinicLocation = `-- name: UpdateClinicLocation :exec
+UPDATE clinics
+SET latitude = $2, longitude = $3, 
+    physical_address = $4, city = $5, province = $6,
+    postal_code = $7, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateClinicLocationParams struct {
+	ID              pgtype.UUID    `json:"id"`
+	Latitude        pgtype.Numeric `json:"latitude"`
+	Longitude       pgtype.Numeric `json:"longitude"`
+	PhysicalAddress string         `json:"physical_address"`
+	City            pgtype.Text    `json:"city"`
+	Province        pgtype.Text    `json:"province"`
+	PostalCode      pgtype.Text    `json:"postal_code"`
+}
+
+func (q *Queries) UpdateClinicLocation(ctx context.Context, arg UpdateClinicLocationParams) error {
+	_, err := q.db.Exec(ctx, updateClinicLocation,
+		arg.ID,
+		arg.Latitude,
+		arg.Longitude,
+		arg.PhysicalAddress,
+		arg.City,
+		arg.Province,
+		arg.PostalCode,
+	)
+	return err
+}
+
+const updateClinicMedicalAid = `-- name: UpdateClinicMedicalAid :exec
+UPDATE clinics
+SET accepts_medical_aid = $2, medical_aid_providers = $3,
+    payment_methods = $4, fee_structure = $5, updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateClinicMedicalAidParams struct {
+	ID                  pgtype.UUID `json:"id"`
+	AcceptsMedicalAid   pgtype.Bool `json:"accepts_medical_aid"`
+	MedicalAidProviders []byte      `json:"medical_aid_providers"`
+	PaymentMethods      []byte      `json:"payment_methods"`
+	FeeStructure        pgtype.Text `json:"fee_structure"`
+}
+
+func (q *Queries) UpdateClinicMedicalAid(ctx context.Context, arg UpdateClinicMedicalAidParams) error {
+	_, err := q.db.Exec(ctx, updateClinicMedicalAid,
+		arg.ID,
+		arg.AcceptsMedicalAid,
+		arg.MedicalAidProviders,
+		arg.PaymentMethods,
+		arg.FeeStructure,
+	)
+	return err
+}
+
 const updateClinicRating = `-- name: UpdateClinicRating :exec
 UPDATE clinics
 SET rating = $2, review_count = $3, updated_at = NOW()
@@ -537,6 +1528,30 @@ type UpdateClinicRatingParams struct {
 
 func (q *Queries) UpdateClinicRating(ctx context.Context, arg UpdateClinicRatingParams) error {
 	_, err := q.db.Exec(ctx, updateClinicRating, arg.ID, arg.Rating, arg.ReviewCount)
+	return err
+}
+
+const updateClinicServices = `-- name: UpdateClinicServices :exec
+UPDATE clinics
+SET services = $2, specialties = $3, facilities = $4,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateClinicServicesParams struct {
+	ID          pgtype.UUID `json:"id"`
+	Services    []byte      `json:"services"`
+	Specialties []byte      `json:"specialties"`
+	Facilities  []byte      `json:"facilities"`
+}
+
+func (q *Queries) UpdateClinicServices(ctx context.Context, arg UpdateClinicServicesParams) error {
+	_, err := q.db.Exec(ctx, updateClinicServices,
+		arg.ID,
+		arg.Services,
+		arg.Specialties,
+		arg.Facilities,
+	)
 	return err
 }
 
