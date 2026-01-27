@@ -11,74 +11,162 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const addProfessionalCredential = `-- name: AddProfessionalCredential :one
+const autoExpireCredentials = `-- name: AutoExpireCredentials :exec
+UPDATE professional_credentials
+SET 
+    status = 'expired',
+    updated_at = NOW()
+WHERE 
+    expiry_date < CURRENT_DATE
+    AND status = 'verified'
+`
+
+func (q *Queries) AutoExpireCredentials(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, autoExpireCredentials)
+	return err
+}
+
+const bulkRejectCredentials = `-- name: BulkRejectCredentials :exec
+UPDATE professional_credentials
+SET 
+    status = 'rejected',
+    verified_by = $2,
+    verification_date = NOW(),
+    notes = $3,
+    updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkRejectCredentialsParams struct {
+	Column1    []pgtype.UUID `json:"column_1"`
+	VerifiedBy pgtype.UUID   `json:"verified_by"`
+	Notes      pgtype.Text   `json:"notes"`
+}
+
+func (q *Queries) BulkRejectCredentials(ctx context.Context, arg BulkRejectCredentialsParams) error {
+	_, err := q.db.Exec(ctx, bulkRejectCredentials, arg.Column1, arg.VerifiedBy, arg.Notes)
+	return err
+}
+
+const bulkUpdateCredentialStatus = `-- name: BulkUpdateCredentialStatus :exec
+UPDATE professional_credentials
+SET 
+    status = $2,
+    updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkUpdateCredentialStatusParams struct {
+	Column1 []pgtype.UUID `json:"column_1"`
+	Status  pgtype.Text   `json:"status"`
+}
+
+func (q *Queries) BulkUpdateCredentialStatus(ctx context.Context, arg BulkUpdateCredentialStatusParams) error {
+	_, err := q.db.Exec(ctx, bulkUpdateCredentialStatus, arg.Column1, arg.Status)
+	return err
+}
+
+const bulkVerifyCredentials = `-- name: BulkVerifyCredentials :exec
+UPDATE professional_credentials
+SET 
+    status = 'verified',
+    verified_by = $2,
+    verification_date = NOW(),
+    updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkVerifyCredentialsParams struct {
+	Column1    []pgtype.UUID `json:"column_1"`
+	VerifiedBy pgtype.UUID   `json:"verified_by"`
+}
+
+func (q *Queries) BulkVerifyCredentials(ctx context.Context, arg BulkVerifyCredentialsParams) error {
+	_, err := q.db.Exec(ctx, bulkVerifyCredentials, arg.Column1, arg.VerifiedBy)
+	return err
+}
+
+const checkCredentialNumberExists = `-- name: CheckCredentialNumberExists :one
+SELECT EXISTS(
+    SELECT 1 FROM professional_credentials
+    WHERE 
+        credential_number = $1
+        AND issuing_authority = $2
+        AND ($3::uuid IS NULL OR id != $3)
+) as exists
+`
+
+type CheckCredentialNumberExistsParams struct {
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	Column3          pgtype.UUID `json:"column_3"`
+}
+
+func (q *Queries) CheckCredentialNumberExists(ctx context.Context, arg CheckCredentialNumberExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkCredentialNumberExists, arg.CredentialNumber, arg.IssuingAuthority, arg.Column3)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const countCredentialsByType = `-- name: CountCredentialsByType :one
+SELECT COUNT(*)
+FROM professional_credentials
+WHERE 
+    staff_id = $1
+    AND credential_type = $2
+    AND status = 'verified'
+`
+
+type CountCredentialsByTypeParams struct {
+	StaffID        pgtype.UUID `json:"staff_id"`
+	CredentialType string      `json:"credential_type"`
+}
+
+func (q *Queries) CountCredentialsByType(ctx context.Context, arg CountCredentialsByTypeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countCredentialsByType, arg.StaffID, arg.CredentialType)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countStaffCredentials = `-- name: CountStaffCredentials :one
+
+SELECT COUNT(*) 
+FROM professional_credentials
+WHERE 
+    staff_id = $1
+    AND ($2::VARCHAR IS NULL OR status = $2)
+`
+
+type CountStaffCredentialsParams struct {
+	StaffID pgtype.UUID `json:"staff_id"`
+	Column2 string      `json:"column_2"`
+}
+
+// ============================================
+// COUNTING & EXISTENCE CHECKS
+// ============================================
+func (q *Queries) CountStaffCredentials(ctx context.Context, arg CountStaffCredentialsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countStaffCredentials, arg.StaffID, arg.Column2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createCredential = `-- name: CreateCredential :one
+
 
 INSERT INTO professional_credentials (
     staff_id, credential_type, credential_number, issuing_authority,
-    issue_date, expiry_date, status, document_url
+    issue_date, expiry_date, status, verified_by, verification_date,
+    document_url, notes
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, staff_id, credential_type, issuing_authority, 
-    status, created_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, staff_id, credential_type, credential_number, issuing_authority, issue_date, expiry_date, status, verified_by, verification_date, document_url, notes, created_at, updated_at
 `
 
-type AddProfessionalCredentialParams struct {
-	StaffID          pgtype.UUID `json:"staff_id"`
-	CredentialType   string      `json:"credential_type"`
-	CredentialNumber pgtype.Text `json:"credential_number"`
-	IssuingAuthority string      `json:"issuing_authority"`
-	IssueDate        pgtype.Date `json:"issue_date"`
-	ExpiryDate       pgtype.Date `json:"expiry_date"`
-	Status           pgtype.Text `json:"status"`
-	DocumentUrl      pgtype.Text `json:"document_url"`
-}
-
-type AddProfessionalCredentialRow struct {
-	ID               pgtype.UUID      `json:"id"`
-	StaffID          pgtype.UUID      `json:"staff_id"`
-	CredentialType   string           `json:"credential_type"`
-	IssuingAuthority string           `json:"issuing_authority"`
-	Status           pgtype.Text      `json:"status"`
-	CreatedAt        pgtype.Timestamp `json:"created_at"`
-}
-
-// ============================================
-// Professional Credentials Queries
-// ============================================
-func (q *Queries) AddProfessionalCredential(ctx context.Context, arg AddProfessionalCredentialParams) (AddProfessionalCredentialRow, error) {
-	row := q.db.QueryRow(ctx, addProfessionalCredential,
-		arg.StaffID,
-		arg.CredentialType,
-		arg.CredentialNumber,
-		arg.IssuingAuthority,
-		arg.IssueDate,
-		arg.ExpiryDate,
-		arg.Status,
-		arg.DocumentUrl,
-	)
-	var i AddProfessionalCredentialRow
-	err := row.Scan(
-		&i.ID,
-		&i.StaffID,
-		&i.CredentialType,
-		&i.IssuingAuthority,
-		&i.Status,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getStaffCredentials = `-- name: GetStaffCredentials :many
-SELECT id, staff_id, credential_type, credential_number, 
-    issuing_authority, issue_date, expiry_date, status,
-    verified_by, verification_date, document_url, notes
-FROM professional_credentials
-WHERE staff_id = $1
-ORDER BY issue_date DESC
-`
-
-type GetStaffCredentialsRow struct {
-	ID               pgtype.UUID      `json:"id"`
+type CreateCredentialParams struct {
 	StaffID          pgtype.UUID      `json:"staff_id"`
 	CredentialType   string           `json:"credential_type"`
 	CredentialNumber pgtype.Text      `json:"credential_number"`
@@ -92,15 +180,621 @@ type GetStaffCredentialsRow struct {
 	Notes            pgtype.Text      `json:"notes"`
 }
 
-func (q *Queries) GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]GetStaffCredentialsRow, error) {
-	rows, err := q.db.Query(ctx, getStaffCredentials, staffID)
+// ============================================
+// PROFESSIONAL CREDENTIALS REPOSITORY QUERIES
+// Maps to: Part of StaffRepository interface (credential methods)
+// Domain: Professional Licensing & Certification Management
+// ============================================
+// ============================================
+// CORE CRUD OPERATIONS
+// ============================================
+func (q *Queries) CreateCredential(ctx context.Context, arg CreateCredentialParams) (ProfessionalCredential, error) {
+	row := q.db.QueryRow(ctx, createCredential,
+		arg.StaffID,
+		arg.CredentialType,
+		arg.CredentialNumber,
+		arg.IssuingAuthority,
+		arg.IssueDate,
+		arg.ExpiryDate,
+		arg.Status,
+		arg.VerifiedBy,
+		arg.VerificationDate,
+		arg.DocumentUrl,
+		arg.Notes,
+	)
+	var i ProfessionalCredential
+	err := row.Scan(
+		&i.ID,
+		&i.StaffID,
+		&i.CredentialType,
+		&i.CredentialNumber,
+		&i.IssuingAuthority,
+		&i.IssueDate,
+		&i.ExpiryDate,
+		&i.Status,
+		&i.VerifiedBy,
+		&i.VerificationDate,
+		&i.DocumentUrl,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const credentialExists = `-- name: CredentialExists :one
+SELECT EXISTS(
+    SELECT 1 FROM professional_credentials 
+    WHERE id = $1
+) as exists
+`
+
+func (q *Queries) CredentialExists(ctx context.Context, id pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, credentialExists, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const deleteCredential = `-- name: DeleteCredential :exec
+DELETE FROM professional_credentials 
+WHERE id = $1
+`
+
+func (q *Queries) DeleteCredential(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteCredential, id)
+	return err
+}
+
+const deleteStaffCredentials = `-- name: DeleteStaffCredentials :exec
+DELETE FROM professional_credentials
+WHERE staff_id = $1
+`
+
+func (q *Queries) DeleteStaffCredentials(ctx context.Context, staffID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteStaffCredentials, staffID)
+	return err
+}
+
+const getActiveStaffCredentials = `-- name: GetActiveStaffCredentials :many
+SELECT 
+    id, credential_type, credential_number,
+    issuing_authority, expiry_date
+FROM professional_credentials
+WHERE 
+    staff_id = $1
+    AND status = 'verified'
+    AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+ORDER BY credential_type
+`
+
+type GetActiveStaffCredentialsRow struct {
+	ID               pgtype.UUID `json:"id"`
+	CredentialType   string      `json:"credential_type"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+}
+
+func (q *Queries) GetActiveStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]GetActiveStaffCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getActiveStaffCredentials, staffID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetStaffCredentialsRow{}
+	items := []GetActiveStaffCredentialsRow{}
 	for rows.Next() {
-		var i GetStaffCredentialsRow
+		var i GetActiveStaffCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.ExpiryDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCertificationCredentials = `-- name: GetCertificationCredentials :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_number,
+    pc.issuing_authority, pc.issue_date, pc.expiry_date, pc.status,
+    cs.first_name, cs.last_name
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE pc.credential_type = 'certification'
+ORDER BY pc.expiry_date ASC NULLS LAST
+`
+
+type GetCertificationCredentialsRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	IssueDate        pgtype.Date `json:"issue_date"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	Status           pgtype.Text `json:"status"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+}
+
+func (q *Queries) GetCertificationCredentials(ctx context.Context) ([]GetCertificationCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getCertificationCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCertificationCredentialsRow{}
+	for rows.Next() {
+		var i GetCertificationCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.Status,
+			&i.FirstName,
+			&i.LastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicCredentialMetrics = `-- name: GetClinicCredentialMetrics :one
+SELECT 
+    COUNT(DISTINCT pc.id) as total_credentials,
+    COUNT(DISTINCT pc.id) FILTER (WHERE pc.status = 'verified') as verified_credentials,
+    COUNT(DISTINCT pc.id) FILTER (WHERE pc.status = 'pending') as pending_credentials,
+    COUNT(DISTINCT pc.id) FILTER (WHERE pc.expiry_date < CURRENT_DATE AND pc.status = 'verified') as expired_credentials,
+    COUNT(DISTINCT pc.staff_id) as staff_with_credentials,
+    AVG(EXTRACT(YEAR FROM AGE(pc.expiry_date, pc.issue_date))) FILTER (WHERE pc.expiry_date IS NOT NULL) as avg_credential_duration
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE cs.clinic_id = $1
+`
+
+type GetClinicCredentialMetricsRow struct {
+	TotalCredentials      int64   `json:"total_credentials"`
+	VerifiedCredentials   int64   `json:"verified_credentials"`
+	PendingCredentials    int64   `json:"pending_credentials"`
+	ExpiredCredentials    int64   `json:"expired_credentials"`
+	StaffWithCredentials  int64   `json:"staff_with_credentials"`
+	AvgCredentialDuration float64 `json:"avg_credential_duration"`
+}
+
+func (q *Queries) GetClinicCredentialMetrics(ctx context.Context, clinicID pgtype.UUID) (GetClinicCredentialMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getClinicCredentialMetrics, clinicID)
+	var i GetClinicCredentialMetricsRow
+	err := row.Scan(
+		&i.TotalCredentials,
+		&i.VerifiedCredentials,
+		&i.PendingCredentials,
+		&i.ExpiredCredentials,
+		&i.StaffWithCredentials,
+		&i.AvgCredentialDuration,
+	)
+	return i, err
+}
+
+const getCredentialByID = `-- name: GetCredentialByID :one
+SELECT id, staff_id, credential_type, credential_number, issuing_authority, issue_date, expiry_date, status, verified_by, verification_date, document_url, notes, created_at, updated_at FROM professional_credentials
+WHERE id = $1
+`
+
+func (q *Queries) GetCredentialByID(ctx context.Context, id pgtype.UUID) (ProfessionalCredential, error) {
+	row := q.db.QueryRow(ctx, getCredentialByID, id)
+	var i ProfessionalCredential
+	err := row.Scan(
+		&i.ID,
+		&i.StaffID,
+		&i.CredentialType,
+		&i.CredentialNumber,
+		&i.IssuingAuthority,
+		&i.IssueDate,
+		&i.ExpiryDate,
+		&i.Status,
+		&i.VerifiedBy,
+		&i.VerificationDate,
+		&i.DocumentUrl,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getCredentialRenewalHistory = `-- name: GetCredentialRenewalHistory :many
+SELECT 
+    id, credential_type, credential_number,
+    issue_date, expiry_date, status, updated_at
+FROM professional_credentials
+WHERE 
+    staff_id = $1
+    AND credential_type = $2
+ORDER BY issue_date DESC
+`
+
+type GetCredentialRenewalHistoryParams struct {
+	StaffID        pgtype.UUID `json:"staff_id"`
+	CredentialType string      `json:"credential_type"`
+}
+
+type GetCredentialRenewalHistoryRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	CredentialType   string           `json:"credential_type"`
+	CredentialNumber pgtype.Text      `json:"credential_number"`
+	IssueDate        pgtype.Date      `json:"issue_date"`
+	ExpiryDate       pgtype.Date      `json:"expiry_date"`
+	Status           pgtype.Text      `json:"status"`
+	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
+}
+
+func (q *Queries) GetCredentialRenewalHistory(ctx context.Context, arg GetCredentialRenewalHistoryParams) ([]GetCredentialRenewalHistoryRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialRenewalHistory, arg.StaffID, arg.CredentialType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialRenewalHistoryRow{}
+	for rows.Next() {
+		var i GetCredentialRenewalHistoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.Status,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCredentialStatistics = `-- name: GetCredentialStatistics :one
+
+SELECT 
+    COUNT(*) as total_credentials,
+    COUNT(*) FILTER (WHERE status = 'verified') as verified_count,
+    COUNT(*) FILTER (WHERE status = 'pending') as pending_count,
+    COUNT(*) FILTER (WHERE status = 'expired') as expired_count,
+    COUNT(*) FILTER (WHERE status = 'revoked') as revoked_count,
+    COUNT(*) FILTER (WHERE status = 'rejected') as rejected_count,
+    COUNT(*) FILTER (WHERE expiry_date < CURRENT_DATE AND status = 'verified') as overdue_renewals
+FROM professional_credentials
+WHERE staff_id = $1
+`
+
+type GetCredentialStatisticsRow struct {
+	TotalCredentials int64 `json:"total_credentials"`
+	VerifiedCount    int64 `json:"verified_count"`
+	PendingCount     int64 `json:"pending_count"`
+	ExpiredCount     int64 `json:"expired_count"`
+	RevokedCount     int64 `json:"revoked_count"`
+	RejectedCount    int64 `json:"rejected_count"`
+	OverdueRenewals  int64 `json:"overdue_renewals"`
+}
+
+// ============================================
+// STATISTICS & ANALYTICS
+// ============================================
+func (q *Queries) GetCredentialStatistics(ctx context.Context, staffID pgtype.UUID) (GetCredentialStatisticsRow, error) {
+	row := q.db.QueryRow(ctx, getCredentialStatistics, staffID)
+	var i GetCredentialStatisticsRow
+	err := row.Scan(
+		&i.TotalCredentials,
+		&i.VerifiedCount,
+		&i.PendingCount,
+		&i.ExpiredCount,
+		&i.RevokedCount,
+		&i.RejectedCount,
+		&i.OverdueRenewals,
+	)
+	return i, err
+}
+
+const getCredentialStatusDistribution = `-- name: GetCredentialStatusDistribution :many
+SELECT 
+    status,
+    COUNT(*) as count,
+    COUNT(*) FILTER (WHERE expiry_date IS NOT NULL) as with_expiry
+FROM professional_credentials
+WHERE staff_id = $1
+GROUP BY status
+ORDER BY 
+    CASE status
+        WHEN 'verified' THEN 1
+        WHEN 'pending' THEN 2
+        WHEN 'expired' THEN 3
+        ELSE 4
+    END
+`
+
+type GetCredentialStatusDistributionRow struct {
+	Status     pgtype.Text `json:"status"`
+	Count      int64       `json:"count"`
+	WithExpiry int64       `json:"with_expiry"`
+}
+
+func (q *Queries) GetCredentialStatusDistribution(ctx context.Context, staffID pgtype.UUID) ([]GetCredentialStatusDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialStatusDistribution, staffID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialStatusDistributionRow{}
+	for rows.Next() {
+		var i GetCredentialStatusDistributionRow
+		if err := rows.Scan(&i.Status, &i.Count, &i.WithExpiry); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCredentialTypeDistribution = `-- name: GetCredentialTypeDistribution :many
+SELECT 
+    credential_type,
+    COUNT(*) as count,
+    COUNT(*) FILTER (WHERE status = 'verified') as verified_count,
+    COUNT(*) FILTER (WHERE expiry_date < CURRENT_DATE AND status = 'verified') as expired_count
+FROM professional_credentials
+WHERE staff_id = $1
+GROUP BY credential_type
+ORDER BY count DESC
+`
+
+type GetCredentialTypeDistributionRow struct {
+	CredentialType string `json:"credential_type"`
+	Count          int64  `json:"count"`
+	VerifiedCount  int64  `json:"verified_count"`
+	ExpiredCount   int64  `json:"expired_count"`
+}
+
+func (q *Queries) GetCredentialTypeDistribution(ctx context.Context, staffID pgtype.UUID) ([]GetCredentialTypeDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialTypeDistribution, staffID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialTypeDistributionRow{}
+	for rows.Next() {
+		var i GetCredentialTypeDistributionRow
+		if err := rows.Scan(
+			&i.CredentialType,
+			&i.Count,
+			&i.VerifiedCount,
+			&i.ExpiredCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCredentialsByAuthority = `-- name: GetCredentialsByAuthority :many
+
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.issue_date, pc.expiry_date, pc.status,
+    cs.first_name, cs.last_name
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE pc.issuing_authority = $1
+ORDER BY pc.issue_date DESC
+`
+
+type GetCredentialsByAuthorityRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialType   string      `json:"credential_type"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssueDate        pgtype.Date `json:"issue_date"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	Status           pgtype.Text `json:"status"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+}
+
+// ============================================
+// ISSUING AUTHORITY QUERIES
+// ============================================
+func (q *Queries) GetCredentialsByAuthority(ctx context.Context, issuingAuthority string) ([]GetCredentialsByAuthorityRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialsByAuthority, issuingAuthority)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialsByAuthorityRow{}
+	for rows.Next() {
+		var i GetCredentialsByAuthorityRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.Status,
+			&i.FirstName,
+			&i.LastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCredentialsByAuthorityAndType = `-- name: GetCredentialsByAuthorityAndType :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_number,
+    pc.issue_date, pc.expiry_date, pc.status,
+    cs.first_name, cs.last_name
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    pc.issuing_authority = $1
+    AND pc.credential_type = $2
+ORDER BY pc.issue_date DESC
+`
+
+type GetCredentialsByAuthorityAndTypeParams struct {
+	IssuingAuthority string `json:"issuing_authority"`
+	CredentialType   string `json:"credential_type"`
+}
+
+type GetCredentialsByAuthorityAndTypeRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssueDate        pgtype.Date `json:"issue_date"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	Status           pgtype.Text `json:"status"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+}
+
+func (q *Queries) GetCredentialsByAuthorityAndType(ctx context.Context, arg GetCredentialsByAuthorityAndTypeParams) ([]GetCredentialsByAuthorityAndTypeRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialsByAuthorityAndType, arg.IssuingAuthority, arg.CredentialType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialsByAuthorityAndTypeRow{}
+	for rows.Next() {
+		var i GetCredentialsByAuthorityAndTypeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialNumber,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.Status,
+			&i.FirstName,
+			&i.LastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCredentialsByDateRange = `-- name: GetCredentialsByDateRange :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.status, pc.created_at,
+    cs.first_name, cs.last_name, cs.clinic_id
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    pc.created_at >= $1
+    AND pc.created_at <= $2
+ORDER BY pc.created_at DESC
+`
+
+type GetCredentialsByDateRangeParams struct {
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
+	CreatedAt_2 pgtype.Timestamp `json:"created_at_2"`
+}
+
+type GetCredentialsByDateRangeRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	StaffID          pgtype.UUID      `json:"staff_id"`
+	CredentialType   string           `json:"credential_type"`
+	CredentialNumber pgtype.Text      `json:"credential_number"`
+	Status           pgtype.Text      `json:"status"`
+	CreatedAt        pgtype.Timestamp `json:"created_at"`
+	FirstName        string           `json:"first_name"`
+	LastName         string           `json:"last_name"`
+	ClinicID         pgtype.UUID      `json:"clinic_id"`
+}
+
+func (q *Queries) GetCredentialsByDateRange(ctx context.Context, arg GetCredentialsByDateRangeParams) ([]GetCredentialsByDateRangeRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialsByDateRange, arg.CreatedAt, arg.CreatedAt_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialsByDateRangeRow{}
+	for rows.Next() {
+		var i GetCredentialsByDateRangeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.Status,
+			&i.CreatedAt,
+			&i.FirstName,
+			&i.LastName,
+			&i.ClinicID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCredentialsByIDs = `-- name: GetCredentialsByIDs :many
+
+SELECT id, staff_id, credential_type, credential_number, issuing_authority, issue_date, expiry_date, status, verified_by, verification_date, document_url, notes, created_at, updated_at FROM professional_credentials
+WHERE id = ANY($1::uuid[])
+ORDER BY created_at DESC
+`
+
+// ============================================
+// BULK OPERATIONS
+// ============================================
+func (q *Queries) GetCredentialsByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ProfessionalCredential, error) {
+	rows, err := q.db.Query(ctx, getCredentialsByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProfessionalCredential{}
+	for rows.Next() {
+		var i ProfessionalCredential
 		if err := rows.Scan(
 			&i.ID,
 			&i.StaffID,
@@ -114,6 +808,8 @@ func (q *Queries) GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) 
 			&i.VerificationDate,
 			&i.DocumentUrl,
 			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -125,44 +821,1368 @@ func (q *Queries) GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) 
 	return items, nil
 }
 
+const getCredentialsByType = `-- name: GetCredentialsByType :many
+
+SELECT 
+    pc.id, pc.staff_id, pc.credential_number,
+    pc.issuing_authority, pc.issue_date, pc.expiry_date, pc.status,
+    cs.first_name, cs.last_name, cs.clinic_id
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE pc.credential_type = $1
+ORDER BY pc.expiry_date ASC NULLS LAST
+`
+
+type GetCredentialsByTypeRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	IssueDate        pgtype.Date `json:"issue_date"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	Status           pgtype.Text `json:"status"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+	ClinicID         pgtype.UUID `json:"clinic_id"`
+}
+
+// ============================================
+// CREDENTIAL TYPE QUERIES
+// ============================================
+func (q *Queries) GetCredentialsByType(ctx context.Context, credentialType string) ([]GetCredentialsByTypeRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialsByType, credentialType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialsByTypeRow{}
+	for rows.Next() {
+		var i GetCredentialsByTypeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.Status,
+			&i.FirstName,
+			&i.LastName,
+			&i.ClinicID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCredentialsExpiringWithinDays = `-- name: GetCredentialsExpiringWithinDays :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.issuing_authority, pc.expiry_date,
+    cs.first_name, cs.last_name, cs.clinic_id, cs.work_email,
+    CURRENT_DATE - pc.expiry_date as days_until_expiry
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    pc.expiry_date <= CURRENT_DATE + ($1 || ' days')::INTERVAL
+    AND pc.expiry_date >= CURRENT_DATE
+    AND pc.status = 'verified'
+ORDER BY pc.expiry_date ASC
+`
+
+type GetCredentialsExpiringWithinDaysRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialType   string      `json:"credential_type"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+	ClinicID         pgtype.UUID `json:"clinic_id"`
+	WorkEmail        pgtype.Text `json:"work_email"`
+	DaysUntilExpiry  int32       `json:"days_until_expiry"`
+}
+
+func (q *Queries) GetCredentialsExpiringWithinDays(ctx context.Context, dollar_1 pgtype.Text) ([]GetCredentialsExpiringWithinDaysRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialsExpiringWithinDays, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialsExpiringWithinDaysRow{}
+	for rows.Next() {
+		var i GetCredentialsExpiringWithinDaysRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.ExpiryDate,
+			&i.FirstName,
+			&i.LastName,
+			&i.ClinicID,
+			&i.WorkEmail,
+			&i.DaysUntilExpiry,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCredentialsNeedingRenewal = `-- name: GetCredentialsNeedingRenewal :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.issuing_authority, pc.expiry_date,
+    cs.first_name, cs.last_name, cs.work_email
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    pc.expiry_date <= CURRENT_DATE + INTERVAL '30 days'
+    AND pc.expiry_date >= CURRENT_DATE
+    AND pc.status = 'verified'
+ORDER BY pc.expiry_date ASC
+`
+
+type GetCredentialsNeedingRenewalRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialType   string      `json:"credential_type"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+	WorkEmail        pgtype.Text `json:"work_email"`
+}
+
+func (q *Queries) GetCredentialsNeedingRenewal(ctx context.Context) ([]GetCredentialsNeedingRenewalRow, error) {
+	rows, err := q.db.Query(ctx, getCredentialsNeedingRenewal)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCredentialsNeedingRenewalRow{}
+	for rows.Next() {
+		var i GetCredentialsNeedingRenewalRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.ExpiryDate,
+			&i.FirstName,
+			&i.LastName,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getDegreeCredentials = `-- name: GetDegreeCredentials :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_number,
+    pc.issuing_authority, pc.issue_date,
+    cs.first_name, cs.last_name
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE pc.credential_type = 'degree'
+ORDER BY pc.issue_date DESC
+`
+
+type GetDegreeCredentialsRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	IssueDate        pgtype.Date `json:"issue_date"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+}
+
+func (q *Queries) GetDegreeCredentials(ctx context.Context) ([]GetDegreeCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getDegreeCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetDegreeCredentialsRow{}
+	for rows.Next() {
+		var i GetDegreeCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.IssueDate,
+			&i.FirstName,
+			&i.LastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getExpiredCredentials = `-- name: GetExpiredCredentials :many
+
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.issuing_authority, pc.expiry_date,
+    cs.first_name, cs.last_name, cs.clinic_id, cs.work_email
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    pc.expiry_date < CURRENT_DATE
+    AND pc.status = 'verified'
+ORDER BY pc.expiry_date ASC
+`
+
+type GetExpiredCredentialsRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialType   string      `json:"credential_type"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+	ClinicID         pgtype.UUID `json:"clinic_id"`
+	WorkEmail        pgtype.Text `json:"work_email"`
+}
+
+// ============================================
+// EXPIRATION & RENEWAL MANAGEMENT
+// ============================================
+func (q *Queries) GetExpiredCredentials(ctx context.Context) ([]GetExpiredCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getExpiredCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetExpiredCredentialsRow{}
+	for rows.Next() {
+		var i GetExpiredCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.ExpiryDate,
+			&i.FirstName,
+			&i.LastName,
+			&i.ClinicID,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getExpiredCredentialsByClinic = `-- name: GetExpiredCredentialsByClinic :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type,
+    pc.credential_number, pc.expiry_date,
+    cs.first_name, cs.last_name, cs.work_email
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    cs.clinic_id = $1
+    AND pc.expiry_date < CURRENT_DATE
+    AND pc.status = 'verified'
+ORDER BY pc.expiry_date ASC
+`
+
+type GetExpiredCredentialsByClinicRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialType   string      `json:"credential_type"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+	WorkEmail        pgtype.Text `json:"work_email"`
+}
+
+func (q *Queries) GetExpiredCredentialsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]GetExpiredCredentialsByClinicRow, error) {
+	rows, err := q.db.Query(ctx, getExpiredCredentialsByClinic, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetExpiredCredentialsByClinicRow{}
+	for rows.Next() {
+		var i GetExpiredCredentialsByClinicRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.ExpiryDate,
+			&i.FirstName,
+			&i.LastName,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLicenseCredentials = `-- name: GetLicenseCredentials :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_number,
+    pc.issuing_authority, pc.expiry_date, pc.status,
+    cs.first_name, cs.last_name, cs.clinic_id
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    pc.credential_type = 'professional_license'
+    AND ($1::uuid IS NULL OR cs.clinic_id = $1)
+ORDER BY pc.expiry_date ASC NULLS LAST
+`
+
+type GetLicenseCredentialsRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	Status           pgtype.Text `json:"status"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+	ClinicID         pgtype.UUID `json:"clinic_id"`
+}
+
+func (q *Queries) GetLicenseCredentials(ctx context.Context, dollar_1 pgtype.UUID) ([]GetLicenseCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getLicenseCredentials, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetLicenseCredentialsRow{}
+	for rows.Next() {
+		var i GetLicenseCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.ExpiryDate,
+			&i.Status,
+			&i.FirstName,
+			&i.LastName,
+			&i.ClinicID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPendingCredentialVerifications = `-- name: GetPendingCredentialVerifications :many
+
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.issuing_authority, pc.issue_date, pc.expiry_date,
+    pc.document_url, pc.notes, pc.created_at,
+    cs.first_name, cs.last_name, cs.clinic_id, cs.work_email
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE pc.status = 'pending'
+ORDER BY pc.created_at ASC
+`
+
+type GetPendingCredentialVerificationsRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	StaffID          pgtype.UUID      `json:"staff_id"`
+	CredentialType   string           `json:"credential_type"`
+	CredentialNumber pgtype.Text      `json:"credential_number"`
+	IssuingAuthority string           `json:"issuing_authority"`
+	IssueDate        pgtype.Date      `json:"issue_date"`
+	ExpiryDate       pgtype.Date      `json:"expiry_date"`
+	DocumentUrl      pgtype.Text      `json:"document_url"`
+	Notes            pgtype.Text      `json:"notes"`
+	CreatedAt        pgtype.Timestamp `json:"created_at"`
+	FirstName        string           `json:"first_name"`
+	LastName         string           `json:"last_name"`
+	ClinicID         pgtype.UUID      `json:"clinic_id"`
+	WorkEmail        pgtype.Text      `json:"work_email"`
+}
+
+// ============================================
+// VERIFICATION WORKFLOWS
+// ============================================
+func (q *Queries) GetPendingCredentialVerifications(ctx context.Context) ([]GetPendingCredentialVerificationsRow, error) {
+	rows, err := q.db.Query(ctx, getPendingCredentialVerifications)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPendingCredentialVerificationsRow{}
+	for rows.Next() {
+		var i GetPendingCredentialVerificationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.DocumentUrl,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.FirstName,
+			&i.LastName,
+			&i.ClinicID,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPendingCredentialsByClinic = `-- name: GetPendingCredentialsByClinic :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.issuing_authority, pc.created_at,
+    cs.first_name, cs.last_name, cs.work_email
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    cs.clinic_id = $1
+    AND pc.status = 'pending'
+ORDER BY pc.created_at ASC
+`
+
+type GetPendingCredentialsByClinicRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	StaffID          pgtype.UUID      `json:"staff_id"`
+	CredentialType   string           `json:"credential_type"`
+	CredentialNumber pgtype.Text      `json:"credential_number"`
+	IssuingAuthority string           `json:"issuing_authority"`
+	CreatedAt        pgtype.Timestamp `json:"created_at"`
+	FirstName        string           `json:"first_name"`
+	LastName         string           `json:"last_name"`
+	WorkEmail        pgtype.Text      `json:"work_email"`
+}
+
+func (q *Queries) GetPendingCredentialsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]GetPendingCredentialsByClinicRow, error) {
+	rows, err := q.db.Query(ctx, getPendingCredentialsByClinic, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPendingCredentialsByClinicRow{}
+	for rows.Next() {
+		var i GetPendingCredentialsByClinicRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.CreatedAt,
+			&i.FirstName,
+			&i.LastName,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRecentlyVerifiedCredentials = `-- name: GetRecentlyVerifiedCredentials :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.verified_by, pc.verification_date,
+    cs.first_name, cs.last_name, cs.clinic_id
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE 
+    pc.status = 'verified'
+    AND pc.verification_date >= CURRENT_DATE - INTERVAL '30 days'
+ORDER BY pc.verification_date DESC
+`
+
+type GetRecentlyVerifiedCredentialsRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	StaffID          pgtype.UUID      `json:"staff_id"`
+	CredentialType   string           `json:"credential_type"`
+	CredentialNumber pgtype.Text      `json:"credential_number"`
+	VerifiedBy       pgtype.UUID      `json:"verified_by"`
+	VerificationDate pgtype.Timestamp `json:"verification_date"`
+	FirstName        string           `json:"first_name"`
+	LastName         string           `json:"last_name"`
+	ClinicID         pgtype.UUID      `json:"clinic_id"`
+}
+
+func (q *Queries) GetRecentlyVerifiedCredentials(ctx context.Context) ([]GetRecentlyVerifiedCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getRecentlyVerifiedCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRecentlyVerifiedCredentialsRow{}
+	for rows.Next() {
+		var i GetRecentlyVerifiedCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.VerifiedBy,
+			&i.VerificationDate,
+			&i.FirstName,
+			&i.LastName,
+			&i.ClinicID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRejectedCredentials = `-- name: GetRejectedCredentials :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type,
+    pc.verified_by, pc.verification_date, pc.notes,
+    cs.first_name, cs.last_name, cs.work_email
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE pc.status = 'rejected'
+ORDER BY pc.verification_date DESC
+`
+
+type GetRejectedCredentialsRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	StaffID          pgtype.UUID      `json:"staff_id"`
+	CredentialType   string           `json:"credential_type"`
+	VerifiedBy       pgtype.UUID      `json:"verified_by"`
+	VerificationDate pgtype.Timestamp `json:"verification_date"`
+	Notes            pgtype.Text      `json:"notes"`
+	FirstName        string           `json:"first_name"`
+	LastName         string           `json:"last_name"`
+	WorkEmail        pgtype.Text      `json:"work_email"`
+}
+
+func (q *Queries) GetRejectedCredentials(ctx context.Context) ([]GetRejectedCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getRejectedCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRejectedCredentialsRow{}
+	for rows.Next() {
+		var i GetRejectedCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.VerifiedBy,
+			&i.VerificationDate,
+			&i.Notes,
+			&i.FirstName,
+			&i.LastName,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRevokedCredentials = `-- name: GetRevokedCredentials :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
+    pc.issuing_authority, pc.notes, pc.updated_at,
+    cs.first_name, cs.last_name, cs.clinic_id, cs.work_email
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE pc.status = 'revoked'
+ORDER BY pc.updated_at DESC
+`
+
+type GetRevokedCredentialsRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	StaffID          pgtype.UUID      `json:"staff_id"`
+	CredentialType   string           `json:"credential_type"`
+	CredentialNumber pgtype.Text      `json:"credential_number"`
+	IssuingAuthority string           `json:"issuing_authority"`
+	Notes            pgtype.Text      `json:"notes"`
+	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
+	FirstName        string           `json:"first_name"`
+	LastName         string           `json:"last_name"`
+	ClinicID         pgtype.UUID      `json:"clinic_id"`
+	WorkEmail        pgtype.Text      `json:"work_email"`
+}
+
+func (q *Queries) GetRevokedCredentials(ctx context.Context) ([]GetRevokedCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getRevokedCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRevokedCredentialsRow{}
+	for rows.Next() {
+		var i GetRevokedCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.Notes,
+			&i.UpdatedAt,
+			&i.FirstName,
+			&i.LastName,
+			&i.ClinicID,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpecializationCredentials = `-- name: GetSpecializationCredentials :many
+SELECT 
+    pc.id, pc.staff_id, pc.credential_number,
+    pc.issuing_authority, pc.issue_date, pc.status,
+    cs.first_name, cs.last_name
+FROM professional_credentials pc
+JOIN clinic_staff cs ON pc.staff_id = cs.id
+WHERE pc.credential_type = 'specialization'
+ORDER BY pc.issue_date DESC
+`
+
+type GetSpecializationCredentialsRow struct {
+	ID               pgtype.UUID `json:"id"`
+	StaffID          pgtype.UUID `json:"staff_id"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	IssueDate        pgtype.Date `json:"issue_date"`
+	Status           pgtype.Text `json:"status"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+}
+
+func (q *Queries) GetSpecializationCredentials(ctx context.Context) ([]GetSpecializationCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getSpecializationCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetSpecializationCredentialsRow{}
+	for rows.Next() {
+		var i GetSpecializationCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.IssueDate,
+			&i.Status,
+			&i.FirstName,
+			&i.LastName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffCredentials = `-- name: GetStaffCredentials :many
+
+SELECT 
+    id, staff_id, credential_type, credential_number,
+    issuing_authority, issue_date, expiry_date, status,
+    verified_by, verification_date, document_url, notes,
+    created_at, updated_at
+FROM professional_credentials
+WHERE staff_id = $1
+ORDER BY 
+    CASE status
+        WHEN 'verified' THEN 1
+        WHEN 'pending' THEN 2
+        WHEN 'expired' THEN 3
+        WHEN 'revoked' THEN 4
+        WHEN 'rejected' THEN 5
+        ELSE 6
+    END,
+    expiry_date ASC NULLS LAST,
+    issue_date DESC
+`
+
+// ============================================
+// QUERYING BY STAFF MEMBER
+// ============================================
+func (q *Queries) GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]ProfessionalCredential, error) {
+	rows, err := q.db.Query(ctx, getStaffCredentials, staffID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProfessionalCredential{}
+	for rows.Next() {
+		var i ProfessionalCredential
+		if err := rows.Scan(
+			&i.ID,
+			&i.StaffID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.Status,
+			&i.VerifiedBy,
+			&i.VerificationDate,
+			&i.DocumentUrl,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffCredentialsByType = `-- name: GetStaffCredentialsByType :many
+SELECT 
+    id, credential_number, issuing_authority,
+    issue_date, expiry_date, status
+FROM professional_credentials
+WHERE 
+    staff_id = $1
+    AND credential_type = $2
+ORDER BY issue_date DESC
+`
+
+type GetStaffCredentialsByTypeParams struct {
+	StaffID        pgtype.UUID `json:"staff_id"`
+	CredentialType string      `json:"credential_type"`
+}
+
+type GetStaffCredentialsByTypeRow struct {
+	ID               pgtype.UUID `json:"id"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	IssueDate        pgtype.Date `json:"issue_date"`
+	ExpiryDate       pgtype.Date `json:"expiry_date"`
+	Status           pgtype.Text `json:"status"`
+}
+
+func (q *Queries) GetStaffCredentialsByType(ctx context.Context, arg GetStaffCredentialsByTypeParams) ([]GetStaffCredentialsByTypeRow, error) {
+	rows, err := q.db.Query(ctx, getStaffCredentialsByType, arg.StaffID, arg.CredentialType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffCredentialsByTypeRow{}
+	for rows.Next() {
+		var i GetStaffCredentialsByTypeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.Status,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffWithoutRequiredCredentials = `-- name: GetStaffWithoutRequiredCredentials :many
+
+SELECT DISTINCT
+    cs.id, cs.clinic_id, cs.first_name, cs.last_name,
+    cs.professional_title, cs.staff_role, cs.work_email
+FROM clinic_staff cs
+LEFT JOIN professional_credentials pc ON cs.id = pc.staff_id 
+    AND pc.credential_type = 'professional_license'
+    AND pc.status = 'verified'
+    AND (pc.expiry_date IS NULL OR pc.expiry_date >= CURRENT_DATE)
+WHERE 
+    cs.employment_status = 'active'
+    AND cs.staff_role IN ('doctor', 'nurse')
+    AND pc.id IS NULL
+ORDER BY cs.clinic_id, cs.last_name
+`
+
+type GetStaffWithoutRequiredCredentialsRow struct {
+	ID                pgtype.UUID `json:"id"`
+	ClinicID          pgtype.UUID `json:"clinic_id"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	StaffRole         string      `json:"staff_role"`
+	WorkEmail         pgtype.Text `json:"work_email"`
+}
+
+// ============================================
+// COMPLIANCE & REPORTING
+// ============================================
+func (q *Queries) GetStaffWithoutRequiredCredentials(ctx context.Context) ([]GetStaffWithoutRequiredCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getStaffWithoutRequiredCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffWithoutRequiredCredentialsRow{}
+	for rows.Next() {
+		var i GetStaffWithoutRequiredCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.StaffRole,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSystemCredentialMetrics = `-- name: GetSystemCredentialMetrics :one
+SELECT 
+    COUNT(*) as total_credentials,
+    COUNT(DISTINCT staff_id) as total_staff_with_credentials,
+    COUNT(*) FILTER (WHERE status = 'verified') as verified_credentials,
+    COUNT(*) FILTER (WHERE status = 'pending') as pending_verifications,
+    COUNT(*) FILTER (WHERE expiry_date < CURRENT_DATE AND status = 'verified') as expired_credentials,
+    COUNT(*) FILTER (WHERE expiry_date <= CURRENT_DATE + INTERVAL '30 days' AND expiry_date >= CURRENT_DATE) as expiring_soon,
+    COUNT(DISTINCT issuing_authority) as unique_authorities,
+    AVG(EXTRACT(DAY FROM AGE(verification_date, created_at))) FILTER (WHERE verification_date IS NOT NULL) as avg_verification_time_days
+FROM professional_credentials
+`
+
+type GetSystemCredentialMetricsRow struct {
+	TotalCredentials          int64   `json:"total_credentials"`
+	TotalStaffWithCredentials int64   `json:"total_staff_with_credentials"`
+	VerifiedCredentials       int64   `json:"verified_credentials"`
+	PendingVerifications      int64   `json:"pending_verifications"`
+	ExpiredCredentials        int64   `json:"expired_credentials"`
+	ExpiringSoon              int64   `json:"expiring_soon"`
+	UniqueAuthorities         int64   `json:"unique_authorities"`
+	AvgVerificationTimeDays   float64 `json:"avg_verification_time_days"`
+}
+
+func (q *Queries) GetSystemCredentialMetrics(ctx context.Context) (GetSystemCredentialMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getSystemCredentialMetrics)
+	var i GetSystemCredentialMetricsRow
+	err := row.Scan(
+		&i.TotalCredentials,
+		&i.TotalStaffWithCredentials,
+		&i.VerifiedCredentials,
+		&i.PendingVerifications,
+		&i.ExpiredCredentials,
+		&i.ExpiringSoon,
+		&i.UniqueAuthorities,
+		&i.AvgVerificationTimeDays,
+	)
+	return i, err
+}
+
+const getVerificationBacklog = `-- name: GetVerificationBacklog :many
+SELECT 
+    DATE(pc.created_at) as submission_date,
+    COUNT(*) as pending_count,
+    AVG(EXTRACT(DAY FROM AGE(CURRENT_TIMESTAMP, pc.created_at))) as avg_days_pending
+FROM professional_credentials pc
+WHERE pc.status = 'pending'
+GROUP BY DATE(pc.created_at)
+ORDER BY submission_date DESC
+`
+
+type GetVerificationBacklogRow struct {
+	SubmissionDate pgtype.Date `json:"submission_date"`
+	PendingCount   int64       `json:"pending_count"`
+	AvgDaysPending float64     `json:"avg_days_pending"`
+}
+
+func (q *Queries) GetVerificationBacklog(ctx context.Context) ([]GetVerificationBacklogRow, error) {
+	rows, err := q.db.Query(ctx, getVerificationBacklog)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetVerificationBacklogRow{}
+	for rows.Next() {
+		var i GetVerificationBacklogRow
+		if err := rows.Scan(&i.SubmissionDate, &i.PendingCount, &i.AvgDaysPending); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVerifiedStaffCredentials = `-- name: GetVerifiedStaffCredentials :many
+SELECT 
+    id, credential_type, credential_number,
+    issuing_authority, issue_date, expiry_date,
+    verification_date, verified_by
+FROM professional_credentials
+WHERE 
+    staff_id = $1
+    AND status = 'verified'
+ORDER BY issue_date DESC
+`
+
+type GetVerifiedStaffCredentialsRow struct {
+	ID               pgtype.UUID      `json:"id"`
+	CredentialType   string           `json:"credential_type"`
+	CredentialNumber pgtype.Text      `json:"credential_number"`
+	IssuingAuthority string           `json:"issuing_authority"`
+	IssueDate        pgtype.Date      `json:"issue_date"`
+	ExpiryDate       pgtype.Date      `json:"expiry_date"`
+	VerificationDate pgtype.Timestamp `json:"verification_date"`
+	VerifiedBy       pgtype.UUID      `json:"verified_by"`
+}
+
+func (q *Queries) GetVerifiedStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]GetVerifiedStaffCredentialsRow, error) {
+	rows, err := q.db.Query(ctx, getVerifiedStaffCredentials, staffID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetVerifiedStaffCredentialsRow{}
+	for rows.Next() {
+		var i GetVerifiedStaffCredentialsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CredentialType,
+			&i.CredentialNumber,
+			&i.IssuingAuthority,
+			&i.IssueDate,
+			&i.ExpiryDate,
+			&i.VerificationDate,
+			&i.VerifiedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVerifierWorkload = `-- name: GetVerifierWorkload :many
+SELECT 
+    u.id as verifier_id,
+    u.email as verifier_email,
+    COUNT(*) as verified_count,
+    MIN(pc.verification_date) as first_verification,
+    MAX(pc.verification_date) as last_verification
+FROM professional_credentials pc
+JOIN users u ON pc.verified_by = u.id
+WHERE 
+    pc.verification_date >= $1
+    AND pc.verification_date <= $2
+GROUP BY u.id, u.email
+ORDER BY verified_count DESC
+`
+
+type GetVerifierWorkloadParams struct {
+	VerificationDate   pgtype.Timestamp `json:"verification_date"`
+	VerificationDate_2 pgtype.Timestamp `json:"verification_date_2"`
+}
+
+type GetVerifierWorkloadRow struct {
+	VerifierID        pgtype.UUID `json:"verifier_id"`
+	VerifierEmail     string      `json:"verifier_email"`
+	VerifiedCount     int64       `json:"verified_count"`
+	FirstVerification interface{} `json:"first_verification"`
+	LastVerification  interface{} `json:"last_verification"`
+}
+
+func (q *Queries) GetVerifierWorkload(ctx context.Context, arg GetVerifierWorkloadParams) ([]GetVerifierWorkloadRow, error) {
+	rows, err := q.db.Query(ctx, getVerifierWorkload, arg.VerificationDate, arg.VerificationDate_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetVerifierWorkloadRow{}
+	for rows.Next() {
+		var i GetVerifierWorkloadRow
+		if err := rows.Scan(
+			&i.VerifierID,
+			&i.VerifierEmail,
+			&i.VerifiedCount,
+			&i.FirstVerification,
+			&i.LastVerification,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const hasVerifiedCredentialOfType = `-- name: HasVerifiedCredentialOfType :one
+SELECT EXISTS(
+    SELECT 1 FROM professional_credentials
+    WHERE 
+        staff_id = $1
+        AND credential_type = $2
+        AND status = 'verified'
+        AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+) as exists
+`
+
+type HasVerifiedCredentialOfTypeParams struct {
+	StaffID        pgtype.UUID `json:"staff_id"`
+	CredentialType string      `json:"credential_type"`
+}
+
+func (q *Queries) HasVerifiedCredentialOfType(ctx context.Context, arg HasVerifiedCredentialOfTypeParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasVerifiedCredentialOfType, arg.StaffID, arg.CredentialType)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const markCredentialExpired = `-- name: MarkCredentialExpired :exec
+UPDATE professional_credentials
+SET 
+    status = 'expired',
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) MarkCredentialExpired(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, markCredentialExpired, id)
+	return err
+}
+
+const rejectCredential = `-- name: RejectCredential :exec
+UPDATE professional_credentials
+SET 
+    status = 'rejected',
+    verified_by = $2,
+    verification_date = NOW(),
+    notes = $3,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type RejectCredentialParams struct {
+	ID         pgtype.UUID `json:"id"`
+	VerifiedBy pgtype.UUID `json:"verified_by"`
+	Notes      pgtype.Text `json:"notes"`
+}
+
+func (q *Queries) RejectCredential(ctx context.Context, arg RejectCredentialParams) error {
+	_, err := q.db.Exec(ctx, rejectCredential, arg.ID, arg.VerifiedBy, arg.Notes)
+	return err
+}
+
+const renewCredential = `-- name: RenewCredential :exec
+UPDATE professional_credentials
+SET 
+    expiry_date = $2,
+    status = 'verified',
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type RenewCredentialParams struct {
+	ID         pgtype.UUID `json:"id"`
+	ExpiryDate pgtype.Date `json:"expiry_date"`
+}
+
+func (q *Queries) RenewCredential(ctx context.Context, arg RenewCredentialParams) error {
+	_, err := q.db.Exec(ctx, renewCredential, arg.ID, arg.ExpiryDate)
+	return err
+}
+
+const revokeCredential = `-- name: RevokeCredential :exec
+UPDATE professional_credentials
+SET 
+    status = 'revoked',
+    notes = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type RevokeCredentialParams struct {
+	ID    pgtype.UUID `json:"id"`
+	Notes pgtype.Text `json:"notes"`
+}
+
+func (q *Queries) RevokeCredential(ctx context.Context, arg RevokeCredentialParams) error {
+	_, err := q.db.Exec(ctx, revokeCredential, arg.ID, arg.Notes)
+	return err
+}
+
 const updateCredential = `-- name: UpdateCredential :exec
 UPDATE professional_credentials
-SET credential_number = $2, expiry_date = $3, 
-    status = $4, notes = $5
+SET 
+    credential_type = COALESCE($2, credential_type),
+    credential_number = COALESCE($3, credential_number),
+    issuing_authority = COALESCE($4, issuing_authority),
+    issue_date = COALESCE($5, issue_date),
+    expiry_date = COALESCE($6, expiry_date),
+    status = COALESCE($7, status),
+    document_url = COALESCE($8, document_url),
+    notes = COALESCE($9, notes),
+    updated_at = NOW()
 WHERE id = $1
 `
 
 type UpdateCredentialParams struct {
 	ID               pgtype.UUID `json:"id"`
+	CredentialType   string      `json:"credential_type"`
 	CredentialNumber pgtype.Text `json:"credential_number"`
+	IssuingAuthority string      `json:"issuing_authority"`
+	IssueDate        pgtype.Date `json:"issue_date"`
 	ExpiryDate       pgtype.Date `json:"expiry_date"`
 	Status           pgtype.Text `json:"status"`
+	DocumentUrl      pgtype.Text `json:"document_url"`
 	Notes            pgtype.Text `json:"notes"`
 }
 
 func (q *Queries) UpdateCredential(ctx context.Context, arg UpdateCredentialParams) error {
 	_, err := q.db.Exec(ctx, updateCredential,
 		arg.ID,
+		arg.CredentialType,
 		arg.CredentialNumber,
+		arg.IssuingAuthority,
+		arg.IssueDate,
 		arg.ExpiryDate,
 		arg.Status,
+		arg.DocumentUrl,
 		arg.Notes,
 	)
 	return err
 }
 
-const verifyCredential = `-- name: VerifyCredential :exec
+const updateCredentialDates = `-- name: UpdateCredentialDates :exec
 UPDATE professional_credentials
-SET status = 'verified', verified_by = $2, verification_date = NOW()
+SET 
+    issue_date = $2,
+    expiry_date = $3,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateCredentialDatesParams struct {
+	ID         pgtype.UUID `json:"id"`
+	IssueDate  pgtype.Date `json:"issue_date"`
+	ExpiryDate pgtype.Date `json:"expiry_date"`
+}
+
+func (q *Queries) UpdateCredentialDates(ctx context.Context, arg UpdateCredentialDatesParams) error {
+	_, err := q.db.Exec(ctx, updateCredentialDates, arg.ID, arg.IssueDate, arg.ExpiryDate)
+	return err
+}
+
+const updateCredentialDocument = `-- name: UpdateCredentialDocument :exec
+UPDATE professional_credentials
+SET 
+    document_url = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateCredentialDocumentParams struct {
+	ID          pgtype.UUID `json:"id"`
+	DocumentUrl pgtype.Text `json:"document_url"`
+}
+
+func (q *Queries) UpdateCredentialDocument(ctx context.Context, arg UpdateCredentialDocumentParams) error {
+	_, err := q.db.Exec(ctx, updateCredentialDocument, arg.ID, arg.DocumentUrl)
+	return err
+}
+
+const updateCredentialExpiry = `-- name: UpdateCredentialExpiry :exec
+UPDATE professional_credentials
+SET 
+    expiry_date = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateCredentialExpiryParams struct {
+	ID         pgtype.UUID `json:"id"`
+	ExpiryDate pgtype.Date `json:"expiry_date"`
+}
+
+func (q *Queries) UpdateCredentialExpiry(ctx context.Context, arg UpdateCredentialExpiryParams) error {
+	_, err := q.db.Exec(ctx, updateCredentialExpiry, arg.ID, arg.ExpiryDate)
+	return err
+}
+
+const updateCredentialNotes = `-- name: UpdateCredentialNotes :exec
+UPDATE professional_credentials
+SET 
+    notes = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateCredentialNotesParams struct {
+	ID    pgtype.UUID `json:"id"`
+	Notes pgtype.Text `json:"notes"`
+}
+
+func (q *Queries) UpdateCredentialNotes(ctx context.Context, arg UpdateCredentialNotesParams) error {
+	_, err := q.db.Exec(ctx, updateCredentialNotes, arg.ID, arg.Notes)
+	return err
+}
+
+const updateCredentialNumber = `-- name: UpdateCredentialNumber :exec
+
+UPDATE professional_credentials
+SET 
+    credential_number = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateCredentialNumberParams struct {
+	ID               pgtype.UUID `json:"id"`
+	CredentialNumber pgtype.Text `json:"credential_number"`
+}
+
+// ============================================
+// CREDENTIAL DETAILS MANAGEMENT
+// ============================================
+func (q *Queries) UpdateCredentialNumber(ctx context.Context, arg UpdateCredentialNumberParams) error {
+	_, err := q.db.Exec(ctx, updateCredentialNumber, arg.ID, arg.CredentialNumber)
+	return err
+}
+
+const updateCredentialStatus = `-- name: UpdateCredentialStatus :exec
+UPDATE professional_credentials
+SET 
+    status = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateCredentialStatusParams struct {
+	ID     pgtype.UUID `json:"id"`
+	Status pgtype.Text `json:"status"`
+}
+
+func (q *Queries) UpdateCredentialStatus(ctx context.Context, arg UpdateCredentialStatusParams) error {
+	_, err := q.db.Exec(ctx, updateCredentialStatus, arg.ID, arg.Status)
+	return err
+}
+
+const verifyCredential = `-- name: VerifyCredential :exec
+
+UPDATE professional_credentials
+SET 
+    status = 'verified',
+    verified_by = $2,
+    verification_date = NOW(),
+    notes = COALESCE($3, notes),
+    updated_at = NOW()
 WHERE id = $1
 `
 
 type VerifyCredentialParams struct {
 	ID         pgtype.UUID `json:"id"`
 	VerifiedBy pgtype.UUID `json:"verified_by"`
+	Notes      pgtype.Text `json:"notes"`
 }
 
+// ============================================
+// VERIFICATION & STATUS MANAGEMENT
+// ============================================
 func (q *Queries) VerifyCredential(ctx context.Context, arg VerifyCredentialParams) error {
-	_, err := q.db.Exec(ctx, verifyCredential, arg.ID, arg.VerifiedBy)
+	_, err := q.db.Exec(ctx, verifyCredential, arg.ID, arg.VerifiedBy, arg.Notes)
 	return err
 }

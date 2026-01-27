@@ -32,23 +32,24 @@ type Querier interface {
 	// Patient Medications Queries
 	// ============================================
 	AddPatientMedication(ctx context.Context, arg AddPatientMedicationParams) (AddPatientMedicationRow, error)
-	// ============================================
-	// Professional Credentials Queries
-	// ============================================
-	AddProfessionalCredential(ctx context.Context, arg AddProfessionalCredentialParams) (AddProfessionalCredentialRow, error)
 	AddStaffQualification(ctx context.Context, arg AddStaffQualificationParams) error
 	AddStaffToService(ctx context.Context, arg AddStaffToServiceParams) error
 	AdvancedPatientSearch(ctx context.Context, arg AdvancedPatientSearchParams) ([]AdvancedPatientSearchRow, error)
+	AutoExpireCredentials(ctx context.Context) error
 	BulkActivateServices(ctx context.Context, dollar_1 []pgtype.UUID) error
 	BulkDeactivateServices(ctx context.Context, dollar_1 []pgtype.UUID) error
+	BulkRejectCredentials(ctx context.Context, arg BulkRejectCredentialsParams) error
 	BulkSetAcceptingPatients(ctx context.Context, arg BulkSetAcceptingPatientsParams) error
 	BulkUpdateCommunicationMethod(ctx context.Context, arg BulkUpdateCommunicationMethodParams) error
+	BulkUpdateCredentialStatus(ctx context.Context, arg BulkUpdateCredentialStatusParams) error
 	BulkUpdatePatientProvince(ctx context.Context, arg BulkUpdatePatientProvinceParams) error
 	BulkUpdateServiceCategory(ctx context.Context, arg BulkUpdateServiceCategoryParams) error
 	BulkUpdateStaffStatus(ctx context.Context, arg BulkUpdateStaffStatusParams) error
 	BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error
 	BulkUpdateVerificationStatus(ctx context.Context, arg BulkUpdateVerificationStatusParams) error
 	BulkVerifyClinics(ctx context.Context, arg BulkVerifyClinicsParams) error
+	BulkVerifyCredentials(ctx context.Context, arg BulkVerifyCredentialsParams) error
+	CheckCredentialNumberExists(ctx context.Context, arg CheckCredentialNumberExistsParams) (bool, error)
 	CheckEmailExists(ctx context.Context, arg CheckEmailExistsParams) (bool, error)
 	CheckHPCSNumberExists(ctx context.Context, arg CheckHPCSNumberExistsParams) (bool, error)
 	CheckPhoneExists(ctx context.Context, arg CheckPhoneExistsParams) (bool, error)
@@ -76,11 +77,16 @@ type Querier interface {
 	CountClinics(ctx context.Context, arg CountClinicsParams) (int64, error)
 	CountClinicsByProvince(ctx context.Context, province pgtype.Text) (int64, error)
 	CountConsentsByType(ctx context.Context) (CountConsentsByTypeRow, error)
+	CountCredentialsByType(ctx context.Context, arg CountCredentialsByTypeParams) (int64, error)
 	CountPatientsByCommunicationMethod(ctx context.Context) (CountPatientsByCommunicationMethodRow, error)
 	CountPatientsByMedicalAidStatus(ctx context.Context) (CountPatientsByMedicalAidStatusRow, error)
 	CountPatientsByProvince(ctx context.Context) (CountPatientsByProvinceRow, error)
 	CountServicesByCategory(ctx context.Context, arg CountServicesByCategoryParams) (int64, error)
 	CountStaffByRole(ctx context.Context, arg CountStaffByRoleParams) (int64, error)
+	// ============================================
+	// COUNTING & EXISTENCE CHECKS
+	// ============================================
+	CountStaffCredentials(ctx context.Context, arg CountStaffCredentialsParams) (int64, error)
 	CountUsersByRole(ctx context.Context, role string) (int64, error)
 	CountVerifiedClinics(ctx context.Context) (int64, error)
 	// ============================================
@@ -101,6 +107,15 @@ type Querier interface {
 	// CORE CRUD OPERATIONS
 	// ============================================
 	CreateClinicService(ctx context.Context, arg CreateClinicServiceParams) (ClinicService, error)
+	// ============================================
+	// PROFESSIONAL CREDENTIALS REPOSITORY QUERIES
+	// Maps to: Part of StaffRepository interface (credential methods)
+	// Domain: Professional Licensing & Certification Management
+	// ============================================
+	// ============================================
+	// CORE CRUD OPERATIONS
+	// ============================================
+	CreateCredential(ctx context.Context, arg CreateCredentialParams) (ProfessionalCredential, error)
 	// ============================================
 	// Notification Preferences Queries
 	// ============================================
@@ -134,6 +149,7 @@ type Querier interface {
 	CreateStaffMember(ctx context.Context, arg CreateStaffMemberParams) (ClinicStaff, error)
 	// User Management Queries
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
+	CredentialExists(ctx context.Context, id pgtype.UUID) (bool, error)
 	DeactivateClinic(ctx context.Context, id pgtype.UUID) error
 	DeactivateClinicServices(ctx context.Context, clinicID pgtype.UUID) error
 	DeactivateClinicStaff(ctx context.Context, clinicID pgtype.UUID) error
@@ -142,6 +158,7 @@ type Querier interface {
 	DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error
 	DeleteClinic(ctx context.Context, id pgtype.UUID) error
 	DeleteClinicService(ctx context.Context, id pgtype.UUID) error
+	DeleteCredential(ctx context.Context, id pgtype.UUID) error
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteNotificationPreferences(ctx context.Context, userID pgtype.UUID) error
@@ -153,6 +170,7 @@ type Querier interface {
 	DeletePrivacyConsent(ctx context.Context, userID pgtype.UUID) error
 	DeleteSession(ctx context.Context, sessionToken string) error
 	DeleteSessionByDevice(ctx context.Context, arg DeleteSessionByDeviceParams) error
+	DeleteStaffCredentials(ctx context.Context, staffID pgtype.UUID) error
 	DeleteStaffMember(ctx context.Context, id pgtype.UUID) error
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
@@ -167,10 +185,12 @@ type Querier interface {
 	GetActiveEmergencyAccessConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetActiveHealthDataConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetActiveResearchConsents(ctx context.Context) ([]PrivacyConsent, error)
+	GetActiveStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]GetActiveStaffCredentialsRow, error)
 	GetActivitiesByResource(ctx context.Context, arg GetActivitiesByResourceParams) ([]UserActivity, error)
 	GetActivitiesByType(ctx context.Context, arg GetActivitiesByTypeParams) ([]UserActivity, error)
 	GetAllClinicStaff(ctx context.Context, clinicID pgtype.UUID) ([]GetAllClinicStaffRow, error)
 	GetAppointmentOnlyServices(ctx context.Context, clinicID pgtype.UUID) ([]GetAppointmentOnlyServicesRow, error)
+	GetCertificationCredentials(ctx context.Context) ([]GetCertificationCredentialsRow, error)
 	GetCheapestServiceProviders(ctx context.Context, arg GetCheapestServiceProvidersParams) ([]GetCheapestServiceProvidersRow, error)
 	GetClinicByEmail(ctx context.Context, email pgtype.Text) (Clinic, error)
 	GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, error)
@@ -179,6 +199,7 @@ type Querier interface {
 	// REFERENCE DATA LOOKUPS
 	// ============================================
 	GetClinicByRegistrationNumber(ctx context.Context, registrationNumber pgtype.Text) (Clinic, error)
+	GetClinicCredentialMetrics(ctx context.Context, clinicID pgtype.UUID) (GetClinicCredentialMetricsRow, error)
 	GetClinicDoctors(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicDoctorsRow, error)
 	GetClinicMetrics(ctx context.Context) (GetClinicMetricsRow, error)
 	GetClinicNurses(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicNursesRow, error)
@@ -228,12 +249,43 @@ type Querier interface {
 	GetConsentHistory(ctx context.Context, userID pgtype.UUID) ([]PrivacyConsent, error)
 	GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error)
 	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error)
+	GetCredentialByID(ctx context.Context, id pgtype.UUID) (ProfessionalCredential, error)
+	GetCredentialRenewalHistory(ctx context.Context, arg GetCredentialRenewalHistoryParams) ([]GetCredentialRenewalHistoryRow, error)
+	// ============================================
+	// STATISTICS & ANALYTICS
+	// ============================================
+	GetCredentialStatistics(ctx context.Context, staffID pgtype.UUID) (GetCredentialStatisticsRow, error)
+	GetCredentialStatusDistribution(ctx context.Context, staffID pgtype.UUID) ([]GetCredentialStatusDistributionRow, error)
+	GetCredentialTypeDistribution(ctx context.Context, staffID pgtype.UUID) ([]GetCredentialTypeDistributionRow, error)
+	// ============================================
+	// ISSUING AUTHORITY QUERIES
+	// ============================================
+	GetCredentialsByAuthority(ctx context.Context, issuingAuthority string) ([]GetCredentialsByAuthorityRow, error)
+	GetCredentialsByAuthorityAndType(ctx context.Context, arg GetCredentialsByAuthorityAndTypeParams) ([]GetCredentialsByAuthorityAndTypeRow, error)
+	GetCredentialsByDateRange(ctx context.Context, arg GetCredentialsByDateRangeParams) ([]GetCredentialsByDateRangeRow, error)
+	// ============================================
+	// BULK OPERATIONS
+	// ============================================
+	GetCredentialsByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ProfessionalCredential, error)
+	// ============================================
+	// CREDENTIAL TYPE QUERIES
+	// ============================================
+	GetCredentialsByType(ctx context.Context, credentialType string) ([]GetCredentialsByTypeRow, error)
+	GetCredentialsExpiringWithinDays(ctx context.Context, dollar_1 pgtype.Text) ([]GetCredentialsExpiringWithinDaysRow, error)
+	GetCredentialsNeedingRenewal(ctx context.Context) ([]GetCredentialsNeedingRenewalRow, error)
 	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]DataAccessLog, error)
+	GetDegreeCredentials(ctx context.Context) ([]GetDegreeCredentialsRow, error)
 	GetEmergencyAccessLogs(ctx context.Context, arg GetEmergencyAccessLogsParams) ([]DataAccessLog, error)
 	GetExpiredConsents(ctx context.Context) ([]PrivacyConsent, error)
+	// ============================================
+	// EXPIRATION & RENEWAL MANAGEMENT
+	// ============================================
+	GetExpiredCredentials(ctx context.Context) ([]GetExpiredCredentialsRow, error)
+	GetExpiredCredentialsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]GetExpiredCredentialsByClinicRow, error)
 	GetFreeServices(ctx context.Context, clinicID pgtype.UUID) ([]GetFreeServicesRow, error)
 	GetIncompleteProfiles(ctx context.Context, arg GetIncompleteProfilesParams) ([]GetIncompleteProfilesRow, error)
 	GetLatestActiveOTP(ctx context.Context, arg GetLatestActiveOTPParams) (OtpVerification, error)
+	GetLicenseCredentials(ctx context.Context, dollar_1 pgtype.UUID) ([]GetLicenseCredentialsRow, error)
 	// ============================================
 	// MEDICAL AID COVERAGE
 	// ============================================
@@ -271,6 +323,11 @@ type Querier interface {
 	GetPatientsWithMedicalAid(ctx context.Context, arg GetPatientsWithMedicalAidParams) ([]GetPatientsWithMedicalAidRow, error)
 	GetPatientsWithoutMedicalAid(ctx context.Context, arg GetPatientsWithoutMedicalAidParams) ([]GetPatientsWithoutMedicalAidRow, error)
 	GetPediatricServices(ctx context.Context, clinicID pgtype.UUID) ([]GetPediatricServicesRow, error)
+	// ============================================
+	// VERIFICATION WORKFLOWS
+	// ============================================
+	GetPendingCredentialVerifications(ctx context.Context) ([]GetPendingCredentialVerificationsRow, error)
+	GetPendingCredentialsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]GetPendingCredentialsByClinicRow, error)
 	GetPendingVerificationClinics(ctx context.Context, arg GetPendingVerificationClinicsParams) ([]GetPendingVerificationClinicsRow, error)
 	GetPreventiveServices(ctx context.Context, clinicID pgtype.UUID) ([]GetPreventiveServicesRow, error)
 	GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error)
@@ -281,6 +338,9 @@ type Querier interface {
 	GetRecentlyAddedServices(ctx context.Context, arg GetRecentlyAddedServicesParams) ([]GetRecentlyAddedServicesRow, error)
 	GetRecentlyUpdatedProfiles(ctx context.Context, arg GetRecentlyUpdatedProfilesParams) ([]GetRecentlyUpdatedProfilesRow, error)
 	GetRecentlyVerifiedClinics(ctx context.Context, limit int32) ([]GetRecentlyVerifiedClinicsRow, error)
+	GetRecentlyVerifiedCredentials(ctx context.Context) ([]GetRecentlyVerifiedCredentialsRow, error)
+	GetRejectedCredentials(ctx context.Context) ([]GetRejectedCredentialsRow, error)
+	GetRevokedCredentials(ctx context.Context) ([]GetRevokedCredentialsRow, error)
 	GetSMSConversationByPhone(ctx context.Context, phoneNumber string) (SmsConversation, error)
 	GetServiceByID(ctx context.Context, id pgtype.UUID) (ClinicService, error)
 	GetServiceCategoryDistribution(ctx context.Context, clinicID pgtype.UUID) ([]GetServiceCategoryDistributionRow, error)
@@ -306,6 +366,7 @@ type Querier interface {
 	GetServicesForGender(ctx context.Context, arg GetServicesForGenderParams) ([]GetServicesForGenderRow, error)
 	GetServicesRequiringFollowUp(ctx context.Context, clinicID pgtype.UUID) ([]GetServicesRequiringFollowUpRow, error)
 	GetSession(ctx context.Context, sessionToken string) (GetSessionRow, error)
+	GetSpecializationCredentials(ctx context.Context) ([]GetSpecializationCredentialsRow, error)
 	// ============================================
 	// STAFF AVAILABILITY QUERIES
 	// ============================================
@@ -327,7 +388,11 @@ type Querier interface {
 	GetStaffByLanguage(ctx context.Context, arg GetStaffByLanguageParams) ([]GetStaffByLanguageRow, error)
 	GetStaffBySpecialization(ctx context.Context, arg GetStaffBySpecializationParams) ([]GetStaffBySpecializationRow, error)
 	GetStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error)
-	GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]GetStaffCredentialsRow, error)
+	// ============================================
+	// QUERYING BY STAFF MEMBER
+	// ============================================
+	GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]ProfessionalCredential, error)
+	GetStaffCredentialsByType(ctx context.Context, arg GetStaffCredentialsByTypeParams) ([]GetStaffCredentialsByTypeRow, error)
 	GetStaffDemographics(ctx context.Context, clinicID pgtype.UUID) (GetStaffDemographicsRow, error)
 	GetStaffHiredBetweenDates(ctx context.Context, arg GetStaffHiredBetweenDatesParams) ([]GetStaffHiredBetweenDatesRow, error)
 	GetStaffNeedingCredentialRenewal(ctx context.Context) ([]GetStaffNeedingCredentialRenewalRow, error)
@@ -344,8 +409,13 @@ type Querier interface {
 	// REPORTING & COMPLIANCE
 	// ============================================
 	GetStaffWithoutHPCSNumber(ctx context.Context) ([]GetStaffWithoutHPCSNumberRow, error)
+	// ============================================
+	// COMPLIANCE & REPORTING
+	// ============================================
+	GetStaffWithoutRequiredCredentials(ctx context.Context) ([]GetStaffWithoutRequiredCredentialsRow, error)
 	GetStaffWorkingHours(ctx context.Context, id pgtype.UUID) (GetStaffWorkingHoursRow, error)
 	GetStaleProfiles(ctx context.Context, arg GetStaleProfilesParams) ([]GetStaleProfilesRow, error)
+	GetSystemCredentialMetrics(ctx context.Context) (GetSystemCredentialMetricsRow, error)
 	// ============================================
 	// RANKING & DISCOVERY
 	// ============================================
@@ -366,9 +436,13 @@ type Querier interface {
 	GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetUsersByIDsRow, error)
 	GetUsersForHealthTips(ctx context.Context, healthTipsFrequency pgtype.Text) ([]pgtype.UUID, error)
 	GetUsersWithDisabledType(ctx context.Context, dollar_1 interface{}) ([]pgtype.UUID, error)
+	GetVerificationBacklog(ctx context.Context) ([]GetVerificationBacklogRow, error)
 	GetVerifiedClinics(ctx context.Context, arg GetVerifiedClinicsParams) ([]GetVerifiedClinicsRow, error)
+	GetVerifiedStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]GetVerifiedStaffCredentialsRow, error)
+	GetVerifierWorkload(ctx context.Context, arg GetVerifierWorkloadParams) ([]GetVerifierWorkloadRow, error)
 	GetWalkInServices(ctx context.Context, clinicID pgtype.UUID) ([]GetWalkInServicesRow, error)
 	GetWithdrawnConsents(ctx context.Context, arg GetWithdrawnConsentsParams) ([]PrivacyConsent, error)
+	HasVerifiedCredentialOfType(ctx context.Context, arg HasVerifiedCredentialOfTypeParams) (bool, error)
 	IncrementPopularityScore(ctx context.Context, id pgtype.UUID) error
 	IncrementReviewCount(ctx context.Context, id pgtype.UUID) error
 	IncrementServiceReviewCount(ctx context.Context, id pgtype.UUID) error
@@ -387,10 +461,14 @@ type Querier interface {
 	// User Activity Queries
 	// ============================================
 	LogUserActivity(ctx context.Context, arg LogUserActivityParams) error
+	MarkCredentialExpired(ctx context.Context, id pgtype.UUID) error
 	MarkOTPUsed(ctx context.Context, arg MarkOTPUsedParams) error
 	ReactivateClinic(ctx context.Context, id pgtype.UUID) error
 	RejectClinicVerification(ctx context.Context, arg RejectClinicVerificationParams) error
+	RejectCredential(ctx context.Context, arg RejectCredentialParams) error
 	RemoveStaffFromService(ctx context.Context, arg RemoveStaffFromServiceParams) error
+	RenewCredential(ctx context.Context, arg RenewCredentialParams) error
+	RevokeCredential(ctx context.Context, arg RevokeCredentialParams) error
 	// OTP Verification Queries
 	SaveOTP(ctx context.Context, arg SaveOTPParams) (OtpVerification, error)
 	// ============================================
@@ -468,6 +546,15 @@ type Querier interface {
 	UpdateClinicVerificationStatus(ctx context.Context, arg UpdateClinicVerificationStatusParams) error
 	UpdateCommunicationConsents(ctx context.Context, arg UpdateCommunicationConsentsParams) error
 	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) error
+	UpdateCredentialDates(ctx context.Context, arg UpdateCredentialDatesParams) error
+	UpdateCredentialDocument(ctx context.Context, arg UpdateCredentialDocumentParams) error
+	UpdateCredentialExpiry(ctx context.Context, arg UpdateCredentialExpiryParams) error
+	UpdateCredentialNotes(ctx context.Context, arg UpdateCredentialNotesParams) error
+	// ============================================
+	// CREDENTIAL DETAILS MANAGEMENT
+	// ============================================
+	UpdateCredentialNumber(ctx context.Context, arg UpdateCredentialNumberParams) error
+	UpdateCredentialStatus(ctx context.Context, arg UpdateCredentialStatusParams) error
 	UpdateDataSharingConsent(ctx context.Context, arg UpdateDataSharingConsentParams) error
 	UpdateEmergencyAccessConsent(ctx context.Context, arg UpdateEmergencyAccessConsentParams) error
 	UpdateEmergencyAlerts(ctx context.Context, arg UpdateEmergencyAlertsParams) error
@@ -546,6 +633,9 @@ type Querier interface {
 	// VERIFICATION & STATUS
 	// ============================================
 	VerifyClinic(ctx context.Context, arg VerifyClinicParams) error
+	// ============================================
+	// VERIFICATION & STATUS MANAGEMENT
+	// ============================================
 	VerifyCredential(ctx context.Context, arg VerifyCredentialParams) error
 	VerifyUser(ctx context.Context, id pgtype.UUID) error
 	WithdrawConsent(ctx context.Context, arg WithdrawConsentParams) error
