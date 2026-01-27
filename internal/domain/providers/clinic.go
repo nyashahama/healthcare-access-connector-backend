@@ -66,3 +66,132 @@ type ClinicFilters struct {
 	VerificationStatus *string
 	AcceptsMedicalAid  *bool
 }
+
+// ============================================
+// SUPPORTING TYPES - CLINIC REPOSITORY
+// ============================================
+
+type ClinicLocation struct {
+	PhysicalAddress string
+	City            *string
+	Province        *string
+	PostalCode      *string
+	Country         *string
+	Latitude        *float64
+	Longitude       *float64
+	GooglePlaceID   *string
+}
+
+type ClinicContact struct {
+	PrimaryPhone       *string
+	SecondaryPhone     *string
+	EmergencyPhone     *string
+	Email              *string
+	Website            *string
+	ContactPersonName  *string
+	ContactPersonRole  *string
+	ContactPersonPhone *string
+	ContactPersonEmail *string
+}
+
+type ClinicServicesUpdate struct {
+	Services        []string
+	Specialties     []string
+	Facilities      []string
+	LanguagesSpoken []string
+}
+
+type ClinicPaymentInfo struct {
+	AcceptsMedicalAid   bool
+	MedicalAidProviders []string
+	PaymentMethods      []string
+	FeeStructure        *string
+}
+
+type ClinicAccreditation struct {
+	AccreditationNumber *string
+	AccreditationBody   *string
+	AccreditationExpiry *time.Time
+	Certifications      map[string]any
+}
+
+type ClinicSearchParams struct {
+	Query      string
+	Province   *string
+	City       *string
+	ClinicType *string
+	Limit      int
+	Offset     int
+}
+
+type ClinicSearchResult struct {
+	Clinic     Clinic   `json:"clinic"`
+	DistanceKm *float64 `json:"distance_km,omitempty"`
+}
+
+type ClinicStatistics struct {
+	ID                  uuid.UUID
+	ClinicName          string
+	ReviewCount         int
+	Rating              *float64
+	PatientCapacity     *int
+	BedCount            *int
+	AverageWaitTime     *int
+	ActiveStaffCount    int64
+	TotalStaffCount     int64
+	ActiveServicesCount int64
+	TotalServicesCount  int64
+}
+
+type ClinicMetrics struct {
+	TotalClinics    int64
+	VerifiedClinics int64
+	PendingClinics  int64
+	RejectedClinics int64
+	ActiveClinics   int64
+	AverageRating   *float64
+	TotalReviews    int64
+	AverageCapacity *float64
+	TotalBeds       int64
+}
+
+type ClinicTypeDistribution struct {
+	ClinicType    string
+	Count         int64
+	AverageRating *float64
+}
+
+type ClinicProvinceDistribution struct {
+	Province      string
+	Count         int64
+	AverageRating *float64
+}
+
+type ClinicOwnershipDistribution struct {
+	OwnershipType string
+	Count         int64
+	AverageRating *float64
+}
+
+type ClinicAdvancedSearchParams struct {
+	Query             *string
+	Province          *string
+	City              *string
+	ClinicType        *string
+	OwnershipType     *string
+	AcceptsMedicalAid *bool
+	Services          map[string]any
+	Specialties       map[string]any
+	Limit             int
+	Offset            int
+}
+
+type ClinicAccreditationInfo struct {
+	ID                  uuid.UUID
+	ClinicName          string
+	AccreditationNumber *string
+	AccreditationBody   *string
+	AccreditationExpiry *time.Time
+	Email               *string
+	PrimaryPhone        *string
+}

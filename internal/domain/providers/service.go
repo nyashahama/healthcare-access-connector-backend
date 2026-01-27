@@ -36,3 +36,88 @@ type ClinicService struct {
 	CreatedAt               time.Time      `json:"created_at"`
 	UpdatedAt               time.Time      `json:"updated_at"`
 }
+
+// ============================================
+// SUPPORTING TYPES - SERVICE REPOSITORY
+// ============================================
+
+type ServiceDetails struct {
+	Description             *string
+	DurationMinutes         *int
+	PreparationInstructions *string
+	FollowUpRequired        bool
+	FollowUpDays            *int
+}
+
+type ServiceEligibility struct {
+	MinimumAge        *int
+	MaximumAge        *int
+	GenderRestriction *string
+	Prerequisites     []string
+}
+
+type ServiceCost struct {
+	Cost                  *float64
+	CostCurrency          string
+	IsCoveredByMedicalAid bool
+	MedicalAidCodes       map[string]any
+}
+
+type ServiceAvailability struct {
+	AvailableDays       []string
+	RequiresAppointment bool
+	WalkInAllowed       bool
+}
+
+type ServiceStatistics struct {
+	ID              uuid.UUID
+	ServiceName     string
+	AverageRating   *float64
+	ReviewCount     int
+	PopularityScore int
+	Cost            *float64
+	CreatedAt       time.Time
+}
+
+type ServiceMetrics struct {
+	TotalServices      int64
+	ActiveServices     int64
+	InactiveServices   int64
+	AverageCost        *float64
+	AverageDuration    *float64
+	OverallRating      *float64
+	TotalReviews       int64
+	MedicalAidServices int64
+	WalkInServices     int64
+}
+
+type ServiceCategoryDistribution struct {
+	ServiceCategory string
+	Count           int64
+	AverageCost     *float64
+	AverageRating   *float64
+}
+
+type ServicePriceDistribution struct {
+	PriceRange    string
+	Count         int64
+	AverageRating *float64
+}
+
+type ServiceComparison struct {
+	ClinicID              uuid.UUID
+	ClinicName            string
+	Cost                  *float64
+	DurationMinutes       *int
+	AverageRating         *float64
+	IsCoveredByMedicalAid bool
+}
+
+type ServiceProvider struct {
+	ClinicID    uuid.UUID
+	ClinicName  string
+	ServiceName string
+	Cost        *float64
+	City        *string
+	Province    *string
+}

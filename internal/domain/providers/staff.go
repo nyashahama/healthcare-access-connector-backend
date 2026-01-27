@@ -38,3 +38,95 @@ type ClinicStaff struct {
 	CreatedAt              time.Time      `json:"created_at"`
 	UpdatedAt              time.Time      `json:"updated_at"`
 }
+
+// ============================================
+// SUPPORTING TYPES - STAFF REPOSITORY
+// ============================================
+
+type StaffProfessionalInfo struct {
+	ProfessionalTitle *string
+	Specialization    *string
+	Qualifications    []string
+	YearsExperience   *int
+	Bio               *string
+}
+
+type StaffLicenses struct {
+	HPCSNumber          *string
+	OtherLicenseNumbers map[string]any
+}
+
+type StaffContact struct {
+	WorkEmail     *string
+	WorkPhone     *string
+	PersonalPhone *string
+}
+
+type StaffProfile struct {
+	Bio               *string
+	ProfilePictureURL *string
+	LanguagesSpoken   []string
+}
+
+type StaffWorkingHours struct {
+	ID            uuid.UUID
+	FirstName     string
+	LastName      string
+	WorkingHours  map[string]any
+	AvailableDays []string
+}
+
+type StaffCredentialRenewal struct {
+	ID             uuid.UUID
+	ClinicID       uuid.UUID
+	FirstName      string
+	LastName       string
+	WorkEmail      *string
+	CredentialType string
+	ExpiryDate     *time.Time
+}
+
+type StaffStatistics struct {
+	ID                     uuid.UUID
+	FullName               string
+	ProfessionalTitle      *string
+	Specialization         *string
+	YearsExperience        *int
+	EmploymentStatus       string
+	IsAcceptingNewPatients bool
+	CreatedAt              time.Time
+}
+
+type StaffMetrics struct {
+	TotalStaff             int64
+	ActiveStaff            int64
+	OnLeaveStaff           int64
+	TerminatedStaff        int64
+	DoctorCount            int64
+	NurseCount             int64
+	AdminCount             int64
+	AcceptingPatientsCount int64
+	AverageExperience      *float64
+}
+
+type StaffRoleDistribution struct {
+	StaffRole         string
+	Count             int64
+	AverageExperience *float64
+}
+
+type StaffDemographics struct {
+	TotalStaff             int64
+	UniqueSpecializations  int64
+	UniqueRoles            int64
+	AverageLanguagesSpoken *float64
+}
+
+type StaffLanguageInfo struct {
+	ID                uuid.UUID
+	FirstName         string
+	LastName          string
+	ProfessionalTitle *string
+	LanguagesSpoken   []string
+	LanguageCount     int
+}

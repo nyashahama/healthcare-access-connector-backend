@@ -171,7 +171,23 @@ type AuditRepository interface {
 }
 
 // ============================================
-// NOTIFICATION & COMMUNICATION
+// PATIENT REPOSITORY
+// Maps to: patient_profiles.sql & related health records tables
+// ============================================
+
+type PatientProfileRepository interface {
+	// Core CRUD Operations
+	CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error)
+	GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
+	GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error)
+	GetPatientProfileByNationalID(ctx context.Context, nationalID string) (patients.PatientProfile, error)
+	UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error
+	DeletePatientProfile(ctx context.Context, id uuid.UUID) error
+	DeletePatientProfileByUserID(ctx context.Context, userID uuid.UUID) error
+}
+
+// ============================================
+// NOTIFICATION REPOSITORY
 // ============================================
 
 type NotificationRepository interface {
@@ -198,192 +214,398 @@ type NotificationRepository interface {
 }
 
 // ============================================
-// PATIENT MANAGEMENT (Comprehensive)
+// CLINIC REPOSITORY
+// Maps to: clinics.sql
+// Domain: Healthcare Facility Management
 // ============================================
 
-// ============================================
-// PATIENT PROFILE REPOSITORY
-// Maps to: patient_profiles.sql
-// ============================================
-
-type PatientProfileRepository interface {
-	// Core CRUD Operations
-	CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error)
-	GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
-	GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error)
-	GetPatientProfileByNationalID(ctx context.Context, nationalID string) (patients.PatientProfile, error)
-	UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error
-	DeletePatientProfile(ctx context.Context, id uuid.UUID) error
-	DeletePatientProfileByUserID(ctx context.Context, userID uuid.UUID) error
-
-	// Profile Management
-	// UpdatePatientPersonalInfo(ctx context.Context, userID uuid.UUID, firstName, lastName, preferredName string, dateOfBirth *time.Time, gender, pronouns *string) error
-	// UpdatePatientContactInfo(ctx context.Context, userID uuid.UUID, address, city, province, postalCode, country, communicationMethod *string) error
-	// UpdatePatientLanguagePreferences(ctx context.Context, userID uuid.UUID, languagePrefs []string, homeLanguage *string, requiresInterpreter bool) error
-	// UpdatePatientMedicalAidInfo(ctx context.Context, userID uuid.UUID, medicalAidNumber, provider *string, hasMedicalAid bool) error
-	// UpdatePatientDemographicInfo(ctx context.Context, userID uuid.UUID, employmentStatus, educationLevel, incomeRange *string) error
-	// UpdatePatientProfilePicture(ctx context.Context, userID uuid.UUID, profilePictureURL *string) error
-	// UpdatePatientTimezone(ctx context.Context, userID uuid.UUID, timezone string) error
-	// UpdatePatientMarketingPreferences(ctx context.Context, userID uuid.UUID, acceptsMarketing bool) error
-	// UpdatePatientReferralInfo(ctx context.Context, userID uuid.UUID, referredBy *uuid.UUID, referralCode *string) error
-	//
-	// // Search & Listing
-	// SearchPatients(ctx context.Context, query string, province, city *string, hasMedicalAid, gender *string, limit, offset int) ([]patients.PatientProfile, error)
-	// SearchPatientsByName(ctx context.Context, name string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByProvince(ctx context.Context, province string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByCity(ctx context.Context, city string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsWithMedicalAid(ctx context.Context, provider *string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsWithoutMedicalAid(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByLanguage(ctx context.Context, language string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsRequiringInterpreter(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByCommunicationMethod(ctx context.Context, method string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByReferrer(ctx context.Context, referrerID uuid.UUID, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByReferralCode(ctx context.Context, referralCode string) ([]patients.PatientProfile, error)
-	// GetPatientsAcceptingMarketing(ctx context.Context, province *string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByAgeRange(ctx context.Context, startDate, endDate time.Time, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByGender(ctx context.Context, gender string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByIncomeRange(ctx context.Context, incomeRange string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientsByEmploymentStatus(ctx context.Context, employmentStatus string, limit, offset int) ([]patients.PatientProfile, error)
-	// GetPatientProfilesByUserIDs(ctx context.Context, userIDs []uuid.UUID) ([]patients.PatientProfile, error)
-	//
-	// // Profile Completeness
-	// GetIncompleteProfiles(ctx context.Context, checkMedicalAid bool, limit, offset int) ([]patients.PatientProfile, error)
-	// GetRecentlyUpdatedProfiles(ctx context.Context, since time.Time, limit, offset int) ([]patients.PatientProfile, error)
-	// GetStaleProfiles(ctx context.Context, olderThan time.Time, limit, offset int) ([]patients.PatientProfile, error)
-	//
-	// // Advanced Search
-	// AdvancedPatientSearch(ctx context.Context, params patients.AdvancedSearchParams) ([]patients.PatientProfile, error)
-	//
-	// // Analytics & Reporting
-	// CountPatientsByProvince(ctx context.Context) (map[string]int64, error)
-	// CountPatientsByMedicalAidStatus(ctx context.Context) (map[string]int64, error)
-	// CountPatientsByCommunicationMethod(ctx context.Context) (map[string]int64, error)
-	// GetPatientDemographicsSummary(ctx context.Context) (patients.PatientDemographicsSummary, error)
-	//
-	// // Validation & Utilities
-	// ValidatePatientExists(ctx context.Context, userID uuid.UUID) (bool, error)
-	// GetPatientFullName(ctx context.Context, userID uuid.UUID) (string, error)
-	// ExportPatientData(ctx context.Context, userID uuid.UUID) ([]patients.PatientProfile, error)
-	//
-	// // Bulk Operations
-	// BulkUpdatePatientProvince(ctx context.Context, profileIDs []uuid.UUID, province string) error
-	// BulkUpdateCommunicationMethod(ctx context.Context, profileIDs []uuid.UUID, method string) error
-}
-
-// ============================================
-// CLINIC & PROVIDER MANAGEMENT
-// ============================================
 type ClinicRepository interface {
-	// ===== Basic CRUD Operations =====
+	// ===== Core CRUD Operations =====
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
 	GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
-	GetClinicsByIDs(ctx context.Context, ids []uuid.UUID) ([]providers.Clinic, error)
 	UpdateClinic(ctx context.Context, clinic providers.Clinic) error
+	DeleteClinic(ctx context.Context, id uuid.UUID) error
+
+	// ===== Location Management =====
+	UpdateClinicLocation(ctx context.Context, id uuid.UUID, location providers.ClinicLocation) error
+	UpdateClinicCoordinates(ctx context.Context, id uuid.UUID, latitude, longitude float64) error
+
+	// ===== Contact Information =====
+	UpdateClinicContact(ctx context.Context, id uuid.UUID, contact providers.ClinicContact) error
+
+	// ===== Services & Capabilities =====
+	UpdateClinicServices(ctx context.Context, id uuid.UUID, services providers.ClinicServicesUpdate) error
+	UpdateClinicOperatingHours(ctx context.Context, id uuid.UUID, hours map[string]any) error
+
+	// ===== Payment & Insurance =====
+	UpdateClinicPaymentInfo(ctx context.Context, id uuid.UUID, payment providers.ClinicPaymentInfo) error
+
+	// ===== Accreditation & Certification =====
+
+	UpdateClinicAccreditation(ctx context.Context, id uuid.UUID, accreditation providers.ClinicAccreditation) error
+	// ===== Verification & Status =====
+	VerifyClinic(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error
+	RejectClinicVerification(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error
+	UpdateClinicVerificationStatus(ctx context.Context, id uuid.UUID, status string) error
 	DeactivateClinic(ctx context.Context, id uuid.UUID) error
 	ReactivateClinic(ctx context.Context, id uuid.UUID) error
 
-	// ===== Listing & Search Operations =====
-	ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
-	CountClinics(ctx context.Context, filters providers.ClinicFilters) (int64, error)
-	SearchClinics(ctx context.Context, query string, province *string, city *string, limit, offset int) ([]providers.Clinic, error)
-	SearchClinicsByLocation(ctx context.Context, latitude, longitude, radiusKm float64) ([]ClinicSearchResult, error)
+	// ===== Ratings & Reviews =====
+	UpdateClinicRating(ctx context.Context, id uuid.UUID, rating float64, reviewCount int) error
+	IncrementReviewCount(ctx context.Context, id uuid.UUID) error
 
-	// ===== Verification & Status Management =====
-	VerifyClinic(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID, notes string) error
-	UpdateClinicStatus(ctx context.Context, id uuid.UUID, status string) error
-	GetClinicsByVerificationStatus(ctx context.Context, status string, limit, offset int) ([]providers.Clinic, error)
-	GetPendingVerifications(ctx context.Context) ([]providers.Clinic, error)
+	// ===== Operational Metrics =====
+	UpdateClinicCapacity(ctx context.Context, id uuid.UUID, patientCapacity, bedCount int) error
+	UpdateAverageWaitTime(ctx context.Context, id uuid.UUID, minutes int) error
 
-	// ===== Specialty & Service Operations =====
+	// ===== Search & Discovery =====
+	SearchClinics(ctx context.Context, params providers.ClinicSearchParams) ([]providers.ClinicSearchResult, error)
+	SearchClinicsByName(ctx context.Context, name string, province *string, limit, offset int) ([]providers.ClinicSearchResult, error)
+	SearchClinicsByLocation(ctx context.Context, lat, lng, radiusKm float64, limit int) ([]providers.ClinicSearchResult, error)
+	GetNearbyClinicsByService(ctx context.Context, lat, lng, radiusKm float64, service string, limit int) ([]providers.ClinicSearchResult, error)
+
+	// ===== Filtering & Listing =====
+	GetClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
+	GetVerifiedClinics(ctx context.Context, limit, offset int) ([]providers.Clinic, error)
+	GetPendingClinics(ctx context.Context, limit, offset int) ([]providers.Clinic, error)
+	GetClinicsByProvince(ctx context.Context, province string, limit, offset int) ([]providers.Clinic, error)
+	GetClinicsByCity(ctx context.Context, province, city string, limit, offset int) ([]providers.Clinic, error)
+	GetClinicsByType(ctx context.Context, clinicType string, limit, offset int) ([]providers.Clinic, error)
+
+	// ===== Services & Specialties =====
 	GetClinicsByService(ctx context.Context, service string, province *string, limit, offset int) ([]providers.Clinic, error)
 	GetClinicsBySpecialty(ctx context.Context, specialty string, province *string, limit, offset int) ([]providers.Clinic, error)
-	GetClinicsAcceptingMedicalAid(ctx context.Context, provider *string, province *string, limit, offset int) ([]providers.Clinic, error)
-	GetClinicsByOwnership(ctx context.Context, ownershipType string, limit, offset int) ([]providers.Clinic, error)
+	GetClinicsWithFacility(ctx context.Context, facility string, province *string, limit, offset int) ([]providers.Clinic, error)
+
+	// ===== Language Support =====
+	GetClinicsByLanguage(ctx context.Context, language string, province *string, limit, offset int) ([]providers.Clinic, error)
+
+	// ===== Medical Aid & Payment =====
+	GetClinicsAcceptingMedicalAid(ctx context.Context, province *string, limit, offset int) ([]providers.Clinic, error)
+	GetClinicsByMedicalAidProvider(ctx context.Context, provider string, province *string, limit, offset int) ([]providers.Clinic, error)
+	GetClinicsByPaymentMethod(ctx context.Context, method map[string]any, province *string, limit, offset int) ([]providers.Clinic, error)
+	GetClinicsByFeeStructure(ctx context.Context, feeStructure string, province *string, limit, offset int) ([]providers.Clinic, error)
+
+	// ===== Ranking & Discovery =====
+	GetTopRatedClinics(ctx context.Context, province *string, minReviews, limit int) ([]providers.Clinic, error)
+	GetMostReviewedClinics(ctx context.Context, province *string, limit int) ([]providers.Clinic, error)
+	GetRecentlyAddedClinics(ctx context.Context, province *string, limit int) ([]providers.Clinic, error)
+	GetRecentlyVerifiedClinics(ctx context.Context, limit int) ([]providers.Clinic, error)
 
 	// ===== Statistics & Analytics =====
-	GetClinicStatistics(ctx context.Context, id uuid.UUID) (ClinicStatistics, error)
-	GetClinicMetrics(ctx context.Context) (ClinicMetrics, error)
-	GetTopRatedClinics(ctx context.Context, province *string, limit int) ([]providers.Clinic, error)
+	GetClinicStatistics(ctx context.Context, id uuid.UUID) (providers.ClinicStatistics, error)
+	GetClinicMetrics(ctx context.Context) (providers.ClinicMetrics, error)
+	GetClinicTypeDistribution(ctx context.Context) ([]providers.ClinicTypeDistribution, error)
+	GetClinicProvinceDistribution(ctx context.Context) ([]providers.ClinicProvinceDistribution, error)
+	GetClinicOwnershipDistribution(ctx context.Context) ([]providers.ClinicOwnershipDistribution, error)
 
-	// ===== Geographic Operations =====
-	GetClinicsByProvince(ctx context.Context, province string, limit, offset int) ([]providers.Clinic, error)
-	GetClinicsByCity(ctx context.Context, city string, limit, offset int) ([]providers.Clinic, error)
-	GetNearbyClinics(ctx context.Context, latitude, longitude float64, limit int) ([]ClinicSearchResult, error)
+	// ===== Counting & Existence Checks =====
+	CountClinics(ctx context.Context, clinicType, province, verificationStatus *string) (int64, error)
+	CountVerifiedClinics(ctx context.Context) (int64, error)
+	CountClinicsByProvince(ctx context.Context, province string) (int64, error)
+	ClinicExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CheckRegistrationNumberExists(ctx context.Context, registrationNumber string, excludeID *uuid.UUID) (bool, error)
+	CheckEmailExists(ctx context.Context, email string, excludeID *uuid.UUID) (bool, error)
+	CheckPhoneExists(ctx context.Context, phone string, excludeID *uuid.UUID) (bool, error)
 
 	// ===== Bulk Operations =====
+	GetClinicsByIDs(ctx context.Context, ids []uuid.UUID) ([]providers.Clinic, error)
 	BulkUpdateVerificationStatus(ctx context.Context, ids []uuid.UUID, status string) error
+	BulkVerifyClinics(ctx context.Context, ids []uuid.UUID, verifiedBy uuid.UUID) error
 
-	// ===== Validation & Utilities =====
-	ClinicExists(ctx context.Context, id uuid.UUID) (bool, error)
-	IsRegistrationNumberUnique(ctx context.Context, registrationNumber string, excludeID *uuid.UUID) (bool, error)
+	// ===== Reference Data Lookups =====
 	GetClinicByRegistrationNumber(ctx context.Context, registrationNumber string) (providers.Clinic, error)
+	GetClinicByEmail(ctx context.Context, email string) (providers.Clinic, error)
+	GetClinicByPhone(ctx context.Context, phone string) (providers.Clinic, error)
 
-	// ===== Export & Reporting =====
-	ExportClinicData(ctx context.Context, id uuid.UUID) ([]byte, error)
+	// ===== Advanced Search =====
+	SearchClinicsAdvanced(ctx context.Context, params providers.ClinicAdvancedSearchParams) ([]providers.Clinic, error)
+
+	// ===== Accreditation Management =====
+	GetClinicsWithExpiredAccreditation(ctx context.Context) ([]providers.ClinicAccreditationInfo, error)
+	GetClinicsNeedingReaccreditation(ctx context.Context) ([]providers.ClinicAccreditationInfo, error)
 }
 
-// ===== Supporting Types =====
+// ============================================
+// SERVICE REPOSITORY
+// Maps to: clinic_services.sql
+// Domain: Healthcare Service Management
+// ============================================
 
-// ClinicSearchResult wraps a clinic with its distance from search point
-type ClinicSearchResult struct {
-	Clinic     providers.Clinic `json:"clinic"`
-	DistanceKm float64          `json:"distance_km"`
+type ServiceRepository interface {
+	// ===== Core CRUD Operations =====
+	CreateClinicService(ctx context.Context, service providers.ClinicService) (providers.ClinicService, error)
+	GetServiceByID(ctx context.Context, id uuid.UUID) (providers.ClinicService, error)
+	UpdateClinicService(ctx context.Context, service providers.ClinicService) error
+	DeleteClinicService(ctx context.Context, id uuid.UUID) error
+
+	// ===== Service Status Management =====
+	ActivateService(ctx context.Context, id uuid.UUID) error
+	DeactivateService(ctx context.Context, id uuid.UUID) error
+	ToggleServiceStatus(ctx context.Context, id uuid.UUID) error
+
+	// ===== Service Details Management =====
+	UpdateServiceDetails(ctx context.Context, id uuid.UUID, details providers.ServiceDetails) error
+	UpdateServiceEligibility(ctx context.Context, id uuid.UUID, eligibility providers.ServiceEligibility) error
+	UpdateServiceCost(ctx context.Context, id uuid.UUID, cost providers.ServiceCost) error
+	UpdateServiceAvailability(ctx context.Context, id uuid.UUID, availability providers.ServiceAvailability) error
+
+	// ===== Service Staff Management =====
+	UpdateServiceStaff(ctx context.Context, id uuid.UUID, staffIDs []uuid.UUID) error
+	AddStaffToService(ctx context.Context, serviceID, staffID uuid.UUID) error
+	RemoveStaffFromService(ctx context.Context, serviceID, staffID uuid.UUID) error
+
+	// ===== Service Metrics & Ratings =====
+	UpdateServiceRating(ctx context.Context, id uuid.UUID, rating float64, reviewCount int) error
+	IncrementServiceReviewCount(ctx context.Context, id uuid.UUID) error
+	UpdateServicePopularity(ctx context.Context, id uuid.UUID, score int) error
+	IncrementPopularityScore(ctx context.Context, id uuid.UUID) error
+
+	// ===== Querying by Clinic =====
+	GetClinicServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	GetActiveClinicServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	GetClinicServicesByCategory(ctx context.Context, clinicID uuid.UUID, category string) ([]providers.ClinicService, error)
+	GetClinicServicesByStaff(ctx context.Context, clinicID, staffID uuid.UUID) ([]providers.ClinicService, error)
+
+	// ===== Search & Filtering =====
+	SearchServices(ctx context.Context, query string, clinicID *uuid.UUID, limit, offset int) ([]providers.ClinicService, error)
+	SearchServicesByCategory(ctx context.Context, category string, clinicID *uuid.UUID, limit, offset int) ([]providers.ClinicService, error)
+	GetServicesByPriceRange(ctx context.Context, clinicID uuid.UUID, minCost, maxCost float64) ([]providers.ClinicService, error)
+	GetFreeServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	GetWalkInServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	GetAppointmentOnlyServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+
+	// ===== Medical Aid Coverage =====
+	GetMedicalAidCoveredServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	GetServicesByMedicalAidCode(ctx context.Context, code map[string]any) ([]providers.ClinicService, error)
+
+	// ===== Age & Eligibility Filtering =====
+	GetServicesForAge(ctx context.Context, clinicID uuid.UUID, age int) ([]providers.ClinicService, error)
+	GetServicesForGender(ctx context.Context, clinicID uuid.UUID, gender string) ([]providers.ClinicService, error)
+	GetPediatricServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	GetPreventiveServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+
+	// ===== Popular & Recommended Services =====
+	GetTopRatedServices(ctx context.Context, minReviews int, clinicID *uuid.UUID, limit int) ([]providers.ClinicService, error)
+	GetMostPopularServices(ctx context.Context, clinicID uuid.UUID, limit int) ([]providers.ClinicService, error)
+	GetRecentlyAddedServices(ctx context.Context, clinicID uuid.UUID, limit int) ([]providers.ClinicService, error)
+
+	// ===== Statistics & Analytics =====
+	GetServiceStatistics(ctx context.Context, id uuid.UUID) (providers.ServiceStatistics, error)
+	GetClinicServiceMetrics(ctx context.Context, clinicID uuid.UUID) (providers.ServiceMetrics, error)
+	GetServiceCategoryDistribution(ctx context.Context, clinicID uuid.UUID) ([]providers.ServiceCategoryDistribution, error)
+	GetServicePriceDistribution(ctx context.Context, clinicID uuid.UUID) ([]providers.ServicePriceDistribution, error)
+
+	// ===== Counting & Existence Checks =====
+	CountClinicServices(ctx context.Context, clinicID uuid.UUID, isActive *bool) (int64, error)
+	CountServicesByCategory(ctx context.Context, clinicID uuid.UUID, category string) (int64, error)
+	ServiceExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CheckServiceNameExists(ctx context.Context, clinicID uuid.UUID, name string, excludeID *uuid.UUID) (bool, error)
+
+	// ===== Bulk Operations =====
+	GetServicesByIDs(ctx context.Context, ids []uuid.UUID) ([]providers.ClinicService, error)
+	BulkActivateServices(ctx context.Context, ids []uuid.UUID) error
+	BulkDeactivateServices(ctx context.Context, ids []uuid.UUID) error
+	BulkUpdateServiceCategory(ctx context.Context, ids []uuid.UUID, category string) error
+	DeactivateClinicServices(ctx context.Context, clinicID uuid.UUID) error
+
+	// ===== Availability & Scheduling =====
+	GetServicesAvailableOnDay(ctx context.Context, clinicID uuid.UUID, day string) ([]providers.ClinicService, error)
+	GetServicesRequiringFollowUp(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	GetQuickServices(ctx context.Context, clinicID uuid.UUID, maxDurationMinutes int) ([]providers.ClinicService, error)
+
+	// ===== Comparison & Cross-Clinic Queries =====
+	CompareServiceAcrossClinics(ctx context.Context, serviceName string) ([]providers.ServiceComparison, error)
+	GetCheapestServiceProviders(ctx context.Context, serviceName string, limit int) ([]providers.ServiceProvider, error)
 }
 
-// ClinicStatistics contains statistics for a single clinic
-type ClinicStatistics struct {
-	ClinicID              uuid.UUID `json:"clinic_id"`
-	TotalAppointments     int64     `json:"total_appointments"`
-	CompletedAppointments int64     `json:"completed_appointments"`
-	CancelledAppointments int64     `json:"cancelled_appointments"`
-	AverageRating         float64   `json:"average_rating"`
-	TotalReviews          int64     `json:"total_reviews"`
-	TotalStaff            int64     `json:"total_staff"`
-	ActiveStaff           int64     `json:"active_staff"`
-	UtilizationRate       float64   `json:"utilization_rate"` // percentage
-}
+// ============================================
+// STAFF REPOSITORY
+// Maps to: clinic_staff.sql
+// Domain: Healthcare Staff Management
+// ============================================
 
-// ClinicMetrics contains system-wide clinic metrics
-type ClinicMetrics struct {
-	TotalClinics       int64            `json:"total_clinics"`
-	VerifiedClinics    int64            `json:"verified_clinics"`
-	PendingClinics     int64            `json:"pending_clinics"`
-	RejectedClinics    int64            `json:"rejected_clinics"`
-	ClinicsByType      map[string]int64 `json:"clinics_by_type"`
-	ClinicsByProvince  map[string]int64 `json:"clinics_by_province"`
-	ClinicsByOwnership map[string]int64 `json:"clinics_by_ownership"`
-	AverageRating      float64          `json:"average_rating"`
-	TotalReviews       int64            `json:"total_reviews"`
-}
 type StaffRepository interface {
-	// Staff CRUD
+	// ===== Core CRUD Operations =====
 	CreateStaffMember(ctx context.Context, staff providers.ClinicStaff) (providers.ClinicStaff, error)
 	GetStaffByID(ctx context.Context, id uuid.UUID) (providers.ClinicStaff, error)
 	GetStaffByUserID(ctx context.Context, userID uuid.UUID) (providers.ClinicStaff, error)
 	UpdateStaffMember(ctx context.Context, staff providers.ClinicStaff) error
 	DeleteStaffMember(ctx context.Context, id uuid.UUID) error
 
-	// Clinic Staff Management
-	GetClinicStaff(ctx context.Context, clinicID uuid.UUID, role string) ([]providers.ClinicStaff, error)
+	// ===== Professional Information =====
+	UpdateStaffProfessionalInfo(ctx context.Context, id uuid.UUID, info providers.StaffProfessionalInfo) error
+	UpdateStaffLicenses(ctx context.Context, id uuid.UUID, licenses providers.StaffLicenses) error
+	UpdateStaffQualifications(ctx context.Context, id uuid.UUID, qualifications []string) error
+	AddStaffQualification(ctx context.Context, id uuid.UUID, qualification string) error
+
+	// ===== Contact Information =====
+	UpdateStaffContact(ctx context.Context, id uuid.UUID, contact providers.StaffContact) error
+	UpdateStaffProfile(ctx context.Context, id uuid.UUID, profile providers.StaffProfile) error
+
+	// ===== Role & Employment =====
+	UpdateStaffRole(ctx context.Context, id uuid.UUID, role, department string) error
+	UpdateStaffStatus(ctx context.Context, id uuid.UUID, status string, endDate *time.Time) error
+	UpdateStaffEmploymentDates(ctx context.Context, id uuid.UUID, startDate *time.Time, endDate *time.Time) error
+	SetPrimaryContact(ctx context.Context, clinicID, staffID uuid.UUID) error
+	ActivateStaff(ctx context.Context, id uuid.UUID) error
+	DeactivateStaff(ctx context.Context, id uuid.UUID) error
+	SetStaffOnLeave(ctx context.Context, id uuid.UUID) error
+
+	// ===== Availability & Scheduling =====
+	UpdateStaffAvailability(ctx context.Context, id uuid.UUID, workingHours map[string]any, availableDays []string) error
+	UpdatePatientAcceptanceStatus(ctx context.Context, id uuid.UUID, accepting bool) error
+	SetAcceptingPatients(ctx context.Context, id uuid.UUID) error
+	SetNotAcceptingPatients(ctx context.Context, id uuid.UUID) error
+
+	// ===== Clinic Staff Management =====
+	GetClinicStaff(ctx context.Context, clinicID uuid.UUID, role *string) ([]providers.ClinicStaff, error)
 	GetAllClinicStaff(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
-	UpdateStaffStatus(ctx context.Context, id uuid.UUID, status string) error
-	UpdateStaffRole(ctx context.Context, id uuid.UUID, role string) error
-	TransferStaff(ctx context.Context, staffID, newClinicID uuid.UUID) error
+	GetActiveClinicStaff(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
+	GetClinicStaffByRole(ctx context.Context, clinicID uuid.UUID, role string) ([]providers.ClinicStaff, error)
+	GetClinicDoctors(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
+	GetClinicNurses(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
+	GetClinicPrimaryContact(ctx context.Context, clinicID uuid.UUID) (providers.ClinicStaff, error)
 
-	// Credentials & Verification
-	AddCredential(ctx context.Context, cred providers.ProfessionalCredential) (providers.ProfessionalCredential, error)
-	GetCredential(ctx context.Context, id uuid.UUID) (providers.ProfessionalCredential, error)
-	GetCredentials(ctx context.Context, staffID uuid.UUID) ([]providers.ProfessionalCredential, error)
-	VerifyCredential(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID, notes string) error
-	UpdateCredential(ctx context.Context, cred providers.ProfessionalCredential) error
-	DeleteCredential(ctx context.Context, id uuid.UUID) error
-	GetPendingCredentialVerifications(ctx context.Context) ([]providers.ProfessionalCredential, error)
+	// ===== Staff Search & Filtering =====
+	SearchStaffByName(ctx context.Context, name string, clinicID *uuid.UUID, limit, offset int) ([]providers.ClinicStaff, error)
+	SearchStaffBySpecialization(ctx context.Context, specialization string, clinicID *uuid.UUID, limit, offset int) ([]providers.ClinicStaff, error)
+	GetStaffByDepartment(ctx context.Context, clinicID uuid.UUID, department string) ([]providers.ClinicStaff, error)
 
-	// Availability & Scheduling
-	// SetStaffAvailability(ctx context.Context, availability providers.StaffAvailability) error
-	// GetStaffAvailability(ctx context.Context, staffID uuid.UUID, startDate, endDate time.Time) ([]providers.StaffAvailability, error)
-	// UpdateStaffAvailability(ctx context.Context, availability providers.StaffAvailability) error
+	// ===== Staff Availability Queries =====
+	GetStaffAvailableOnDay(ctx context.Context, clinicID uuid.UUID, day string) ([]providers.ClinicStaff, error)
+	GetStaffWorkingHours(ctx context.Context, id uuid.UUID) (providers.StaffWorkingHours, error)
+
+	// ===== Licensing & Credentials =====
+	GetStaffByHPCSNumber(ctx context.Context, hpcsNumber string) (providers.ClinicStaff, error)
+	CheckHPCSNumberExists(ctx context.Context, hpcsNumber string, excludeID *uuid.UUID) (bool, error)
+	GetStaffWithExpiredLicenses(ctx context.Context) ([]providers.ClinicStaff, error)
+
+	GetStaffNeedingCredentialRenewal(ctx context.Context) ([]providers.StaffCredentialRenewal, error)
+	// ===== Transfer & Reassignment =====
+	TransferStaffToClinic(ctx context.Context, staffID, newClinicID uuid.UUID) error
+	GetStaffTransferHistory(ctx context.Context, userID uuid.UUID) ([]providers.ClinicStaff, error)
+
+	// ===== Statistics & Analytics =====
+	GetStaffStatistics(ctx context.Context, id uuid.UUID) (providers.StaffStatistics, error)
+	GetClinicStaffMetrics(ctx context.Context, clinicID uuid.UUID) (providers.StaffMetrics, error)
+	GetStaffRoleDistribution(ctx context.Context, clinicID uuid.UUID) ([]providers.StaffRoleDistribution, error)
+	GetStaffByExperience(ctx context.Context, clinicID uuid.UUID, minYears int) ([]providers.ClinicStaff, error)
+	GetStaffDemographics(ctx context.Context, clinicID uuid.UUID) (providers.StaffDemographics, error)
+
+	// ===== Counting & Existence Checks =====
+	CountClinicStaff(ctx context.Context, clinicID uuid.UUID, employmentStatus *string) (int64, error)
+	CountStaffByRole(ctx context.Context, clinicID uuid.UUID, role string) (int64, error)
+	StaffExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CheckStaffEmailExists(ctx context.Context, email string, excludeID *uuid.UUID) (bool, error)
+	CheckUserStaffExists(ctx context.Context, userID uuid.UUID) (bool, error)
+
+	// ===== Bulk Operations =====
+	GetStaffByIDs(ctx context.Context, ids []uuid.UUID) ([]providers.ClinicStaff, error)
+	BulkUpdateStaffStatus(ctx context.Context, ids []uuid.UUID, status string) error
+	BulkSetAcceptingPatients(ctx context.Context, ids []uuid.UUID, accepting bool) error
+	DeactivateClinicStaff(ctx context.Context, clinicID uuid.UUID) error
+
+	// ===== Language & Communication =====
+	GetStaffByLanguage(ctx context.Context, clinicID uuid.UUID, language string) ([]providers.ClinicStaff, error)
+	GetMultilingualStaff(ctx context.Context, clinicID uuid.UUID, minLanguages int) ([]providers.StaffLanguageInfo, error)
+
+	// ===== Reporting & Compliance =====
+	GetStaffWithoutHPCSNumber(ctx context.Context) ([]providers.ClinicStaff, error)
+	GetStaffWithIncompleteProfiles(ctx context.Context) ([]providers.ClinicStaff, error)
+	GetStaffHiredBetweenDates(ctx context.Context, startDate, endDate time.Time) ([]providers.ClinicStaff, error)
+	GetStaffTerminatedBetweenDates(ctx context.Context, startDate, endDate time.Time) ([]providers.ClinicStaff, error)
 }
+
+// ============================================
+// CREDENTIAL REPOSITORY
+// Maps to: professional_credentials.sql
+// Domain: Professional Licensing & Certification Management
+// ============================================
+
+type CredentialRepository interface {
+	// ===== Core CRUD Operations =====
+	CreateCredential(ctx context.Context, credential providers.ProfessionalCredential) (providers.ProfessionalCredential, error)
+	GetCredentialByID(ctx context.Context, id uuid.UUID) (providers.ProfessionalCredential, error)
+	UpdateCredential(ctx context.Context, credential providers.ProfessionalCredential) error
+	DeleteCredential(ctx context.Context, id uuid.UUID) error
+
+	// ===== Verification & Status Management =====
+	VerifyCredential(ctx context.Context, id, verifiedBy uuid.UUID, notes *string) error
+	RejectCredential(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error
+	RevokeCredential(ctx context.Context, id uuid.UUID, notes string) error
+	MarkCredentialExpired(ctx context.Context, id uuid.UUID) error
+	UpdateCredentialStatus(ctx context.Context, id uuid.UUID, status string) error
+	RenewCredential(ctx context.Context, id uuid.UUID, expiryDate time.Time) error
+
+	// ===== Credential Details Management =====
+	UpdateCredentialNumber(ctx context.Context, id uuid.UUID, credentialNumber string) error
+	UpdateCredentialExpiry(ctx context.Context, id uuid.UUID, expiryDate time.Time) error
+	UpdateCredentialDocument(ctx context.Context, id uuid.UUID, documentURL string) error
+	UpdateCredentialNotes(ctx context.Context, id uuid.UUID, notes string) error
+	UpdateCredentialDates(ctx context.Context, id uuid.UUID, issueDate, expiryDate time.Time) error
+
+	// ===== Querying by Staff Member =====
+	GetStaffCredentials(ctx context.Context, staffID uuid.UUID) ([]providers.ProfessionalCredential, error)
+	GetVerifiedStaffCredentials(ctx context.Context, staffID uuid.UUID) ([]providers.ProfessionalCredential, error)
+	GetActiveStaffCredentials(ctx context.Context, staffID uuid.UUID) ([]providers.ProfessionalCredential, error)
+	GetStaffCredentialsByType(ctx context.Context, staffID uuid.UUID, credentialType string) ([]providers.ProfessionalCredential, error)
+
+	// ===== Credential Type Queries =====
+	GetCredentialsByType(ctx context.Context, credentialType string) ([]providers.CredentialWithStaff, error)
+	GetLicenseCredentials(ctx context.Context, clinicID *uuid.UUID) ([]providers.CredentialWithStaff, error)
+	GetSpecializationCredentials(ctx context.Context) ([]providers.CredentialWithStaff, error)
+	GetDegreeCredentials(ctx context.Context) ([]providers.CredentialWithStaff, error)
+	GetCertificationCredentials(ctx context.Context) ([]providers.CredentialWithStaff, error)
+
+	// ===== Verification Workflows =====
+	GetPendingCredentialVerifications(ctx context.Context) ([]providers.CredentialWithStaff, error)
+	GetPendingCredentialsByClinic(ctx context.Context, clinicID uuid.UUID) ([]providers.CredentialWithStaff, error)
+	GetVerifiedCredentialsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]providers.CredentialWithStaff, error)
+
+	// ===== Expiration Management =====
+	GetExpiringCredentials(ctx context.Context, daysUntilExpiry int) ([]providers.CredentialWithStaff, error)
+	GetExpiredCredentials(ctx context.Context) ([]providers.CredentialWithStaff, error)
+	GetClinicExpiredCredentials(ctx context.Context, clinicID uuid.UUID) ([]providers.CredentialWithStaff, error)
+	AutoExpireCredentials(ctx context.Context) error
+
+	// ===== Issuing Authority Queries =====
+	GetCredentialsByAuthority(ctx context.Context, issuingAuthority string) ([]providers.CredentialWithStaff, error)
+	GetCredentialsByAuthorityAndType(ctx context.Context, issuingAuthority, credentialType string) ([]providers.CredentialWithStaff, error)
+
+	// ===== Statistics & Analytics =====
+	GetCredentialStatistics(ctx context.Context, staffID uuid.UUID) (providers.CredentialStatistics, error)
+	GetClinicCredentialMetrics(ctx context.Context, clinicID uuid.UUID) (providers.ClinicCredentialMetrics, error)
+	GetCredentialTypeDistribution(ctx context.Context, staffID uuid.UUID) ([]providers.CredentialTypeDistribution, error)
+	GetCredentialStatusDistribution(ctx context.Context, staffID uuid.UUID) ([]providers.CredentialStatusDistribution, error)
+	GetSystemCredentialMetrics(ctx context.Context) (providers.SystemCredentialMetrics, error)
+
+	// ===== Counting & Existence Checks =====
+	CountStaffCredentials(ctx context.Context, staffID uuid.UUID, status *string) (int64, error)
+	CountCredentialsByType(ctx context.Context, staffID uuid.UUID, credentialType string) (int64, error)
+	CredentialExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CheckCredentialNumberExists(ctx context.Context, credentialNumber, issuingAuthority string, excludeID *uuid.UUID) (bool, error)
+	HasVerifiedCredentialOfType(ctx context.Context, staffID uuid.UUID, credentialType string) (bool, error)
+
+	// ===== Bulk Operations =====
+	GetCredentialsByIDs(ctx context.Context, ids []uuid.UUID) ([]providers.ProfessionalCredential, error)
+	BulkVerifyCredentials(ctx context.Context, ids []uuid.UUID, verifiedBy uuid.UUID) error
+	BulkRejectCredentials(ctx context.Context, ids []uuid.UUID, verifiedBy uuid.UUID, notes string) error
+	BulkUpdateCredentialStatus(ctx context.Context, ids []uuid.UUID, status string) error
+	DeleteStaffCredentials(ctx context.Context, staffID uuid.UUID) error
+
+	// ===== Compliance & Reporting =====
+	GetStaffWithoutRequiredCredentials(ctx context.Context) ([]providers.ClinicStaff, error)
+	GetVerificationBacklog(ctx context.Context) ([]providers.VerificationBacklog, error)
+	GetVerifierWorkload(ctx context.Context, startDate, endDate time.Time) ([]providers.VerifierWorkload, error)
+	GetCredentialsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]providers.CredentialWithStaff, error)
+	GetRevokedCredentials(ctx context.Context) ([]providers.CredentialWithStaff, error)
+	GetCredentialRenewalHistory(ctx context.Context, staffID uuid.UUID, credentialType string) ([]providers.ProfessionalCredential, error)
+}
+
+// ============================================
+// SMS REPOSITORY
+// ============================================
 
 type SMSRepository interface {
 	// Conversation Management
@@ -399,36 +621,14 @@ type SMSRepository interface {
 	LogMessage(ctx context.Context, msg sms.SMSMessage) (sms.SMSMessage, error)
 	GetMessage(ctx context.Context, id uuid.UUID) (sms.SMSMessage, error)
 	GetConversationMessages(ctx context.Context, conversationID uuid.UUID, limit, offset int) ([]sms.SMSMessage, error)
-	//	GetMessagesByStatus(ctx context.Context, status sms.MessageStatus) ([]sms.SMSMessage, error)
-	//	UpdateMessageStatus(ctx context.Context, messageID uuid.UUID, status sms.MessageStatus) error
-
-	// Template Management
-	// SaveSMSTemplate(ctx context.Context, template sms.SMSTemplate) (sms.SMSTemplate, error)
-	// GetSMSTemplate(ctx context.Context, id uuid.UUID) (sms.SMSTemplate, error)
-	// GetSMSTemplateByType(ctx context.Context, templateType string) (sms.SMSTemplate, error)
-	// UpdateSMSTemplate(ctx context.Context, template sms.SMSTemplate) error
 
 	// Analytics & Reporting
-	//	GetSMSMetrics(ctx context.Context, startDate, endDate time.Time) (sms.SMSMetrics, error)
 	GetFailedMessages(ctx context.Context, startDate, endDate time.Time) ([]sms.SMSMessage, error)
-	//	GetConversationStats(ctx context.Context, conversationID uuid.UUID) (sms.ConversationStats, error)
 
 	// Compliance & Retention
 	ArchiveOldMessages(ctx context.Context, olderThan time.Duration) error
 	ExportConversation(ctx context.Context, conversationID uuid.UUID) ([]byte, error)
 }
-
-// ============================================
-// APPOINTMENT MANAGEMENT
-// ============================================
-
-// ============================================
-// BILLING & PAYMENTS
-// ============================================
-
-// ============================================
-// PRESCRIPTION MANAGEMENT
-// ============================================
 
 // ============================================
 // TRANSACTION MANAGEMENT
@@ -440,42 +640,3 @@ type TxManager interface {
 	WithRetryTransaction(ctx context.Context, maxRetries int, fn func(context.Context, pgx.Tx) error) error
 	GetTransaction(ctx context.Context) (pgx.Tx, bool)
 }
-
-// ============================================
-// REPOSITORY FACTORY/COLLECTION
-// ============================================
-
-// type RepositoryProvider interface {
-// 	// Core Repositories
-// 	Auth() AuthRepository
-// 	User() UserRepository
-// 	OTP() OTPRepository
-// 	Session() SessionRepository
-//
-// 	// Patient Domain
-// 	Patient() PatientRepository
-//
-// 	// Provider Domain
-// 	Clinic() ClinicRepository
-// 	Staff() StaffRepository
-//
-// 	// Compliance & Audit
-// 	Consent() ConsentRepository
-// 	Audit() AuditRepository
-//
-// 	// Communication
-// 	Notification() NotificationRepository
-// 	SMS() SMSRepository
-//
-// 	// Business Logic
-// 	Appointment() AppointmentRepository
-// 	Billing() BillingRepository
-// 	Prescription() PrescriptionRepository
-//
-// 	// Transaction Management
-// 	Transaction() TxManager
-//
-// 	// Health & Connection
-// 	HealthCheck(ctx context.Context) error
-// 	Close() error
-// }
