@@ -406,14 +406,23 @@ func (q *Queries) SearchClinics(ctx context.Context, arg SearchClinicsParams) ([
 }
 
 const searchClinicsByLocation = `-- name: SearchClinicsByLocation :many
-SELECT id, clinic_name, clinic_type, physical_address, city, 
-    province, primary_phone, latitude, longitude, rating,
+SELECT 
+    id, 
+    clinic_name, 
+    clinic_type, 
+    physical_address, 
+    city, 
+    province, 
+    primary_phone, 
+    latitude, 
+    longitude, 
+    rating,
     -- Calculate distance using Haversine formula (approximate)
-    (6371 * acos(
+    CAST((6371 * acos(
         cos(radians($1)) * cos(radians(latitude)) * 
         cos(radians(longitude) - radians($2)) + 
         sin(radians($1)) * sin(radians(latitude))
-    )) AS distance_km
+    )) AS NUMERIC(10,2)) AS distance_km
 FROM clinics
 WHERE 
     latitude IS NOT NULL 
@@ -444,7 +453,7 @@ type SearchClinicsByLocationRow struct {
 	Latitude        pgtype.Numeric `json:"latitude"`
 	Longitude       pgtype.Numeric `json:"longitude"`
 	Rating          pgtype.Numeric `json:"rating"`
-	DistanceKm      int32          `json:"distance_km"`
+	DistanceKm      pgtype.Numeric `json:"distance_km"`
 }
 
 func (q *Queries) SearchClinicsByLocation(ctx context.Context, arg SearchClinicsByLocationParams) ([]SearchClinicsByLocationRow, error) {

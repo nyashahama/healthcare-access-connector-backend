@@ -275,31 +275,151 @@ type PatientProfileRepository interface {
 // ============================================
 
 type ClinicRepository interface {
-	// Clinic CRUD
+	// ===== Basic CRUD Operations =====
 
 	// Create
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
 
 	// Read
 	GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
-	ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
-	SearchClinics(ctx context.Context, query string, province *string, city *string, limit, offset int) ([]providers.Clinic, error)
-	// SearchClinicsByLocation(ctx context.Context, latitude, longitude, radiusKm float64) ([]providers.Clinic, error)
-	//
-	// // Update
+	GetClinicsByIDs(ctx context.Context, ids []uuid.UUID) ([]providers.Clinic, error)
+
+	// Update
 	UpdateClinic(ctx context.Context, clinic providers.Clinic) error
-	// VerifyClinic(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID, notes string) error
 
-	// Operating Hours
-	// SetOperatingHours(ctx context.Context, hours providers.OperatingHours) error
-	// GetOperatingHours(ctx context.Context, clinicID uuid.UUID) ([]providers.OperatingHours, error)
-	// UpdateOperatingHours(ctx context.Context, hours providers.OperatingHours) error
+	// Delete
+	DeleteClinic(ctx context.Context, id uuid.UUID) error
 
-	// Clinic Stats
-	// GetClinicStats(ctx context.Context, clinicID uuid.UUID) (providers.ClinicStats, error)
-	// GetClinicAppointmentSlots(ctx context.Context, clinicID uuid.UUID, date time.Time) ([]providers.AppointmentSlot, error)
+	// ===== Listing & Search Operations =====
+
+	// List with filters
+	ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
+
+	// Count for pagination
+	CountClinics(ctx context.Context, filters providers.ClinicFilters) (int64, error)
+
+	// Search by text query
+	SearchClinics(ctx context.Context, query string, province *string, city *string, limit, offset int) ([]providers.Clinic, error)
+
+	// Location-based search
+	SearchClinicsByLocation(ctx context.Context, latitude, longitude, radiusKm float64) ([]ClinicSearchResult, error)
+
+	// ===== Verification & Status Management =====
+
+	// Verify clinic
+	VerifyClinic(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID, notes string) error
+
+	// Update verification status
+	UpdateClinicStatus(ctx context.Context, id uuid.UUID, status string) error
+
+	// Get clinics by verification status
+	GetClinicsByVerificationStatus(ctx context.Context, status string, limit, offset int) ([]providers.Clinic, error)
+
+	// Get pending verifications
+	GetPendingVerifications(ctx context.Context) ([]providers.Clinic, error)
+
+	// ===== Rating & Review Management =====
+
+	// Update clinic rating
+	UpdateClinicRating(ctx context.Context, id uuid.UUID, rating float64, reviewCount int) error
+
+	// Get top-rated clinics
+	GetTopRatedClinics(ctx context.Context, province *string, limit int) ([]providers.Clinic, error)
+
+	// ===== Geographic & Location Operations =====
+
+	// Get clinics by province
+	GetClinicsByProvince(ctx context.Context, province string, limit, offset int) ([]providers.Clinic, error)
+
+	// Get clinics by city
+	GetClinicsByCity(ctx context.Context, city string, limit, offset int) ([]providers.Clinic, error)
+
+	// Get nearby clinics
+	GetNearbyClinics(ctx context.Context, latitude, longitude float64, limit int) ([]ClinicSearchResult, error)
+
+	// ===== Specialty & Service Operations =====
+
+	// Get clinics by service
+	GetClinicsByService(ctx context.Context, service string, province *string, limit, offset int) ([]providers.Clinic, error)
+
+	// Get clinics by specialty
+	GetClinicsBySpecialty(ctx context.Context, specialty string, province *string, limit, offset int) ([]providers.Clinic, error)
+
+	// Get clinics accepting medical aid
+	GetClinicsAcceptingMedicalAid(ctx context.Context, provider *string, province *string, limit, offset int) ([]providers.Clinic, error)
+
+	// ===== Statistics & Analytics =====
+
+	// Get clinic stats
+	GetClinicStatistics(ctx context.Context, id uuid.UUID) (ClinicStatistics, error)
+
+	// Get clinic metrics for admin dashboard
+	GetClinicMetrics(ctx context.Context) (ClinicMetrics, error)
+
+	// Get clinics by ownership type
+	GetClinicsByOwnership(ctx context.Context, ownershipType string, limit, offset int) ([]providers.Clinic, error)
+
+	// ===== Bulk Operations =====
+
+	// Bulk update verification status
+	BulkUpdateVerificationStatus(ctx context.Context, ids []uuid.UUID, status string) error
+
+	// Bulk update province
+	BulkUpdateProvince(ctx context.Context, ids []uuid.UUID, province string) error
+
+	// ===== Validation & Utilities =====
+
+	// Check if clinic exists
+	ClinicExists(ctx context.Context, id uuid.UUID) (bool, error)
+
+	// Validate clinic registration number uniqueness
+	IsRegistrationNumberUnique(ctx context.Context, registrationNumber string, excludeID *uuid.UUID) (bool, error)
+
+	// Get clinic by registration number
+	GetClinicByRegistrationNumber(ctx context.Context, registrationNumber string) (providers.Clinic, error)
+
+	// ===== Export & Reporting =====
+
+	// Export clinic data (for reports)
+	ExportClinicData(ctx context.Context, id uuid.UUID) ([]byte, error)
+
+	// Get clinics for export (with filters)
+	GetClinicsForExport(ctx context.Context, filters providers.ClinicFilters) ([]providers.Clinic, error)
 }
 
+// ===== Supporting Types =====
+
+// ClinicSearchResult wraps a clinic with its distance from search point
+type ClinicSearchResult struct {
+	Clinic     providers.Clinic `json:"clinic"`
+	DistanceKm float64          `json:"distance_km"`
+}
+
+// ClinicStatistics contains statistics for a single clinic
+type ClinicStatistics struct {
+	ClinicID              uuid.UUID `json:"clinic_id"`
+	TotalAppointments     int64     `json:"total_appointments"`
+	CompletedAppointments int64     `json:"completed_appointments"`
+	CancelledAppointments int64     `json:"cancelled_appointments"`
+	AverageRating         float64   `json:"average_rating"`
+	TotalReviews          int64     `json:"total_reviews"`
+	TotalStaff            int64     `json:"total_staff"`
+	ActiveStaff           int64     `json:"active_staff"`
+	UtilizationRate       float64   `json:"utilization_rate"` // percentage
+}
+
+// ClinicMetrics contains system-wide clinic metrics
+type ClinicMetrics struct {
+	TotalClinics       int64            `json:"total_clinics"`
+	VerifiedClinics    int64            `json:"verified_clinics"`
+	PendingClinics     int64            `json:"pending_clinics"`
+	RejectedClinics    int64            `json:"rejected_clinics"`
+	ClinicsByType      map[string]int64 `json:"clinics_by_type"`
+	ClinicsByProvince  map[string]int64 `json:"clinics_by_province"`
+	ClinicsByOwnership map[string]int64 `json:"clinics_by_ownership"`
+	AverageRating      float64          `json:"average_rating"`
+	TotalReviews       int64            `json:"total_reviews"`
+}
 type StaffRepository interface {
 	// Staff CRUD
 	CreateStaffMember(ctx context.Context, staff providers.ClinicStaff) (providers.ClinicStaff, error)

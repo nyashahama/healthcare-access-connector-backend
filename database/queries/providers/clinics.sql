@@ -61,14 +61,23 @@ LIMIT $4 OFFSET $5;
 
 
 -- name: SearchClinicsByLocation :many
-SELECT id, clinic_name, clinic_type, physical_address, city, 
-    province, primary_phone, latitude, longitude, rating,
+SELECT 
+    id, 
+    clinic_name, 
+    clinic_type, 
+    physical_address, 
+    city, 
+    province, 
+    primary_phone, 
+    latitude, 
+    longitude, 
+    rating,
     -- Calculate distance using Haversine formula (approximate)
-    (6371 * acos(
+    CAST((6371 * acos(
         cos(radians($1)) * cos(radians(latitude)) * 
         cos(radians(longitude) - radians($2)) + 
         sin(radians($1)) * sin(radians(latitude))
-    )) AS distance_km
+    )) AS NUMERIC(10,2)) AS distance_km
 FROM clinics
 WHERE 
     latitude IS NOT NULL 
