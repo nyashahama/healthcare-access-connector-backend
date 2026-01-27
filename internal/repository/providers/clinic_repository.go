@@ -79,31 +79,89 @@ func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Cl
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	created, err := r.querier.CreateClinic(ctx, sqlc.CreateClinicParams{
-		ClinicName:         clinic.ClinicName,
-		ClinicType:         clinic.ClinicType,
-		RegistrationNumber: pgtypeTextFromStringPtr(clinic.RegistrationNumber),
-		PrimaryPhone:       pgtypeTextFromStringPtr(clinic.PrimaryPhone),
-		Email:              pgtypeTextFromStringPtr(clinic.Email),
-		PhysicalAddress:    clinic.PhysicalAddress,
-		City:               pgtypeTextFromStringPtr(clinic.City),
-		Province:           pgtypeTextFromStringPtr(clinic.Province),
-		PostalCode:         pgtypeTextFromStringPtr(clinic.PostalCode),
-		Country:            pgtypeTextFromString(clinic.Country),
-		Latitude:           float64PtrToPgtypeNumeric(clinic.Latitude),
-		Longitude:          float64PtrToPgtypeNumeric(clinic.Longitude),
-		Description:        pgtypeTextFromStringPtr(clinic.Description),
-		OwnershipType:      pgtypeTextFromStringPtr(clinic.OwnershipType),
-		AcceptsMedicalAid:  pgtype.Bool{Bool: clinic.AcceptsMedicalAid, Valid: true},
-		VerificationStatus: pgtypeTextFromString(clinic.VerificationStatus),
-	})
+	operatingHoursJSON, err := jsonbFromMap(clinic.OperatingHours)
+	if err != nil {
+		return providers.Clinic{}, fmt.Errorf("marshal operating hours: %w", err)
+	}
+
+	servicesJSON, err := jsonbFromStringSlice(clinic.Services)
+	if err != nil {
+		return providers.Clinic{}, fmt.Errorf("marshal services: %w", err)
+	}
+
+	specialtiesJSON, err := jsonbFromStringSlice(clinic.Specialties)
+	if err != nil {
+		return providers.Clinic{}, fmt.Errorf("marshal specialties: %w", err)
+	}
+
+	facilitiesJSON, err := jsonbFromStringSlice(clinic.Facilities)
+	if err != nil {
+		return providers.Clinic{}, fmt.Errorf("marshal facilities: %w", err)
+	}
+
+	medicalAidProvidersJSON, err := jsonbFromStringSlice(clinic.MedicalAidProviders)
+	if err != nil {
+		return providers.Clinic{}, fmt.Errorf("marshal medical aid providers: %w", err)
+	}
+
+	paymentMethodsJSON, err := jsonbFromStringSlice(clinic.PaymentMethods)
+	if err != nil {
+		return providers.Clinic{}, fmt.Errorf("marshal payment methods: %w", err)
+	}
+
+	// Assuming certifications is not in Clinic struct, set to nil
+	certificationsJSON, _ := jsonbFromMap(nil)
+
+	params := sqlc.CreateClinicParams{
+		ClinicName:             clinic.ClinicName,
+		ClinicType:             clinic.ClinicType,
+		RegistrationNumber:     pgtypeTextFromStringPtr(clinic.RegistrationNumber),
+		AccreditationNumber:    pgtypeTextFromStringPtr(clinic.AccreditationNumber),
+		PrimaryPhone:           pgtypeTextFromStringPtr(clinic.PrimaryPhone),
+		SecondaryPhone:         pgtypeTextFromStringPtr(clinic.SecondaryPhone),
+		EmergencyPhone:         pgtypeTextFromStringPtr(clinic.EmergencyPhone),
+		Email:                  pgtypeTextFromStringPtr(clinic.Email),
+		Website:                pgtypeTextFromStringPtr(clinic.Website),
+		PhysicalAddress:        clinic.PhysicalAddress,
+		City:                   pgtypeTextFromStringPtr(clinic.City),
+		Province:               pgtypeTextFromStringPtr(clinic.Province),
+		PostalCode:             pgtypeTextFromStringPtr(clinic.PostalCode),
+		Country:                pgtypeTextFromString(clinic.Country),
+		Latitude:               float64PtrToPgtypeNumeric(clinic.Latitude),
+		Longitude:              float64PtrToPgtypeNumeric(clinic.Longitude),
+		GooglePlaceID:          pgtypeTextFromStringPtr(clinic.GooglePlaceID),
+		Description:            pgtypeTextFromStringPtr(clinic.Description),
+		YearEstablished:        intPtrToPgtypeInt4(clinic.YearEstablished),
+		OwnershipType:          pgtypeTextFromStringPtr(clinic.OwnershipType),
+		BedCount:               intPtrToPgtypeInt4(clinic.BedCount),
+		OperatingHours:         operatingHoursJSON,
+		Services:               servicesJSON,
+		Specialties:            specialtiesJSON,
+		LanguagesSpoken:        stringSliceToArray(clinic.LanguagesSpoken),
+		Facilities:             facilitiesJSON,
+		AcceptsMedicalAid:      pgtype.Bool{Bool: clinic.AcceptsMedicalAid, Valid: true},
+		MedicalAidProviders:    medicalAidProvidersJSON,
+		PaymentMethods:         paymentMethodsJSON,
+		FeeStructure:           pgtypeTextFromStringPtr(clinic.FeeStructure),
+		AccreditationBody:      pgtypeTextFromStringPtr(clinic.AccreditationBody),
+		AccreditationExpiry:    datePtrToPgtypeDate(clinic.AccreditationExpiry),
+		Certifications:         certificationsJSON,
+		PatientCapacity:        intPtrToPgtypeInt4(clinic.PatientCapacity),
+		AverageWaitTimeMinutes: intPtrToPgtypeInt4(clinic.AverageWaitTimeMinutes),
+		ContactPersonName:      pgtypeTextFromStringPtr(clinic.ContactPersonName),
+		ContactPersonRole:      pgtypeTextFromStringPtr(clinic.ContactPersonRole),
+		ContactPersonPhone:     pgtypeTextFromStringPtr(clinic.ContactPersonPhone),
+		ContactPersonEmail:     pgtypeTextFromStringPtr(clinic.ContactPersonEmail),
+	}
+
+	created, err := r.querier.CreateClinic(ctx, params)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("create_clinic", "error").Inc()
 		return providers.Clinic{}, r.handleError(err, "create clinic")
 	}
 
 	clinicDBQueryTotal.WithLabelValues("create_clinic", "success").Inc()
-	return r.mapToClinicFromCreate(created), nil
+	return r.mapToClinic(created), nil
 }
 
 func (r *clinicRepository) GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error) {
@@ -886,16 +944,69 @@ func (r *clinicRepository) handleError(err error, operation string) error {
 // MAPPING FUNCTIONS
 // ============================================
 
-func (r *clinicRepository) mapToClinicFromCreate(row sqlc.CreateClinicRow) providers.Clinic {
+func (r *clinicRepository) mapToClinic(row sqlc.Clinic) providers.Clinic {
 	return providers.Clinic{
-		ID:                 pgtypeUUIDToUUID(row.ID),
-		ClinicName:         row.ClinicName,
-		ClinicType:         row.ClinicType,
-		City:               pgtypeTextToStringPtr(row.City),
-		Province:           pgtypeTextToStringPtr(row.Province),
+		ID:         pgtypeUUIDToUUID(row.ID),
+		ClinicName: row.ClinicName,
+		ClinicType: row.ClinicType,
+
+		RegistrationNumber:  pgtypeTextToStringPtr(row.RegistrationNumber),
+		AccreditationNumber: pgtypeTextToStringPtr(row.AccreditationNumber),
+		PrimaryPhone:        pgtypeTextToStringPtr(row.PrimaryPhone),
+		SecondaryPhone:      pgtypeTextToStringPtr(row.SecondaryPhone),
+		EmergencyPhone:      pgtypeTextToStringPtr(row.EmergencyPhone),
+		Email:               pgtypeTextToStringPtr(row.Email),
+		Website:             pgtypeTextToStringPtr(row.Website),
+
+		PhysicalAddress: row.PhysicalAddress,
+		City:            pgtypeTextToStringPtr(row.City),
+		Province:        pgtypeTextToStringPtr(row.Province),
+		PostalCode:      pgtypeTextToStringPtr(row.PostalCode),
+		Country:         pgtypeTextToString(row.Country),
+
+		Latitude:      pgtypeNumericToFloat64Ptr(row.Latitude),
+		Longitude:     pgtypeNumericToFloat64Ptr(row.Longitude),
+		GooglePlaceID: pgtypeTextToStringPtr(row.GooglePlaceID),
+		Description:   pgtypeTextToStringPtr(row.Description),
+
+		YearEstablished: pgtypeInt4ToIntPtr(row.YearEstablished),
+		OwnershipType:   pgtypeTextToStringPtr(row.OwnershipType),
+		BedCount:        pgtypeInt4ToIntPtr(row.BedCount),
+
+		OperatingHours: mapFromJSONB(row.OperatingHours),
+		Services:       stringSliceFromJSONB(row.Services),
+		Specialties:    stringSliceFromJSONB(row.Specialties),
+
+		LanguagesSpoken: row.LanguagesSpoken,
+
+		Facilities:          stringSliceFromJSONB(row.Facilities),
+		AcceptsMedicalAid:   pgtypeBoolToBool(row.AcceptsMedicalAid),
+		MedicalAidProviders: stringSliceFromJSONB(row.MedicalAidProviders),
+		PaymentMethods:      stringSliceFromJSONB(row.PaymentMethods),
+
+		FeeStructure: pgtypeTextToStringPtr(row.FeeStructure),
+
+		AccreditationBody:   pgtypeTextToStringPtr(row.AccreditationBody),
+		AccreditationExpiry: pgtypeDateToTimePtr(row.AccreditationExpiry),
+
+		IsVerified:         pgtypeBoolToBool(row.IsVerified),
 		VerificationStatus: pgtypeTextToString(row.VerificationStatus),
-		CreatedAt:          row.CreatedAt.Time,
-		UpdatedAt:          row.UpdatedAt.Time,
+		VerificationNotes:  pgtypeTextToStringPtr(row.VerificationNotes),
+		VerifiedBy:         uuidPtrToUUID(row.VerifiedBy),
+		VerificationDate:   pgtypeTimestampToTimePtr(row.VerificationDate),
+
+		PatientCapacity:        pgtypeInt4ToIntPtr(row.PatientCapacity),
+		AverageWaitTimeMinutes: pgtypeInt4ToIntPtr(row.AverageWaitTimeMinutes),
+		Rating:                 pgtypeNumericToFloat64Ptr(row.Rating),
+		ReviewCount:            pgtypeInt4ToInt(row.ReviewCount),
+
+		ContactPersonName:  pgtypeTextToStringPtr(row.ContactPersonName),
+		ContactPersonRole:  pgtypeTextToStringPtr(row.ContactPersonRole),
+		ContactPersonPhone: pgtypeTextToStringPtr(row.ContactPersonPhone),
+		ContactPersonEmail: pgtypeTextToStringPtr(row.ContactPersonEmail),
+
+		CreatedAt: row.CreatedAt.Time,
+		UpdatedAt: row.UpdatedAt.Time,
 	}
 }
 

@@ -255,11 +255,3 @@ func stringSliceToArray(s []string) []string {
 	}
 	return s
 }
-
-// Float8 conversion helpers
-func pgtypeFloat8ToFloat64Ptr(f pgtype.Float8) *float64 {
-	if !f.Valid {
-		return nil
-	}
-	return &f.Float64
-}
