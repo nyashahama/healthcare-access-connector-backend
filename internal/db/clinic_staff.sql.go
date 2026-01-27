@@ -11,20 +11,195 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createClinicStaff = `-- name: CreateClinicStaff :one
-
-INSERT INTO clinic_staff (
-    clinic_id, user_id, title, first_name, last_name, 
-    professional_title, specialization, work_email, work_phone,
-    hpcs_number, staff_role, employment_status, 
-    is_accepting_new_patients
-)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, clinic_id, user_id, first_name, last_name, 
-    staff_role, employment_status, created_at
+const activateStaff = `-- name: ActivateStaff :exec
+UPDATE clinic_staff
+SET 
+    employment_status = 'active',
+    updated_at = NOW()
+WHERE id = $1
 `
 
-type CreateClinicStaffParams struct {
+func (q *Queries) ActivateStaff(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, activateStaff, id)
+	return err
+}
+
+const addStaffQualification = `-- name: AddStaffQualification :exec
+UPDATE clinic_staff
+SET 
+    qualifications = array_append(qualifications, $2),
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type AddStaffQualificationParams struct {
+	ID          pgtype.UUID `json:"id"`
+	ArrayAppend interface{} `json:"array_append"`
+}
+
+func (q *Queries) AddStaffQualification(ctx context.Context, arg AddStaffQualificationParams) error {
+	_, err := q.db.Exec(ctx, addStaffQualification, arg.ID, arg.ArrayAppend)
+	return err
+}
+
+const bulkSetAcceptingPatients = `-- name: BulkSetAcceptingPatients :exec
+UPDATE clinic_staff
+SET 
+    is_accepting_new_patients = $2,
+    updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkSetAcceptingPatientsParams struct {
+	Column1                []pgtype.UUID `json:"column_1"`
+	IsAcceptingNewPatients pgtype.Bool   `json:"is_accepting_new_patients"`
+}
+
+func (q *Queries) BulkSetAcceptingPatients(ctx context.Context, arg BulkSetAcceptingPatientsParams) error {
+	_, err := q.db.Exec(ctx, bulkSetAcceptingPatients, arg.Column1, arg.IsAcceptingNewPatients)
+	return err
+}
+
+const bulkUpdateStaffStatus = `-- name: BulkUpdateStaffStatus :exec
+UPDATE clinic_staff
+SET 
+    employment_status = $2,
+    updated_at = NOW()
+WHERE id = ANY($1::uuid[])
+`
+
+type BulkUpdateStaffStatusParams struct {
+	Column1          []pgtype.UUID `json:"column_1"`
+	EmploymentStatus pgtype.Text   `json:"employment_status"`
+}
+
+func (q *Queries) BulkUpdateStaffStatus(ctx context.Context, arg BulkUpdateStaffStatusParams) error {
+	_, err := q.db.Exec(ctx, bulkUpdateStaffStatus, arg.Column1, arg.EmploymentStatus)
+	return err
+}
+
+const checkHPCSNumberExists = `-- name: CheckHPCSNumberExists :one
+SELECT EXISTS(
+    SELECT 1 FROM clinic_staff
+    WHERE 
+        hpcs_number = $1
+        AND ($2::uuid IS NULL OR id != $2)
+) as exists
+`
+
+type CheckHPCSNumberExistsParams struct {
+	HpcsNumber pgtype.Text `json:"hpcs_number"`
+	Column2    pgtype.UUID `json:"column_2"`
+}
+
+func (q *Queries) CheckHPCSNumberExists(ctx context.Context, arg CheckHPCSNumberExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkHPCSNumberExists, arg.HpcsNumber, arg.Column2)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const checkStaffEmailExists = `-- name: CheckStaffEmailExists :one
+SELECT EXISTS(
+    SELECT 1 FROM clinic_staff
+    WHERE 
+        work_email = $1
+        AND ($2::uuid IS NULL OR id != $2)
+) as exists
+`
+
+type CheckStaffEmailExistsParams struct {
+	WorkEmail pgtype.Text `json:"work_email"`
+	Column2   pgtype.UUID `json:"column_2"`
+}
+
+func (q *Queries) CheckStaffEmailExists(ctx context.Context, arg CheckStaffEmailExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkStaffEmailExists, arg.WorkEmail, arg.Column2)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const checkUserStaffExists = `-- name: CheckUserStaffExists :one
+SELECT EXISTS(
+    SELECT 1 FROM clinic_staff
+    WHERE user_id = $1
+) as exists
+`
+
+func (q *Queries) CheckUserStaffExists(ctx context.Context, userID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, checkUserStaffExists, userID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const countClinicStaff = `-- name: CountClinicStaff :one
+
+SELECT COUNT(*) 
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND ($2::VARCHAR IS NULL OR employment_status = $2)
+`
+
+type CountClinicStaffParams struct {
+	ClinicID pgtype.UUID `json:"clinic_id"`
+	Column2  string      `json:"column_2"`
+}
+
+// ============================================
+// COUNTING & EXISTENCE CHECKS
+// ============================================
+func (q *Queries) CountClinicStaff(ctx context.Context, arg CountClinicStaffParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countClinicStaff, arg.ClinicID, arg.Column2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countStaffByRole = `-- name: CountStaffByRole :one
+SELECT COUNT(*)
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND staff_role = $2
+    AND employment_status = 'active'
+`
+
+type CountStaffByRoleParams struct {
+	ClinicID  pgtype.UUID `json:"clinic_id"`
+	StaffRole string      `json:"staff_role"`
+}
+
+func (q *Queries) CountStaffByRole(ctx context.Context, arg CountStaffByRoleParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countStaffByRole, arg.ClinicID, arg.StaffRole)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createStaffMember = `-- name: CreateStaffMember :one
+
+
+INSERT INTO clinic_staff (
+    clinic_id, user_id, title, first_name, last_name,
+    professional_title, specialization,
+    work_email, work_phone, personal_phone,
+    hpcs_number, other_license_numbers, qualifications, years_experience, bio,
+    staff_role, department, is_primary_contact,
+    working_hours, available_days, is_accepting_new_patients,
+    employment_status, start_date, end_date,
+    profile_picture_url, languages_spoken
+)
+VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+    $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+)
+RETURNING id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at
+`
+
+type CreateStaffMemberParams struct {
 	ClinicID               pgtype.UUID `json:"clinic_id"`
 	UserID                 pgtype.UUID `json:"user_id"`
 	Title                  pgtype.Text `json:"title"`
@@ -34,28 +209,35 @@ type CreateClinicStaffParams struct {
 	Specialization         pgtype.Text `json:"specialization"`
 	WorkEmail              pgtype.Text `json:"work_email"`
 	WorkPhone              pgtype.Text `json:"work_phone"`
+	PersonalPhone          pgtype.Text `json:"personal_phone"`
 	HpcsNumber             pgtype.Text `json:"hpcs_number"`
+	OtherLicenseNumbers    []byte      `json:"other_license_numbers"`
+	Qualifications         []string    `json:"qualifications"`
+	YearsExperience        pgtype.Int4 `json:"years_experience"`
+	Bio                    pgtype.Text `json:"bio"`
 	StaffRole              string      `json:"staff_role"`
-	EmploymentStatus       pgtype.Text `json:"employment_status"`
+	Department             pgtype.Text `json:"department"`
+	IsPrimaryContact       pgtype.Bool `json:"is_primary_contact"`
+	WorkingHours           []byte      `json:"working_hours"`
+	AvailableDays          []string    `json:"available_days"`
 	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
-}
-
-type CreateClinicStaffRow struct {
-	ID               pgtype.UUID      `json:"id"`
-	ClinicID         pgtype.UUID      `json:"clinic_id"`
-	UserID           pgtype.UUID      `json:"user_id"`
-	FirstName        string           `json:"first_name"`
-	LastName         string           `json:"last_name"`
-	StaffRole        string           `json:"staff_role"`
-	EmploymentStatus pgtype.Text      `json:"employment_status"`
-	CreatedAt        pgtype.Timestamp `json:"created_at"`
+	EmploymentStatus       pgtype.Text `json:"employment_status"`
+	StartDate              pgtype.Date `json:"start_date"`
+	EndDate                pgtype.Date `json:"end_date"`
+	ProfilePictureUrl      pgtype.Text `json:"profile_picture_url"`
+	LanguagesSpoken        []string    `json:"languages_spoken"`
 }
 
 // ============================================
-// Clinic Staff Queries
+// CLINIC STAFF REPOSITORY QUERIES
+// Maps to: StaffRepository interface
+// Domain: Healthcare Staff Management
 // ============================================
-func (q *Queries) CreateClinicStaff(ctx context.Context, arg CreateClinicStaffParams) (CreateClinicStaffRow, error) {
-	row := q.db.QueryRow(ctx, createClinicStaff,
+// ============================================
+// CORE CRUD OPERATIONS
+// ============================================
+func (q *Queries) CreateStaffMember(ctx context.Context, arg CreateStaffMemberParams) (ClinicStaff, error) {
+	row := q.db.QueryRow(ctx, createStaffMember,
 		arg.ClinicID,
 		arg.UserID,
 		arg.Title,
@@ -65,31 +247,24 @@ func (q *Queries) CreateClinicStaff(ctx context.Context, arg CreateClinicStaffPa
 		arg.Specialization,
 		arg.WorkEmail,
 		arg.WorkPhone,
+		arg.PersonalPhone,
 		arg.HpcsNumber,
+		arg.OtherLicenseNumbers,
+		arg.Qualifications,
+		arg.YearsExperience,
+		arg.Bio,
 		arg.StaffRole,
-		arg.EmploymentStatus,
+		arg.Department,
+		arg.IsPrimaryContact,
+		arg.WorkingHours,
+		arg.AvailableDays,
 		arg.IsAcceptingNewPatients,
+		arg.EmploymentStatus,
+		arg.StartDate,
+		arg.EndDate,
+		arg.ProfilePictureUrl,
+		arg.LanguagesSpoken,
 	)
-	var i CreateClinicStaffRow
-	err := row.Scan(
-		&i.ID,
-		&i.ClinicID,
-		&i.UserID,
-		&i.FirstName,
-		&i.LastName,
-		&i.StaffRole,
-		&i.EmploymentStatus,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const getClinicStaffByID = `-- name: GetClinicStaffByID :one
-SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff WHERE id = $1
-`
-
-func (q *Queries) GetClinicStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff, error) {
-	row := q.db.QueryRow(ctx, getClinicStaffByID, id)
 	var i ClinicStaff
 	err := row.Scan(
 		&i.ID,
@@ -125,64 +300,166 @@ func (q *Queries) GetClinicStaffByID(ctx context.Context, id pgtype.UUID) (Clini
 	return i, err
 }
 
-const getClinicStaffByUserID = `-- name: GetClinicStaffByUserID :one
-SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff WHERE user_id = $1
+const deactivateClinicStaff = `-- name: DeactivateClinicStaff :exec
+UPDATE clinic_staff
+SET 
+    employment_status = 'terminated',
+    end_date = CURRENT_DATE,
+    updated_at = NOW()
+WHERE clinic_id = $1
 `
 
-func (q *Queries) GetClinicStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error) {
-	row := q.db.QueryRow(ctx, getClinicStaffByUserID, userID)
-	var i ClinicStaff
-	err := row.Scan(
-		&i.ID,
-		&i.ClinicID,
-		&i.UserID,
-		&i.Title,
-		&i.FirstName,
-		&i.LastName,
-		&i.ProfessionalTitle,
-		&i.Specialization,
-		&i.WorkEmail,
-		&i.WorkPhone,
-		&i.PersonalPhone,
-		&i.HpcsNumber,
-		&i.OtherLicenseNumbers,
-		&i.Qualifications,
-		&i.YearsExperience,
-		&i.Bio,
-		&i.StaffRole,
-		&i.Department,
-		&i.IsPrimaryContact,
-		&i.WorkingHours,
-		&i.AvailableDays,
-		&i.IsAcceptingNewPatients,
-		&i.EmploymentStatus,
-		&i.StartDate,
-		&i.EndDate,
-		&i.ProfilePictureUrl,
-		&i.LanguagesSpoken,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) DeactivateClinicStaff(ctx context.Context, clinicID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deactivateClinicStaff, clinicID)
+	return err
 }
 
-const listClinicStaff = `-- name: ListClinicStaff :many
-SELECT id, clinic_id, user_id, title, first_name, last_name,
-    professional_title, specialization, staff_role, 
-    employment_status, is_accepting_new_patients, created_at
+const deactivateStaff = `-- name: DeactivateStaff :exec
+UPDATE clinic_staff
+SET 
+    employment_status = 'terminated',
+    end_date = CURRENT_DATE,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) DeactivateStaff(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deactivateStaff, id)
+	return err
+}
+
+const deleteStaffMember = `-- name: DeleteStaffMember :exec
+DELETE FROM clinic_staff 
+WHERE id = $1
+`
+
+func (q *Queries) DeleteStaffMember(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteStaffMember, id)
+	return err
+}
+
+const getAcceptingNewPatientsStaff = `-- name: GetAcceptingNewPatientsStaff :many
+SELECT 
+    id, clinic_id, title, first_name, last_name,
+    professional_title, specialization, staff_role
 FROM clinic_staff
-WHERE clinic_id = $1 
-    AND ($2::VARCHAR IS NULL OR staff_role = $2)
+WHERE 
+    clinic_id = $1
+    AND is_accepting_new_patients = TRUE
     AND employment_status = 'active'
-ORDER BY first_name, last_name
+ORDER BY staff_role, first_name
 `
 
-type ListClinicStaffParams struct {
-	ClinicID pgtype.UUID `json:"clinic_id"`
-	Column2  string      `json:"column_2"`
+type GetAcceptingNewPatientsStaffRow struct {
+	ID                pgtype.UUID `json:"id"`
+	ClinicID          pgtype.UUID `json:"clinic_id"`
+	Title             pgtype.Text `json:"title"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	Specialization    pgtype.Text `json:"specialization"`
+	StaffRole         string      `json:"staff_role"`
 }
 
-type ListClinicStaffRow struct {
+func (q *Queries) GetAcceptingNewPatientsStaff(ctx context.Context, clinicID pgtype.UUID) ([]GetAcceptingNewPatientsStaffRow, error) {
+	rows, err := q.db.Query(ctx, getAcceptingNewPatientsStaff, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetAcceptingNewPatientsStaffRow{}
+	for rows.Next() {
+		var i GetAcceptingNewPatientsStaffRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.StaffRole,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getActiveClinicStaff = `-- name: GetActiveClinicStaff :many
+SELECT 
+    id, user_id, title, first_name, last_name,
+    professional_title, specialization, staff_role,
+    work_email, work_phone, is_accepting_new_patients
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND employment_status = 'active'
+ORDER BY staff_role, first_name, last_name
+`
+
+type GetActiveClinicStaffRow struct {
+	ID                     pgtype.UUID `json:"id"`
+	UserID                 pgtype.UUID `json:"user_id"`
+	Title                  pgtype.Text `json:"title"`
+	FirstName              string      `json:"first_name"`
+	LastName               string      `json:"last_name"`
+	ProfessionalTitle      pgtype.Text `json:"professional_title"`
+	Specialization         pgtype.Text `json:"specialization"`
+	StaffRole              string      `json:"staff_role"`
+	WorkEmail              pgtype.Text `json:"work_email"`
+	WorkPhone              pgtype.Text `json:"work_phone"`
+	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
+}
+
+func (q *Queries) GetActiveClinicStaff(ctx context.Context, clinicID pgtype.UUID) ([]GetActiveClinicStaffRow, error) {
+	rows, err := q.db.Query(ctx, getActiveClinicStaff, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetActiveClinicStaffRow{}
+	for rows.Next() {
+		var i GetActiveClinicStaffRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.StaffRole,
+			&i.WorkEmail,
+			&i.WorkPhone,
+			&i.IsAcceptingNewPatients,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllClinicStaff = `-- name: GetAllClinicStaff :many
+SELECT 
+    id, clinic_id, user_id, title, first_name, last_name,
+    professional_title, specialization, staff_role,
+    employment_status, is_accepting_new_patients,
+    start_date, end_date, created_at
+FROM clinic_staff
+WHERE clinic_id = $1
+ORDER BY employment_status, first_name, last_name
+`
+
+type GetAllClinicStaffRow struct {
 	ID                     pgtype.UUID      `json:"id"`
 	ClinicID               pgtype.UUID      `json:"clinic_id"`
 	UserID                 pgtype.UUID      `json:"user_id"`
@@ -194,18 +471,20 @@ type ListClinicStaffRow struct {
 	StaffRole              string           `json:"staff_role"`
 	EmploymentStatus       pgtype.Text      `json:"employment_status"`
 	IsAcceptingNewPatients pgtype.Bool      `json:"is_accepting_new_patients"`
+	StartDate              pgtype.Date      `json:"start_date"`
+	EndDate                pgtype.Date      `json:"end_date"`
 	CreatedAt              pgtype.Timestamp `json:"created_at"`
 }
 
-func (q *Queries) ListClinicStaff(ctx context.Context, arg ListClinicStaffParams) ([]ListClinicStaffRow, error) {
-	rows, err := q.db.Query(ctx, listClinicStaff, arg.ClinicID, arg.Column2)
+func (q *Queries) GetAllClinicStaff(ctx context.Context, clinicID pgtype.UUID) ([]GetAllClinicStaffRow, error) {
+	rows, err := q.db.Query(ctx, getAllClinicStaff, clinicID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListClinicStaffRow{}
+	items := []GetAllClinicStaffRow{}
 	for rows.Next() {
-		var i ListClinicStaffRow
+		var i GetAllClinicStaffRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ClinicID,
@@ -218,6 +497,8 @@ func (q *Queries) ListClinicStaff(ctx context.Context, arg ListClinicStaffParams
 			&i.StaffRole,
 			&i.EmploymentStatus,
 			&i.IsAcceptingNewPatients,
+			&i.StartDate,
+			&i.EndDate,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -230,40 +511,1820 @@ func (q *Queries) ListClinicStaff(ctx context.Context, arg ListClinicStaffParams
 	return items, nil
 }
 
-const updateClinicStaff = `-- name: UpdateClinicStaff :exec
-UPDATE clinic_staff
-SET professional_title = $2, specialization = $3, 
-    work_email = $4, work_phone = $5, bio = $6,
-    is_accepting_new_patients = $7
+const getClinicDoctors = `-- name: GetClinicDoctors :many
+SELECT 
+    id, user_id, title, first_name, last_name,
+    professional_title, specialization, hpcs_number,
+    is_accepting_new_patients, years_experience
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND staff_role = 'doctor'
+    AND employment_status = 'active'
+ORDER BY is_accepting_new_patients DESC, years_experience DESC
+`
+
+type GetClinicDoctorsRow struct {
+	ID                     pgtype.UUID `json:"id"`
+	UserID                 pgtype.UUID `json:"user_id"`
+	Title                  pgtype.Text `json:"title"`
+	FirstName              string      `json:"first_name"`
+	LastName               string      `json:"last_name"`
+	ProfessionalTitle      pgtype.Text `json:"professional_title"`
+	Specialization         pgtype.Text `json:"specialization"`
+	HpcsNumber             pgtype.Text `json:"hpcs_number"`
+	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
+	YearsExperience        pgtype.Int4 `json:"years_experience"`
+}
+
+func (q *Queries) GetClinicDoctors(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicDoctorsRow, error) {
+	rows, err := q.db.Query(ctx, getClinicDoctors, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicDoctorsRow{}
+	for rows.Next() {
+		var i GetClinicDoctorsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.HpcsNumber,
+			&i.IsAcceptingNewPatients,
+			&i.YearsExperience,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicNurses = `-- name: GetClinicNurses :many
+SELECT 
+    id, user_id, title, first_name, last_name,
+    professional_title, specialization,
+    is_accepting_new_patients
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND staff_role = 'nurse'
+    AND employment_status = 'active'
+ORDER BY first_name, last_name
+`
+
+type GetClinicNursesRow struct {
+	ID                     pgtype.UUID `json:"id"`
+	UserID                 pgtype.UUID `json:"user_id"`
+	Title                  pgtype.Text `json:"title"`
+	FirstName              string      `json:"first_name"`
+	LastName               string      `json:"last_name"`
+	ProfessionalTitle      pgtype.Text `json:"professional_title"`
+	Specialization         pgtype.Text `json:"specialization"`
+	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
+}
+
+func (q *Queries) GetClinicNurses(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicNursesRow, error) {
+	rows, err := q.db.Query(ctx, getClinicNurses, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicNursesRow{}
+	for rows.Next() {
+		var i GetClinicNursesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.IsAcceptingNewPatients,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicPrimaryContact = `-- name: GetClinicPrimaryContact :one
+SELECT 
+    id, user_id, title, first_name, last_name,
+    staff_role, work_email, work_phone
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND is_primary_contact = TRUE
+    AND employment_status = 'active'
+LIMIT 1
+`
+
+type GetClinicPrimaryContactRow struct {
+	ID        pgtype.UUID `json:"id"`
+	UserID    pgtype.UUID `json:"user_id"`
+	Title     pgtype.Text `json:"title"`
+	FirstName string      `json:"first_name"`
+	LastName  string      `json:"last_name"`
+	StaffRole string      `json:"staff_role"`
+	WorkEmail pgtype.Text `json:"work_email"`
+	WorkPhone pgtype.Text `json:"work_phone"`
+}
+
+func (q *Queries) GetClinicPrimaryContact(ctx context.Context, clinicID pgtype.UUID) (GetClinicPrimaryContactRow, error) {
+	row := q.db.QueryRow(ctx, getClinicPrimaryContact, clinicID)
+	var i GetClinicPrimaryContactRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Title,
+		&i.FirstName,
+		&i.LastName,
+		&i.StaffRole,
+		&i.WorkEmail,
+		&i.WorkPhone,
+	)
+	return i, err
+}
+
+const getClinicStaff = `-- name: GetClinicStaff :many
+
+SELECT 
+    id, clinic_id, user_id, title, first_name, last_name,
+    professional_title, specialization, staff_role,
+    employment_status, is_accepting_new_patients,
+    work_email, work_phone, created_at
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND ($2::VARCHAR IS NULL OR staff_role = $2)
+    AND employment_status = 'active'
+ORDER BY 
+    CASE staff_role
+        WHEN 'manager' THEN 1
+        WHEN 'doctor' THEN 2
+        WHEN 'nurse' THEN 3
+        ELSE 4
+    END,
+    first_name, last_name
+`
+
+type GetClinicStaffParams struct {
+	ClinicID pgtype.UUID `json:"clinic_id"`
+	Column2  string      `json:"column_2"`
+}
+
+type GetClinicStaffRow struct {
+	ID                     pgtype.UUID      `json:"id"`
+	ClinicID               pgtype.UUID      `json:"clinic_id"`
+	UserID                 pgtype.UUID      `json:"user_id"`
+	Title                  pgtype.Text      `json:"title"`
+	FirstName              string           `json:"first_name"`
+	LastName               string           `json:"last_name"`
+	ProfessionalTitle      pgtype.Text      `json:"professional_title"`
+	Specialization         pgtype.Text      `json:"specialization"`
+	StaffRole              string           `json:"staff_role"`
+	EmploymentStatus       pgtype.Text      `json:"employment_status"`
+	IsAcceptingNewPatients pgtype.Bool      `json:"is_accepting_new_patients"`
+	WorkEmail              pgtype.Text      `json:"work_email"`
+	WorkPhone              pgtype.Text      `json:"work_phone"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+}
+
+// ============================================
+// CLINIC STAFF MANAGEMENT
+// ============================================
+func (q *Queries) GetClinicStaff(ctx context.Context, arg GetClinicStaffParams) ([]GetClinicStaffRow, error) {
+	rows, err := q.db.Query(ctx, getClinicStaff, arg.ClinicID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicStaffRow{}
+	for rows.Next() {
+		var i GetClinicStaffRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.UserID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.StaffRole,
+			&i.EmploymentStatus,
+			&i.IsAcceptingNewPatients,
+			&i.WorkEmail,
+			&i.WorkPhone,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicStaffByRole = `-- name: GetClinicStaffByRole :many
+SELECT 
+    id, user_id, title, first_name, last_name,
+    professional_title, specialization,
+    work_email, work_phone, employment_status
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND staff_role = $2
+ORDER BY first_name, last_name
+`
+
+type GetClinicStaffByRoleParams struct {
+	ClinicID  pgtype.UUID `json:"clinic_id"`
+	StaffRole string      `json:"staff_role"`
+}
+
+type GetClinicStaffByRoleRow struct {
+	ID                pgtype.UUID `json:"id"`
+	UserID            pgtype.UUID `json:"user_id"`
+	Title             pgtype.Text `json:"title"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	Specialization    pgtype.Text `json:"specialization"`
+	WorkEmail         pgtype.Text `json:"work_email"`
+	WorkPhone         pgtype.Text `json:"work_phone"`
+	EmploymentStatus  pgtype.Text `json:"employment_status"`
+}
+
+func (q *Queries) GetClinicStaffByRole(ctx context.Context, arg GetClinicStaffByRoleParams) ([]GetClinicStaffByRoleRow, error) {
+	rows, err := q.db.Query(ctx, getClinicStaffByRole, arg.ClinicID, arg.StaffRole)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetClinicStaffByRoleRow{}
+	for rows.Next() {
+		var i GetClinicStaffByRoleRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.WorkEmail,
+			&i.WorkPhone,
+			&i.EmploymentStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getClinicStaffMetrics = `-- name: GetClinicStaffMetrics :one
+SELECT 
+    COUNT(*) as total_staff,
+    COUNT(*) FILTER (WHERE employment_status = 'active') as active_staff,
+    COUNT(*) FILTER (WHERE employment_status = 'on_leave') as on_leave_staff,
+    COUNT(*) FILTER (WHERE employment_status = 'terminated') as terminated_staff,
+    COUNT(*) FILTER (WHERE staff_role = 'doctor') as doctor_count,
+    COUNT(*) FILTER (WHERE staff_role = 'nurse') as nurse_count,
+    COUNT(*) FILTER (WHERE staff_role = 'administrator') as admin_count,
+    COUNT(*) FILTER (WHERE is_accepting_new_patients = TRUE AND employment_status = 'active') as accepting_patients_count,
+    AVG(years_experience) FILTER (WHERE years_experience IS NOT NULL) as avg_experience
+FROM clinic_staff
+WHERE clinic_id = $1
+`
+
+type GetClinicStaffMetricsRow struct {
+	TotalStaff             int64   `json:"total_staff"`
+	ActiveStaff            int64   `json:"active_staff"`
+	OnLeaveStaff           int64   `json:"on_leave_staff"`
+	TerminatedStaff        int64   `json:"terminated_staff"`
+	DoctorCount            int64   `json:"doctor_count"`
+	NurseCount             int64   `json:"nurse_count"`
+	AdminCount             int64   `json:"admin_count"`
+	AcceptingPatientsCount int64   `json:"accepting_patients_count"`
+	AvgExperience          float64 `json:"avg_experience"`
+}
+
+func (q *Queries) GetClinicStaffMetrics(ctx context.Context, clinicID pgtype.UUID) (GetClinicStaffMetricsRow, error) {
+	row := q.db.QueryRow(ctx, getClinicStaffMetrics, clinicID)
+	var i GetClinicStaffMetricsRow
+	err := row.Scan(
+		&i.TotalStaff,
+		&i.ActiveStaff,
+		&i.OnLeaveStaff,
+		&i.TerminatedStaff,
+		&i.DoctorCount,
+		&i.NurseCount,
+		&i.AdminCount,
+		&i.AcceptingPatientsCount,
+		&i.AvgExperience,
+	)
+	return i, err
+}
+
+const getMultilingualStaff = `-- name: GetMultilingualStaff :many
+SELECT 
+    id, first_name, last_name,
+    professional_title, languages_spoken,
+    array_length(languages_spoken, 1) as language_count
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND employment_status = 'active'
+    AND array_length(languages_spoken, 1) >= $2
+ORDER BY language_count DESC
+`
+
+type GetMultilingualStaffParams struct {
+	ClinicID        pgtype.UUID `json:"clinic_id"`
+	LanguagesSpoken []string    `json:"languages_spoken"`
+}
+
+type GetMultilingualStaffRow struct {
+	ID                pgtype.UUID `json:"id"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	LanguagesSpoken   []string    `json:"languages_spoken"`
+	LanguageCount     int32       `json:"language_count"`
+}
+
+func (q *Queries) GetMultilingualStaff(ctx context.Context, arg GetMultilingualStaffParams) ([]GetMultilingualStaffRow, error) {
+	rows, err := q.db.Query(ctx, getMultilingualStaff, arg.ClinicID, arg.LanguagesSpoken)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetMultilingualStaffRow{}
+	for rows.Next() {
+		var i GetMultilingualStaffRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.LanguagesSpoken,
+			&i.LanguageCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffAvailableOnDay = `-- name: GetStaffAvailableOnDay :many
+
+SELECT 
+    id, title, first_name, last_name,
+    professional_title, staff_role,
+    working_hours, available_days
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND $2 = ANY(available_days)
+    AND employment_status = 'active'
+ORDER BY staff_role, first_name
+`
+
+type GetStaffAvailableOnDayParams struct {
+	ClinicID      pgtype.UUID `json:"clinic_id"`
+	AvailableDays []string    `json:"available_days"`
+}
+
+type GetStaffAvailableOnDayRow struct {
+	ID                pgtype.UUID `json:"id"`
+	Title             pgtype.Text `json:"title"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	StaffRole         string      `json:"staff_role"`
+	WorkingHours      []byte      `json:"working_hours"`
+	AvailableDays     []string    `json:"available_days"`
+}
+
+// ============================================
+// STAFF AVAILABILITY QUERIES
+// ============================================
+func (q *Queries) GetStaffAvailableOnDay(ctx context.Context, arg GetStaffAvailableOnDayParams) ([]GetStaffAvailableOnDayRow, error) {
+	rows, err := q.db.Query(ctx, getStaffAvailableOnDay, arg.ClinicID, arg.AvailableDays)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffAvailableOnDayRow{}
+	for rows.Next() {
+		var i GetStaffAvailableOnDayRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.StaffRole,
+			&i.WorkingHours,
+			&i.AvailableDays,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffByDepartment = `-- name: GetStaffByDepartment :many
+SELECT 
+    id, title, first_name, last_name,
+    professional_title, staff_role, department
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND department = $2
+    AND employment_status = 'active'
+ORDER BY first_name, last_name
+`
+
+type GetStaffByDepartmentParams struct {
+	ClinicID   pgtype.UUID `json:"clinic_id"`
+	Department pgtype.Text `json:"department"`
+}
+
+type GetStaffByDepartmentRow struct {
+	ID                pgtype.UUID `json:"id"`
+	Title             pgtype.Text `json:"title"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	StaffRole         string      `json:"staff_role"`
+	Department        pgtype.Text `json:"department"`
+}
+
+func (q *Queries) GetStaffByDepartment(ctx context.Context, arg GetStaffByDepartmentParams) ([]GetStaffByDepartmentRow, error) {
+	rows, err := q.db.Query(ctx, getStaffByDepartment, arg.ClinicID, arg.Department)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffByDepartmentRow{}
+	for rows.Next() {
+		var i GetStaffByDepartmentRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.StaffRole,
+			&i.Department,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffByExperience = `-- name: GetStaffByExperience :many
+SELECT 
+    id, title, first_name, last_name,
+    professional_title, years_experience
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND employment_status = 'active'
+    AND years_experience >= $2
+ORDER BY years_experience DESC
+`
+
+type GetStaffByExperienceParams struct {
+	ClinicID        pgtype.UUID `json:"clinic_id"`
+	YearsExperience pgtype.Int4 `json:"years_experience"`
+}
+
+type GetStaffByExperienceRow struct {
+	ID                pgtype.UUID `json:"id"`
+	Title             pgtype.Text `json:"title"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	YearsExperience   pgtype.Int4 `json:"years_experience"`
+}
+
+func (q *Queries) GetStaffByExperience(ctx context.Context, arg GetStaffByExperienceParams) ([]GetStaffByExperienceRow, error) {
+	rows, err := q.db.Query(ctx, getStaffByExperience, arg.ClinicID, arg.YearsExperience)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffByExperienceRow{}
+	for rows.Next() {
+		var i GetStaffByExperienceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.YearsExperience,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffByHPCSNumber = `-- name: GetStaffByHPCSNumber :one
+
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
+WHERE hpcs_number = $1
+LIMIT 1
+`
+
+// ============================================
+// LICENSING & CREDENTIALS
+// ============================================
+func (q *Queries) GetStaffByHPCSNumber(ctx context.Context, hpcsNumber pgtype.Text) (ClinicStaff, error) {
+	row := q.db.QueryRow(ctx, getStaffByHPCSNumber, hpcsNumber)
+	var i ClinicStaff
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicID,
+		&i.UserID,
+		&i.Title,
+		&i.FirstName,
+		&i.LastName,
+		&i.ProfessionalTitle,
+		&i.Specialization,
+		&i.WorkEmail,
+		&i.WorkPhone,
+		&i.PersonalPhone,
+		&i.HpcsNumber,
+		&i.OtherLicenseNumbers,
+		&i.Qualifications,
+		&i.YearsExperience,
+		&i.Bio,
+		&i.StaffRole,
+		&i.Department,
+		&i.IsPrimaryContact,
+		&i.WorkingHours,
+		&i.AvailableDays,
+		&i.IsAcceptingNewPatients,
+		&i.EmploymentStatus,
+		&i.StartDate,
+		&i.EndDate,
+		&i.ProfilePictureUrl,
+		&i.LanguagesSpoken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getStaffByID = `-- name: GetStaffByID :one
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
 WHERE id = $1
 `
 
-type UpdateClinicStaffParams struct {
+func (q *Queries) GetStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff, error) {
+	row := q.db.QueryRow(ctx, getStaffByID, id)
+	var i ClinicStaff
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicID,
+		&i.UserID,
+		&i.Title,
+		&i.FirstName,
+		&i.LastName,
+		&i.ProfessionalTitle,
+		&i.Specialization,
+		&i.WorkEmail,
+		&i.WorkPhone,
+		&i.PersonalPhone,
+		&i.HpcsNumber,
+		&i.OtherLicenseNumbers,
+		&i.Qualifications,
+		&i.YearsExperience,
+		&i.Bio,
+		&i.StaffRole,
+		&i.Department,
+		&i.IsPrimaryContact,
+		&i.WorkingHours,
+		&i.AvailableDays,
+		&i.IsAcceptingNewPatients,
+		&i.EmploymentStatus,
+		&i.StartDate,
+		&i.EndDate,
+		&i.ProfilePictureUrl,
+		&i.LanguagesSpoken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getStaffByIDs = `-- name: GetStaffByIDs :many
+
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
+WHERE id = ANY($1::uuid[])
+ORDER BY first_name, last_name
+`
+
+// ============================================
+// BULK OPERATIONS
+// ============================================
+func (q *Queries) GetStaffByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ClinicStaff, error) {
+	rows, err := q.db.Query(ctx, getStaffByIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ClinicStaff{}
+	for rows.Next() {
+		var i ClinicStaff
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.UserID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.WorkEmail,
+			&i.WorkPhone,
+			&i.PersonalPhone,
+			&i.HpcsNumber,
+			&i.OtherLicenseNumbers,
+			&i.Qualifications,
+			&i.YearsExperience,
+			&i.Bio,
+			&i.StaffRole,
+			&i.Department,
+			&i.IsPrimaryContact,
+			&i.WorkingHours,
+			&i.AvailableDays,
+			&i.IsAcceptingNewPatients,
+			&i.EmploymentStatus,
+			&i.StartDate,
+			&i.EndDate,
+			&i.ProfilePictureUrl,
+			&i.LanguagesSpoken,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffByLanguage = `-- name: GetStaffByLanguage :many
+
+SELECT 
+    id, title, first_name, last_name,
+    professional_title, staff_role, languages_spoken
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND $2 = ANY(languages_spoken)
+    AND employment_status = 'active'
+ORDER BY staff_role, first_name
+`
+
+type GetStaffByLanguageParams struct {
+	ClinicID        pgtype.UUID `json:"clinic_id"`
+	LanguagesSpoken []string    `json:"languages_spoken"`
+}
+
+type GetStaffByLanguageRow struct {
+	ID                pgtype.UUID `json:"id"`
+	Title             pgtype.Text `json:"title"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	StaffRole         string      `json:"staff_role"`
+	LanguagesSpoken   []string    `json:"languages_spoken"`
+}
+
+// ============================================
+// LANGUAGE & COMMUNICATION
+// ============================================
+func (q *Queries) GetStaffByLanguage(ctx context.Context, arg GetStaffByLanguageParams) ([]GetStaffByLanguageRow, error) {
+	rows, err := q.db.Query(ctx, getStaffByLanguage, arg.ClinicID, arg.LanguagesSpoken)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffByLanguageRow{}
+	for rows.Next() {
+		var i GetStaffByLanguageRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.StaffRole,
+			&i.LanguagesSpoken,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffBySpecialization = `-- name: GetStaffBySpecialization :many
+SELECT 
+    id, clinic_id, title, first_name, last_name,
+    professional_title, specialization,
+    is_accepting_new_patients
+FROM clinic_staff
+WHERE 
+    specialization ILIKE '%' || $1 || '%'
+    AND ($2::uuid IS NULL OR clinic_id = $2)
+    AND employment_status = 'active'
+ORDER BY years_experience DESC
+`
+
+type GetStaffBySpecializationParams struct {
+	Column1 pgtype.Text `json:"column_1"`
+	Column2 pgtype.UUID `json:"column_2"`
+}
+
+type GetStaffBySpecializationRow struct {
 	ID                     pgtype.UUID `json:"id"`
+	ClinicID               pgtype.UUID `json:"clinic_id"`
+	Title                  pgtype.Text `json:"title"`
+	FirstName              string      `json:"first_name"`
+	LastName               string      `json:"last_name"`
+	ProfessionalTitle      pgtype.Text `json:"professional_title"`
+	Specialization         pgtype.Text `json:"specialization"`
+	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
+}
+
+func (q *Queries) GetStaffBySpecialization(ctx context.Context, arg GetStaffBySpecializationParams) ([]GetStaffBySpecializationRow, error) {
+	rows, err := q.db.Query(ctx, getStaffBySpecialization, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffBySpecializationRow{}
+	for rows.Next() {
+		var i GetStaffBySpecializationRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.IsAcceptingNewPatients,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffByUserID = `-- name: GetStaffByUserID :one
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
+WHERE user_id = $1
+`
+
+func (q *Queries) GetStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error) {
+	row := q.db.QueryRow(ctx, getStaffByUserID, userID)
+	var i ClinicStaff
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicID,
+		&i.UserID,
+		&i.Title,
+		&i.FirstName,
+		&i.LastName,
+		&i.ProfessionalTitle,
+		&i.Specialization,
+		&i.WorkEmail,
+		&i.WorkPhone,
+		&i.PersonalPhone,
+		&i.HpcsNumber,
+		&i.OtherLicenseNumbers,
+		&i.Qualifications,
+		&i.YearsExperience,
+		&i.Bio,
+		&i.StaffRole,
+		&i.Department,
+		&i.IsPrimaryContact,
+		&i.WorkingHours,
+		&i.AvailableDays,
+		&i.IsAcceptingNewPatients,
+		&i.EmploymentStatus,
+		&i.StartDate,
+		&i.EndDate,
+		&i.ProfilePictureUrl,
+		&i.LanguagesSpoken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getStaffDemographics = `-- name: GetStaffDemographics :one
+SELECT 
+    COUNT(*) as total_staff,
+    COUNT(DISTINCT specialization) FILTER (WHERE specialization IS NOT NULL) as unique_specializations,
+    COUNT(DISTINCT staff_role) as unique_roles,
+    AVG(array_length(languages_spoken, 1)) as avg_languages_spoken
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND employment_status = 'active'
+`
+
+type GetStaffDemographicsRow struct {
+	TotalStaff            int64   `json:"total_staff"`
+	UniqueSpecializations int64   `json:"unique_specializations"`
+	UniqueRoles           int64   `json:"unique_roles"`
+	AvgLanguagesSpoken    float64 `json:"avg_languages_spoken"`
+}
+
+func (q *Queries) GetStaffDemographics(ctx context.Context, clinicID pgtype.UUID) (GetStaffDemographicsRow, error) {
+	row := q.db.QueryRow(ctx, getStaffDemographics, clinicID)
+	var i GetStaffDemographicsRow
+	err := row.Scan(
+		&i.TotalStaff,
+		&i.UniqueSpecializations,
+		&i.UniqueRoles,
+		&i.AvgLanguagesSpoken,
+	)
+	return i, err
+}
+
+const getStaffHiredBetweenDates = `-- name: GetStaffHiredBetweenDates :many
+SELECT 
+    id, clinic_id, first_name, last_name,
+    professional_title, staff_role, start_date
+FROM clinic_staff
+WHERE 
+    start_date >= $1
+    AND start_date <= $2
+ORDER BY start_date DESC
+`
+
+type GetStaffHiredBetweenDatesParams struct {
+	StartDate   pgtype.Date `json:"start_date"`
+	StartDate_2 pgtype.Date `json:"start_date_2"`
+}
+
+type GetStaffHiredBetweenDatesRow struct {
+	ID                pgtype.UUID `json:"id"`
+	ClinicID          pgtype.UUID `json:"clinic_id"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	StaffRole         string      `json:"staff_role"`
+	StartDate         pgtype.Date `json:"start_date"`
+}
+
+func (q *Queries) GetStaffHiredBetweenDates(ctx context.Context, arg GetStaffHiredBetweenDatesParams) ([]GetStaffHiredBetweenDatesRow, error) {
+	rows, err := q.db.Query(ctx, getStaffHiredBetweenDates, arg.StartDate, arg.StartDate_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffHiredBetweenDatesRow{}
+	for rows.Next() {
+		var i GetStaffHiredBetweenDatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.StaffRole,
+			&i.StartDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffNeedingCredentialRenewal = `-- name: GetStaffNeedingCredentialRenewal :many
+SELECT 
+    cs.id, cs.clinic_id, cs.first_name, cs.last_name,
+    cs.work_email, pc.credential_type, pc.expiry_date
+FROM clinic_staff cs
+JOIN professional_credentials pc ON cs.id = pc.staff_id
+WHERE 
+    cs.employment_status = 'active'
+    AND pc.expiry_date <= CURRENT_DATE + INTERVAL '30 days'
+    AND pc.expiry_date >= CURRENT_DATE
+    AND pc.status = 'verified'
+ORDER BY pc.expiry_date ASC
+`
+
+type GetStaffNeedingCredentialRenewalRow struct {
+	ID             pgtype.UUID `json:"id"`
+	ClinicID       pgtype.UUID `json:"clinic_id"`
+	FirstName      string      `json:"first_name"`
+	LastName       string      `json:"last_name"`
+	WorkEmail      pgtype.Text `json:"work_email"`
+	CredentialType string      `json:"credential_type"`
+	ExpiryDate     pgtype.Date `json:"expiry_date"`
+}
+
+func (q *Queries) GetStaffNeedingCredentialRenewal(ctx context.Context) ([]GetStaffNeedingCredentialRenewalRow, error) {
+	rows, err := q.db.Query(ctx, getStaffNeedingCredentialRenewal)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffNeedingCredentialRenewalRow{}
+	for rows.Next() {
+		var i GetStaffNeedingCredentialRenewalRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.FirstName,
+			&i.LastName,
+			&i.WorkEmail,
+			&i.CredentialType,
+			&i.ExpiryDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffRoleDistribution = `-- name: GetStaffRoleDistribution :many
+SELECT 
+    staff_role,
+    COUNT(*) as count,
+    AVG(years_experience) FILTER (WHERE years_experience IS NOT NULL) as avg_experience
+FROM clinic_staff
+WHERE 
+    clinic_id = $1
+    AND employment_status = 'active'
+GROUP BY staff_role
+ORDER BY count DESC
+`
+
+type GetStaffRoleDistributionRow struct {
+	StaffRole     string  `json:"staff_role"`
+	Count         int64   `json:"count"`
+	AvgExperience float64 `json:"avg_experience"`
+}
+
+func (q *Queries) GetStaffRoleDistribution(ctx context.Context, clinicID pgtype.UUID) ([]GetStaffRoleDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getStaffRoleDistribution, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffRoleDistributionRow{}
+	for rows.Next() {
+		var i GetStaffRoleDistributionRow
+		if err := rows.Scan(&i.StaffRole, &i.Count, &i.AvgExperience); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffStatistics = `-- name: GetStaffStatistics :one
+
+SELECT 
+    id,
+    CONCAT(first_name, ' ', last_name) as full_name,
+    professional_title,
+    specialization,
+    years_experience,
+    employment_status,
+    is_accepting_new_patients,
+    created_at
+FROM clinic_staff
+WHERE id = $1
+`
+
+type GetStaffStatisticsRow struct {
+	ID                     pgtype.UUID      `json:"id"`
+	FullName               interface{}      `json:"full_name"`
+	ProfessionalTitle      pgtype.Text      `json:"professional_title"`
+	Specialization         pgtype.Text      `json:"specialization"`
+	YearsExperience        pgtype.Int4      `json:"years_experience"`
+	EmploymentStatus       pgtype.Text      `json:"employment_status"`
+	IsAcceptingNewPatients pgtype.Bool      `json:"is_accepting_new_patients"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+}
+
+// ============================================
+// STATISTICS & ANALYTICS
+// ============================================
+func (q *Queries) GetStaffStatistics(ctx context.Context, id pgtype.UUID) (GetStaffStatisticsRow, error) {
+	row := q.db.QueryRow(ctx, getStaffStatistics, id)
+	var i GetStaffStatisticsRow
+	err := row.Scan(
+		&i.ID,
+		&i.FullName,
+		&i.ProfessionalTitle,
+		&i.Specialization,
+		&i.YearsExperience,
+		&i.EmploymentStatus,
+		&i.IsAcceptingNewPatients,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getStaffTerminatedBetweenDates = `-- name: GetStaffTerminatedBetweenDates :many
+SELECT 
+    id, clinic_id, first_name, last_name,
+    professional_title, staff_role, end_date
+FROM clinic_staff
+WHERE 
+    employment_status = 'terminated'
+    AND end_date >= $1
+    AND end_date <= $2
+ORDER BY end_date DESC
+`
+
+type GetStaffTerminatedBetweenDatesParams struct {
+	EndDate   pgtype.Date `json:"end_date"`
+	EndDate_2 pgtype.Date `json:"end_date_2"`
+}
+
+type GetStaffTerminatedBetweenDatesRow struct {
+	ID                pgtype.UUID `json:"id"`
+	ClinicID          pgtype.UUID `json:"clinic_id"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	StaffRole         string      `json:"staff_role"`
+	EndDate           pgtype.Date `json:"end_date"`
+}
+
+func (q *Queries) GetStaffTerminatedBetweenDates(ctx context.Context, arg GetStaffTerminatedBetweenDatesParams) ([]GetStaffTerminatedBetweenDatesRow, error) {
+	rows, err := q.db.Query(ctx, getStaffTerminatedBetweenDates, arg.EndDate, arg.EndDate_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffTerminatedBetweenDatesRow{}
+	for rows.Next() {
+		var i GetStaffTerminatedBetweenDatesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.StaffRole,
+			&i.EndDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffTransferHistory = `-- name: GetStaffTransferHistory :many
+SELECT 
+    id, clinic_id, first_name, last_name,
+    staff_role, start_date, end_date
+FROM clinic_staff
+WHERE user_id = $1
+ORDER BY start_date DESC
+`
+
+type GetStaffTransferHistoryRow struct {
+	ID        pgtype.UUID `json:"id"`
+	ClinicID  pgtype.UUID `json:"clinic_id"`
+	FirstName string      `json:"first_name"`
+	LastName  string      `json:"last_name"`
+	StaffRole string      `json:"staff_role"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
+}
+
+func (q *Queries) GetStaffTransferHistory(ctx context.Context, userID pgtype.UUID) ([]GetStaffTransferHistoryRow, error) {
+	rows, err := q.db.Query(ctx, getStaffTransferHistory, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffTransferHistoryRow{}
+	for rows.Next() {
+		var i GetStaffTransferHistoryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.FirstName,
+			&i.LastName,
+			&i.StaffRole,
+			&i.StartDate,
+			&i.EndDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffWithExpiredLicenses = `-- name: GetStaffWithExpiredLicenses :many
+SELECT 
+    cs.id, cs.clinic_id, cs.first_name, cs.last_name,
+    cs.hpcs_number, cs.work_email
+FROM clinic_staff cs
+WHERE 
+    cs.employment_status = 'active'
+    AND EXISTS (
+        SELECT 1 FROM professional_credentials pc
+        WHERE pc.staff_id = cs.id
+        AND pc.expiry_date < CURRENT_DATE
+        AND pc.status = 'verified'
+    )
+ORDER BY cs.clinic_id, cs.last_name
+`
+
+type GetStaffWithExpiredLicensesRow struct {
+	ID         pgtype.UUID `json:"id"`
+	ClinicID   pgtype.UUID `json:"clinic_id"`
+	FirstName  string      `json:"first_name"`
+	LastName   string      `json:"last_name"`
+	HpcsNumber pgtype.Text `json:"hpcs_number"`
+	WorkEmail  pgtype.Text `json:"work_email"`
+}
+
+func (q *Queries) GetStaffWithExpiredLicenses(ctx context.Context) ([]GetStaffWithExpiredLicensesRow, error) {
+	rows, err := q.db.Query(ctx, getStaffWithExpiredLicenses)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffWithExpiredLicensesRow{}
+	for rows.Next() {
+		var i GetStaffWithExpiredLicensesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.FirstName,
+			&i.LastName,
+			&i.HpcsNumber,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffWithIncompleteProfiles = `-- name: GetStaffWithIncompleteProfiles :many
+SELECT 
+    id, clinic_id, first_name, last_name,
+    professional_title, work_email
+FROM clinic_staff
+WHERE 
+    employment_status = 'active'
+    AND (
+        bio IS NULL 
+        OR profile_picture_url IS NULL
+        OR qualifications IS NULL
+        OR array_length(qualifications, 1) = 0
+    )
+ORDER BY clinic_id, last_name
+`
+
+type GetStaffWithIncompleteProfilesRow struct {
+	ID                pgtype.UUID `json:"id"`
+	ClinicID          pgtype.UUID `json:"clinic_id"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	WorkEmail         pgtype.Text `json:"work_email"`
+}
+
+func (q *Queries) GetStaffWithIncompleteProfiles(ctx context.Context) ([]GetStaffWithIncompleteProfilesRow, error) {
+	rows, err := q.db.Query(ctx, getStaffWithIncompleteProfiles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffWithIncompleteProfilesRow{}
+	for rows.Next() {
+		var i GetStaffWithIncompleteProfilesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffWithoutHPCSNumber = `-- name: GetStaffWithoutHPCSNumber :many
+
+SELECT 
+    id, clinic_id, first_name, last_name,
+    professional_title, staff_role, work_email
+FROM clinic_staff
+WHERE 
+    staff_role IN ('doctor', 'nurse')
+    AND (hpcs_number IS NULL OR hpcs_number = '')
+    AND employment_status = 'active'
+ORDER BY clinic_id, last_name
+`
+
+type GetStaffWithoutHPCSNumberRow struct {
+	ID                pgtype.UUID `json:"id"`
+	ClinicID          pgtype.UUID `json:"clinic_id"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	StaffRole         string      `json:"staff_role"`
+	WorkEmail         pgtype.Text `json:"work_email"`
+}
+
+// ============================================
+// REPORTING & COMPLIANCE
+// ============================================
+func (q *Queries) GetStaffWithoutHPCSNumber(ctx context.Context) ([]GetStaffWithoutHPCSNumberRow, error) {
+	rows, err := q.db.Query(ctx, getStaffWithoutHPCSNumber)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffWithoutHPCSNumberRow{}
+	for rows.Next() {
+		var i GetStaffWithoutHPCSNumberRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.StaffRole,
+			&i.WorkEmail,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffWorkingHours = `-- name: GetStaffWorkingHours :one
+SELECT 
+    id, first_name, last_name,
+    working_hours, available_days
+FROM clinic_staff
+WHERE id = $1
+`
+
+type GetStaffWorkingHoursRow struct {
+	ID            pgtype.UUID `json:"id"`
+	FirstName     string      `json:"first_name"`
+	LastName      string      `json:"last_name"`
+	WorkingHours  []byte      `json:"working_hours"`
+	AvailableDays []string    `json:"available_days"`
+}
+
+func (q *Queries) GetStaffWorkingHours(ctx context.Context, id pgtype.UUID) (GetStaffWorkingHoursRow, error) {
+	row := q.db.QueryRow(ctx, getStaffWorkingHours, id)
+	var i GetStaffWorkingHoursRow
+	err := row.Scan(
+		&i.ID,
+		&i.FirstName,
+		&i.LastName,
+		&i.WorkingHours,
+		&i.AvailableDays,
+	)
+	return i, err
+}
+
+const searchStaffByName = `-- name: SearchStaffByName :many
+
+SELECT 
+    id, clinic_id, title, first_name, last_name,
+    professional_title, specialization, staff_role
+FROM clinic_staff
+WHERE 
+    (first_name ILIKE '%' || $1 || '%' 
+     OR last_name ILIKE '%' || $1 || '%')
+    AND ($2::uuid IS NULL OR clinic_id = $2)
+    AND employment_status = 'active'
+ORDER BY first_name, last_name
+LIMIT $3 OFFSET $4
+`
+
+type SearchStaffByNameParams struct {
+	Column1 pgtype.Text `json:"column_1"`
+	Column2 pgtype.UUID `json:"column_2"`
+	Limit   int32       `json:"limit"`
+	Offset  int32       `json:"offset"`
+}
+
+type SearchStaffByNameRow struct {
+	ID                pgtype.UUID `json:"id"`
+	ClinicID          pgtype.UUID `json:"clinic_id"`
+	Title             pgtype.Text `json:"title"`
+	FirstName         string      `json:"first_name"`
+	LastName          string      `json:"last_name"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	Specialization    pgtype.Text `json:"specialization"`
+	StaffRole         string      `json:"staff_role"`
+}
+
+// ============================================
+// STAFF SEARCH & FILTERING
+// ============================================
+func (q *Queries) SearchStaffByName(ctx context.Context, arg SearchStaffByNameParams) ([]SearchStaffByNameRow, error) {
+	rows, err := q.db.Query(ctx, searchStaffByName,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchStaffByNameRow{}
+	for rows.Next() {
+		var i SearchStaffByNameRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.StaffRole,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setAcceptingPatients = `-- name: SetAcceptingPatients :exec
+UPDATE clinic_staff
+SET 
+    is_accepting_new_patients = TRUE,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) SetAcceptingPatients(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, setAcceptingPatients, id)
+	return err
+}
+
+const setNotAcceptingPatients = `-- name: SetNotAcceptingPatients :exec
+UPDATE clinic_staff
+SET 
+    is_accepting_new_patients = FALSE,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) SetNotAcceptingPatients(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, setNotAcceptingPatients, id)
+	return err
+}
+
+const setPrimaryContact = `-- name: SetPrimaryContact :exec
+UPDATE clinic_staff
+SET 
+    is_primary_contact = CASE WHEN id = $2 THEN TRUE ELSE FALSE END,
+    updated_at = NOW()
+WHERE clinic_id = $1
+`
+
+type SetPrimaryContactParams struct {
+	ClinicID pgtype.UUID `json:"clinic_id"`
+	ID       pgtype.UUID `json:"id"`
+}
+
+func (q *Queries) SetPrimaryContact(ctx context.Context, arg SetPrimaryContactParams) error {
+	_, err := q.db.Exec(ctx, setPrimaryContact, arg.ClinicID, arg.ID)
+	return err
+}
+
+const setStaffOnLeave = `-- name: SetStaffOnLeave :exec
+UPDATE clinic_staff
+SET 
+    employment_status = 'on_leave',
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) SetStaffOnLeave(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, setStaffOnLeave, id)
+	return err
+}
+
+const staffExists = `-- name: StaffExists :one
+SELECT EXISTS(
+    SELECT 1 FROM clinic_staff 
+    WHERE id = $1
+) as exists
+`
+
+func (q *Queries) StaffExists(ctx context.Context, id pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, staffExists, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const transferStaffToClinic = `-- name: TransferStaffToClinic :exec
+
+UPDATE clinic_staff
+SET 
+    clinic_id = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type TransferStaffToClinicParams struct {
+	ID       pgtype.UUID `json:"id"`
+	ClinicID pgtype.UUID `json:"clinic_id"`
+}
+
+// ============================================
+// TRANSFER & REASSIGNMENT
+// ============================================
+func (q *Queries) TransferStaffToClinic(ctx context.Context, arg TransferStaffToClinicParams) error {
+	_, err := q.db.Exec(ctx, transferStaffToClinic, arg.ID, arg.ClinicID)
+	return err
+}
+
+const updatePatientAcceptanceStatus = `-- name: UpdatePatientAcceptanceStatus :exec
+UPDATE clinic_staff
+SET 
+    is_accepting_new_patients = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdatePatientAcceptanceStatusParams struct {
+	ID                     pgtype.UUID `json:"id"`
+	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
+}
+
+func (q *Queries) UpdatePatientAcceptanceStatus(ctx context.Context, arg UpdatePatientAcceptanceStatusParams) error {
+	_, err := q.db.Exec(ctx, updatePatientAcceptanceStatus, arg.ID, arg.IsAcceptingNewPatients)
+	return err
+}
+
+const updateStaffAvailability = `-- name: UpdateStaffAvailability :exec
+
+UPDATE clinic_staff
+SET 
+    working_hours = $2,
+    available_days = $3,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffAvailabilityParams struct {
+	ID            pgtype.UUID `json:"id"`
+	WorkingHours  []byte      `json:"working_hours"`
+	AvailableDays []string    `json:"available_days"`
+}
+
+// ============================================
+// AVAILABILITY & SCHEDULING
+// ============================================
+func (q *Queries) UpdateStaffAvailability(ctx context.Context, arg UpdateStaffAvailabilityParams) error {
+	_, err := q.db.Exec(ctx, updateStaffAvailability, arg.ID, arg.WorkingHours, arg.AvailableDays)
+	return err
+}
+
+const updateStaffContact = `-- name: UpdateStaffContact :exec
+
+UPDATE clinic_staff
+SET 
+    work_email = $2,
+    work_phone = $3,
+    personal_phone = $4,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffContactParams struct {
+	ID            pgtype.UUID `json:"id"`
+	WorkEmail     pgtype.Text `json:"work_email"`
+	WorkPhone     pgtype.Text `json:"work_phone"`
+	PersonalPhone pgtype.Text `json:"personal_phone"`
+}
+
+// ============================================
+// CONTACT INFORMATION
+// ============================================
+func (q *Queries) UpdateStaffContact(ctx context.Context, arg UpdateStaffContactParams) error {
+	_, err := q.db.Exec(ctx, updateStaffContact,
+		arg.ID,
+		arg.WorkEmail,
+		arg.WorkPhone,
+		arg.PersonalPhone,
+	)
+	return err
+}
+
+const updateStaffEmploymentDates = `-- name: UpdateStaffEmploymentDates :exec
+UPDATE clinic_staff
+SET 
+    start_date = COALESCE($2, start_date),
+    end_date = $3,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffEmploymentDatesParams struct {
+	ID        pgtype.UUID `json:"id"`
+	StartDate pgtype.Date `json:"start_date"`
+	EndDate   pgtype.Date `json:"end_date"`
+}
+
+func (q *Queries) UpdateStaffEmploymentDates(ctx context.Context, arg UpdateStaffEmploymentDatesParams) error {
+	_, err := q.db.Exec(ctx, updateStaffEmploymentDates, arg.ID, arg.StartDate, arg.EndDate)
+	return err
+}
+
+const updateStaffLicenses = `-- name: UpdateStaffLicenses :exec
+UPDATE clinic_staff
+SET 
+    hpcs_number = $2,
+    other_license_numbers = $3,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffLicensesParams struct {
+	ID                  pgtype.UUID `json:"id"`
+	HpcsNumber          pgtype.Text `json:"hpcs_number"`
+	OtherLicenseNumbers []byte      `json:"other_license_numbers"`
+}
+
+func (q *Queries) UpdateStaffLicenses(ctx context.Context, arg UpdateStaffLicensesParams) error {
+	_, err := q.db.Exec(ctx, updateStaffLicenses, arg.ID, arg.HpcsNumber, arg.OtherLicenseNumbers)
+	return err
+}
+
+const updateStaffMember = `-- name: UpdateStaffMember :exec
+UPDATE clinic_staff
+SET 
+    title = COALESCE($2, title),
+    first_name = COALESCE($3, first_name),
+    last_name = COALESCE($4, last_name),
+    professional_title = COALESCE($5, professional_title),
+    specialization = COALESCE($6, specialization),
+    work_email = COALESCE($7, work_email),
+    work_phone = COALESCE($8, work_phone),
+    bio = COALESCE($9, bio),
+    years_experience = COALESCE($10, years_experience),
+    is_accepting_new_patients = COALESCE($11, is_accepting_new_patients),
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffMemberParams struct {
+	ID                     pgtype.UUID `json:"id"`
+	Title                  pgtype.Text `json:"title"`
+	FirstName              string      `json:"first_name"`
+	LastName               string      `json:"last_name"`
 	ProfessionalTitle      pgtype.Text `json:"professional_title"`
 	Specialization         pgtype.Text `json:"specialization"`
 	WorkEmail              pgtype.Text `json:"work_email"`
 	WorkPhone              pgtype.Text `json:"work_phone"`
 	Bio                    pgtype.Text `json:"bio"`
+	YearsExperience        pgtype.Int4 `json:"years_experience"`
 	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
 }
 
-func (q *Queries) UpdateClinicStaff(ctx context.Context, arg UpdateClinicStaffParams) error {
-	_, err := q.db.Exec(ctx, updateClinicStaff,
+func (q *Queries) UpdateStaffMember(ctx context.Context, arg UpdateStaffMemberParams) error {
+	_, err := q.db.Exec(ctx, updateStaffMember,
 		arg.ID,
+		arg.Title,
+		arg.FirstName,
+		arg.LastName,
 		arg.ProfessionalTitle,
 		arg.Specialization,
 		arg.WorkEmail,
 		arg.WorkPhone,
 		arg.Bio,
+		arg.YearsExperience,
 		arg.IsAcceptingNewPatients,
 	)
 	return err
 }
 
+const updateStaffProfessionalInfo = `-- name: UpdateStaffProfessionalInfo :exec
+
+UPDATE clinic_staff
+SET 
+    professional_title = $2,
+    specialization = $3,
+    qualifications = $4,
+    years_experience = $5,
+    bio = $6,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffProfessionalInfoParams struct {
+	ID                pgtype.UUID `json:"id"`
+	ProfessionalTitle pgtype.Text `json:"professional_title"`
+	Specialization    pgtype.Text `json:"specialization"`
+	Qualifications    []string    `json:"qualifications"`
+	YearsExperience   pgtype.Int4 `json:"years_experience"`
+	Bio               pgtype.Text `json:"bio"`
+}
+
+// ============================================
+// PROFESSIONAL INFORMATION
+// ============================================
+func (q *Queries) UpdateStaffProfessionalInfo(ctx context.Context, arg UpdateStaffProfessionalInfoParams) error {
+	_, err := q.db.Exec(ctx, updateStaffProfessionalInfo,
+		arg.ID,
+		arg.ProfessionalTitle,
+		arg.Specialization,
+		arg.Qualifications,
+		arg.YearsExperience,
+		arg.Bio,
+	)
+	return err
+}
+
+const updateStaffProfile = `-- name: UpdateStaffProfile :exec
+UPDATE clinic_staff
+SET 
+    bio = $2,
+    profile_picture_url = $3,
+    languages_spoken = $4,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffProfileParams struct {
+	ID                pgtype.UUID `json:"id"`
+	Bio               pgtype.Text `json:"bio"`
+	ProfilePictureUrl pgtype.Text `json:"profile_picture_url"`
+	LanguagesSpoken   []string    `json:"languages_spoken"`
+}
+
+func (q *Queries) UpdateStaffProfile(ctx context.Context, arg UpdateStaffProfileParams) error {
+	_, err := q.db.Exec(ctx, updateStaffProfile,
+		arg.ID,
+		arg.Bio,
+		arg.ProfilePictureUrl,
+		arg.LanguagesSpoken,
+	)
+	return err
+}
+
+const updateStaffQualifications = `-- name: UpdateStaffQualifications :exec
+UPDATE clinic_staff
+SET 
+    qualifications = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffQualificationsParams struct {
+	ID             pgtype.UUID `json:"id"`
+	Qualifications []string    `json:"qualifications"`
+}
+
+func (q *Queries) UpdateStaffQualifications(ctx context.Context, arg UpdateStaffQualificationsParams) error {
+	_, err := q.db.Exec(ctx, updateStaffQualifications, arg.ID, arg.Qualifications)
+	return err
+}
+
+const updateStaffRole = `-- name: UpdateStaffRole :exec
+
+UPDATE clinic_staff
+SET 
+    staff_role = $2,
+    department = $3,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffRoleParams struct {
+	ID         pgtype.UUID `json:"id"`
+	StaffRole  string      `json:"staff_role"`
+	Department pgtype.Text `json:"department"`
+}
+
+// ============================================
+// ROLE & EMPLOYMENT
+// ============================================
+func (q *Queries) UpdateStaffRole(ctx context.Context, arg UpdateStaffRoleParams) error {
+	_, err := q.db.Exec(ctx, updateStaffRole, arg.ID, arg.StaffRole, arg.Department)
+	return err
+}
+
 const updateStaffStatus = `-- name: UpdateStaffStatus :exec
 UPDATE clinic_staff
-SET employment_status = $2, end_date = $3
+SET 
+    employment_status = $2,
+    end_date = $3,
+    updated_at = NOW()
 WHERE id = $1
 `
 
