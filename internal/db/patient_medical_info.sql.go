@@ -11,71 +11,716 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bulkUpdateHealthStatus = `-- name: BulkUpdateHealthStatus :exec
+UPDATE patient_medical_info
+SET 
+    overall_health_status = $2,
+    updated_at = NOW()
+WHERE patient_id = ANY($1::uuid[])
+`
+
+type BulkUpdateHealthStatusParams struct {
+	Column1             []pgtype.UUID `json:"column_1"`
+	OverallHealthStatus pgtype.Text   `json:"overall_health_status"`
+}
+
+func (q *Queries) BulkUpdateHealthStatus(ctx context.Context, arg BulkUpdateHealthStatusParams) error {
+	_, err := q.db.Exec(ctx, bulkUpdateHealthStatus, arg.Column1, arg.OverallHealthStatus)
+	return err
+}
+
 const createPatientMedicalInfo = `-- name: CreatePatientMedicalInfo :one
 
+
 INSERT INTO patient_medical_info (
-    patient_id, blood_type, height_cm, weight_kg, bmi, 
-    overall_health_status, health_summary, primary_care_physician, 
-    primary_clinic_id, organ_donor, dnr_status
+    patient_id, blood_type, blood_type_last_tested, height_cm, weight_kg, bmi,
+    last_measured_date, overall_health_status, health_summary,
+    primary_care_physician, primary_clinic_id,
+    organ_donor, advance_directive_exists, advance_directive_url, dnr_status
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, patient_id, blood_type, overall_health_status, created_at, updated_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+RETURNING id, patient_id, blood_type, blood_type_last_tested, height_cm, weight_kg, bmi, last_measured_date, overall_health_status, health_summary, primary_care_physician, primary_clinic_id, organ_donor, advance_directive_exists, advance_directive_url, dnr_status, created_at, updated_at
 `
 
 type CreatePatientMedicalInfoParams struct {
-	PatientID            pgtype.UUID    `json:"patient_id"`
-	BloodType            pgtype.Text    `json:"blood_type"`
-	HeightCm             pgtype.Numeric `json:"height_cm"`
-	WeightKg             pgtype.Numeric `json:"weight_kg"`
-	Bmi                  pgtype.Numeric `json:"bmi"`
-	OverallHealthStatus  pgtype.Text    `json:"overall_health_status"`
-	HealthSummary        pgtype.Text    `json:"health_summary"`
-	PrimaryCarePhysician pgtype.Text    `json:"primary_care_physician"`
-	PrimaryClinicID      pgtype.UUID    `json:"primary_clinic_id"`
-	OrganDonor           pgtype.Bool    `json:"organ_donor"`
-	DnrStatus            pgtype.Bool    `json:"dnr_status"`
-}
-
-type CreatePatientMedicalInfoRow struct {
-	ID                  pgtype.UUID      `json:"id"`
-	PatientID           pgtype.UUID      `json:"patient_id"`
-	BloodType           pgtype.Text      `json:"blood_type"`
-	OverallHealthStatus pgtype.Text      `json:"overall_health_status"`
-	CreatedAt           pgtype.Timestamp `json:"created_at"`
-	UpdatedAt           pgtype.Timestamp `json:"updated_at"`
+	PatientID              pgtype.UUID    `json:"patient_id"`
+	BloodType              pgtype.Text    `json:"blood_type"`
+	BloodTypeLastTested    pgtype.Date    `json:"blood_type_last_tested"`
+	HeightCm               pgtype.Numeric `json:"height_cm"`
+	WeightKg               pgtype.Numeric `json:"weight_kg"`
+	Bmi                    pgtype.Numeric `json:"bmi"`
+	LastMeasuredDate       pgtype.Date    `json:"last_measured_date"`
+	OverallHealthStatus    pgtype.Text    `json:"overall_health_status"`
+	HealthSummary          pgtype.Text    `json:"health_summary"`
+	PrimaryCarePhysician   pgtype.Text    `json:"primary_care_physician"`
+	PrimaryClinicID        pgtype.UUID    `json:"primary_clinic_id"`
+	OrganDonor             pgtype.Bool    `json:"organ_donor"`
+	AdvanceDirectiveExists pgtype.Bool    `json:"advance_directive_exists"`
+	AdvanceDirectiveUrl    pgtype.Text    `json:"advance_directive_url"`
+	DnrStatus              pgtype.Bool    `json:"dnr_status"`
 }
 
 // ============================================
-// Patient Medical Info Queries
+// PATIENT MEDICAL INFO REPOSITORY QUERIES
+// Maps to: Part of PatientRepository interface
+// Domain: Patient Medical & Health Information Management
 // ============================================
-func (q *Queries) CreatePatientMedicalInfo(ctx context.Context, arg CreatePatientMedicalInfoParams) (CreatePatientMedicalInfoRow, error) {
+// ============================================
+// CORE CRUD OPERATIONS
+// ============================================
+func (q *Queries) CreatePatientMedicalInfo(ctx context.Context, arg CreatePatientMedicalInfoParams) (PatientMedicalInfo, error) {
 	row := q.db.QueryRow(ctx, createPatientMedicalInfo,
 		arg.PatientID,
 		arg.BloodType,
+		arg.BloodTypeLastTested,
 		arg.HeightCm,
 		arg.WeightKg,
 		arg.Bmi,
+		arg.LastMeasuredDate,
 		arg.OverallHealthStatus,
 		arg.HealthSummary,
 		arg.PrimaryCarePhysician,
 		arg.PrimaryClinicID,
 		arg.OrganDonor,
+		arg.AdvanceDirectiveExists,
+		arg.AdvanceDirectiveUrl,
 		arg.DnrStatus,
 	)
-	var i CreatePatientMedicalInfoRow
+	var i PatientMedicalInfo
 	err := row.Scan(
 		&i.ID,
 		&i.PatientID,
 		&i.BloodType,
+		&i.BloodTypeLastTested,
+		&i.HeightCm,
+		&i.WeightKg,
+		&i.Bmi,
+		&i.LastMeasuredDate,
 		&i.OverallHealthStatus,
+		&i.HealthSummary,
+		&i.PrimaryCarePhysician,
+		&i.PrimaryClinicID,
+		&i.OrganDonor,
+		&i.AdvanceDirectiveExists,
+		&i.AdvanceDirectiveUrl,
+		&i.DnrStatus,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
+const deletePatientMedicalInfo = `-- name: DeletePatientMedicalInfo :exec
+DELETE FROM patient_medical_info
+WHERE patient_id = $1
+`
+
+func (q *Queries) DeletePatientMedicalInfo(ctx context.Context, patientID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deletePatientMedicalInfo, patientID)
+	return err
+}
+
+const getBMIDistribution = `-- name: GetBMIDistribution :many
+
+SELECT 
+    CASE
+        WHEN bmi < 18.5 THEN 'Underweight'
+        WHEN bmi >= 18.5 AND bmi < 25 THEN 'Normal'
+        WHEN bmi >= 25 AND bmi < 30 THEN 'Overweight'
+        WHEN bmi >= 30 THEN 'Obese'
+        ELSE 'Unknown'
+    END as bmi_category,
+    COUNT(*) as patient_count,
+    AVG(bmi) as avg_bmi
+FROM patient_medical_info
+WHERE bmi IS NOT NULL
+GROUP BY bmi_category
+ORDER BY 
+    CASE bmi_category
+        WHEN 'Underweight' THEN 1
+        WHEN 'Normal' THEN 2
+        WHEN 'Overweight' THEN 3
+        WHEN 'Obese' THEN 4
+        ELSE 5
+    END
+`
+
+type GetBMIDistributionRow struct {
+	BmiCategory  string  `json:"bmi_category"`
+	PatientCount int64   `json:"patient_count"`
+	AvgBmi       float64 `json:"avg_bmi"`
+}
+
+// ============================================
+// HEALTH METRICS & ANALYTICS
+// ============================================
+func (q *Queries) GetBMIDistribution(ctx context.Context) ([]GetBMIDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getBMIDistribution)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetBMIDistributionRow{}
+	for rows.Next() {
+		var i GetBMIDistributionRow
+		if err := rows.Scan(&i.BmiCategory, &i.PatientCount, &i.AvgBmi); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getBloodTypeDistribution = `-- name: GetBloodTypeDistribution :many
+SELECT 
+    blood_type,
+    COUNT(*) as patient_count,
+    COUNT(*) FILTER (WHERE organ_donor = true) as organ_donors
+FROM patient_medical_info
+WHERE blood_type IS NOT NULL
+GROUP BY blood_type
+ORDER BY patient_count DESC
+`
+
+type GetBloodTypeDistributionRow struct {
+	BloodType    pgtype.Text `json:"blood_type"`
+	PatientCount int64       `json:"patient_count"`
+	OrganDonors  int64       `json:"organ_donors"`
+}
+
+func (q *Queries) GetBloodTypeDistribution(ctx context.Context) ([]GetBloodTypeDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getBloodTypeDistribution)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetBloodTypeDistributionRow{}
+	for rows.Next() {
+		var i GetBloodTypeDistributionRow
+		if err := rows.Scan(&i.BloodType, &i.PatientCount, &i.OrganDonors); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCriticalPatientInfo = `-- name: GetCriticalPatientInfo :one
+SELECT 
+    pmi.blood_type,
+    pmi.dnr_status,
+    pmi.advance_directive_exists,
+    pmi.primary_care_physician,
+    pp.first_name,
+    pp.last_name,
+    pp.date_of_birth,
+    pp.national_id_number
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.patient_id = $1
+`
+
+type GetCriticalPatientInfoRow struct {
+	BloodType              pgtype.Text `json:"blood_type"`
+	DnrStatus              pgtype.Bool `json:"dnr_status"`
+	AdvanceDirectiveExists pgtype.Bool `json:"advance_directive_exists"`
+	PrimaryCarePhysician   pgtype.Text `json:"primary_care_physician"`
+	FirstName              string      `json:"first_name"`
+	LastName               string      `json:"last_name"`
+	DateOfBirth            pgtype.Date `json:"date_of_birth"`
+	NationalIDNumber       pgtype.Text `json:"national_id_number"`
+}
+
+func (q *Queries) GetCriticalPatientInfo(ctx context.Context, patientID pgtype.UUID) (GetCriticalPatientInfoRow, error) {
+	row := q.db.QueryRow(ctx, getCriticalPatientInfo, patientID)
+	var i GetCriticalPatientInfoRow
+	err := row.Scan(
+		&i.BloodType,
+		&i.DnrStatus,
+		&i.AdvanceDirectiveExists,
+		&i.PrimaryCarePhysician,
+		&i.FirstName,
+		&i.LastName,
+		&i.DateOfBirth,
+		&i.NationalIDNumber,
+	)
+	return i, err
+}
+
+const getEmergencyMedicalInfo = `-- name: GetEmergencyMedicalInfo :one
+
+SELECT 
+    pmi.blood_type,
+    pmi.dnr_status,
+    pmi.organ_donor,
+    pmi.primary_care_physician,
+    pmi.primary_clinic_id,
+    pmi.overall_health_status,
+    pp.first_name,
+    pp.last_name,
+    pp.date_of_birth
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.patient_id = $1
+`
+
+type GetEmergencyMedicalInfoRow struct {
+	BloodType            pgtype.Text `json:"blood_type"`
+	DnrStatus            pgtype.Bool `json:"dnr_status"`
+	OrganDonor           pgtype.Bool `json:"organ_donor"`
+	PrimaryCarePhysician pgtype.Text `json:"primary_care_physician"`
+	PrimaryClinicID      pgtype.UUID `json:"primary_clinic_id"`
+	OverallHealthStatus  pgtype.Text `json:"overall_health_status"`
+	FirstName            string      `json:"first_name"`
+	LastName             string      `json:"last_name"`
+	DateOfBirth          pgtype.Date `json:"date_of_birth"`
+}
+
+// ============================================
+// EMERGENCY INFORMATION
+// ============================================
+func (q *Queries) GetEmergencyMedicalInfo(ctx context.Context, patientID pgtype.UUID) (GetEmergencyMedicalInfoRow, error) {
+	row := q.db.QueryRow(ctx, getEmergencyMedicalInfo, patientID)
+	var i GetEmergencyMedicalInfoRow
+	err := row.Scan(
+		&i.BloodType,
+		&i.DnrStatus,
+		&i.OrganDonor,
+		&i.PrimaryCarePhysician,
+		&i.PrimaryClinicID,
+		&i.OverallHealthStatus,
+		&i.FirstName,
+		&i.LastName,
+		&i.DateOfBirth,
+	)
+	return i, err
+}
+
+const getHealthStatusDistribution = `-- name: GetHealthStatusDistribution :many
+SELECT 
+    overall_health_status,
+    COUNT(*) as patient_count,
+    AVG(bmi) FILTER (WHERE bmi IS NOT NULL) as avg_bmi
+FROM patient_medical_info
+WHERE overall_health_status IS NOT NULL
+GROUP BY overall_health_status
+ORDER BY 
+    CASE overall_health_status
+        WHEN 'excellent' THEN 1
+        WHEN 'good' THEN 2
+        WHEN 'fair' THEN 3
+        WHEN 'poor' THEN 4
+        ELSE 5
+    END
+`
+
+type GetHealthStatusDistributionRow struct {
+	OverallHealthStatus pgtype.Text `json:"overall_health_status"`
+	PatientCount        int64       `json:"patient_count"`
+	AvgBmi              float64     `json:"avg_bmi"`
+}
+
+func (q *Queries) GetHealthStatusDistribution(ctx context.Context) ([]GetHealthStatusDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getHealthStatusDistribution)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetHealthStatusDistributionRow{}
+	for rows.Next() {
+		var i GetHealthStatusDistributionRow
+		if err := rows.Scan(&i.OverallHealthStatus, &i.PatientCount, &i.AvgBmi); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getIncompleteMedicalInfo = `-- name: GetIncompleteMedicalInfo :many
+
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    CASE WHEN pmi.blood_type IS NULL THEN true ELSE false END as missing_blood_type,
+    CASE WHEN pmi.height_cm IS NULL THEN true ELSE false END as missing_height,
+    CASE WHEN pmi.weight_kg IS NULL THEN true ELSE false END as missing_weight,
+    CASE WHEN pmi.overall_health_status IS NULL THEN true ELSE false END as missing_health_status,
+    CASE WHEN pmi.primary_care_physician IS NULL AND pmi.primary_clinic_id IS NULL THEN true ELSE false END as missing_primary_care,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE 
+    pmi.blood_type IS NULL
+    OR pmi.height_cm IS NULL
+    OR pmi.weight_kg IS NULL
+    OR pmi.overall_health_status IS NULL
+    OR (pmi.primary_care_physician IS NULL AND pmi.primary_clinic_id IS NULL)
+ORDER BY pp.last_name, pp.first_name
+LIMIT $1 OFFSET $2
+`
+
+type GetIncompleteMedicalInfoParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetIncompleteMedicalInfoRow struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	FirstName           string      `json:"first_name"`
+	LastName            string      `json:"last_name"`
+	MissingBloodType    bool        `json:"missing_blood_type"`
+	MissingHeight       bool        `json:"missing_height"`
+	MissingWeight       bool        `json:"missing_weight"`
+	MissingHealthStatus bool        `json:"missing_health_status"`
+	MissingPrimaryCare  bool        `json:"missing_primary_care"`
+	City                pgtype.Text `json:"city"`
+	Province            pgtype.Text `json:"province"`
+}
+
+// ============================================
+// COMPLETENESS & DATA QUALITY
+// ============================================
+func (q *Queries) GetIncompleteMedicalInfo(ctx context.Context, arg GetIncompleteMedicalInfoParams) ([]GetIncompleteMedicalInfoRow, error) {
+	rows, err := q.db.Query(ctx, getIncompleteMedicalInfo, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetIncompleteMedicalInfoRow{}
+	for rows.Next() {
+		var i GetIncompleteMedicalInfoRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.MissingBloodType,
+			&i.MissingHeight,
+			&i.MissingWeight,
+			&i.MissingHealthStatus,
+			&i.MissingPrimaryCare,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMedicalInfoByPatientIDs = `-- name: GetMedicalInfoByPatientIDs :many
+
+SELECT id, patient_id, blood_type, blood_type_last_tested, height_cm, weight_kg, bmi, last_measured_date, overall_health_status, health_summary, primary_care_physician, primary_clinic_id, organ_donor, advance_directive_exists, advance_directive_url, dnr_status, created_at, updated_at FROM patient_medical_info
+WHERE patient_id = ANY($1::uuid[])
+ORDER BY patient_id
+`
+
+// ============================================
+// BULK OPERATIONS
+// ============================================
+func (q *Queries) GetMedicalInfoByPatientIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]PatientMedicalInfo, error) {
+	rows, err := q.db.Query(ctx, getMedicalInfoByPatientIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PatientMedicalInfo{}
+	for rows.Next() {
+		var i PatientMedicalInfo
+		if err := rows.Scan(
+			&i.ID,
+			&i.PatientID,
+			&i.BloodType,
+			&i.BloodTypeLastTested,
+			&i.HeightCm,
+			&i.WeightKg,
+			&i.Bmi,
+			&i.LastMeasuredDate,
+			&i.OverallHealthStatus,
+			&i.HealthSummary,
+			&i.PrimaryCarePhysician,
+			&i.PrimaryClinicID,
+			&i.OrganDonor,
+			&i.AdvanceDirectiveExists,
+			&i.AdvanceDirectiveUrl,
+			&i.DnrStatus,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMedicalInfoStatistics = `-- name: GetMedicalInfoStatistics :one
+SELECT 
+    COUNT(*) as total_records,
+    COUNT(*) FILTER (WHERE blood_type IS NOT NULL) as with_blood_type,
+    COUNT(*) FILTER (WHERE height_cm IS NOT NULL) as with_height,
+    COUNT(*) FILTER (WHERE weight_kg IS NOT NULL) as with_weight,
+    COUNT(*) FILTER (WHERE bmi IS NOT NULL) as with_bmi,
+    COUNT(*) FILTER (WHERE primary_care_physician IS NOT NULL) as with_primary_physician,
+    COUNT(*) FILTER (WHERE primary_clinic_id IS NOT NULL) as with_primary_clinic,
+    COUNT(*) FILTER (WHERE organ_donor = true) as organ_donors,
+    COUNT(*) FILTER (WHERE dnr_status = true) as with_dnr,
+    COUNT(*) FILTER (WHERE advance_directive_exists = true) as with_advance_directive,
+    AVG(bmi) FILTER (WHERE bmi IS NOT NULL) as avg_bmi,
+    AVG(weight_kg) FILTER (WHERE weight_kg IS NOT NULL) as avg_weight,
+    AVG(height_cm) FILTER (WHERE height_cm IS NOT NULL) as avg_height
+FROM patient_medical_info
+`
+
+type GetMedicalInfoStatisticsRow struct {
+	TotalRecords         int64   `json:"total_records"`
+	WithBloodType        int64   `json:"with_blood_type"`
+	WithHeight           int64   `json:"with_height"`
+	WithWeight           int64   `json:"with_weight"`
+	WithBmi              int64   `json:"with_bmi"`
+	WithPrimaryPhysician int64   `json:"with_primary_physician"`
+	WithPrimaryClinic    int64   `json:"with_primary_clinic"`
+	OrganDonors          int64   `json:"organ_donors"`
+	WithDnr              int64   `json:"with_dnr"`
+	WithAdvanceDirective int64   `json:"with_advance_directive"`
+	AvgBmi               float64 `json:"avg_bmi"`
+	AvgWeight            float64 `json:"avg_weight"`
+	AvgHeight            float64 `json:"avg_height"`
+}
+
+func (q *Queries) GetMedicalInfoStatistics(ctx context.Context) (GetMedicalInfoStatisticsRow, error) {
+	row := q.db.QueryRow(ctx, getMedicalInfoStatistics)
+	var i GetMedicalInfoStatisticsRow
+	err := row.Scan(
+		&i.TotalRecords,
+		&i.WithBloodType,
+		&i.WithHeight,
+		&i.WithWeight,
+		&i.WithBmi,
+		&i.WithPrimaryPhysician,
+		&i.WithPrimaryClinic,
+		&i.OrganDonors,
+		&i.WithDnr,
+		&i.WithAdvanceDirective,
+		&i.AvgBmi,
+		&i.AvgWeight,
+		&i.AvgHeight,
+	)
+	return i, err
+}
+
+const getObesePatients = `-- name: GetObesePatients :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.bmi,
+    pmi.weight_kg,
+    pmi.height_cm,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.bmi >= 30
+ORDER BY pmi.bmi DESC
+LIMIT $1 OFFSET $2
+`
+
+type GetObesePatientsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetObesePatientsRow struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	FirstName string         `json:"first_name"`
+	LastName  string         `json:"last_name"`
+	Bmi       pgtype.Numeric `json:"bmi"`
+	WeightKg  pgtype.Numeric `json:"weight_kg"`
+	HeightCm  pgtype.Numeric `json:"height_cm"`
+	City      pgtype.Text    `json:"city"`
+	Province  pgtype.Text    `json:"province"`
+}
+
+func (q *Queries) GetObesePatients(ctx context.Context, arg GetObesePatientsParams) ([]GetObesePatientsRow, error) {
+	rows, err := q.db.Query(ctx, getObesePatients, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetObesePatientsRow{}
+	for rows.Next() {
+		var i GetObesePatientsRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Bmi,
+			&i.WeightKg,
+			&i.HeightCm,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getOrganDonors = `-- name: GetOrganDonors :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.blood_type,
+    pp.date_of_birth,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE 
+    pmi.organ_donor = true
+    AND ($1::VARCHAR IS NULL OR pmi.blood_type = $1)
+    AND ($2::VARCHAR IS NULL OR pp.province = $2)
+ORDER BY pp.province, pp.city, pp.last_name
+`
+
+type GetOrganDonorsParams struct {
+	Column1 string `json:"column_1"`
+	Column2 string `json:"column_2"`
+}
+
+type GetOrganDonorsRow struct {
+	PatientID   pgtype.UUID `json:"patient_id"`
+	FirstName   string      `json:"first_name"`
+	LastName    string      `json:"last_name"`
+	BloodType   pgtype.Text `json:"blood_type"`
+	DateOfBirth pgtype.Date `json:"date_of_birth"`
+	City        pgtype.Text `json:"city"`
+	Province    pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetOrganDonors(ctx context.Context, arg GetOrganDonorsParams) ([]GetOrganDonorsRow, error) {
+	rows, err := q.db.Query(ctx, getOrganDonors, arg.Column1, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetOrganDonorsRow{}
+	for rows.Next() {
+		var i GetOrganDonorsRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.BloodType,
+			&i.DateOfBirth,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getOverweightPatients = `-- name: GetOverweightPatients :many
+
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.bmi,
+    pmi.weight_kg,
+    pmi.height_cm,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE 
+    pmi.bmi >= 25
+    AND pmi.bmi < 30
+ORDER BY pmi.bmi DESC
+LIMIT $1 OFFSET $2
+`
+
+type GetOverweightPatientsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetOverweightPatientsRow struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	FirstName string         `json:"first_name"`
+	LastName  string         `json:"last_name"`
+	Bmi       pgtype.Numeric `json:"bmi"`
+	WeightKg  pgtype.Numeric `json:"weight_kg"`
+	HeightCm  pgtype.Numeric `json:"height_cm"`
+	City      pgtype.Text    `json:"city"`
+	Province  pgtype.Text    `json:"province"`
+}
+
+// ============================================
+// BMI & WEIGHT MANAGEMENT QUERIES
+// ============================================
+func (q *Queries) GetOverweightPatients(ctx context.Context, arg GetOverweightPatientsParams) ([]GetOverweightPatientsRow, error) {
+	rows, err := q.db.Query(ctx, getOverweightPatients, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetOverweightPatientsRow{}
+	for rows.Next() {
+		var i GetOverweightPatientsRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Bmi,
+			&i.WeightKg,
+			&i.HeightCm,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getPatientMedicalInfo = `-- name: GetPatientMedicalInfo :one
-SELECT id, patient_id, blood_type, blood_type_last_tested, height_cm, weight_kg, bmi, last_measured_date, overall_health_status, health_summary, primary_care_physician, primary_clinic_id, organ_donor, advance_directive_exists, advance_directive_url, dnr_status, created_at, updated_at FROM patient_medical_info WHERE patient_id = $1
+SELECT id, patient_id, blood_type, blood_type_last_tested, height_cm, weight_kg, bmi, last_measured_date, overall_health_status, health_summary, primary_care_physician, primary_clinic_id, organ_donor, advance_directive_exists, advance_directive_url, dnr_status, created_at, updated_at FROM patient_medical_info
+WHERE patient_id = $1
 `
 
 func (q *Queries) GetPatientMedicalInfo(ctx context.Context, patientID pgtype.UUID) (PatientMedicalInfo, error) {
@@ -104,40 +749,1217 @@ func (q *Queries) GetPatientMedicalInfo(ctx context.Context, patientID pgtype.UU
 	return i, err
 }
 
+const getPatientMedicalInfoByID = `-- name: GetPatientMedicalInfoByID :one
+SELECT id, patient_id, blood_type, blood_type_last_tested, height_cm, weight_kg, bmi, last_measured_date, overall_health_status, health_summary, primary_care_physician, primary_clinic_id, organ_donor, advance_directive_exists, advance_directive_url, dnr_status, created_at, updated_at FROM patient_medical_info
+WHERE id = $1
+`
+
+func (q *Queries) GetPatientMedicalInfoByID(ctx context.Context, id pgtype.UUID) (PatientMedicalInfo, error) {
+	row := q.db.QueryRow(ctx, getPatientMedicalInfoByID, id)
+	var i PatientMedicalInfo
+	err := row.Scan(
+		&i.ID,
+		&i.PatientID,
+		&i.BloodType,
+		&i.BloodTypeLastTested,
+		&i.HeightCm,
+		&i.WeightKg,
+		&i.Bmi,
+		&i.LastMeasuredDate,
+		&i.OverallHealthStatus,
+		&i.HealthSummary,
+		&i.PrimaryCarePhysician,
+		&i.PrimaryClinicID,
+		&i.OrganDonor,
+		&i.AdvanceDirectiveExists,
+		&i.AdvanceDirectiveUrl,
+		&i.DnrStatus,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPatientsByBMIRange = `-- name: GetPatientsByBMIRange :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.bmi,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE 
+    pmi.bmi >= $1
+    AND pmi.bmi <= $2
+ORDER BY pmi.bmi DESC
+LIMIT $3 OFFSET $4
+`
+
+type GetPatientsByBMIRangeParams struct {
+	Bmi    pgtype.Numeric `json:"bmi"`
+	Bmi_2  pgtype.Numeric `json:"bmi_2"`
+	Limit  int32          `json:"limit"`
+	Offset int32          `json:"offset"`
+}
+
+type GetPatientsByBMIRangeRow struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	FirstName string         `json:"first_name"`
+	LastName  string         `json:"last_name"`
+	Bmi       pgtype.Numeric `json:"bmi"`
+	City      pgtype.Text    `json:"city"`
+	Province  pgtype.Text    `json:"province"`
+}
+
+func (q *Queries) GetPatientsByBMIRange(ctx context.Context, arg GetPatientsByBMIRangeParams) ([]GetPatientsByBMIRangeRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByBMIRange,
+		arg.Bmi,
+		arg.Bmi_2,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByBMIRangeRow{}
+	for rows.Next() {
+		var i GetPatientsByBMIRangeRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Bmi,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByBloodType = `-- name: GetPatientsByBloodType :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.blood_type,
+    pmi.blood_type_last_tested,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.blood_type = $1
+ORDER BY pp.last_name, pp.first_name
+`
+
+type GetPatientsByBloodTypeRow struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	FirstName           string      `json:"first_name"`
+	LastName            string      `json:"last_name"`
+	BloodType           pgtype.Text `json:"blood_type"`
+	BloodTypeLastTested pgtype.Date `json:"blood_type_last_tested"`
+	City                pgtype.Text `json:"city"`
+	Province            pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsByBloodType(ctx context.Context, bloodType pgtype.Text) ([]GetPatientsByBloodTypeRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByBloodType, bloodType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByBloodTypeRow{}
+	for rows.Next() {
+		var i GetPatientsByBloodTypeRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.BloodType,
+			&i.BloodTypeLastTested,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByHealthStatus = `-- name: GetPatientsByHealthStatus :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.overall_health_status,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.overall_health_status = $1
+ORDER BY pp.last_name, pp.first_name
+LIMIT $2 OFFSET $3
+`
+
+type GetPatientsByHealthStatusParams struct {
+	OverallHealthStatus pgtype.Text `json:"overall_health_status"`
+	Limit               int32       `json:"limit"`
+	Offset              int32       `json:"offset"`
+}
+
+type GetPatientsByHealthStatusRow struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	FirstName           string      `json:"first_name"`
+	LastName            string      `json:"last_name"`
+	OverallHealthStatus pgtype.Text `json:"overall_health_status"`
+	City                pgtype.Text `json:"city"`
+	Province            pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsByHealthStatus(ctx context.Context, arg GetPatientsByHealthStatusParams) ([]GetPatientsByHealthStatusRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByHealthStatus, arg.OverallHealthStatus, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByHealthStatusRow{}
+	for rows.Next() {
+		var i GetPatientsByHealthStatusRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.OverallHealthStatus,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByPrimaryCarePhysician = `-- name: GetPatientsByPrimaryCarePhysician :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.primary_care_physician,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.primary_care_physician = $1
+ORDER BY pp.last_name, pp.first_name
+`
+
+type GetPatientsByPrimaryCarePhysicianRow struct {
+	PatientID            pgtype.UUID `json:"patient_id"`
+	FirstName            string      `json:"first_name"`
+	LastName             string      `json:"last_name"`
+	PrimaryCarePhysician pgtype.Text `json:"primary_care_physician"`
+	City                 pgtype.Text `json:"city"`
+	Province             pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsByPrimaryCarePhysician(ctx context.Context, primaryCarePhysician pgtype.Text) ([]GetPatientsByPrimaryCarePhysicianRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByPrimaryCarePhysician, primaryCarePhysician)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByPrimaryCarePhysicianRow{}
+	for rows.Next() {
+		var i GetPatientsByPrimaryCarePhysicianRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PrimaryCarePhysician,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsByPrimaryClinic = `-- name: GetPatientsByPrimaryClinic :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.primary_care_physician,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.primary_clinic_id = $1
+ORDER BY pp.last_name, pp.first_name
+`
+
+type GetPatientsByPrimaryClinicRow struct {
+	PatientID            pgtype.UUID `json:"patient_id"`
+	FirstName            string      `json:"first_name"`
+	LastName             string      `json:"last_name"`
+	PrimaryCarePhysician pgtype.Text `json:"primary_care_physician"`
+	City                 pgtype.Text `json:"city"`
+	Province             pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsByPrimaryClinic(ctx context.Context, primaryClinicID pgtype.UUID) ([]GetPatientsByPrimaryClinicRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsByPrimaryClinic, primaryClinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsByPrimaryClinicRow{}
+	for rows.Next() {
+		var i GetPatientsByPrimaryClinicRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.PrimaryCarePhysician,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsNeedingBloodTypeTest = `-- name: GetPatientsNeedingBloodTypeTest :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.blood_type,
+    pmi.blood_type_last_tested,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE 
+    pmi.blood_type IS NULL
+    OR pmi.blood_type_last_tested IS NULL
+    OR pmi.blood_type_last_tested < CURRENT_DATE - INTERVAL '5 years'
+ORDER BY pmi.blood_type_last_tested ASC NULLS FIRST
+LIMIT $1 OFFSET $2
+`
+
+type GetPatientsNeedingBloodTypeTestParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetPatientsNeedingBloodTypeTestRow struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	FirstName           string      `json:"first_name"`
+	LastName            string      `json:"last_name"`
+	BloodType           pgtype.Text `json:"blood_type"`
+	BloodTypeLastTested pgtype.Date `json:"blood_type_last_tested"`
+	City                pgtype.Text `json:"city"`
+	Province            pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsNeedingBloodTypeTest(ctx context.Context, arg GetPatientsNeedingBloodTypeTestParams) ([]GetPatientsNeedingBloodTypeTestRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsNeedingBloodTypeTest, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsNeedingBloodTypeTestRow{}
+	for rows.Next() {
+		var i GetPatientsNeedingBloodTypeTestRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.BloodType,
+			&i.BloodTypeLastTested,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsNeedingHealthAssessment = `-- name: GetPatientsNeedingHealthAssessment :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.overall_health_status,
+    pmi.last_measured_date,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE 
+    pmi.overall_health_status IN ('poor', 'fair')
+    AND (pmi.last_measured_date < CURRENT_DATE - INTERVAL '3 months' OR pmi.last_measured_date IS NULL)
+ORDER BY 
+    CASE pmi.overall_health_status
+        WHEN 'poor' THEN 1
+        WHEN 'fair' THEN 2
+        ELSE 3
+    END,
+    pmi.last_measured_date ASC NULLS FIRST
+LIMIT $1 OFFSET $2
+`
+
+type GetPatientsNeedingHealthAssessmentParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetPatientsNeedingHealthAssessmentRow struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	FirstName           string      `json:"first_name"`
+	LastName            string      `json:"last_name"`
+	OverallHealthStatus pgtype.Text `json:"overall_health_status"`
+	LastMeasuredDate    pgtype.Date `json:"last_measured_date"`
+	City                pgtype.Text `json:"city"`
+	Province            pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsNeedingHealthAssessment(ctx context.Context, arg GetPatientsNeedingHealthAssessmentParams) ([]GetPatientsNeedingHealthAssessmentRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsNeedingHealthAssessment, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsNeedingHealthAssessmentRow{}
+	for rows.Next() {
+		var i GetPatientsNeedingHealthAssessmentRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.OverallHealthStatus,
+			&i.LastMeasuredDate,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsWithAdvanceDirectives = `-- name: GetPatientsWithAdvanceDirectives :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.advance_directive_url,
+    pp.date_of_birth
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.advance_directive_exists = true
+ORDER BY pp.last_name, pp.first_name
+`
+
+type GetPatientsWithAdvanceDirectivesRow struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	FirstName           string      `json:"first_name"`
+	LastName            string      `json:"last_name"`
+	AdvanceDirectiveUrl pgtype.Text `json:"advance_directive_url"`
+	DateOfBirth         pgtype.Date `json:"date_of_birth"`
+}
+
+func (q *Queries) GetPatientsWithAdvanceDirectives(ctx context.Context) ([]GetPatientsWithAdvanceDirectivesRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsWithAdvanceDirectives)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsWithAdvanceDirectivesRow{}
+	for rows.Next() {
+		var i GetPatientsWithAdvanceDirectivesRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.AdvanceDirectiveUrl,
+			&i.DateOfBirth,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsWithDNR = `-- name: GetPatientsWithDNR :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pp.date_of_birth,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.dnr_status = true
+ORDER BY pp.province, pp.city, pp.last_name
+`
+
+type GetPatientsWithDNRRow struct {
+	PatientID   pgtype.UUID `json:"patient_id"`
+	FirstName   string      `json:"first_name"`
+	LastName    string      `json:"last_name"`
+	DateOfBirth pgtype.Date `json:"date_of_birth"`
+	City        pgtype.Text `json:"city"`
+	Province    pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsWithDNR(ctx context.Context) ([]GetPatientsWithDNRRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsWithDNR)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsWithDNRRow{}
+	for rows.Next() {
+		var i GetPatientsWithDNRRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.DateOfBirth,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsWithOutdatedVitals = `-- name: GetPatientsWithOutdatedVitals :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.last_measured_date,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE 
+    pmi.last_measured_date < CURRENT_DATE - INTERVAL '1 year'
+    OR pmi.last_measured_date IS NULL
+ORDER BY pmi.last_measured_date ASC NULLS FIRST
+LIMIT $1 OFFSET $2
+`
+
+type GetPatientsWithOutdatedVitalsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetPatientsWithOutdatedVitalsRow struct {
+	PatientID        pgtype.UUID `json:"patient_id"`
+	FirstName        string      `json:"first_name"`
+	LastName         string      `json:"last_name"`
+	LastMeasuredDate pgtype.Date `json:"last_measured_date"`
+	City             pgtype.Text `json:"city"`
+	Province         pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetPatientsWithOutdatedVitals(ctx context.Context, arg GetPatientsWithOutdatedVitalsParams) ([]GetPatientsWithOutdatedVitalsRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsWithOutdatedVitals, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsWithOutdatedVitalsRow{}
+	for rows.Next() {
+		var i GetPatientsWithOutdatedVitalsRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.LastMeasuredDate,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientsWithoutPrimaryCare = `-- name: GetPatientsWithoutPrimaryCare :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pp.city,
+    pp.province,
+    pp.has_medical_aid
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE 
+    pmi.primary_care_physician IS NULL
+    AND pmi.primary_clinic_id IS NULL
+ORDER BY pp.province, pp.city, pp.last_name
+LIMIT $1 OFFSET $2
+`
+
+type GetPatientsWithoutPrimaryCareParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetPatientsWithoutPrimaryCareRow struct {
+	PatientID     pgtype.UUID `json:"patient_id"`
+	FirstName     string      `json:"first_name"`
+	LastName      string      `json:"last_name"`
+	City          pgtype.Text `json:"city"`
+	Province      pgtype.Text `json:"province"`
+	HasMedicalAid pgtype.Bool `json:"has_medical_aid"`
+}
+
+func (q *Queries) GetPatientsWithoutPrimaryCare(ctx context.Context, arg GetPatientsWithoutPrimaryCareParams) ([]GetPatientsWithoutPrimaryCareRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsWithoutPrimaryCare, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsWithoutPrimaryCareRow{}
+	for rows.Next() {
+		var i GetPatientsWithoutPrimaryCareRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.City,
+			&i.Province,
+			&i.HasMedicalAid,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUnderweightPatients = `-- name: GetUnderweightPatients :many
+SELECT 
+    pmi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pmi.bmi,
+    pmi.weight_kg,
+    pmi.height_cm,
+    pp.city,
+    pp.province
+FROM patient_medical_info pmi
+JOIN patient_profiles pp ON pmi.patient_id = pp.id
+WHERE pmi.bmi < 18.5
+ORDER BY pmi.bmi ASC
+LIMIT $1 OFFSET $2
+`
+
+type GetUnderweightPatientsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetUnderweightPatientsRow struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	FirstName string         `json:"first_name"`
+	LastName  string         `json:"last_name"`
+	Bmi       pgtype.Numeric `json:"bmi"`
+	WeightKg  pgtype.Numeric `json:"weight_kg"`
+	HeightCm  pgtype.Numeric `json:"height_cm"`
+	City      pgtype.Text    `json:"city"`
+	Province  pgtype.Text    `json:"province"`
+}
+
+func (q *Queries) GetUnderweightPatients(ctx context.Context, arg GetUnderweightPatientsParams) ([]GetUnderweightPatientsRow, error) {
+	rows, err := q.db.Query(ctx, getUnderweightPatients, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUnderweightPatientsRow{}
+	for rows.Next() {
+		var i GetUnderweightPatientsRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.Bmi,
+			&i.WeightKg,
+			&i.HeightCm,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVitalStatisticsSummary = `-- name: GetVitalStatisticsSummary :one
+SELECT 
+    COUNT(*) FILTER (WHERE height_cm IS NOT NULL AND weight_kg IS NOT NULL) as with_complete_vitals,
+    COUNT(*) FILTER (WHERE last_measured_date >= CURRENT_DATE - INTERVAL '6 months') as recently_measured,
+    COUNT(*) FILTER (WHERE last_measured_date < CURRENT_DATE - INTERVAL '1 year' OR last_measured_date IS NULL) as outdated_measurements,
+    AVG(bmi) FILTER (WHERE bmi IS NOT NULL AND bmi > 0) as avg_bmi,
+    MIN(last_measured_date) as oldest_measurement,
+    MAX(last_measured_date) as most_recent_measurement
+FROM patient_medical_info
+`
+
+type GetVitalStatisticsSummaryRow struct {
+	WithCompleteVitals    int64       `json:"with_complete_vitals"`
+	RecentlyMeasured      int64       `json:"recently_measured"`
+	OutdatedMeasurements  int64       `json:"outdated_measurements"`
+	AvgBmi                float64     `json:"avg_bmi"`
+	OldestMeasurement     interface{} `json:"oldest_measurement"`
+	MostRecentMeasurement interface{} `json:"most_recent_measurement"`
+}
+
+func (q *Queries) GetVitalStatisticsSummary(ctx context.Context) (GetVitalStatisticsSummaryRow, error) {
+	row := q.db.QueryRow(ctx, getVitalStatisticsSummary)
+	var i GetVitalStatisticsSummaryRow
+	err := row.Scan(
+		&i.WithCompleteVitals,
+		&i.RecentlyMeasured,
+		&i.OutdatedMeasurements,
+		&i.AvgBmi,
+		&i.OldestMeasurement,
+		&i.MostRecentMeasurement,
+	)
+	return i, err
+}
+
+const hasCompleteVitals = `-- name: HasCompleteVitals :one
+SELECT 
+    (height_cm IS NOT NULL AND weight_kg IS NOT NULL AND bmi IS NOT NULL) as has_complete_vitals
+FROM patient_medical_info
+WHERE patient_id = $1
+`
+
+func (q *Queries) HasCompleteVitals(ctx context.Context, patientID pgtype.UUID) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, hasCompleteVitals, patientID)
+	var has_complete_vitals pgtype.Bool
+	err := row.Scan(&has_complete_vitals)
+	return has_complete_vitals, err
+}
+
+const medicalInfoExists = `-- name: MedicalInfoExists :one
+
+SELECT EXISTS(
+    SELECT 1 FROM patient_medical_info WHERE patient_id = $1
+) as exists
+`
+
+// ============================================
+// VALIDATION & UTILITIES
+// ============================================
+func (q *Queries) MedicalInfoExists(ctx context.Context, patientID pgtype.UUID) (bool, error) {
+	row := q.db.QueryRow(ctx, medicalInfoExists, patientID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const needsBMICalculation = `-- name: NeedsBMICalculation :many
+SELECT 
+    patient_id,
+    height_cm,
+    weight_kg
+FROM patient_medical_info
+WHERE 
+    height_cm IS NOT NULL
+    AND weight_kg IS NOT NULL
+    AND (bmi IS NULL OR bmi = 0)
+`
+
+type NeedsBMICalculationRow struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	HeightCm  pgtype.Numeric `json:"height_cm"`
+	WeightKg  pgtype.Numeric `json:"weight_kg"`
+}
+
+func (q *Queries) NeedsBMICalculation(ctx context.Context) ([]NeedsBMICalculationRow, error) {
+	rows, err := q.db.Query(ctx, needsBMICalculation)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []NeedsBMICalculationRow{}
+	for rows.Next() {
+		var i NeedsBMICalculationRow
+		if err := rows.Scan(&i.PatientID, &i.HeightCm, &i.WeightKg); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const recordVitalMeasurement = `-- name: RecordVitalMeasurement :exec
+UPDATE patient_medical_info
+SET 
+    height_cm = COALESCE($2, height_cm),
+    weight_kg = COALESCE($3, weight_kg),
+    bmi = COALESCE($4, bmi),
+    last_measured_date = CURRENT_DATE,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type RecordVitalMeasurementParams struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	HeightCm  pgtype.Numeric `json:"height_cm"`
+	WeightKg  pgtype.Numeric `json:"weight_kg"`
+	Bmi       pgtype.Numeric `json:"bmi"`
+}
+
+func (q *Queries) RecordVitalMeasurement(ctx context.Context, arg RecordVitalMeasurementParams) error {
+	_, err := q.db.Exec(ctx, recordVitalMeasurement,
+		arg.PatientID,
+		arg.HeightCm,
+		arg.WeightKg,
+		arg.Bmi,
+	)
+	return err
+}
+
+const updateAdvanceDirective = `-- name: UpdateAdvanceDirective :exec
+UPDATE patient_medical_info
+SET 
+    advance_directive_exists = $2,
+    advance_directive_url = $3,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdateAdvanceDirectiveParams struct {
+	PatientID              pgtype.UUID `json:"patient_id"`
+	AdvanceDirectiveExists pgtype.Bool `json:"advance_directive_exists"`
+	AdvanceDirectiveUrl    pgtype.Text `json:"advance_directive_url"`
+}
+
+func (q *Queries) UpdateAdvanceDirective(ctx context.Context, arg UpdateAdvanceDirectiveParams) error {
+	_, err := q.db.Exec(ctx, updateAdvanceDirective, arg.PatientID, arg.AdvanceDirectiveExists, arg.AdvanceDirectiveUrl)
+	return err
+}
+
+const updateBloodTypeTestDate = `-- name: UpdateBloodTypeTestDate :exec
+UPDATE patient_medical_info
+SET 
+    blood_type_last_tested = $2,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdateBloodTypeTestDateParams struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	BloodTypeLastTested pgtype.Date `json:"blood_type_last_tested"`
+}
+
+func (q *Queries) UpdateBloodTypeTestDate(ctx context.Context, arg UpdateBloodTypeTestDateParams) error {
+	_, err := q.db.Exec(ctx, updateBloodTypeTestDate, arg.PatientID, arg.BloodTypeLastTested)
+	return err
+}
+
+const updateDNRStatus = `-- name: UpdateDNRStatus :exec
+UPDATE patient_medical_info
+SET 
+    dnr_status = $2,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdateDNRStatusParams struct {
+	PatientID pgtype.UUID `json:"patient_id"`
+	DnrStatus pgtype.Bool `json:"dnr_status"`
+}
+
+func (q *Queries) UpdateDNRStatus(ctx context.Context, arg UpdateDNRStatusParams) error {
+	_, err := q.db.Exec(ctx, updateDNRStatus, arg.PatientID, arg.DnrStatus)
+	return err
+}
+
+const updateEndOfLifePreferences = `-- name: UpdateEndOfLifePreferences :exec
+UPDATE patient_medical_info
+SET 
+    organ_donor = $2,
+    advance_directive_exists = $3,
+    advance_directive_url = $4,
+    dnr_status = $5,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdateEndOfLifePreferencesParams struct {
+	PatientID              pgtype.UUID `json:"patient_id"`
+	OrganDonor             pgtype.Bool `json:"organ_donor"`
+	AdvanceDirectiveExists pgtype.Bool `json:"advance_directive_exists"`
+	AdvanceDirectiveUrl    pgtype.Text `json:"advance_directive_url"`
+	DnrStatus              pgtype.Bool `json:"dnr_status"`
+}
+
+func (q *Queries) UpdateEndOfLifePreferences(ctx context.Context, arg UpdateEndOfLifePreferencesParams) error {
+	_, err := q.db.Exec(ctx, updateEndOfLifePreferences,
+		arg.PatientID,
+		arg.OrganDonor,
+		arg.AdvanceDirectiveExists,
+		arg.AdvanceDirectiveUrl,
+		arg.DnrStatus,
+	)
+	return err
+}
+
+const updateHealthSummary = `-- name: UpdateHealthSummary :exec
+UPDATE patient_medical_info
+SET 
+    health_summary = $2,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdateHealthSummaryParams struct {
+	PatientID     pgtype.UUID `json:"patient_id"`
+	HealthSummary pgtype.Text `json:"health_summary"`
+}
+
+func (q *Queries) UpdateHealthSummary(ctx context.Context, arg UpdateHealthSummaryParams) error {
+	_, err := q.db.Exec(ctx, updateHealthSummary, arg.PatientID, arg.HealthSummary)
+	return err
+}
+
+const updateOrganDonorStatus = `-- name: UpdateOrganDonorStatus :exec
+
+UPDATE patient_medical_info
+SET 
+    organ_donor = $2,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdateOrganDonorStatusParams struct {
+	PatientID  pgtype.UUID `json:"patient_id"`
+	OrganDonor pgtype.Bool `json:"organ_donor"`
+}
+
+// ============================================
+// ADVANCE DIRECTIVES & END-OF-LIFE
+// ============================================
+func (q *Queries) UpdateOrganDonorStatus(ctx context.Context, arg UpdateOrganDonorStatusParams) error {
+	_, err := q.db.Exec(ctx, updateOrganDonorStatus, arg.PatientID, arg.OrganDonor)
+	return err
+}
+
+const updatePatientBMI = `-- name: UpdatePatientBMI :exec
+UPDATE patient_medical_info
+SET 
+    bmi = $2,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePatientBMIParams struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	Bmi       pgtype.Numeric `json:"bmi"`
+}
+
+func (q *Queries) UpdatePatientBMI(ctx context.Context, arg UpdatePatientBMIParams) error {
+	_, err := q.db.Exec(ctx, updatePatientBMI, arg.PatientID, arg.Bmi)
+	return err
+}
+
+const updatePatientBloodType = `-- name: UpdatePatientBloodType :exec
+
+UPDATE patient_medical_info
+SET 
+    blood_type = $2,
+    blood_type_last_tested = $3,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePatientBloodTypeParams struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	BloodType           pgtype.Text `json:"blood_type"`
+	BloodTypeLastTested pgtype.Date `json:"blood_type_last_tested"`
+}
+
+// ============================================
+// BLOOD TYPE MANAGEMENT
+// ============================================
+func (q *Queries) UpdatePatientBloodType(ctx context.Context, arg UpdatePatientBloodTypeParams) error {
+	_, err := q.db.Exec(ctx, updatePatientBloodType, arg.PatientID, arg.BloodType, arg.BloodTypeLastTested)
+	return err
+}
+
+const updatePatientHealthStatus = `-- name: UpdatePatientHealthStatus :exec
+
+UPDATE patient_medical_info
+SET 
+    overall_health_status = $2,
+    health_summary = $3,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePatientHealthStatusParams struct {
+	PatientID           pgtype.UUID `json:"patient_id"`
+	OverallHealthStatus pgtype.Text `json:"overall_health_status"`
+	HealthSummary       pgtype.Text `json:"health_summary"`
+}
+
+// ============================================
+// HEALTH STATUS MANAGEMENT
+// ============================================
+func (q *Queries) UpdatePatientHealthStatus(ctx context.Context, arg UpdatePatientHealthStatusParams) error {
+	_, err := q.db.Exec(ctx, updatePatientHealthStatus, arg.PatientID, arg.OverallHealthStatus, arg.HealthSummary)
+	return err
+}
+
+const updatePatientHeight = `-- name: UpdatePatientHeight :exec
+UPDATE patient_medical_info
+SET 
+    height_cm = $2,
+    last_measured_date = CURRENT_DATE,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePatientHeightParams struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	HeightCm  pgtype.Numeric `json:"height_cm"`
+}
+
+func (q *Queries) UpdatePatientHeight(ctx context.Context, arg UpdatePatientHeightParams) error {
+	_, err := q.db.Exec(ctx, updatePatientHeight, arg.PatientID, arg.HeightCm)
+	return err
+}
+
 const updatePatientMedicalInfo = `-- name: UpdatePatientMedicalInfo :exec
 UPDATE patient_medical_info
-SET blood_type = $2, height_cm = $3, weight_kg = $4, bmi = $5,
-    overall_health_status = $6, health_summary = $7, 
-    primary_care_physician = $8, primary_clinic_id = $9,
-    last_measured_date = $10
+SET 
+    blood_type = COALESCE($2, blood_type),
+    blood_type_last_tested = COALESCE($3, blood_type_last_tested),
+    height_cm = COALESCE($4, height_cm),
+    weight_kg = COALESCE($5, weight_kg),
+    bmi = COALESCE($6, bmi),
+    last_measured_date = COALESCE($7, last_measured_date),
+    overall_health_status = COALESCE($8, overall_health_status),
+    health_summary = COALESCE($9, health_summary),
+    primary_care_physician = COALESCE($10, primary_care_physician),
+    primary_clinic_id = COALESCE($11, primary_clinic_id),
+    updated_at = NOW()
 WHERE patient_id = $1
 `
 
 type UpdatePatientMedicalInfoParams struct {
 	PatientID            pgtype.UUID    `json:"patient_id"`
 	BloodType            pgtype.Text    `json:"blood_type"`
+	BloodTypeLastTested  pgtype.Date    `json:"blood_type_last_tested"`
 	HeightCm             pgtype.Numeric `json:"height_cm"`
 	WeightKg             pgtype.Numeric `json:"weight_kg"`
 	Bmi                  pgtype.Numeric `json:"bmi"`
+	LastMeasuredDate     pgtype.Date    `json:"last_measured_date"`
 	OverallHealthStatus  pgtype.Text    `json:"overall_health_status"`
 	HealthSummary        pgtype.Text    `json:"health_summary"`
 	PrimaryCarePhysician pgtype.Text    `json:"primary_care_physician"`
 	PrimaryClinicID      pgtype.UUID    `json:"primary_clinic_id"`
-	LastMeasuredDate     pgtype.Date    `json:"last_measured_date"`
 }
 
 func (q *Queries) UpdatePatientMedicalInfo(ctx context.Context, arg UpdatePatientMedicalInfoParams) error {
 	_, err := q.db.Exec(ctx, updatePatientMedicalInfo,
 		arg.PatientID,
 		arg.BloodType,
+		arg.BloodTypeLastTested,
 		arg.HeightCm,
 		arg.WeightKg,
 		arg.Bmi,
+		arg.LastMeasuredDate,
 		arg.OverallHealthStatus,
 		arg.HealthSummary,
 		arg.PrimaryCarePhysician,
 		arg.PrimaryClinicID,
+	)
+	return err
+}
+
+const updatePatientVitals = `-- name: UpdatePatientVitals :exec
+
+UPDATE patient_medical_info
+SET 
+    height_cm = $2,
+    weight_kg = $3,
+    bmi = $4,
+    last_measured_date = $5,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePatientVitalsParams struct {
+	PatientID        pgtype.UUID    `json:"patient_id"`
+	HeightCm         pgtype.Numeric `json:"height_cm"`
+	WeightKg         pgtype.Numeric `json:"weight_kg"`
+	Bmi              pgtype.Numeric `json:"bmi"`
+	LastMeasuredDate pgtype.Date    `json:"last_measured_date"`
+}
+
+// ============================================
+// VITAL STATISTICS MANAGEMENT
+// ============================================
+func (q *Queries) UpdatePatientVitals(ctx context.Context, arg UpdatePatientVitalsParams) error {
+	_, err := q.db.Exec(ctx, updatePatientVitals,
+		arg.PatientID,
+		arg.HeightCm,
+		arg.WeightKg,
+		arg.Bmi,
 		arg.LastMeasuredDate,
 	)
+	return err
+}
+
+const updatePatientWeight = `-- name: UpdatePatientWeight :exec
+UPDATE patient_medical_info
+SET 
+    weight_kg = $2,
+    bmi = $3,
+    last_measured_date = CURRENT_DATE,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePatientWeightParams struct {
+	PatientID pgtype.UUID    `json:"patient_id"`
+	WeightKg  pgtype.Numeric `json:"weight_kg"`
+	Bmi       pgtype.Numeric `json:"bmi"`
+}
+
+func (q *Queries) UpdatePatientWeight(ctx context.Context, arg UpdatePatientWeightParams) error {
+	_, err := q.db.Exec(ctx, updatePatientWeight, arg.PatientID, arg.WeightKg, arg.Bmi)
+	return err
+}
+
+const updatePrimaryCareProvider = `-- name: UpdatePrimaryCareProvider :exec
+
+UPDATE patient_medical_info
+SET 
+    primary_care_physician = $2,
+    primary_clinic_id = $3,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePrimaryCareProviderParams struct {
+	PatientID            pgtype.UUID `json:"patient_id"`
+	PrimaryCarePhysician pgtype.Text `json:"primary_care_physician"`
+	PrimaryClinicID      pgtype.UUID `json:"primary_clinic_id"`
+}
+
+// ============================================
+// CARE PROVIDER MANAGEMENT
+// ============================================
+func (q *Queries) UpdatePrimaryCareProvider(ctx context.Context, arg UpdatePrimaryCareProviderParams) error {
+	_, err := q.db.Exec(ctx, updatePrimaryCareProvider, arg.PatientID, arg.PrimaryCarePhysician, arg.PrimaryClinicID)
+	return err
+}
+
+const updatePrimaryClinic = `-- name: UpdatePrimaryClinic :exec
+UPDATE patient_medical_info
+SET 
+    primary_clinic_id = $2,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePrimaryClinicParams struct {
+	PatientID       pgtype.UUID `json:"patient_id"`
+	PrimaryClinicID pgtype.UUID `json:"primary_clinic_id"`
+}
+
+func (q *Queries) UpdatePrimaryClinic(ctx context.Context, arg UpdatePrimaryClinicParams) error {
+	_, err := q.db.Exec(ctx, updatePrimaryClinic, arg.PatientID, arg.PrimaryClinicID)
+	return err
+}
+
+const updatePrimaryPhysician = `-- name: UpdatePrimaryPhysician :exec
+UPDATE patient_medical_info
+SET 
+    primary_care_physician = $2,
+    updated_at = NOW()
+WHERE patient_id = $1
+`
+
+type UpdatePrimaryPhysicianParams struct {
+	PatientID            pgtype.UUID `json:"patient_id"`
+	PrimaryCarePhysician pgtype.Text `json:"primary_care_physician"`
+}
+
+func (q *Queries) UpdatePrimaryPhysician(ctx context.Context, arg UpdatePrimaryPhysicianParams) error {
+	_, err := q.db.Exec(ctx, updatePrimaryPhysician, arg.PatientID, arg.PrimaryCarePhysician)
 	return err
 }
