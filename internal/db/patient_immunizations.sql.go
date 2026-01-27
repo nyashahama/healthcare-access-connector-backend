@@ -13,13 +13,14 @@ import (
 
 const addPatientImmunization = `-- name: AddPatientImmunization :one
 
+
 INSERT INTO patient_immunizations (
-    patient_id, vaccine_name, vaccine_type, administration_date, 
-    next_due_date, administered_by, clinic_name, lot_number, 
-    manufacturer, dose_number, total_doses, documented_by
+    patient_id, vaccine_name, vaccine_type, administration_date,
+    next_due_date, administered_by, clinic_name, lot_number,
+    manufacturer, dose_number, total_doses, notes, documented_by
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, patient_id, vaccine_name, administration_date, next_due_date, created_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, patient_id, vaccine_name, vaccine_type, administration_date, next_due_date, administered_by, clinic_name, lot_number, manufacturer, dose_number, total_doses, notes, documented_by, created_at, updated_at
 `
 
 type AddPatientImmunizationParams struct {
@@ -34,22 +35,19 @@ type AddPatientImmunizationParams struct {
 	Manufacturer       pgtype.Text `json:"manufacturer"`
 	DoseNumber         pgtype.Int4 `json:"dose_number"`
 	TotalDoses         pgtype.Int4 `json:"total_doses"`
+	Notes              pgtype.Text `json:"notes"`
 	DocumentedBy       pgtype.UUID `json:"documented_by"`
 }
 
-type AddPatientImmunizationRow struct {
-	ID                 pgtype.UUID      `json:"id"`
-	PatientID          pgtype.UUID      `json:"patient_id"`
-	VaccineName        string           `json:"vaccine_name"`
-	AdministrationDate pgtype.Date      `json:"administration_date"`
-	NextDueDate        pgtype.Date      `json:"next_due_date"`
-	CreatedAt          pgtype.Timestamp `json:"created_at"`
-}
-
 // ============================================
-// Patient Immunizations Queries
+// PATIENT IMMUNIZATIONS REPOSITORY QUERIES
+// Maps to: Part of PatientRepository interface
+// Domain: Patient Immunization & Vaccination Management
 // ============================================
-func (q *Queries) AddPatientImmunization(ctx context.Context, arg AddPatientImmunizationParams) (AddPatientImmunizationRow, error) {
+// ============================================
+// CORE CRUD OPERATIONS
+// ============================================
+func (q *Queries) AddPatientImmunization(ctx context.Context, arg AddPatientImmunizationParams) (PatientImmunization, error) {
 	row := q.db.QueryRow(ctx, addPatientImmunization,
 		arg.PatientID,
 		arg.VaccineName,
@@ -62,23 +60,989 @@ func (q *Queries) AddPatientImmunization(ctx context.Context, arg AddPatientImmu
 		arg.Manufacturer,
 		arg.DoseNumber,
 		arg.TotalDoses,
+		arg.Notes,
 		arg.DocumentedBy,
 	)
-	var i AddPatientImmunizationRow
+	var i PatientImmunization
 	err := row.Scan(
 		&i.ID,
 		&i.PatientID,
 		&i.VaccineName,
+		&i.VaccineType,
 		&i.AdministrationDate,
 		&i.NextDueDate,
+		&i.AdministeredBy,
+		&i.ClinicName,
+		&i.LotNumber,
+		&i.Manufacturer,
+		&i.DoseNumber,
+		&i.TotalDoses,
+		&i.Notes,
+		&i.DocumentedBy,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const checkVaccineReceived = `-- name: CheckVaccineReceived :one
+
+SELECT EXISTS(
+    SELECT 1 FROM patient_immunizations
+    WHERE 
+        patient_id = $1
+        AND vaccine_name = $2
+) as has_received
+`
+
+type CheckVaccineReceivedParams struct {
+	PatientID   pgtype.UUID `json:"patient_id"`
+	VaccineName string      `json:"vaccine_name"`
+}
+
+// ============================================
+// VALIDATION & UTILITIES
+// ============================================
+func (q *Queries) CheckVaccineReceived(ctx context.Context, arg CheckVaccineReceivedParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkVaccineReceived, arg.PatientID, arg.VaccineName)
+	var has_received bool
+	err := row.Scan(&has_received)
+	return has_received, err
+}
+
+const countPatientImmunizations = `-- name: CountPatientImmunizations :one
+
+SELECT 
+    COUNT(*) as total_immunizations,
+    COUNT(DISTINCT vaccine_name) as unique_vaccines,
+    COUNT(*) FILTER (WHERE vaccine_type = 'routine') as routine_count,
+    COUNT(*) FILTER (WHERE next_due_date >= CURRENT_DATE) as upcoming_count,
+    COUNT(*) FILTER (WHERE next_due_date < CURRENT_DATE) as overdue_count
+FROM patient_immunizations
+WHERE patient_id = $1
+`
+
+type CountPatientImmunizationsRow struct {
+	TotalImmunizations int64 `json:"total_immunizations"`
+	UniqueVaccines     int64 `json:"unique_vaccines"`
+	RoutineCount       int64 `json:"routine_count"`
+	UpcomingCount      int64 `json:"upcoming_count"`
+	OverdueCount       int64 `json:"overdue_count"`
+}
+
+// ============================================
+// STATISTICS & ANALYTICS
+// ============================================
+func (q *Queries) CountPatientImmunizations(ctx context.Context, patientID pgtype.UUID) (CountPatientImmunizationsRow, error) {
+	row := q.db.QueryRow(ctx, countPatientImmunizations, patientID)
+	var i CountPatientImmunizationsRow
+	err := row.Scan(
+		&i.TotalImmunizations,
+		&i.UniqueVaccines,
+		&i.RoutineCount,
+		&i.UpcomingCount,
+		&i.OverdueCount,
+	)
+	return i, err
+}
+
+const deletePatientImmunization = `-- name: DeletePatientImmunization :exec
+DELETE FROM patient_immunizations WHERE id = $1
+`
+
+func (q *Queries) DeletePatientImmunization(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deletePatientImmunization, id)
+	return err
+}
+
+const deletePatientImmunizations = `-- name: DeletePatientImmunizations :exec
+DELETE FROM patient_immunizations
+WHERE patient_id = $1
+`
+
+func (q *Queries) DeletePatientImmunizations(ctx context.Context, patientID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deletePatientImmunizations, patientID)
+	return err
+}
+
+const getChildrenNeedingVaccines = `-- name: GetChildrenNeedingVaccines :many
+SELECT 
+    pp.id as patient_id,
+    pp.first_name,
+    pp.last_name,
+    pp.date_of_birth,
+    EXTRACT(YEAR FROM AGE(pp.date_of_birth))::INTEGER as age_years,
+    pp.city,
+    pp.province
+FROM patient_profiles pp
+LEFT JOIN patient_immunizations pi ON pp.id = pi.patient_id AND pi.vaccine_type = 'routine'
+WHERE 
+    pp.date_of_birth > CURRENT_DATE - INTERVAL '18 years'
+    AND pi.id IS NULL
+ORDER BY pp.date_of_birth DESC
+LIMIT $1 OFFSET $2
+`
+
+type GetChildrenNeedingVaccinesParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type GetChildrenNeedingVaccinesRow struct {
+	PatientID   pgtype.UUID `json:"patient_id"`
+	FirstName   string      `json:"first_name"`
+	LastName    string      `json:"last_name"`
+	DateOfBirth pgtype.Date `json:"date_of_birth"`
+	AgeYears    int32       `json:"age_years"`
+	City        pgtype.Text `json:"city"`
+	Province    pgtype.Text `json:"province"`
+}
+
+func (q *Queries) GetChildrenNeedingVaccines(ctx context.Context, arg GetChildrenNeedingVaccinesParams) ([]GetChildrenNeedingVaccinesRow, error) {
+	rows, err := q.db.Query(ctx, getChildrenNeedingVaccines, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetChildrenNeedingVaccinesRow{}
+	for rows.Next() {
+		var i GetChildrenNeedingVaccinesRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.DateOfBirth,
+			&i.AgeYears,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCompleteVaccineSeries = `-- name: GetCompleteVaccineSeries :many
+SELECT 
+    vaccine_name,
+    MAX(dose_number) as doses_completed,
+    MAX(total_doses) as total_doses,
+    MAX(administration_date) as last_dose_date
+FROM patient_immunizations
+WHERE patient_id = $1
+GROUP BY vaccine_name
+HAVING MAX(dose_number) >= MAX(total_doses)
+`
+
+type GetCompleteVaccineSeriesRow struct {
+	VaccineName    string      `json:"vaccine_name"`
+	DosesCompleted interface{} `json:"doses_completed"`
+	TotalDoses     interface{} `json:"total_doses"`
+	LastDoseDate   interface{} `json:"last_dose_date"`
+}
+
+func (q *Queries) GetCompleteVaccineSeries(ctx context.Context, patientID pgtype.UUID) ([]GetCompleteVaccineSeriesRow, error) {
+	rows, err := q.db.Query(ctx, getCompleteVaccineSeries, patientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetCompleteVaccineSeriesRow{}
+	for rows.Next() {
+		var i GetCompleteVaccineSeriesRow
+		if err := rows.Scan(
+			&i.VaccineName,
+			&i.DosesCompleted,
+			&i.TotalDoses,
+			&i.LastDoseDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getEmergencyImmunizationInfo = `-- name: GetEmergencyImmunizationInfo :many
+
+SELECT 
+    vaccine_name,
+    vaccine_type,
+    administration_date,
+    dose_number,
+    total_doses
+FROM patient_immunizations
+WHERE patient_id = $1
+ORDER BY administration_date DESC
+LIMIT 10
+`
+
+type GetEmergencyImmunizationInfoRow struct {
+	VaccineName        string      `json:"vaccine_name"`
+	VaccineType        pgtype.Text `json:"vaccine_type"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	DoseNumber         pgtype.Int4 `json:"dose_number"`
+	TotalDoses         pgtype.Int4 `json:"total_doses"`
+}
+
+// ============================================
+// EMERGENCY ACCESS
+// ============================================
+func (q *Queries) GetEmergencyImmunizationInfo(ctx context.Context, patientID pgtype.UUID) ([]GetEmergencyImmunizationInfoRow, error) {
+	rows, err := q.db.Query(ctx, getEmergencyImmunizationInfo, patientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetEmergencyImmunizationInfoRow{}
+	for rows.Next() {
+		var i GetEmergencyImmunizationInfoRow
+		if err := rows.Scan(
+			&i.VaccineName,
+			&i.VaccineType,
+			&i.AdministrationDate,
+			&i.DoseNumber,
+			&i.TotalDoses,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationCoverage = `-- name: GetImmunizationCoverage :many
+SELECT 
+    vaccine_type,
+    COUNT(DISTINCT patient_id) as patients_vaccinated,
+    COUNT(*) as total_doses,
+    COUNT(*) FILTER (WHERE administration_date >= CURRENT_DATE - INTERVAL '1 year') as doses_last_year
+FROM patient_immunizations
+GROUP BY vaccine_type
+ORDER BY patients_vaccinated DESC
+`
+
+type GetImmunizationCoverageRow struct {
+	VaccineType        pgtype.Text `json:"vaccine_type"`
+	PatientsVaccinated int64       `json:"patients_vaccinated"`
+	TotalDoses         int64       `json:"total_doses"`
+	DosesLastYear      int64       `json:"doses_last_year"`
+}
+
+func (q *Queries) GetImmunizationCoverage(ctx context.Context) ([]GetImmunizationCoverageRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationCoverage)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationCoverageRow{}
+	for rows.Next() {
+		var i GetImmunizationCoverageRow
+		if err := rows.Scan(
+			&i.VaccineType,
+			&i.PatientsVaccinated,
+			&i.TotalDoses,
+			&i.DosesLastYear,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationHistory = `-- name: GetImmunizationHistory :many
+SELECT 
+    vaccine_name, vaccine_type, administration_date,
+    dose_number, total_doses, administered_by, clinic_name
+FROM patient_immunizations
+WHERE patient_id = $1
+ORDER BY administration_date DESC
+`
+
+type GetImmunizationHistoryRow struct {
+	VaccineName        string      `json:"vaccine_name"`
+	VaccineType        pgtype.Text `json:"vaccine_type"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	DoseNumber         pgtype.Int4 `json:"dose_number"`
+	TotalDoses         pgtype.Int4 `json:"total_doses"`
+	AdministeredBy     pgtype.Text `json:"administered_by"`
+	ClinicName         pgtype.Text `json:"clinic_name"`
+}
+
+func (q *Queries) GetImmunizationHistory(ctx context.Context, patientID pgtype.UUID) ([]GetImmunizationHistoryRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationHistory, patientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationHistoryRow{}
+	for rows.Next() {
+		var i GetImmunizationHistoryRow
+		if err := rows.Scan(
+			&i.VaccineName,
+			&i.VaccineType,
+			&i.AdministrationDate,
+			&i.DoseNumber,
+			&i.TotalDoses,
+			&i.AdministeredBy,
+			&i.ClinicName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationRecordsByDateRange = `-- name: GetImmunizationRecordsByDateRange :many
+SELECT 
+    pi.id,
+    pi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pi.vaccine_name,
+    pi.administration_date,
+    pi.administered_by,
+    pi.clinic_name
+FROM patient_immunizations pi
+JOIN patient_profiles pp ON pi.patient_id = pp.id
+WHERE 
+    pi.administration_date BETWEEN $1 AND $2
+ORDER BY pi.administration_date DESC
+`
+
+type GetImmunizationRecordsByDateRangeParams struct {
+	AdministrationDate   pgtype.Date `json:"administration_date"`
+	AdministrationDate_2 pgtype.Date `json:"administration_date_2"`
+}
+
+type GetImmunizationRecordsByDateRangeRow struct {
+	ID                 pgtype.UUID `json:"id"`
+	PatientID          pgtype.UUID `json:"patient_id"`
+	FirstName          string      `json:"first_name"`
+	LastName           string      `json:"last_name"`
+	VaccineName        string      `json:"vaccine_name"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	AdministeredBy     pgtype.Text `json:"administered_by"`
+	ClinicName         pgtype.Text `json:"clinic_name"`
+}
+
+func (q *Queries) GetImmunizationRecordsByDateRange(ctx context.Context, arg GetImmunizationRecordsByDateRangeParams) ([]GetImmunizationRecordsByDateRangeRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationRecordsByDateRange, arg.AdministrationDate, arg.AdministrationDate_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationRecordsByDateRangeRow{}
+	for rows.Next() {
+		var i GetImmunizationRecordsByDateRangeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.VaccineName,
+			&i.AdministrationDate,
+			&i.AdministeredBy,
+			&i.ClinicName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationStatistics = `-- name: GetImmunizationStatistics :one
+SELECT 
+    COUNT(DISTINCT patient_id) as patients_immunized,
+    COUNT(*) as total_immunizations,
+    COUNT(DISTINCT vaccine_name) as unique_vaccines,
+    COUNT(*) FILTER (WHERE vaccine_type = 'routine') as routine_immunizations,
+    COUNT(*) FILTER (WHERE vaccine_type = 'covid') as covid_immunizations,
+    COUNT(*) FILTER (WHERE vaccine_type = 'flu') as flu_immunizations,
+    COUNT(*) FILTER (WHERE next_due_date < CURRENT_DATE) as overdue_count,
+    AVG(dose_number::NUMERIC / total_doses) FILTER (WHERE total_doses > 0) as avg_series_completion
+FROM patient_immunizations
+`
+
+type GetImmunizationStatisticsRow struct {
+	PatientsImmunized    int64   `json:"patients_immunized"`
+	TotalImmunizations   int64   `json:"total_immunizations"`
+	UniqueVaccines       int64   `json:"unique_vaccines"`
+	RoutineImmunizations int64   `json:"routine_immunizations"`
+	CovidImmunizations   int64   `json:"covid_immunizations"`
+	FluImmunizations     int64   `json:"flu_immunizations"`
+	OverdueCount         int64   `json:"overdue_count"`
+	AvgSeriesCompletion  float64 `json:"avg_series_completion"`
+}
+
+func (q *Queries) GetImmunizationStatistics(ctx context.Context) (GetImmunizationStatisticsRow, error) {
+	row := q.db.QueryRow(ctx, getImmunizationStatistics)
+	var i GetImmunizationStatisticsRow
+	err := row.Scan(
+		&i.PatientsImmunized,
+		&i.TotalImmunizations,
+		&i.UniqueVaccines,
+		&i.RoutineImmunizations,
+		&i.CovidImmunizations,
+		&i.FluImmunizations,
+		&i.OverdueCount,
+		&i.AvgSeriesCompletion,
+	)
+	return i, err
+}
+
+const getImmunizationsByAdministrator = `-- name: GetImmunizationsByAdministrator :many
+SELECT 
+    pi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pi.vaccine_name,
+    pi.administration_date,
+    pi.clinic_name
+FROM patient_immunizations pi
+JOIN patient_profiles pp ON pi.patient_id = pp.id
+WHERE pi.administered_by = $1
+ORDER BY pi.administration_date DESC
+`
+
+type GetImmunizationsByAdministratorRow struct {
+	PatientID          pgtype.UUID `json:"patient_id"`
+	FirstName          string      `json:"first_name"`
+	LastName           string      `json:"last_name"`
+	VaccineName        string      `json:"vaccine_name"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	ClinicName         pgtype.Text `json:"clinic_name"`
+}
+
+func (q *Queries) GetImmunizationsByAdministrator(ctx context.Context, administeredBy pgtype.Text) ([]GetImmunizationsByAdministratorRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationsByAdministrator, administeredBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationsByAdministratorRow{}
+	for rows.Next() {
+		var i GetImmunizationsByAdministratorRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.VaccineName,
+			&i.AdministrationDate,
+			&i.ClinicName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationsByClinic = `-- name: GetImmunizationsByClinic :many
+SELECT 
+    pi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pi.vaccine_name,
+    pi.administration_date,
+    pi.administered_by
+FROM patient_immunizations pi
+JOIN patient_profiles pp ON pi.patient_id = pp.id
+WHERE pi.clinic_name = $1
+ORDER BY pi.administration_date DESC
+`
+
+type GetImmunizationsByClinicRow struct {
+	PatientID          pgtype.UUID `json:"patient_id"`
+	FirstName          string      `json:"first_name"`
+	LastName           string      `json:"last_name"`
+	VaccineName        string      `json:"vaccine_name"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	AdministeredBy     pgtype.Text `json:"administered_by"`
+}
+
+func (q *Queries) GetImmunizationsByClinic(ctx context.Context, clinicName pgtype.Text) ([]GetImmunizationsByClinicRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationsByClinic, clinicName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationsByClinicRow{}
+	for rows.Next() {
+		var i GetImmunizationsByClinicRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.VaccineName,
+			&i.AdministrationDate,
+			&i.AdministeredBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationsByLotNumber = `-- name: GetImmunizationsByLotNumber :many
+SELECT 
+    pi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pi.vaccine_name,
+    pi.administration_date,
+    pi.manufacturer
+FROM patient_immunizations pi
+JOIN patient_profiles pp ON pi.patient_id = pp.id
+WHERE pi.lot_number = $1
+ORDER BY pi.administration_date DESC
+`
+
+type GetImmunizationsByLotNumberRow struct {
+	PatientID          pgtype.UUID `json:"patient_id"`
+	FirstName          string      `json:"first_name"`
+	LastName           string      `json:"last_name"`
+	VaccineName        string      `json:"vaccine_name"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	Manufacturer       pgtype.Text `json:"manufacturer"`
+}
+
+func (q *Queries) GetImmunizationsByLotNumber(ctx context.Context, lotNumber pgtype.Text) ([]GetImmunizationsByLotNumberRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationsByLotNumber, lotNumber)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationsByLotNumberRow{}
+	for rows.Next() {
+		var i GetImmunizationsByLotNumberRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.VaccineName,
+			&i.AdministrationDate,
+			&i.Manufacturer,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationsByPatientIDs = `-- name: GetImmunizationsByPatientIDs :many
+
+SELECT 
+    patient_id, vaccine_name, vaccine_type,
+    administration_date, next_due_date
+FROM patient_immunizations
+WHERE patient_id = ANY($1::uuid[])
+ORDER BY patient_id, administration_date DESC
+`
+
+type GetImmunizationsByPatientIDsRow struct {
+	PatientID          pgtype.UUID `json:"patient_id"`
+	VaccineName        string      `json:"vaccine_name"`
+	VaccineType        pgtype.Text `json:"vaccine_type"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	NextDueDate        pgtype.Date `json:"next_due_date"`
+}
+
+// ============================================
+// BULK OPERATIONS
+// ============================================
+func (q *Queries) GetImmunizationsByPatientIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetImmunizationsByPatientIDsRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationsByPatientIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationsByPatientIDsRow{}
+	for rows.Next() {
+		var i GetImmunizationsByPatientIDsRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.VaccineName,
+			&i.VaccineType,
+			&i.AdministrationDate,
+			&i.NextDueDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationsByType = `-- name: GetImmunizationsByType :many
+SELECT 
+    id, vaccine_name, administration_date, next_due_date,
+    dose_number, total_doses, administered_by
+FROM patient_immunizations
+WHERE 
+    patient_id = $1
+    AND vaccine_type = $2
+ORDER BY administration_date DESC
+`
+
+type GetImmunizationsByTypeParams struct {
+	PatientID   pgtype.UUID `json:"patient_id"`
+	VaccineType pgtype.Text `json:"vaccine_type"`
+}
+
+type GetImmunizationsByTypeRow struct {
+	ID                 pgtype.UUID `json:"id"`
+	VaccineName        string      `json:"vaccine_name"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	NextDueDate        pgtype.Date `json:"next_due_date"`
+	DoseNumber         pgtype.Int4 `json:"dose_number"`
+	TotalDoses         pgtype.Int4 `json:"total_doses"`
+	AdministeredBy     pgtype.Text `json:"administered_by"`
+}
+
+func (q *Queries) GetImmunizationsByType(ctx context.Context, arg GetImmunizationsByTypeParams) ([]GetImmunizationsByTypeRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationsByType, arg.PatientID, arg.VaccineType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationsByTypeRow{}
+	for rows.Next() {
+		var i GetImmunizationsByTypeRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.VaccineName,
+			&i.AdministrationDate,
+			&i.NextDueDate,
+			&i.DoseNumber,
+			&i.TotalDoses,
+			&i.AdministeredBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationsByVaccine = `-- name: GetImmunizationsByVaccine :many
+
+SELECT 
+    pi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pi.administration_date,
+    pi.dose_number,
+    pi.administered_by,
+    pi.clinic_name
+FROM patient_immunizations pi
+JOIN patient_profiles pp ON pi.patient_id = pp.id
+WHERE pi.vaccine_name = $1
+ORDER BY pi.administration_date DESC
+`
+
+type GetImmunizationsByVaccineRow struct {
+	PatientID          pgtype.UUID `json:"patient_id"`
+	FirstName          string      `json:"first_name"`
+	LastName           string      `json:"last_name"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	DoseNumber         pgtype.Int4 `json:"dose_number"`
+	AdministeredBy     pgtype.Text `json:"administered_by"`
+	ClinicName         pgtype.Text `json:"clinic_name"`
+}
+
+// ============================================
+// VACCINE & PROVIDER QUERIES
+// ============================================
+func (q *Queries) GetImmunizationsByVaccine(ctx context.Context, vaccineName string) ([]GetImmunizationsByVaccineRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationsByVaccine, vaccineName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationsByVaccineRow{}
+	for rows.Next() {
+		var i GetImmunizationsByVaccineRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.AdministrationDate,
+			&i.DoseNumber,
+			&i.AdministeredBy,
+			&i.ClinicName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getImmunizationsDueInPeriod = `-- name: GetImmunizationsDueInPeriod :many
+SELECT 
+    pi.id,
+    pi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pi.vaccine_name,
+    pi.vaccine_type,
+    pi.next_due_date,
+    pi.dose_number,
+    pi.total_doses
+FROM patient_immunizations pi
+JOIN patient_profiles pp ON pi.patient_id = pp.id
+WHERE 
+    pi.next_due_date BETWEEN CURRENT_DATE AND $1
+ORDER BY pi.next_due_date ASC
+`
+
+type GetImmunizationsDueInPeriodRow struct {
+	ID          pgtype.UUID `json:"id"`
+	PatientID   pgtype.UUID `json:"patient_id"`
+	FirstName   string      `json:"first_name"`
+	LastName    string      `json:"last_name"`
+	VaccineName string      `json:"vaccine_name"`
+	VaccineType pgtype.Text `json:"vaccine_type"`
+	NextDueDate pgtype.Date `json:"next_due_date"`
+	DoseNumber  pgtype.Int4 `json:"dose_number"`
+	TotalDoses  pgtype.Int4 `json:"total_doses"`
+}
+
+func (q *Queries) GetImmunizationsDueInPeriod(ctx context.Context, nextDueDate pgtype.Date) ([]GetImmunizationsDueInPeriodRow, error) {
+	rows, err := q.db.Query(ctx, getImmunizationsDueInPeriod, nextDueDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetImmunizationsDueInPeriodRow{}
+	for rows.Next() {
+		var i GetImmunizationsDueInPeriodRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.VaccineName,
+			&i.VaccineType,
+			&i.NextDueDate,
+			&i.DoseNumber,
+			&i.TotalDoses,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getIncompleteVaccineSeries = `-- name: GetIncompleteVaccineSeries :many
+
+SELECT 
+    id, vaccine_name, dose_number, total_doses,
+    administration_date, next_due_date
+FROM patient_immunizations
+WHERE 
+    patient_id = $1
+    AND dose_number < total_doses
+ORDER BY next_due_date ASC NULLS LAST
+`
+
+type GetIncompleteVaccineSeriesRow struct {
+	ID                 pgtype.UUID `json:"id"`
+	VaccineName        string      `json:"vaccine_name"`
+	DoseNumber         pgtype.Int4 `json:"dose_number"`
+	TotalDoses         pgtype.Int4 `json:"total_doses"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	NextDueDate        pgtype.Date `json:"next_due_date"`
+}
+
+// ============================================
+// VACCINE SERIES TRACKING
+// ============================================
+func (q *Queries) GetIncompleteVaccineSeries(ctx context.Context, patientID pgtype.UUID) ([]GetIncompleteVaccineSeriesRow, error) {
+	rows, err := q.db.Query(ctx, getIncompleteVaccineSeries, patientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetIncompleteVaccineSeriesRow{}
+	for rows.Next() {
+		var i GetIncompleteVaccineSeriesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.VaccineName,
+			&i.DoseNumber,
+			&i.TotalDoses,
+			&i.AdministrationDate,
+			&i.NextDueDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLastVaccineDate = `-- name: GetLastVaccineDate :one
+SELECT MAX(administration_date) as last_vaccine_date
+FROM patient_immunizations
+WHERE 
+    patient_id = $1
+    AND vaccine_name = $2
+`
+
+type GetLastVaccineDateParams struct {
+	PatientID   pgtype.UUID `json:"patient_id"`
+	VaccineName string      `json:"vaccine_name"`
+}
+
+func (q *Queries) GetLastVaccineDate(ctx context.Context, arg GetLastVaccineDateParams) (interface{}, error) {
+	row := q.db.QueryRow(ctx, getLastVaccineDate, arg.PatientID, arg.VaccineName)
+	var last_vaccine_date interface{}
+	err := row.Scan(&last_vaccine_date)
+	return last_vaccine_date, err
+}
+
+const getOverdueImmunizations = `-- name: GetOverdueImmunizations :many
+SELECT 
+    pi.id,
+    pi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pi.vaccine_name,
+    pi.next_due_date,
+    pi.dose_number,
+    pi.total_doses
+FROM patient_immunizations pi
+JOIN patient_profiles pp ON pi.patient_id = pp.id
+WHERE 
+    pi.next_due_date < CURRENT_DATE
+ORDER BY pi.next_due_date ASC
+`
+
+type GetOverdueImmunizationsRow struct {
+	ID          pgtype.UUID `json:"id"`
+	PatientID   pgtype.UUID `json:"patient_id"`
+	FirstName   string      `json:"first_name"`
+	LastName    string      `json:"last_name"`
+	VaccineName string      `json:"vaccine_name"`
+	NextDueDate pgtype.Date `json:"next_due_date"`
+	DoseNumber  pgtype.Int4 `json:"dose_number"`
+	TotalDoses  pgtype.Int4 `json:"total_doses"`
+}
+
+func (q *Queries) GetOverdueImmunizations(ctx context.Context) ([]GetOverdueImmunizationsRow, error) {
+	rows, err := q.db.Query(ctx, getOverdueImmunizations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetOverdueImmunizationsRow{}
+	for rows.Next() {
+		var i GetOverdueImmunizationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.VaccineName,
+			&i.NextDueDate,
+			&i.DoseNumber,
+			&i.TotalDoses,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPatientImmunization = `-- name: GetPatientImmunization :one
+SELECT id, patient_id, vaccine_name, vaccine_type, administration_date, next_due_date, administered_by, clinic_name, lot_number, manufacturer, dose_number, total_doses, notes, documented_by, created_at, updated_at FROM patient_immunizations
+WHERE id = $1
+`
+
+func (q *Queries) GetPatientImmunization(ctx context.Context, id pgtype.UUID) (PatientImmunization, error) {
+	row := q.db.QueryRow(ctx, getPatientImmunization, id)
+	var i PatientImmunization
+	err := row.Scan(
+		&i.ID,
+		&i.PatientID,
+		&i.VaccineName,
+		&i.VaccineType,
+		&i.AdministrationDate,
+		&i.NextDueDate,
+		&i.AdministeredBy,
+		&i.ClinicName,
+		&i.LotNumber,
+		&i.Manufacturer,
+		&i.DoseNumber,
+		&i.TotalDoses,
+		&i.Notes,
+		&i.DocumentedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getPatientImmunizations = `-- name: GetPatientImmunizations :many
-SELECT id, patient_id, vaccine_name, vaccine_type, administration_date,
-    next_due_date, administered_by, clinic_name, dose_number, 
+
+SELECT 
+    id, patient_id, vaccine_name, vaccine_type, administration_date,
+    next_due_date, administered_by, clinic_name, dose_number,
     total_doses, notes, created_at
 FROM patient_immunizations
 WHERE patient_id = $1
@@ -100,6 +1064,9 @@ type GetPatientImmunizationsRow struct {
 	CreatedAt          pgtype.Timestamp `json:"created_at"`
 }
 
+// ============================================
+// QUERYING BY PATIENT
+// ============================================
 func (q *Queries) GetPatientImmunizations(ctx context.Context, patientID pgtype.UUID) ([]GetPatientImmunizationsRow, error) {
 	rows, err := q.db.Query(ctx, getPatientImmunizations, patientID)
 	if err != nil {
@@ -133,13 +1100,120 @@ func (q *Queries) GetPatientImmunizations(ctx context.Context, patientID pgtype.
 	return items, nil
 }
 
-const getUpcomingImmunizations = `-- name: GetUpcomingImmunizations :many
-SELECT id, patient_id, vaccine_name, vaccine_type, next_due_date,
-    dose_number, total_doses
+const getPatientsNeedingImmunizations = `-- name: GetPatientsNeedingImmunizations :many
+
+SELECT DISTINCT
+    pi.patient_id,
+    pp.first_name,
+    pp.last_name,
+    pp.date_of_birth,
+    COUNT(DISTINCT pi.vaccine_name) FILTER (WHERE pi.next_due_date < CURRENT_DATE) as overdue_count,
+    pp.city,
+    pp.province
+FROM patient_immunizations pi
+JOIN patient_profiles pp ON pi.patient_id = pp.id
+WHERE pi.next_due_date < CURRENT_DATE
+GROUP BY pi.patient_id, pp.first_name, pp.last_name, pp.date_of_birth, pp.city, pp.province
+ORDER BY overdue_count DESC, pp.last_name
+`
+
+type GetPatientsNeedingImmunizationsRow struct {
+	PatientID    pgtype.UUID `json:"patient_id"`
+	FirstName    string      `json:"first_name"`
+	LastName     string      `json:"last_name"`
+	DateOfBirth  pgtype.Date `json:"date_of_birth"`
+	OverdueCount int64       `json:"overdue_count"`
+	City         pgtype.Text `json:"city"`
+	Province     pgtype.Text `json:"province"`
+}
+
+// ============================================
+// COMPLIANCE & REPORTING
+// ============================================
+func (q *Queries) GetPatientsNeedingImmunizations(ctx context.Context) ([]GetPatientsNeedingImmunizationsRow, error) {
+	rows, err := q.db.Query(ctx, getPatientsNeedingImmunizations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPatientsNeedingImmunizationsRow{}
+	for rows.Next() {
+		var i GetPatientsNeedingImmunizationsRow
+		if err := rows.Scan(
+			&i.PatientID,
+			&i.FirstName,
+			&i.LastName,
+			&i.DateOfBirth,
+			&i.OverdueCount,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRoutineImmunizations = `-- name: GetRoutineImmunizations :many
+SELECT 
+    id, vaccine_name, administration_date, next_due_date, dose_number, total_doses
 FROM patient_immunizations
-WHERE patient_id = $1 
-    AND next_due_date IS NOT NULL 
-    AND next_due_date > NOW()
+WHERE 
+    patient_id = $1
+    AND vaccine_type = 'routine'
+ORDER BY administration_date DESC
+`
+
+type GetRoutineImmunizationsRow struct {
+	ID                 pgtype.UUID `json:"id"`
+	VaccineName        string      `json:"vaccine_name"`
+	AdministrationDate pgtype.Date `json:"administration_date"`
+	NextDueDate        pgtype.Date `json:"next_due_date"`
+	DoseNumber         pgtype.Int4 `json:"dose_number"`
+	TotalDoses         pgtype.Int4 `json:"total_doses"`
+}
+
+func (q *Queries) GetRoutineImmunizations(ctx context.Context, patientID pgtype.UUID) ([]GetRoutineImmunizationsRow, error) {
+	rows, err := q.db.Query(ctx, getRoutineImmunizations, patientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetRoutineImmunizationsRow{}
+	for rows.Next() {
+		var i GetRoutineImmunizationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.VaccineName,
+			&i.AdministrationDate,
+			&i.NextDueDate,
+			&i.DoseNumber,
+			&i.TotalDoses,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getUpcomingImmunizations = `-- name: GetUpcomingImmunizations :many
+
+SELECT 
+    id, patient_id, vaccine_name, vaccine_type, next_due_date,
+    dose_number, total_doses, notes
+FROM patient_immunizations
+WHERE 
+    patient_id = $1
+    AND next_due_date IS NOT NULL
+    AND next_due_date >= CURRENT_DATE
 ORDER BY next_due_date ASC
 `
 
@@ -151,8 +1225,12 @@ type GetUpcomingImmunizationsRow struct {
 	NextDueDate pgtype.Date `json:"next_due_date"`
 	DoseNumber  pgtype.Int4 `json:"dose_number"`
 	TotalDoses  pgtype.Int4 `json:"total_doses"`
+	Notes       pgtype.Text `json:"notes"`
 }
 
+// ============================================
+// DUE DATE & SCHEDULING
+// ============================================
 func (q *Queries) GetUpcomingImmunizations(ctx context.Context, patientID pgtype.UUID) ([]GetUpcomingImmunizationsRow, error) {
 	rows, err := q.db.Query(ctx, getUpcomingImmunizations, patientID)
 	if err != nil {
@@ -170,6 +1248,7 @@ func (q *Queries) GetUpcomingImmunizations(ctx context.Context, patientID pgtype
 			&i.NextDueDate,
 			&i.DoseNumber,
 			&i.TotalDoses,
+			&i.Notes,
 		); err != nil {
 			return nil, err
 		}
@@ -179,4 +1258,172 @@ func (q *Queries) GetUpcomingImmunizations(ctx context.Context, patientID pgtype
 		return nil, err
 	}
 	return items, nil
+}
+
+const getVaccineDistribution = `-- name: GetVaccineDistribution :many
+SELECT 
+    vaccine_name,
+    COUNT(DISTINCT patient_id) as patient_count,
+    COUNT(*) as total_doses,
+    AVG(dose_number::NUMERIC) as avg_dose_number
+FROM patient_immunizations
+GROUP BY vaccine_name
+ORDER BY patient_count DESC
+`
+
+type GetVaccineDistributionRow struct {
+	VaccineName   string  `json:"vaccine_name"`
+	PatientCount  int64   `json:"patient_count"`
+	TotalDoses    int64   `json:"total_doses"`
+	AvgDoseNumber float64 `json:"avg_dose_number"`
+}
+
+func (q *Queries) GetVaccineDistribution(ctx context.Context) ([]GetVaccineDistributionRow, error) {
+	rows, err := q.db.Query(ctx, getVaccineDistribution)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetVaccineDistributionRow{}
+	for rows.Next() {
+		var i GetVaccineDistributionRow
+		if err := rows.Scan(
+			&i.VaccineName,
+			&i.PatientCount,
+			&i.TotalDoses,
+			&i.AvgDoseNumber,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVaccineSeriesProgress = `-- name: GetVaccineSeriesProgress :many
+SELECT 
+    vaccine_name,
+    MAX(dose_number) as current_dose,
+    MAX(total_doses) as total_doses,
+    CASE 
+        WHEN MAX(dose_number) >= MAX(total_doses) THEN 'complete'
+        ELSE 'incomplete'
+    END as status,
+    MAX(administration_date) as last_dose_date,
+    MIN(next_due_date) FILTER (WHERE next_due_date >= CURRENT_DATE) as next_due
+FROM patient_immunizations
+WHERE patient_id = $1
+GROUP BY vaccine_name
+ORDER BY vaccine_name
+`
+
+type GetVaccineSeriesProgressRow struct {
+	VaccineName  string      `json:"vaccine_name"`
+	CurrentDose  interface{} `json:"current_dose"`
+	TotalDoses   interface{} `json:"total_doses"`
+	Status       string      `json:"status"`
+	LastDoseDate interface{} `json:"last_dose_date"`
+	NextDue      interface{} `json:"next_due"`
+}
+
+func (q *Queries) GetVaccineSeriesProgress(ctx context.Context, patientID pgtype.UUID) ([]GetVaccineSeriesProgressRow, error) {
+	rows, err := q.db.Query(ctx, getVaccineSeriesProgress, patientID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetVaccineSeriesProgressRow{}
+	for rows.Next() {
+		var i GetVaccineSeriesProgressRow
+		if err := rows.Scan(
+			&i.VaccineName,
+			&i.CurrentDose,
+			&i.TotalDoses,
+			&i.Status,
+			&i.LastDoseDate,
+			&i.NextDue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const isVaccineSeriesComplete = `-- name: IsVaccineSeriesComplete :one
+SELECT 
+    CASE 
+        WHEN MAX(dose_number) >= MAX(total_doses) THEN true
+        ELSE false
+    END as is_complete
+FROM patient_immunizations
+WHERE 
+    patient_id = $1
+    AND vaccine_name = $2
+`
+
+type IsVaccineSeriesCompleteParams struct {
+	PatientID   pgtype.UUID `json:"patient_id"`
+	VaccineName string      `json:"vaccine_name"`
+}
+
+func (q *Queries) IsVaccineSeriesComplete(ctx context.Context, arg IsVaccineSeriesCompleteParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isVaccineSeriesComplete, arg.PatientID, arg.VaccineName)
+	var is_complete bool
+	err := row.Scan(&is_complete)
+	return is_complete, err
+}
+
+const updateNextDueDate = `-- name: UpdateNextDueDate :exec
+UPDATE patient_immunizations
+SET 
+    next_due_date = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateNextDueDateParams struct {
+	ID          pgtype.UUID `json:"id"`
+	NextDueDate pgtype.Date `json:"next_due_date"`
+}
+
+func (q *Queries) UpdateNextDueDate(ctx context.Context, arg UpdateNextDueDateParams) error {
+	_, err := q.db.Exec(ctx, updateNextDueDate, arg.ID, arg.NextDueDate)
+	return err
+}
+
+const updatePatientImmunization = `-- name: UpdatePatientImmunization :exec
+UPDATE patient_immunizations
+SET 
+    vaccine_name = COALESCE($2, vaccine_name),
+    vaccine_type = COALESCE($3, vaccine_type),
+    next_due_date = COALESCE($4, next_due_date),
+    notes = COALESCE($5, notes),
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdatePatientImmunizationParams struct {
+	ID          pgtype.UUID `json:"id"`
+	VaccineName string      `json:"vaccine_name"`
+	VaccineType pgtype.Text `json:"vaccine_type"`
+	NextDueDate pgtype.Date `json:"next_due_date"`
+	Notes       pgtype.Text `json:"notes"`
+}
+
+func (q *Queries) UpdatePatientImmunization(ctx context.Context, arg UpdatePatientImmunizationParams) error {
+	_, err := q.db.Exec(ctx, updatePatientImmunization,
+		arg.ID,
+		arg.VaccineName,
+		arg.VaccineType,
+		arg.NextDueDate,
+		arg.Notes,
+	)
+	return err
 }
