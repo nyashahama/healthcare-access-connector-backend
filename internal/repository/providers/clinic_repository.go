@@ -1627,7 +1627,7 @@ func (r *clinicRepository) GetClinicOwnershipDistribution(ctx context.Context) (
 	for i, row := range rows {
 		distributions[i] = providers.ClinicOwnershipDistribution{
 			OwnershipType: pgtypeTextToString(row.OwnershipType),
-			Count:         int64(row.Count),
+			Count:         row.Count,
 			AverageRating: float64ToFloat64Ptr(row.AvgRating),
 		}
 	}
