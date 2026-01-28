@@ -255,3 +255,10 @@ func stringSliceToArray(s []string) []string {
 	}
 	return s
 }
+
+func stringPtrToString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
