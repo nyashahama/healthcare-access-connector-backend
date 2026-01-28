@@ -69,7 +69,7 @@ func NewClinicRepositoryWithQuerier(querier sqlc.Querier) repository.ClinicRepos
 }
 
 // ============================================
-// CORE CRUD OPERATIONS
+// BASIC CRUD OPERATIONS
 // ============================================
 
 func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error) {
@@ -108,7 +108,10 @@ func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Cl
 		return providers.Clinic{}, fmt.Errorf("marshal payment methods: %w", err)
 	}
 
-	certificationsJSON, _ := jsonbFromMap(nil)
+	certificationsJSON, err := jsonbFromMap(clinic.Certifications)
+	if err != nil {
+		return providers.Clinic{}, fmt.Errorf("marshal certifications: %w", err)
+	}
 
 	params := sqlc.CreateClinicParams{
 		ClinicName:             clinic.ClinicName,
@@ -193,31 +196,6 @@ func (r *clinicRepository) UpdateClinic(ctx context.Context, clinic providers.Cl
 		return fmt.Errorf("marshal operating hours: %w", err)
 	}
 
-	// servicesJSON, err := jsonbFromStringSlice(clinic.Services)
-	// if err != nil {
-	// 	return fmt.Errorf("marshal services: %w", err)
-	// }
-	//
-	// specialtiesJSON, err := jsonbFromStringSlice(clinic.Specialties)
-	// if err != nil {
-	// 	return fmt.Errorf("marshal specialties: %w", err)
-	// }
-	//
-	// facilitiesJSON, err := jsonbFromStringSlice(clinic.Facilities)
-	// if err != nil {
-	// 	return fmt.Errorf("marshal facilities: %w", err)
-	// }
-	//
-	// medicalAidProvidersJSON, err := jsonbFromStringSlice(clinic.MedicalAidProviders)
-	// if err != nil {
-	// 	return fmt.Errorf("marshal medical aid providers: %w", err)
-	// }
-	//
-	// paymentMethodsJSON, err := jsonbFromStringSlice(clinic.PaymentMethods)
-	// if err != nil {
-	// 	return fmt.Errorf("marshal payment methods: %w", err)
-	// }
-
 	params := sqlc.UpdateClinicParams{
 		ID:             uuidToPgtypeUUID(clinic.ID),
 		ClinicName:     clinic.ClinicName,
@@ -255,33 +233,6 @@ func (r *clinicRepository) DeleteClinic(ctx context.Context, id uuid.UUID) error
 
 	clinicDBQueryTotal.WithLabelValues("delete_clinic", "success").Inc()
 	return nil
-}
-
-func (r *clinicRepository) GetClinicsByIDs(ctx context.Context, ids []uuid.UUID) ([]providers.Clinic, error) {
-	start := time.Now()
-	defer func() {
-		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	pgtypeIDs := make([]pgtype.UUID, len(ids))
-	for i, id := range ids {
-		pgtypeIDs[i] = uuidToPgtypeUUID(id)
-	}
-
-	clinics, err := r.querier.GetClinicsByIDs(ctx, pgtypeIDs)
-	if err != nil {
-		clinicDBQueryTotal.WithLabelValues("get_clinics_by_ids", "error").Inc()
-		return nil, fmt.Errorf("get clinics by ids: %w", err)
-	}
-
-	clinicDBQueryTotal.WithLabelValues("get_clinics_by_ids", "success").Inc()
-
-	result := make([]providers.Clinic, len(clinics))
-	for i, c := range clinics {
-		result[i] = r.mapToClinicFromGetByID(c)
-	}
-
-	return result, nil
 }
 
 // ============================================
@@ -401,7 +352,7 @@ func (r *clinicRepository) UpdateClinicServices(ctx context.Context, id uuid.UUI
 		Services:        servicesJSON,
 		Specialties:     specialtiesJSON,
 		Facilities:      facilitiesJSON,
-		LanguagesSpoken: stringSliceToArray(services.LanguagesSpoken),
+		LanguagesSpoken: services.LanguagesSpoken,
 	}
 
 	err = r.querier.UpdateClinicServices(ctx, params)
@@ -524,7 +475,7 @@ func (r *clinicRepository) VerifyClinic(ctx context.Context, id, verifiedBy uuid
 	params := sqlc.VerifyClinicParams{
 		ID:                uuidToPgtypeUUID(id),
 		VerifiedBy:        uuidToPgtypeUUID(verifiedBy),
-		VerificationNotes: pgtypeTextFromString(notes),
+		VerificationNotes: pgtypeTextFromStringPtr(&notes),
 	}
 
 	err := r.querier.VerifyClinic(ctx, params)
@@ -546,7 +497,7 @@ func (r *clinicRepository) RejectClinicVerification(ctx context.Context, id, ver
 	params := sqlc.RejectClinicVerificationParams{
 		ID:                uuidToPgtypeUUID(id),
 		VerifiedBy:        uuidToPgtypeUUID(verifiedBy),
-		VerificationNotes: pgtypeTextFromString(notes),
+		VerificationNotes: pgtypeTextFromStringPtr(&notes),
 	}
 
 	err := r.querier.RejectClinicVerification(ctx, params)
@@ -692,8 +643,8 @@ func (r *clinicRepository) UpdateAverageWaitTime(ctx context.Context, id uuid.UU
 	}
 
 	err := r.querier.UpdateAverageWaitTime(ctx, params)
-	clinicDBQueryTotal.WithLabelValues("update_average_wait_time", "error").Inc()
 	if err != nil {
+		clinicDBQueryTotal.WithLabelValues("update_average_wait_time", "error").Inc()
 		return r.handleError(err, "update average wait time")
 	}
 
@@ -723,10 +674,8 @@ func (r *clinicRepository) SearchClinics(ctx context.Context, params providers.C
 	rows, err := r.querier.SearchClinics(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("search_clinics", "error").Inc()
-		return nil, fmt.Errorf("search clinics: %w", err)
+		return nil, r.handleError(err, "search clinics")
 	}
-
-	clinicDBQueryTotal.WithLabelValues("search_clinics", "success").Inc()
 
 	results := make([]providers.ClinicSearchResult, len(rows))
 	for i, row := range rows {
@@ -735,6 +684,7 @@ func (r *clinicRepository) SearchClinics(ctx context.Context, params providers.C
 		}
 	}
 
+	clinicDBQueryTotal.WithLabelValues("search_clinics", "success").Inc()
 	return results, nil
 }
 
@@ -744,28 +694,35 @@ func (r *clinicRepository) SearchClinicsByName(ctx context.Context, name string,
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.SearchClinicsByNameParams{
-		Column1: pgtypeTextFromString(name),
+	sqlParams := sqlc.SearchClinicsByNameParams{
+		Column1: pgtypeTextFromStringPtr(&name),
 		Column2: stringPtrToString(province),
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
 
-	rows, err := r.querier.SearchClinicsByName(ctx, params)
+	rows, err := r.querier.SearchClinicsByName(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("search_clinics_by_name", "error").Inc()
-		return nil, fmt.Errorf("search clinics by name: %w", err)
+		return nil, r.handleError(err, "search clinics by name")
 	}
-
-	clinicDBQueryTotal.WithLabelValues("search_clinics_by_name", "success").Inc()
 
 	results := make([]providers.ClinicSearchResult, len(rows))
 	for i, row := range rows {
 		results[i] = providers.ClinicSearchResult{
-			Clinic: r.mapToClinicFromSearch(row),
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
 		}
 	}
 
+	clinicDBQueryTotal.WithLabelValues("search_clinics_by_name", "success").Inc()
 	return results, nil
 }
 
@@ -775,30 +732,38 @@ func (r *clinicRepository) SearchClinicsByLocation(ctx context.Context, lat, lng
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.SearchClinicsByLocationParams{
-		Latitude:  float64PtrToPgtypeNumeric(&lat),
-		Longitude: float64PtrToPgtypeNumeric(&lng),
-		RadiusKm:  float64PtrToPgtypeNumeric(&radiusKm),
+	sqlParams := sqlc.SearchClinicsByLocationParams{
+		Radians:   lat,
+		Radians_2: lng,
+		Latitude:  float64PtrToPgtypeNumeric(&radiusKm),
 		Limit:     int32(limit),
 	}
 
-	rows, err := r.querier.SearchClinicsByLocation(ctx, params)
+	rows, err := r.querier.SearchClinicsByLocation(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("search_clinics_by_location", "error").Inc()
-		return nil, fmt.Errorf("search clinics by location: %w", err)
+		return nil, r.handleError(err, "search clinics by location")
 	}
-
-	clinicDBQueryTotal.WithLabelValues("search_clinics_by_location", "success").Inc()
 
 	results := make([]providers.ClinicSearchResult, len(rows))
 	for i, row := range rows {
-		distanceKm := pgtypeNumericToFloat64Ptr(row.DistanceKm)
+		distance := pgtypeNumericToFloat64Ptr(row.DistanceKm)
 		results[i] = providers.ClinicSearchResult{
-			Clinic:     r.mapToClinicFromSearch(row.Clinic),
-			DistanceKm: distanceKm,
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			PhysicalAddress: row.PhysicalAddress,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Latitude:        pgtypeNumericToFloat64Ptr(row.Latitude),
+			Longitude:       pgtypeNumericToFloat64Ptr(row.Longitude),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			DistanceKm:      distance,
 		}
 	}
 
+	clinicDBQueryTotal.WithLabelValues("search_clinics_by_location", "success").Inc()
 	return results, nil
 }
 
@@ -808,31 +773,46 @@ func (r *clinicRepository) GetNearbyClinicsByService(ctx context.Context, lat, l
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetNearbyClinicsByServiceParams{
-		Latitude:  float64PtrToPgtypeNumeric(&lat),
-		Longitude: float64PtrToPgtypeNumeric(&lng),
-		RadiusKm:  float64PtrToPgtypeNumeric(&radiusKm),
-		Service:   pgtypeTextFromString(service),
+	serviceJSON, err := jsonbFromStringSlice([]string{service})
+	if err != nil {
+		return nil, fmt.Errorf("marshal service: %w", err)
+	}
+
+	sqlParams := sqlc.GetNearbyClinicsByServiceParams{
+		Radians:   lat,
+		Radians_2: lng,
+		Column3:   serviceJSON,
+		Latitude:  float64PtrToPgtypeNumeric(&radiusKm),
 		Limit:     int32(limit),
 	}
 
-	rows, err := r.querier.GetNearbyClinicsByService(ctx, params)
+	rows, err := r.querier.GetNearbyClinicsByService(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_nearby_clinics_by_service", "error").Inc()
-		return nil, fmt.Errorf("get nearby clinics by service: %w", err)
+		return nil, r.handleError(err, "get nearby clinics by service")
 	}
-
-	clinicDBQueryTotal.WithLabelValues("get_nearby_clinics_by_service", "success").Inc()
 
 	results := make([]providers.ClinicSearchResult, len(rows))
 	for i, row := range rows {
-		distanceKm := pgtypeNumericToFloat64Ptr(row.DistanceKm)
+		distance := pgtypeNumericToFloat64Ptr(row.DistanceKm)
+		services := stringSliceFromJSONB(row.Services)
 		results[i] = providers.ClinicSearchResult{
-			Clinic:     r.mapToClinicFromSearch(row.Clinic),
-			DistanceKm: distanceKm,
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			PhysicalAddress: row.PhysicalAddress,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Latitude:        pgtypeNumericToFloat64Ptr(row.Latitude),
+			Longitude:       pgtypeNumericToFloat64Ptr(row.Longitude),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			DistanceKm:      distance,
+			Services:        services,
 		}
 	}
 
+	clinicDBQueryTotal.WithLabelValues("get_nearby_clinics_by_service", "success").Inc()
 	return results, nil
 }
 
@@ -846,29 +826,47 @@ func (r *clinicRepository) GetClinics(ctx context.Context, filters providers.Cli
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.ListClinicsParams{
-		Column1: stringPtrToString(filters.ClinicType),
-		Column2: stringPtrToString(filters.Province),
-		Column3: stringPtrToString(filters.City),
-		Column4: stringPtrToString(filters.VerificationStatus),
+	clinicType := stringToStringPtr(filters.ClinicType)
+	province := stringToStringPtr(filters.Province)
+	city := stringToStringPtr(filters.City)
+	verificationStatus := stringToStringPtr(filters.VerificationStatus)
+
+	sqlParams := sqlc.ListClinicsParams{
+		Column1: clinicType,
+		Column2: province,
+		Column3: city,
+		Column4: verificationStatus,
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
 
-	rows, err := r.querier.ListClinics(ctx, params)
+	rows, err := r.querier.ListClinics(ctx, sqlParams)
 	if err != nil {
-		clinicDBQueryTotal.WithLabelValues("get_clinics", "error").Inc()
-		return nil, fmt.Errorf("get clinics: %w", err)
+		clinicDBQueryTotal.WithLabelValues("list_clinics", "error").Inc()
+		return nil, r.handleError(err, "list clinics")
 	}
 
-	clinicDBQueryTotal.WithLabelValues("get_clinics", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
+	clinics := make([]providers.Clinic, len(rows))
 	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
+		clinics[i] = providers.Clinic{
+			ID:                 pgtypeUUIDToUUID(row.ID),
+			ClinicName:         row.ClinicName,
+			ClinicType:         row.ClinicType,
+			City:               pgtypeTextToStringPtr(row.City),
+			Province:           pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress:    row.PhysicalAddress,
+			PrimaryPhone:       pgtypeTextToStringPtr(row.PrimaryPhone),
+			Email:              pgtypeTextToStringPtr(row.Email),
+			IsVerified:         pgtypeBoolToBool(row.IsVerified),
+			VerificationStatus: pgtypeTextToString(row.VerificationStatus),
+			Rating:             pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:        pgtypeInt4ToInt(row.ReviewCount),
+			CreatedAt:          row.CreatedAt.Time,
+		}
 	}
 
-	return result, nil
+	clinicDBQueryTotal.WithLabelValues("list_clinics", "success").Inc()
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetVerifiedClinics(ctx context.Context, limit, offset int) ([]providers.Clinic, error) {
@@ -877,25 +875,36 @@ func (r *clinicRepository) GetVerifiedClinics(ctx context.Context, limit, offset
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetVerifiedClinicsParams{
+	sqlParams := sqlc.GetVerifiedClinicsParams{
 		Limit:  int32(limit),
 		Offset: int32(offset),
 	}
 
-	rows, err := r.querier.GetVerifiedClinics(ctx, params)
+	rows, err := r.querier.GetVerifiedClinics(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_verified_clinics", "error").Inc()
-		return nil, fmt.Errorf("get verified clinics: %w", err)
+		return nil, r.handleError(err, "get verified clinics")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Email:           pgtypeTextToStringPtr(row.Email),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+			CreatedAt:       row.CreatedAt.Time,
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_verified_clinics", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetPendingClinics(ctx context.Context, limit, offset int) ([]providers.Clinic, error) {
@@ -904,27 +913,35 @@ func (r *clinicRepository) GetPendingClinics(ctx context.Context, limit, offset 
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// params := sqlc.GetPendingClinicsParams{
-	// 	Limit:  int32(limit),
-	// 	Offset: int32(offset),
-	// }
-	//
-	// rows, err := r.querier.GetPendingClinics(ctx, params)
-	// if err != nil {
-	// 	clinicDBQueryTotal.WithLabelValues("get_pending_clinics", "error").Inc()
-	// 	return nil, fmt.Errorf("get pending clinics: %w", err)
-	// }
-	//
-	// clinicDBQueryTotal.WithLabelValues("get_pending_clinics", "success").Inc()
-	//
-	// result := make([]providers.Clinic, len(rows))
-	// for i, row := range rows {
-	// 	result[i] = r.mapToClinicFromList(row)
-	// }
+	sqlParams := sqlc.GetPendingVerificationClinicsParams{
+		Limit:  int32(limit),
+		Offset: int32(offset),
+	}
 
-	result := make([]providers.Clinic, 10)
+	rows, err := r.querier.GetPendingVerificationClinics(ctx, sqlParams)
+	if err != nil {
+		clinicDBQueryTotal.WithLabelValues("get_pending_clinics", "error").Inc()
+		return nil, r.handleError(err, "get pending clinics")
+	}
 
-	return result, nil
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:                 pgtypeUUIDToUUID(row.ID),
+			ClinicName:         row.ClinicName,
+			ClinicType:         row.ClinicType,
+			RegistrationNumber: pgtypeTextToStringPtr(row.RegistrationNumber),
+			City:               pgtypeTextToStringPtr(row.City),
+			Province:           pgtypeTextToStringPtr(row.Province),
+			Email:              pgtypeTextToStringPtr(row.Email),
+			PrimaryPhone:       pgtypeTextToStringPtr(row.PrimaryPhone),
+			CreatedAt:          row.CreatedAt.Time,
+			VerificationStatus: pgtypeTextToString(row.VerificationStatus),
+		}
+	}
+
+	clinicDBQueryTotal.WithLabelValues("get_pending_clinics", "success").Inc()
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetClinicsByProvince(ctx context.Context, province string, limit, offset int) ([]providers.Clinic, error) {
@@ -933,26 +950,34 @@ func (r *clinicRepository) GetClinicsByProvince(ctx context.Context, province st
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetClinicsByProvinceParams{
+	sqlParams := sqlc.GetClinicsByProvinceParams{
 		Province: pgtypeTextFromString(province),
 		Limit:    int32(limit),
 		Offset:   int32(offset),
 	}
 
-	rows, err := r.querier.GetClinicsByProvince(ctx, params)
+	rows, err := r.querier.GetClinicsByProvince(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_by_province", "error").Inc()
-		return nil, fmt.Errorf("get clinics by province: %w", err)
+		return nil, r.handleError(err, "get clinics by province")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_province", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetClinicsByCity(ctx context.Context, province, city string, limit, offset int) ([]providers.Clinic, error) {
@@ -961,27 +986,42 @@ func (r *clinicRepository) GetClinicsByCity(ctx context.Context, province, city 
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// params := sqlc.GetClinicsByCityParams{
-	// 	Province: pgtypeTextFromString(province),
-	// 	City:     pgtypeTextFromString(city),
-	// 	Limit:    int32(limit),
-	// 	Offset:   int32(offset),
-	// }
-	//
-	// rows, err := r.querier.GetClinicsByCity(ctx, params)
-	// if err != nil {
-	// 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_city", "error").Inc()
-	// 	return nil, fmt.Errorf("get clinics by city: %w", err)
-	// }
-	//
-	// clinicDBQueryTotal.WithLabelValues("get_clinics_by_city", "success").Inc()
-	//
-	// result := make([]providers.Clinic, len(rows))
-	// for i, row := range rows {
-	// 	result[i] = r.mapToClinicFromList(row)
-	// }
-	result := make([]providers.Clinic, 10)
-	return result, nil
+	// Use the ListClinics query with province and city filters
+	sqlParams := sqlc.ListClinicsParams{
+		Column2: province,
+		Column3: city,
+		Column4: "verified",
+		Limit:   int32(limit),
+		Offset:  int32(offset),
+	}
+
+	rows, err := r.querier.ListClinics(ctx, sqlParams)
+	if err != nil {
+		clinicDBQueryTotal.WithLabelValues("get_clinics_by_city", "error").Inc()
+		return nil, r.handleError(err, "get clinics by city")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:                 pgtypeUUIDToUUID(row.ID),
+			ClinicName:         row.ClinicName,
+			ClinicType:         row.ClinicType,
+			City:               pgtypeTextToStringPtr(row.City),
+			Province:           pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress:    row.PhysicalAddress,
+			PrimaryPhone:       pgtypeTextToStringPtr(row.PrimaryPhone),
+			Email:              pgtypeTextToStringPtr(row.Email),
+			IsVerified:         pgtypeBoolToBool(row.IsVerified),
+			VerificationStatus: pgtypeTextToString(row.VerificationStatus),
+			Rating:             pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:        pgtypeInt4ToInt(row.ReviewCount),
+			CreatedAt:          row.CreatedAt.Time,
+		}
+	}
+
+	clinicDBQueryTotal.WithLabelValues("get_clinics_by_city", "success").Inc()
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetClinicsByType(ctx context.Context, clinicType string, limit, offset int) ([]providers.Clinic, error) {
@@ -990,26 +1030,36 @@ func (r *clinicRepository) GetClinicsByType(ctx context.Context, clinicType stri
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetClinicsByTypeParams{
+	sqlParams := sqlc.GetClinicsByTypeParams{
 		ClinicType: clinicType,
+		Column2:    "", // Province filter - nil
 		Limit:      int32(limit),
 		Offset:     int32(offset),
 	}
 
-	rows, err := r.querier.GetClinicsByType(ctx, params)
+	rows, err := r.querier.GetClinicsByType(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_by_type", "error").Inc()
-		return nil, fmt.Errorf("get clinics by type: %w", err)
+		return nil, r.handleError(err, "get clinics by type")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_type", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 // ============================================
@@ -1022,27 +1072,43 @@ func (r *clinicRepository) GetClinicsByService(ctx context.Context, service stri
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetClinicsByServiceParams{
-		Column1: pgtypeTextFromString(service),
-		Column2: pgtypeTextFromStringPtr(province),
+	serviceJSON, err := jsonbFromStringSlice([]string{service})
+	if err != nil {
+		return nil, fmt.Errorf("marshal service: %w", err)
+	}
+
+	sqlParams := sqlc.GetClinicsByServiceParams{
+		Column1: serviceJSON,
+		Column2: stringPtrToString(province),
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
 
-	rows, err := r.querier.GetClinicsByService(ctx, params)
+	rows, err := r.querier.GetClinicsByService(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_by_service", "error").Inc()
-		return nil, fmt.Errorf("get clinics by service: %w", err)
+		return nil, r.handleError(err, "get clinics by service")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		services := stringSliceFromJSONB(row.Services)
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+			Services:        services,
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_service", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetClinicsBySpecialty(ctx context.Context, specialty string, province *string, limit, offset int) ([]providers.Clinic, error) {
@@ -1051,27 +1117,43 @@ func (r *clinicRepository) GetClinicsBySpecialty(ctx context.Context, specialty 
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetClinicsBySpecialtyParams{
-		Column1: pgtypeTextFromString(specialty),
-		Column2: pgtypeTextFromStringPtr(province),
+	specialtyJSON, err := jsonbFromStringSlice([]string{specialty})
+	if err != nil {
+		return nil, fmt.Errorf("marshal specialty: %w", err)
+	}
+
+	sqlParams := sqlc.GetClinicsBySpecialtyParams{
+		Column1: specialtyJSON,
+		Column2: stringPtrToString(province),
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
 
-	rows, err := r.querier.GetClinicsBySpecialty(ctx, params)
+	rows, err := r.querier.GetClinicsBySpecialty(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_by_specialty", "error").Inc()
-		return nil, fmt.Errorf("get clinics by specialty: %w", err)
+		return nil, r.handleError(err, "get clinics by specialty")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		specialties := stringSliceFromJSONB(row.Specialties)
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+			Specialties:     specialties,
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_specialty", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetClinicsWithFacility(ctx context.Context, facility string, province *string, limit, offset int) ([]providers.Clinic, error) {
@@ -1080,27 +1162,42 @@ func (r *clinicRepository) GetClinicsWithFacility(ctx context.Context, facility 
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetClinicsWithFacilityParams{
-		Column1: pgtypeTextFromString(facility),
-		Column2: pgtypeTextFromStringPtr(province),
+	facilityJSON, err := jsonbFromStringSlice([]string{facility})
+	if err != nil {
+		return nil, fmt.Errorf("marshal facility: %w", err)
+	}
+
+	sqlParams := sqlc.GetClinicsWithFacilityParams{
+		Column1: facilityJSON,
+		Column2: stringPtrToString(province),
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
 
-	rows, err := r.querier.GetClinicsWithFacility(ctx, params)
+	rows, err := r.querier.GetClinicsWithFacility(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_with_facility", "error").Inc()
-		return nil, fmt.Errorf("get clinics with facility: %w", err)
+		return nil, r.handleError(err, "get clinics with facility")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		facilities := stringSliceFromJSONB(row.Facilities)
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			Facilities:      facilities,
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinics_with_facility", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 // ============================================
@@ -1113,29 +1210,16 @@ func (r *clinicRepository) GetClinicsByLanguage(ctx context.Context, language st
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// params := sqlc.GetClinicsByLanguageParams{
-	// 	Language: pgtypeTextFromString(language),
-	// 	Province: pgtypeTextFromStringPtr(province),
-	// 	Limit:    int32(limit),
-	// 	Offset:   int32(offset),
-	// }
-	//
-	// rows, err := r.querier.GetClinicsByLanguage(ctx, params)
-	// if err != nil {
-	// 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_language", "error").Inc()
-	// 	return nil, fmt.Errorf("get clinics by language: %w", err)
-	// }
-	//
-	// clinicDBQueryTotal.WithLabelValues("get_clinics_by_language", "success").Inc()
-	//
-	// result := make([]providers.Clinic, len(rows))
-	// for i, row := range rows {
-	// 	result[i] = r.mapToClinicFromList(row)
-	// }
-	//
+	// Since there's no direct query for language, we'll use the SearchClinicsAdvanced with language in the search term
+	// This is a simplified implementation - in production you might want a different approach
+	searchParams := providers.ClinicAdvancedSearchParams{
+		Query:    &language,
+		Province: province,
+		Limit:    limit,
+		Offset:   offset,
+	}
 
-	result := make([]providers.Clinic, 10)
-	return result, nil
+	return r.SearchClinicsAdvanced(ctx, searchParams)
 }
 
 // ============================================
@@ -1148,26 +1232,41 @@ func (r *clinicRepository) GetClinicsAcceptingMedicalAid(ctx context.Context, pr
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetClinicsAcceptingMedicalAidParams{
+	sqlParams := sqlc.GetClinicsAcceptingMedicalAidParams{
 		Column1: stringPtrToString(province),
+		Column2: nil, // Medical aid provider filter - nil for all
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
 
-	rows, err := r.querier.GetClinicsAcceptingMedicalAid(ctx, params)
+	rows, err := r.querier.GetClinicsAcceptingMedicalAid(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_accepting_medical_aid", "error").Inc()
-		return nil, fmt.Errorf("get clinics accepting medical aid: %w", err)
+		return nil, r.handleError(err, "get clinics accepting medical aid")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		medicalAidProviders := stringSliceFromJSONB(row.MedicalAidProviders)
+		paymentMethods := stringSliceFromJSONB(row.PaymentMethods)
+		clinics[i] = providers.Clinic{
+			ID:                  pgtypeUUIDToUUID(row.ID),
+			ClinicName:          row.ClinicName,
+			ClinicType:          row.ClinicType,
+			City:                pgtypeTextToStringPtr(row.City),
+			Province:            pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress:     row.PhysicalAddress,
+			PrimaryPhone:        pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:              pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:         pgtypeInt4ToInt(row.ReviewCount),
+			MedicalAidProviders: medicalAidProviders,
+			PaymentMethods:      paymentMethods,
+			AcceptsMedicalAid:   true,
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinics_accepting_medical_aid", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetClinicsByMedicalAidProvider(ctx context.Context, provider string, province *string, limit, offset int) ([]providers.Clinic, error) {
@@ -1176,27 +1275,46 @@ func (r *clinicRepository) GetClinicsByMedicalAidProvider(ctx context.Context, p
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// params := sqlc.GetClinicsByMedicalAidProviderParams{
-	// 	Provider: pgtypeTextFromString(provider),
-	// 	Province: pgtypeTextFromStringPtr(province),
-	// 	Limit:    int32(limit),
-	// 	Offset:   int32(offset),
-	// }
-	//
-	// rows, err := r.querier.GetClinicsByMedicalAidProvider(ctx, params)
-	// if err != nil {
-	// 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_medical_aid_provider", "error").Inc()
-	// 	return nil, fmt.Errorf("get clinics by medical aid provider: %w", err)
-	// }
-	//
-	// clinicDBQueryTotal.WithLabelValues("get_clinics_by_medical_aid_provider", "success").Inc()
-	//
-	// result := make([]providers.Clinic, len(rows))
-	// for i, row := range rows {
-	// 	result[i] = r.mapToClinicFromList(row)
-	// }
-	result := make([]providers.Clinic, 10)
-	return result, nil
+	providerJSON, err := jsonbFromStringSlice([]string{provider})
+	if err != nil {
+		return nil, fmt.Errorf("marshal provider: %w", err)
+	}
+
+	sqlParams := sqlc.GetClinicsAcceptingMedicalAidParams{
+		Column1: stringPtrToString(province),
+		Column2: providerJSON,
+		Limit:   int32(limit),
+		Offset:  int32(offset),
+	}
+
+	rows, err := r.querier.GetClinicsAcceptingMedicalAid(ctx, sqlParams)
+	if err != nil {
+		clinicDBQueryTotal.WithLabelValues("get_clinics_by_medical_aid_provider", "error").Inc()
+		return nil, r.handleError(err, "get clinics by medical aid provider")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		medicalAidProviders := stringSliceFromJSONB(row.MedicalAidProviders)
+		paymentMethods := stringSliceFromJSONB(row.PaymentMethods)
+		clinics[i] = providers.Clinic{
+			ID:                  pgtypeUUIDToUUID(row.ID),
+			ClinicName:          row.ClinicName,
+			ClinicType:          row.ClinicType,
+			City:                pgtypeTextToStringPtr(row.City),
+			Province:            pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress:     row.PhysicalAddress,
+			PrimaryPhone:        pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:              pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:         pgtypeInt4ToInt(row.ReviewCount),
+			MedicalAidProviders: medicalAidProviders,
+			PaymentMethods:      paymentMethods,
+			AcceptsMedicalAid:   true,
+		}
+	}
+
+	clinicDBQueryTotal.WithLabelValues("get_clinics_by_medical_aid_provider", "success").Inc()
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetClinicsByPaymentMethod(ctx context.Context, method map[string]any, province *string, limit, offset int) ([]providers.Clinic, error) {
@@ -1210,27 +1328,36 @@ func (r *clinicRepository) GetClinicsByPaymentMethod(ctx context.Context, method
 		return nil, fmt.Errorf("marshal payment method: %w", err)
 	}
 
-	params := sqlc.GetClinicsByPaymentMethodParams{
+	sqlParams := sqlc.GetClinicsByPaymentMethodParams{
 		Column1: methodJSON,
 		Column2: stringPtrToString(province),
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	}
 
-	rows, err := r.querier.GetClinicsByPaymentMethod(ctx, params)
+	rows, err := r.querier.GetClinicsByPaymentMethod(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_by_payment_method", "error").Inc()
-		return nil, fmt.Errorf("get clinics by payment method: %w", err)
+		return nil, r.handleError(err, "get clinics by payment method")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		paymentMethods := stringSliceFromJSONB(row.PaymentMethods)
+		clinics[i] = providers.Clinic{
+			ID:             pgtypeUUIDToUUID(row.ID),
+			ClinicName:     row.ClinicName,
+			ClinicType:     row.ClinicType,
+			City:           pgtypeTextToStringPtr(row.City),
+			Province:       pgtypeTextToStringPtr(row.Province),
+			PrimaryPhone:   pgtypeTextToStringPtr(row.PrimaryPhone),
+			PaymentMethods: paymentMethods,
+			FeeStructure:   pgtypeTextToStringPtr(row.FeeStructure),
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_payment_method", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetClinicsByFeeStructure(ctx context.Context, feeStructure string, province *string, limit, offset int) ([]providers.Clinic, error) {
@@ -1239,27 +1366,34 @@ func (r *clinicRepository) GetClinicsByFeeStructure(ctx context.Context, feeStru
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetClinicsByFeeStructureParams{
+	sqlParams := sqlc.GetClinicsByFeeStructureParams{
 		FeeStructure: pgtypeTextFromString(feeStructure),
 		Column2:      stringPtrToString(province),
 		Limit:        int32(limit),
 		Offset:       int32(offset),
 	}
 
-	rows, err := r.querier.GetClinicsByFeeStructure(ctx, params)
+	rows, err := r.querier.GetClinicsByFeeStructure(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_by_fee_structure", "error").Inc()
-		return nil, fmt.Errorf("get clinics by fee structure: %w", err)
+		return nil, r.handleError(err, "get clinics by fee structure")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:           pgtypeUUIDToUUID(row.ID),
+			ClinicName:   row.ClinicName,
+			ClinicType:   row.ClinicType,
+			City:         pgtypeTextToStringPtr(row.City),
+			Province:     pgtypeTextToStringPtr(row.Province),
+			PrimaryPhone: pgtypeTextToStringPtr(row.PrimaryPhone),
+			FeeStructure: pgtypeTextToStringPtr(row.FeeStructure),
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinics_by_fee_structure", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 // ============================================
@@ -1272,26 +1406,35 @@ func (r *clinicRepository) GetTopRatedClinics(ctx context.Context, province *str
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetTopRatedClinicsParams{
+	sqlParams := sqlc.GetTopRatedClinicsParams{
 		Column1:     stringPtrToString(province),
-		ReviewCount: int32(minReviews),
+		ReviewCount: pgtype.Int4{Int32: int32(minReviews), Valid: true},
 		Limit:       int32(limit),
 	}
 
-	rows, err := r.querier.GetTopRatedClinics(ctx, params)
+	rows, err := r.querier.GetTopRatedClinics(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_top_rated_clinics", "error").Inc()
-		return nil, fmt.Errorf("get top rated clinics: %w", err)
+		return nil, r.handleError(err, "get top rated clinics")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_top_rated_clinics", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetMostReviewedClinics(ctx context.Context, province *string, limit int) ([]providers.Clinic, error) {
@@ -1300,25 +1443,34 @@ func (r *clinicRepository) GetMostReviewedClinics(ctx context.Context, province 
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetMostReviewedClinicsParams{
+	sqlParams := sqlc.GetMostReviewedClinicsParams{
 		Column1: stringPtrToString(province),
 		Limit:   int32(limit),
 	}
 
-	rows, err := r.querier.GetMostReviewedClinics(ctx, params)
+	rows, err := r.querier.GetMostReviewedClinics(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_most_reviewed_clinics", "error").Inc()
-		return nil, fmt.Errorf("get most reviewed clinics: %w", err)
+		return nil, r.handleError(err, "get most reviewed clinics")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_most_reviewed_clinics", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetRecentlyAddedClinics(ctx context.Context, province *string, limit int) ([]providers.Clinic, error) {
@@ -1327,25 +1479,35 @@ func (r *clinicRepository) GetRecentlyAddedClinics(ctx context.Context, province
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.GetRecentlyAddedClinicsParams{
+	sqlParams := sqlc.GetRecentlyAddedClinicsParams{
 		Column1: stringPtrToString(province),
 		Limit:   int32(limit),
 	}
 
-	rows, err := r.querier.GetRecentlyAddedClinics(ctx, params)
+	rows, err := r.querier.GetRecentlyAddedClinics(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_recently_added_clinics", "error").Inc()
-		return nil, fmt.Errorf("get recently added clinics: %w", err)
+		return nil, r.handleError(err, "get recently added clinics")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:              pgtypeUUIDToUUID(row.ID),
+			ClinicName:      row.ClinicName,
+			ClinicType:      row.ClinicType,
+			City:            pgtypeTextToStringPtr(row.City),
+			Province:        pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress: row.PhysicalAddress,
+			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+			CreatedAt:       row.CreatedAt.Time,
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_recently_added_clinics", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 func (r *clinicRepository) GetRecentlyVerifiedClinics(ctx context.Context, limit int) ([]providers.Clinic, error) {
@@ -1357,17 +1519,24 @@ func (r *clinicRepository) GetRecentlyVerifiedClinics(ctx context.Context, limit
 	rows, err := r.querier.GetRecentlyVerifiedClinics(ctx, int32(limit))
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_recently_verified_clinics", "error").Inc()
-		return nil, fmt.Errorf("get recently verified clinics: %w", err)
+		return nil, r.handleError(err, "get recently verified clinics")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = providers.Clinic{
+			ID:               pgtypeUUIDToUUID(row.ID),
+			ClinicName:       row.ClinicName,
+			ClinicType:       row.ClinicType,
+			City:             pgtypeTextToStringPtr(row.City),
+			Province:         pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress:  row.PhysicalAddress,
+			VerificationDate: pgtypeTimestampToTimePtr(row.VerificationDate),
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_recently_verified_clinics", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 // ============================================
@@ -1383,23 +1552,25 @@ func (r *clinicRepository) GetClinicStatistics(ctx context.Context, id uuid.UUID
 	row, err := r.querier.GetClinicStatistics(ctx, uuidToPgtypeUUID(id))
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinic_statistics", "error").Inc()
-		return providers.ClinicStatistics{}, fmt.Errorf("get clinic statistics: %w", err)
+		return providers.ClinicStatistics{}, r.handleError(err, "get clinic statistics")
+	}
+
+	stats := providers.ClinicStatistics{
+		ID:                     pgtypeUUIDToUUID(row.ID),
+		ClinicName:             row.ClinicName,
+		ReviewCount:            pgtypeInt4ToInt(row.ReviewCount),
+		Rating:                 pgtypeNumericToFloat64Ptr(row.Rating),
+		PatientCapacity:        pgtypeInt4ToIntPtr(row.PatientCapacity),
+		BedCount:               pgtypeInt4ToIntPtr(row.BedCount),
+		AverageWaitTimeMinutes: pgtypeInt4ToIntPtr(row.AverageWaitTimeMinutes),
+		ActiveStaffCount:       int(row.ActiveStaffCount),
+		TotalStaffCount:        int(row.TotalStaffCount),
+		ActiveServicesCount:    int(row.ActiveServicesCount),
+		TotalServicesCount:     int(row.TotalServicesCount),
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinic_statistics", "success").Inc()
-
-	return providers.ClinicStatistics{
-		ID:                  pgtypeUUIDToUUID(row.ID),
-		ClinicName:          row.ClinicName,
-		ReviewCount:         pgtypeInt4ToInt(row.ReviewCount),
-		Rating:              pgtypeNumericToFloat64Ptr(row.Rating),
-		PatientCapacity:     pgtypeInt4ToIntPtr(row.PatientCapacity),
-		BedCount:            pgtypeInt4ToIntPtr(row.BedCount),
-		ActiveStaffCount:    row.ActiveStaffCount,
-		TotalStaffCount:     row.TotalStaffCount,
-		ActiveServicesCount: row.ActiveServicesCount,
-		TotalServicesCount:  row.TotalServicesCount,
-	}, nil
+	return stats, nil
 }
 
 func (r *clinicRepository) GetClinicMetrics(ctx context.Context) (providers.ClinicMetrics, error) {
@@ -1411,20 +1582,23 @@ func (r *clinicRepository) GetClinicMetrics(ctx context.Context) (providers.Clin
 	row, err := r.querier.GetClinicMetrics(ctx)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinic_metrics", "error").Inc()
-		return providers.ClinicMetrics{}, fmt.Errorf("get clinic metrics: %w", err)
+		return providers.ClinicMetrics{}, r.handleError(err, "get clinic metrics")
+	}
+
+	metrics := providers.ClinicMetrics{
+		TotalClinics:    int(row.TotalClinics),
+		VerifiedClinics: int(row.VerifiedClinics),
+		PendingClinics:  int(row.PendingClinics),
+		RejectedClinics: int(row.RejectedClinics),
+		ActiveClinics:   int(row.ActiveClinics),
+		AverageRating:   row.AverageRating,
+		TotalReviews:    int(row.TotalReviews),
+		AverageCapacity: row.AvgCapacity,
+		TotalBeds:       int(row.TotalBeds),
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinic_metrics", "success").Inc()
-
-	return providers.ClinicMetrics{
-		TotalClinics:    row.TotalClinics,
-		VerifiedClinics: row.VerifiedClinics,
-		PendingClinics:  row.PendingClinics,
-		RejectedClinics: row.RejectedClinics,
-		ActiveClinics:   row.ActiveClinics,
-		TotalReviews:    row.TotalReviews,
-		TotalBeds:       row.TotalBeds,
-	}, nil
+	return metrics, nil
 }
 
 func (r *clinicRepository) GetClinicTypeDistribution(ctx context.Context) ([]providers.ClinicTypeDistribution, error) {
@@ -1436,21 +1610,20 @@ func (r *clinicRepository) GetClinicTypeDistribution(ctx context.Context) ([]pro
 	rows, err := r.querier.GetClinicTypeDistribution(ctx)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinic_type_distribution", "error").Inc()
-		return nil, fmt.Errorf("get clinic type distribution: %w", err)
+		return nil, r.handleError(err, "get clinic type distribution")
 	}
 
-	clinicDBQueryTotal.WithLabelValues("get_clinic_type_distribution", "success").Inc()
-
-	result := make([]providers.ClinicTypeDistribution, len(rows))
+	distributions := make([]providers.ClinicTypeDistribution, len(rows))
 	for i, row := range rows {
-		result[i] = providers.ClinicTypeDistribution{
-			ClinicType:    pgtypeTextToString(row.ClinicType),
-			Count:         row.Count,
-			AverageRating: pgtypeNumericToFloat64Ptr(row.AverageRating),
+		distributions[i] = providers.ClinicTypeDistribution{
+			ClinicType:    row.ClinicType,
+			Count:         int64(row.Count),
+			AverageRating: row.AvgRating,
 		}
 	}
 
-	return result, nil
+	clinicDBQueryTotal.WithLabelValues("get_clinic_type_distribution", "success").Inc()
+	return distributions, nil
 }
 
 func (r *clinicRepository) GetClinicProvinceDistribution(ctx context.Context) ([]providers.ClinicProvinceDistribution, error) {
@@ -1462,21 +1635,20 @@ func (r *clinicRepository) GetClinicProvinceDistribution(ctx context.Context) ([
 	rows, err := r.querier.GetClinicProvinceDistribution(ctx)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinic_province_distribution", "error").Inc()
-		return nil, fmt.Errorf("get clinic province distribution: %w", err)
+		return nil, r.handleError(err, "get clinic province distribution")
 	}
 
-	clinicDBQueryTotal.WithLabelValues("get_clinic_province_distribution", "success").Inc()
-
-	result := make([]providers.ClinicProvinceDistribution, len(rows))
+	distributions := make([]providers.ClinicProvinceDistribution, len(rows))
 	for i, row := range rows {
-		result[i] = providers.ClinicProvinceDistribution{
+		distributions[i] = providers.ClinicProvinceDistribution{
+			Count:         int64(row.Count),
 			Province:      pgtypeTextToString(row.Province),
-			Count:         row.Count,
-			AverageRating: pgtypeNumericToFloat64Ptr(row.AverageRating),
+			AverageRating: row.AvgRating,
 		}
 	}
 
-	return result, nil
+	clinicDBQueryTotal.WithLabelValues("get_clinic_province_distribution", "success").Inc()
+	return distributions, nil
 }
 
 func (r *clinicRepository) GetClinicOwnershipDistribution(ctx context.Context) ([]providers.ClinicOwnershipDistribution, error) {
@@ -1488,21 +1660,20 @@ func (r *clinicRepository) GetClinicOwnershipDistribution(ctx context.Context) (
 	rows, err := r.querier.GetClinicOwnershipDistribution(ctx)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinic_ownership_distribution", "error").Inc()
-		return nil, fmt.Errorf("get clinic ownership distribution: %w", err)
+		return nil, r.handleError(err, "get clinic ownership distribution")
 	}
 
-	clinicDBQueryTotal.WithLabelValues("get_clinic_ownership_distribution", "success").Inc()
-
-	result := make([]providers.ClinicOwnershipDistribution, len(rows))
+	distributions := make([]providers.ClinicOwnershipDistribution, len(rows))
 	for i, row := range rows {
-		result[i] = providers.ClinicOwnershipDistribution{
+		distributions[i] = providers.ClinicOwnershipDistribution{
 			OwnershipType: pgtypeTextToString(row.OwnershipType),
-			Count:         row.Count,
-			AverageRating: pgtypeNumericToFloat64Ptr(row.AverageRating),
+			Count:         int64(row.Count),
+			AverageRating: (*float64)(row.AvgRating),
 		}
 	}
 
-	return result, nil
+	clinicDBQueryTotal.WithLabelValues("get_clinic_ownership_distribution", "success").Inc()
+	return distributions, nil
 }
 
 // ============================================
@@ -1516,15 +1687,15 @@ func (r *clinicRepository) CountClinics(ctx context.Context, clinicType, provinc
 	}()
 
 	params := sqlc.CountClinicsParams{
-		ClinicType:         pgtypeTextFromStringPtr(clinicType),
-		Province:           pgtypeTextFromStringPtr(province),
-		VerificationStatus: pgtypeTextFromStringPtr(verificationStatus),
+		Column1: stringPtrToString(clinicType),
+		Column2: stringPtrToString(province),
+		Column3: stringPtrToString(verificationStatus),
 	}
 
 	count, err := r.querier.CountClinics(ctx, params)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("count_clinics", "error").Inc()
-		return 0, fmt.Errorf("count clinics: %w", err)
+		return 0, r.handleError(err, "count clinics")
 	}
 
 	clinicDBQueryTotal.WithLabelValues("count_clinics", "success").Inc()
@@ -1540,7 +1711,7 @@ func (r *clinicRepository) CountVerifiedClinics(ctx context.Context) (int64, err
 	count, err := r.querier.CountVerifiedClinics(ctx)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("count_verified_clinics", "error").Inc()
-		return 0, fmt.Errorf("count verified clinics: %w", err)
+		return 0, r.handleError(err, "count verified clinics")
 	}
 
 	clinicDBQueryTotal.WithLabelValues("count_verified_clinics", "success").Inc()
@@ -1556,7 +1727,7 @@ func (r *clinicRepository) CountClinicsByProvince(ctx context.Context, province 
 	count, err := r.querier.CountClinicsByProvince(ctx, pgtypeTextFromString(province))
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("count_clinics_by_province", "error").Inc()
-		return 0, fmt.Errorf("count clinics by province: %w", err)
+		return 0, r.handleError(err, "count clinics by province")
 	}
 
 	clinicDBQueryTotal.WithLabelValues("count_clinics_by_province", "success").Inc()
@@ -1572,7 +1743,7 @@ func (r *clinicRepository) ClinicExists(ctx context.Context, id uuid.UUID) (bool
 	exists, err := r.querier.ClinicExists(ctx, uuidToPgtypeUUID(id))
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("clinic_exists", "error").Inc()
-		return false, fmt.Errorf("clinic exists: %w", err)
+		return false, r.handleError(err, "check clinic exists")
 	}
 
 	clinicDBQueryTotal.WithLabelValues("clinic_exists", "success").Inc()
@@ -1587,13 +1758,13 @@ func (r *clinicRepository) CheckRegistrationNumberExists(ctx context.Context, re
 
 	params := sqlc.CheckRegistrationNumberExistsParams{
 		RegistrationNumber: pgtypeTextFromString(registrationNumber),
-		ExcludeID:          uuidPtrToPgtypeUUID(excludeID),
+		Column2:            uuidPtrToPgtypeUUID(excludeID),
 	}
 
 	exists, err := r.querier.CheckRegistrationNumberExists(ctx, params)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("check_registration_number_exists", "error").Inc()
-		return false, fmt.Errorf("check registration number exists: %w", err)
+		return false, r.handleError(err, "check registration number exists")
 	}
 
 	clinicDBQueryTotal.WithLabelValues("check_registration_number_exists", "success").Inc()
@@ -1606,15 +1777,15 @@ func (r *clinicRepository) CheckEmailExists(ctx context.Context, email string, e
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.CheckClinicEmailExistsParams{
-		Email:     pgtypeTextFromString(email),
-		ExcludeID: uuidPtrToPgtypeUUID(excludeID),
+	params := sqlc.CheckEmailExistsParams{
+		Email:   pgtypeTextFromString(email),
+		Column2: uuidPtrToPgtypeUUID(excludeID),
 	}
 
-	exists, err := r.querier.CheckClinicEmailExists(ctx, params)
+	exists, err := r.querier.CheckEmailExists(ctx, params)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("check_email_exists", "error").Inc()
-		return false, fmt.Errorf("check email exists: %w", err)
+		return false, r.handleError(err, "check email exists")
 	}
 
 	clinicDBQueryTotal.WithLabelValues("check_email_exists", "success").Inc()
@@ -1627,15 +1798,15 @@ func (r *clinicRepository) CheckPhoneExists(ctx context.Context, phone string, e
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	params := sqlc.CheckClinicPhoneExistsParams{
+	params := sqlc.CheckPhoneExistsParams{
 		PrimaryPhone: pgtypeTextFromString(phone),
-		ExcludeID:    uuidPtrToPgtypeUUID(excludeID),
+		Column2:      uuidPtrToPgtypeUUID(excludeID),
 	}
 
-	exists, err := r.querier.CheckClinicPhoneExists(ctx, params)
+	exists, err := r.querier.CheckPhoneExists(ctx, params)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("check_phone_exists", "error").Inc()
-		return false, fmt.Errorf("check phone exists: %w", err)
+		return false, r.handleError(err, "check phone exists")
 	}
 
 	clinicDBQueryTotal.WithLabelValues("check_phone_exists", "success").Inc()
@@ -1646,19 +1817,48 @@ func (r *clinicRepository) CheckPhoneExists(ctx context.Context, phone string, e
 // BULK OPERATIONS
 // ============================================
 
+func (r *clinicRepository) GetClinicsByIDs(ctx context.Context, ids []uuid.UUID) ([]providers.Clinic, error) {
+	start := time.Now()
+	defer func() {
+		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	// Convert UUIDs to pgtype.UUID
+	pgtypeIDs := make([]pgtype.UUID, len(ids))
+	for i, id := range ids {
+		pgtypeIDs[i] = uuidToPgtypeUUID(id)
+	}
+
+	clinics, err := r.querier.GetClinicsByIDs(ctx, pgtypeIDs)
+	if err != nil {
+		clinicDBQueryTotal.WithLabelValues("get_clinics_by_ids", "error").Inc()
+		return nil, fmt.Errorf("get clinics by ids: %w", err)
+	}
+
+	clinicDBQueryTotal.WithLabelValues("get_clinics_by_ids", "success").Inc()
+
+	result := make([]providers.Clinic, len(clinics))
+	for i, c := range clinics {
+		result[i] = r.mapToClinicFromGetByID(c)
+	}
+
+	return result, nil
+}
+
 func (r *clinicRepository) BulkUpdateVerificationStatus(ctx context.Context, ids []uuid.UUID, status string) error {
 	start := time.Now()
 	defer func() {
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
+	// Convert UUIDs to pgtype.UUID
 	pgtypeIDs := make([]pgtype.UUID, len(ids))
 	for i, id := range ids {
 		pgtypeIDs[i] = uuidToPgtypeUUID(id)
 	}
 
 	params := sqlc.BulkUpdateVerificationStatusParams{
-		Ids:                pgtypeIDs,
+		Column1:            pgtypeIDs,
 		VerificationStatus: pgtypeTextFromString(status),
 	}
 
@@ -1678,13 +1878,14 @@ func (r *clinicRepository) BulkVerifyClinics(ctx context.Context, ids []uuid.UUI
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
+	// Convert UUIDs to pgtype.UUID
 	pgtypeIDs := make([]pgtype.UUID, len(ids))
 	for i, id := range ids {
 		pgtypeIDs[i] = uuidToPgtypeUUID(id)
 	}
 
 	params := sqlc.BulkVerifyClinicsParams{
-		Ids:        pgtypeIDs,
+		Column1:    pgtypeIDs,
 		VerifiedBy: uuidToPgtypeUUID(verifiedBy),
 	}
 
@@ -1708,7 +1909,7 @@ func (r *clinicRepository) GetClinicByRegistrationNumber(ctx context.Context, re
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	c, err := r.querier.GetClinicByRegistrationNumber(ctx, pgtypeTextFromString(registrationNumber))
+	clinic, err := r.querier.GetClinicByRegistrationNumber(ctx, pgtypeTextFromString(registrationNumber))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			clinicDBQueryTotal.WithLabelValues("get_clinic_by_registration_number", "not_found").Inc()
@@ -1719,7 +1920,7 @@ func (r *clinicRepository) GetClinicByRegistrationNumber(ctx context.Context, re
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinic_by_registration_number", "success").Inc()
-	return r.mapToClinic(c), nil
+	return r.mapToClinicFromGetByID(clinic), nil
 }
 
 func (r *clinicRepository) GetClinicByEmail(ctx context.Context, email string) (providers.Clinic, error) {
@@ -1728,7 +1929,7 @@ func (r *clinicRepository) GetClinicByEmail(ctx context.Context, email string) (
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	c, err := r.querier.GetClinicByEmail(ctx, pgtypeTextFromString(email))
+	clinic, err := r.querier.GetClinicByEmail(ctx, pgtypeTextFromString(email))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			clinicDBQueryTotal.WithLabelValues("get_clinic_by_email", "not_found").Inc()
@@ -1739,7 +1940,7 @@ func (r *clinicRepository) GetClinicByEmail(ctx context.Context, email string) (
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinic_by_email", "success").Inc()
-	return r.mapToClinic(c), nil
+	return r.mapToClinicFromGetByID(clinic), nil
 }
 
 func (r *clinicRepository) GetClinicByPhone(ctx context.Context, phone string) (providers.Clinic, error) {
@@ -1748,7 +1949,7 @@ func (r *clinicRepository) GetClinicByPhone(ctx context.Context, phone string) (
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	c, err := r.querier.GetClinicByPhone(ctx, pgtypeTextFromString(phone))
+	clinic, err := r.querier.GetClinicByPhone(ctx, pgtypeTextFromString(phone))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
 			clinicDBQueryTotal.WithLabelValues("get_clinic_by_phone", "not_found").Inc()
@@ -1759,7 +1960,7 @@ func (r *clinicRepository) GetClinicByPhone(ctx context.Context, phone string) (
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinic_by_phone", "success").Inc()
-	return r.mapToClinic(c), nil
+	return r.mapToClinicFromGetByID(clinic), nil
 }
 
 // ============================================
@@ -1772,43 +1973,66 @@ func (r *clinicRepository) SearchClinicsAdvanced(ctx context.Context, params pro
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	servicesJSON, err := jsonbFromMap(params.Services)
+	servicesJSON, err := jsonbFromStringSlice(params.Services)
 	if err != nil {
 		return nil, fmt.Errorf("marshal services: %w", err)
 	}
 
-	specialtiesJSON, err := jsonbFromMap(params.Specialties)
+	specialtiesJSON, err := jsonbFromStringSlice(params.Specialties)
 	if err != nil {
 		return nil, fmt.Errorf("marshal specialties: %w", err)
 	}
 
+	acceptsMedicalAid := params.AcceptsMedicalAid
+	if acceptsMedicalAid == nil {
+		acceptsMedicalAid = &[]bool{false}[0]
+	}
+
 	sqlParams := sqlc.SearchClinicsAdvancedParams{
-		Query:             pgtypeTextFromStringPtr(params.Query),
-		Province:          pgtypeTextFromStringPtr(params.Province),
-		City:              pgtypeTextFromStringPtr(params.City),
-		ClinicType:        pgtypeTextFromStringPtr(params.ClinicType),
-		OwnershipType:     pgtypeTextFromStringPtr(params.OwnershipType),
-		AcceptsMedicalAid: params.AcceptsMedicalAid,
-		Services:          servicesJSON,
-		Specialties:       specialtiesJSON,
-		Limit:             int32(params.Limit),
-		Offset:            int32(params.Offset),
+		Column1: params.Query,
+		Column2: params.Province,
+		Column3: params.City,
+		Column4: params.ClinicType,
+		Column5: params.OwnershipType,
+		Column6: *acceptsMedicalAid,
+		Column7: servicesJSON,
+		Column8: specialtiesJSON,
+		Limit:   int32(params.Limit),
+		Offset:  int32(params.Offset),
 	}
 
 	rows, err := r.querier.SearchClinicsAdvanced(ctx, sqlParams)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("search_clinics_advanced", "error").Inc()
-		return nil, fmt.Errorf("search clinics advanced: %w", err)
+		return nil, r.handleError(err, "search clinics advanced")
+	}
+
+	clinics := make([]providers.Clinic, len(rows))
+	for i, row := range rows {
+		services := stringSliceFromJSONB(row.Services)
+		specialties := stringSliceFromJSONB(row.Specialties)
+		facilities := stringSliceFromJSONB(row.Facilities)
+
+		clinics[i] = providers.Clinic{
+			ID:                pgtypeUUIDToUUID(row.ID),
+			ClinicName:        row.ClinicName,
+			ClinicType:        row.ClinicType,
+			City:              pgtypeTextToStringPtr(row.City),
+			Province:          pgtypeTextToStringPtr(row.Province),
+			PhysicalAddress:   row.PhysicalAddress,
+			PrimaryPhone:      pgtypeTextToStringPtr(row.PrimaryPhone),
+			Email:             pgtypeTextToStringPtr(row.Email),
+			Rating:            pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:       pgtypeInt4ToInt(row.ReviewCount),
+			AcceptsMedicalAid: pgtypeBoolToBool(row.AcceptsMedicalAid),
+			Services:          services,
+			Specialties:       specialties,
+			Facilities:        facilities,
+		}
 	}
 
 	clinicDBQueryTotal.WithLabelValues("search_clinics_advanced", "success").Inc()
-
-	result := make([]providers.Clinic, len(rows))
-	for i, row := range rows {
-		result[i] = r.mapToClinicFromList(row)
-	}
-
-	return result, nil
+	return clinics, nil
 }
 
 // ============================================
@@ -1824,14 +2048,12 @@ func (r *clinicRepository) GetClinicsWithExpiredAccreditation(ctx context.Contex
 	rows, err := r.querier.GetClinicsWithExpiredAccreditation(ctx)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_with_expired_accreditation", "error").Inc()
-		return nil, fmt.Errorf("get clinics with expired accreditation: %w", err)
+		return nil, r.handleError(err, "get clinics with expired accreditation")
 	}
 
-	clinicDBQueryTotal.WithLabelValues("get_clinics_with_expired_accreditation", "success").Inc()
-
-	result := make([]providers.ClinicAccreditationInfo, len(rows))
+	infos := make([]providers.ClinicAccreditationInfo, len(rows))
 	for i, row := range rows {
-		result[i] = providers.ClinicAccreditationInfo{
+		infos[i] = providers.ClinicAccreditationInfo{
 			ID:                  pgtypeUUIDToUUID(row.ID),
 			ClinicName:          row.ClinicName,
 			AccreditationNumber: pgtypeTextToStringPtr(row.AccreditationNumber),
@@ -1842,7 +2064,8 @@ func (r *clinicRepository) GetClinicsWithExpiredAccreditation(ctx context.Contex
 		}
 	}
 
-	return result, nil
+	clinicDBQueryTotal.WithLabelValues("get_clinics_with_expired_accreditation", "success").Inc()
+	return infos, nil
 }
 
 func (r *clinicRepository) GetClinicsNeedingReaccreditation(ctx context.Context) ([]providers.ClinicAccreditationInfo, error) {
@@ -1854,14 +2077,12 @@ func (r *clinicRepository) GetClinicsNeedingReaccreditation(ctx context.Context)
 	rows, err := r.querier.GetClinicsNeedingReaccreditation(ctx)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("get_clinics_needing_reaccreditation", "error").Inc()
-		return nil, fmt.Errorf("get clinics needing reaccreditation: %w", err)
+		return nil, r.handleError(err, "get clinics needing reaccreditation")
 	}
 
-	clinicDBQueryTotal.WithLabelValues("get_clinics_needing_reaccreditation", "success").Inc()
-
-	result := make([]providers.ClinicAccreditationInfo, len(rows))
+	infos := make([]providers.ClinicAccreditationInfo, len(rows))
 	for i, row := range rows {
-		result[i] = providers.ClinicAccreditationInfo{
+		infos[i] = providers.ClinicAccreditationInfo{
 			ID:                  pgtypeUUIDToUUID(row.ID),
 			ClinicName:          row.ClinicName,
 			AccreditationNumber: pgtypeTextToStringPtr(row.AccreditationNumber),
@@ -1872,7 +2093,8 @@ func (r *clinicRepository) GetClinicsNeedingReaccreditation(ctx context.Context)
 		}
 	}
 
-	return result, nil
+	clinicDBQueryTotal.WithLabelValues("get_clinics_needing_reaccreditation", "success").Inc()
+	return infos, nil
 }
 
 // ============================================
@@ -1951,6 +2173,7 @@ func (r *clinicRepository) mapToClinic(row sqlc.Clinic) providers.Clinic {
 
 		AccreditationBody:   pgtypeTextToStringPtr(row.AccreditationBody),
 		AccreditationExpiry: pgtypeDateToTimePtr(row.AccreditationExpiry),
+		Certifications:      mapFromJSONB(row.Certifications),
 
 		IsVerified:         pgtypeBoolToBool(row.IsVerified),
 		VerificationStatus: pgtypeTextToString(row.VerificationStatus),
@@ -1997,14 +2220,18 @@ func (r *clinicRepository) mapToClinicFromList(row sqlc.ListClinicsRow) provider
 
 func (r *clinicRepository) mapToClinicFromSearch(row sqlc.SearchClinicsRow) providers.Clinic {
 	return providers.Clinic{
-		ID:              pgtypeUUIDToUUID(row.ID),
-		ClinicName:      row.ClinicName,
-		ClinicType:      row.ClinicType,
-		City:            pgtypeTextToStringPtr(row.City),
-		Province:        pgtypeTextToStringPtr(row.Province),
-		PhysicalAddress: row.PhysicalAddress,
-		PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
-		Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
-		ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+		ID:                 pgtypeUUIDToUUID(row.ID),
+		ClinicName:         row.ClinicName,
+		ClinicType:         row.ClinicType,
+		City:               pgtypeTextToStringPtr(row.City),
+		Province:           pgtypeTextToStringPtr(row.Province),
+		PhysicalAddress:    row.PhysicalAddress,
+		PrimaryPhone:       pgtypeTextToStringPtr(row.PrimaryPhone),
+		Email:              pgtypeTextToStringPtr(row.Email),
+		Rating:             pgtypeNumericToFloat64Ptr(row.Rating),
+		ReviewCount:        pgtypeInt4ToInt(row.ReviewCount),
+		VerificationStatus: pgtypeTextToString(row.VerificationStatus),
+		AcceptsMedicalAid:  pgtypeBoolToBool(row.AcceptsMedicalAid),
+		CreatedAt:          row.CreatedAt.Time,
 	}
 }

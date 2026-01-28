@@ -41,6 +41,7 @@ type Clinic struct {
 	FeeStructure           *string        `json:"fee_structure,omitempty"` // free, sliding_scale, fixed_fees
 	AccreditationBody      *string        `json:"accreditation_body,omitempty"`
 	AccreditationExpiry    *time.Time     `json:"accreditation_expiry,omitempty"`
+	Certifications         map[string]any `json:"certifications,omitempty"`
 	IsVerified             bool           `json:"is_verified"`
 	VerificationStatus     string         `json:"verification_status"` // pending, verified, rejected
 	VerificationNotes      *string        `json:"verification_notes,omitempty"`
