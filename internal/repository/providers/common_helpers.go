@@ -262,3 +262,15 @@ func stringPtrToString(s *string) string {
 	}
 	return *s
 }
+
+// Float64 pointer conversion helpers
+func float64ToFloat64Ptr(f float64) *float64 {
+	return &f
+}
+
+func float64PtrToFloat64(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
+}

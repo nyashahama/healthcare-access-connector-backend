@@ -695,7 +695,7 @@ func (r *clinicRepository) SearchClinicsByName(ctx context.Context, name string,
 	}()
 
 	sqlParams := sqlc.SearchClinicsByNameParams{
-		Column1: pgtypeTextFromStringPtr(&name),
+		Column1: pgtypeTextFromString(name),
 		Column2: stringPtrToString(province),
 		Limit:   int32(limit),
 		Offset:  int32(offset),
@@ -710,15 +710,7 @@ func (r *clinicRepository) SearchClinicsByName(ctx context.Context, name string,
 	results := make([]providers.ClinicSearchResult, len(rows))
 	for i, row := range rows {
 		results[i] = providers.ClinicSearchResult{
-			ID:              pgtypeUUIDToUUID(row.ID),
-			ClinicName:      row.ClinicName,
-			ClinicType:      row.ClinicType,
-			City:            pgtypeTextToStringPtr(row.City),
-			Province:        pgtypeTextToStringPtr(row.Province),
-			PhysicalAddress: row.PhysicalAddress,
-			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
-			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
-			ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+			Clinic: r.mapToClinicFromSearchByName(row),
 		}
 	}
 
@@ -748,18 +740,10 @@ func (r *clinicRepository) SearchClinicsByLocation(ctx context.Context, lat, lng
 	results := make([]providers.ClinicSearchResult, len(rows))
 	for i, row := range rows {
 		distance := pgtypeNumericToFloat64Ptr(row.DistanceKm)
+		clinic := r.mapToClinicFromSearchByLocation(row)
 		results[i] = providers.ClinicSearchResult{
-			ID:              pgtypeUUIDToUUID(row.ID),
-			ClinicName:      row.ClinicName,
-			ClinicType:      row.ClinicType,
-			PhysicalAddress: row.PhysicalAddress,
-			City:            pgtypeTextToStringPtr(row.City),
-			Province:        pgtypeTextToStringPtr(row.Province),
-			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
-			Latitude:        pgtypeNumericToFloat64Ptr(row.Latitude),
-			Longitude:       pgtypeNumericToFloat64Ptr(row.Longitude),
-			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
-			DistanceKm:      distance,
+			Clinic:     clinic,
+			DistanceKm: distance,
 		}
 	}
 
@@ -795,20 +779,10 @@ func (r *clinicRepository) GetNearbyClinicsByService(ctx context.Context, lat, l
 	results := make([]providers.ClinicSearchResult, len(rows))
 	for i, row := range rows {
 		distance := pgtypeNumericToFloat64Ptr(row.DistanceKm)
-		services := stringSliceFromJSONB(row.Services)
+		clinic := r.mapToClinicFromNearbyService(row)
 		results[i] = providers.ClinicSearchResult{
-			ID:              pgtypeUUIDToUUID(row.ID),
-			ClinicName:      row.ClinicName,
-			ClinicType:      row.ClinicType,
-			PhysicalAddress: row.PhysicalAddress,
-			City:            pgtypeTextToStringPtr(row.City),
-			Province:        pgtypeTextToStringPtr(row.Province),
-			PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
-			Latitude:        pgtypeNumericToFloat64Ptr(row.Latitude),
-			Longitude:       pgtypeNumericToFloat64Ptr(row.Longitude),
-			Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
-			DistanceKm:      distance,
-			Services:        services,
+			Clinic:     clinic,
+			DistanceKm: distance,
 		}
 	}
 
@@ -826,10 +800,10 @@ func (r *clinicRepository) GetClinics(ctx context.Context, filters providers.Cli
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	clinicType := stringToStringPtr(filters.ClinicType)
-	province := stringToStringPtr(filters.Province)
-	city := stringToStringPtr(filters.City)
-	verificationStatus := stringToStringPtr(filters.VerificationStatus)
+	clinicType := stringPtrToString(filters.ClinicType)
+	province := stringPtrToString(filters.Province)
+	city := stringPtrToString(filters.City)
+	verificationStatus := stringPtrToString(filters.VerificationStatus)
 
 	sqlParams := sqlc.ListClinicsParams{
 		Column1: clinicType,
@@ -848,21 +822,7 @@ func (r *clinicRepository) GetClinics(ctx context.Context, filters providers.Cli
 
 	clinics := make([]providers.Clinic, len(rows))
 	for i, row := range rows {
-		clinics[i] = providers.Clinic{
-			ID:                 pgtypeUUIDToUUID(row.ID),
-			ClinicName:         row.ClinicName,
-			ClinicType:         row.ClinicType,
-			City:               pgtypeTextToStringPtr(row.City),
-			Province:           pgtypeTextToStringPtr(row.Province),
-			PhysicalAddress:    row.PhysicalAddress,
-			PrimaryPhone:       pgtypeTextToStringPtr(row.PrimaryPhone),
-			Email:              pgtypeTextToStringPtr(row.Email),
-			IsVerified:         pgtypeBoolToBool(row.IsVerified),
-			VerificationStatus: pgtypeTextToString(row.VerificationStatus),
-			Rating:             pgtypeNumericToFloat64Ptr(row.Rating),
-			ReviewCount:        pgtypeInt4ToInt(row.ReviewCount),
-			CreatedAt:          row.CreatedAt.Time,
-		}
+		clinics[i] = r.mapToClinicFromList(row)
 	}
 
 	clinicDBQueryTotal.WithLabelValues("list_clinics", "success").Inc()
@@ -1211,7 +1171,7 @@ func (r *clinicRepository) GetClinicsByLanguage(ctx context.Context, language st
 	}()
 
 	// Since there's no direct query for language, we'll use the SearchClinicsAdvanced with language in the search term
-	// This is a simplified implementation - in production you might want a different approach
+	// This is a simplified implementation - in production we'll change this
 	searchParams := providers.ClinicAdvancedSearchParams{
 		Query:    &language,
 		Province: province,
@@ -1556,17 +1516,17 @@ func (r *clinicRepository) GetClinicStatistics(ctx context.Context, id uuid.UUID
 	}
 
 	stats := providers.ClinicStatistics{
-		ID:                     pgtypeUUIDToUUID(row.ID),
-		ClinicName:             row.ClinicName,
-		ReviewCount:            pgtypeInt4ToInt(row.ReviewCount),
-		Rating:                 pgtypeNumericToFloat64Ptr(row.Rating),
-		PatientCapacity:        pgtypeInt4ToIntPtr(row.PatientCapacity),
-		BedCount:               pgtypeInt4ToIntPtr(row.BedCount),
-		AverageWaitTimeMinutes: pgtypeInt4ToIntPtr(row.AverageWaitTimeMinutes),
-		ActiveStaffCount:       int(row.ActiveStaffCount),
-		TotalStaffCount:        int(row.TotalStaffCount),
-		ActiveServicesCount:    int(row.ActiveServicesCount),
-		TotalServicesCount:     int(row.TotalServicesCount),
+		ID:                  pgtypeUUIDToUUID(row.ID),
+		ClinicName:          row.ClinicName,
+		ReviewCount:         pgtypeInt4ToInt(row.ReviewCount),
+		Rating:              pgtypeNumericToFloat64Ptr(row.Rating),
+		PatientCapacity:     pgtypeInt4ToIntPtr(row.PatientCapacity),
+		BedCount:            pgtypeInt4ToIntPtr(row.BedCount),
+		AverageWaitTime:     pgtypeInt4ToIntPtr(row.AverageWaitTimeMinutes),
+		ActiveStaffCount:    row.ActiveStaffCount,
+		TotalStaffCount:     row.TotalStaffCount,
+		ActiveServicesCount: row.ActiveServicesCount,
+		TotalServicesCount:  row.TotalServicesCount,
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinic_statistics", "success").Inc()
@@ -1586,15 +1546,15 @@ func (r *clinicRepository) GetClinicMetrics(ctx context.Context) (providers.Clin
 	}
 
 	metrics := providers.ClinicMetrics{
-		TotalClinics:    int(row.TotalClinics),
-		VerifiedClinics: int(row.VerifiedClinics),
-		PendingClinics:  int(row.PendingClinics),
-		RejectedClinics: int(row.RejectedClinics),
-		ActiveClinics:   int(row.ActiveClinics),
-		AverageRating:   row.AverageRating,
-		TotalReviews:    int(row.TotalReviews),
-		AverageCapacity: row.AvgCapacity,
-		TotalBeds:       int(row.TotalBeds),
+		TotalClinics:    row.TotalClinics,
+		VerifiedClinics: row.VerifiedClinics,
+		PendingClinics:  row.PendingClinics,
+		RejectedClinics: row.RejectedClinics,
+		ActiveClinics:   row.ActiveClinics,
+		AverageRating:   float64ToFloat64Ptr(row.AverageRating),
+		TotalReviews:    row.TotalReviews,
+		AverageCapacity: float64ToFloat64Ptr(row.AvgCapacity),
+		TotalBeds:       row.TotalBeds,
 	}
 
 	clinicDBQueryTotal.WithLabelValues("get_clinic_metrics", "success").Inc()
@@ -1618,7 +1578,7 @@ func (r *clinicRepository) GetClinicTypeDistribution(ctx context.Context) ([]pro
 		distributions[i] = providers.ClinicTypeDistribution{
 			ClinicType:    row.ClinicType,
 			Count:         int64(row.Count),
-			AverageRating: row.AvgRating,
+			AverageRating: float64ToFloat64Ptr(row.AvgRating),
 		}
 	}
 
@@ -1643,7 +1603,7 @@ func (r *clinicRepository) GetClinicProvinceDistribution(ctx context.Context) ([
 		distributions[i] = providers.ClinicProvinceDistribution{
 			Count:         int64(row.Count),
 			Province:      pgtypeTextToString(row.Province),
-			AverageRating: row.AvgRating,
+			AverageRating: float64ToFloat64Ptr(row.AvgRating),
 		}
 	}
 
@@ -1668,7 +1628,7 @@ func (r *clinicRepository) GetClinicOwnershipDistribution(ctx context.Context) (
 		distributions[i] = providers.ClinicOwnershipDistribution{
 			OwnershipType: pgtypeTextToString(row.OwnershipType),
 			Count:         int64(row.Count),
-			AverageRating: (*float64)(row.AvgRating),
+			AverageRating: float64ToFloat64Ptr(row.AvgRating),
 		}
 	}
 
@@ -1973,28 +1933,30 @@ func (r *clinicRepository) SearchClinicsAdvanced(ctx context.Context, params pro
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	servicesJSON, err := jsonbFromStringSlice(params.Services)
+	// Use jsonbFromMap for map[string]any types
+	servicesJSON, err := jsonbFromMap(params.Services)
 	if err != nil {
 		return nil, fmt.Errorf("marshal services: %w", err)
 	}
 
-	specialtiesJSON, err := jsonbFromStringSlice(params.Specialties)
+	specialtiesJSON, err := jsonbFromMap(params.Specialties)
 	if err != nil {
 		return nil, fmt.Errorf("marshal specialties: %w", err)
 	}
 
-	acceptsMedicalAid := params.AcceptsMedicalAid
-	if acceptsMedicalAid == nil {
-		acceptsMedicalAid = &[]bool{false}[0]
+	// Handle nullable bool properly
+	acceptsMedicalAid := false
+	if params.AcceptsMedicalAid != nil {
+		acceptsMedicalAid = *params.AcceptsMedicalAid
 	}
 
 	sqlParams := sqlc.SearchClinicsAdvancedParams{
-		Column1: params.Query,
-		Column2: params.Province,
-		Column3: params.City,
-		Column4: params.ClinicType,
-		Column5: params.OwnershipType,
-		Column6: *acceptsMedicalAid,
+		Column1: stringPtrToString(params.Query),
+		Column2: stringPtrToString(params.Province),
+		Column3: stringPtrToString(params.City),
+		Column4: stringPtrToString(params.ClinicType),
+		Column5: stringPtrToString(params.OwnershipType),
+		Column6: acceptsMedicalAid,
 		Column7: servicesJSON,
 		Column8: specialtiesJSON,
 		Limit:   int32(params.Limit),
@@ -2009,10 +1971,6 @@ func (r *clinicRepository) SearchClinicsAdvanced(ctx context.Context, params pro
 
 	clinics := make([]providers.Clinic, len(rows))
 	for i, row := range rows {
-		services := stringSliceFromJSONB(row.Services)
-		specialties := stringSliceFromJSONB(row.Specialties)
-		facilities := stringSliceFromJSONB(row.Facilities)
-
 		clinics[i] = providers.Clinic{
 			ID:                pgtypeUUIDToUUID(row.ID),
 			ClinicName:        row.ClinicName,
@@ -2025,9 +1983,9 @@ func (r *clinicRepository) SearchClinicsAdvanced(ctx context.Context, params pro
 			Rating:            pgtypeNumericToFloat64Ptr(row.Rating),
 			ReviewCount:       pgtypeInt4ToInt(row.ReviewCount),
 			AcceptsMedicalAid: pgtypeBoolToBool(row.AcceptsMedicalAid),
-			Services:          services,
-			Specialties:       specialties,
-			Facilities:        facilities,
+			Services:          stringSliceFromJSONB(row.Services),
+			Specialties:       stringSliceFromJSONB(row.Specialties),
+			Facilities:        stringSliceFromJSONB(row.Facilities),
 		}
 	}
 
@@ -2233,5 +2191,50 @@ func (r *clinicRepository) mapToClinicFromSearch(row sqlc.SearchClinicsRow) prov
 		VerificationStatus: pgtypeTextToString(row.VerificationStatus),
 		AcceptsMedicalAid:  pgtypeBoolToBool(row.AcceptsMedicalAid),
 		CreatedAt:          row.CreatedAt.Time,
+	}
+}
+
+func (r *clinicRepository) mapToClinicFromSearchByName(row sqlc.SearchClinicsByNameRow) providers.Clinic {
+	return providers.Clinic{
+		ID:              pgtypeUUIDToUUID(row.ID),
+		ClinicName:      row.ClinicName,
+		ClinicType:      row.ClinicType,
+		City:            pgtypeTextToStringPtr(row.City),
+		Province:        pgtypeTextToStringPtr(row.Province),
+		PhysicalAddress: row.PhysicalAddress,
+		PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+		Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+		ReviewCount:     pgtypeInt4ToInt(row.ReviewCount),
+	}
+}
+
+func (r *clinicRepository) mapToClinicFromSearchByLocation(row sqlc.SearchClinicsByLocationRow) providers.Clinic {
+	return providers.Clinic{
+		ID:              pgtypeUUIDToUUID(row.ID),
+		ClinicName:      row.ClinicName,
+		ClinicType:      row.ClinicType,
+		PhysicalAddress: row.PhysicalAddress,
+		City:            pgtypeTextToStringPtr(row.City),
+		Province:        pgtypeTextToStringPtr(row.Province),
+		PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+		Latitude:        pgtypeNumericToFloat64Ptr(row.Latitude),
+		Longitude:       pgtypeNumericToFloat64Ptr(row.Longitude),
+		Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+	}
+}
+
+func (r *clinicRepository) mapToClinicFromNearbyService(row sqlc.GetNearbyClinicsByServiceRow) providers.Clinic {
+	return providers.Clinic{
+		ID:              pgtypeUUIDToUUID(row.ID),
+		ClinicName:      row.ClinicName,
+		ClinicType:      row.ClinicType,
+		PhysicalAddress: row.PhysicalAddress,
+		City:            pgtypeTextToStringPtr(row.City),
+		Province:        pgtypeTextToStringPtr(row.Province),
+		PrimaryPhone:    pgtypeTextToStringPtr(row.PrimaryPhone),
+		Latitude:        pgtypeNumericToFloat64Ptr(row.Latitude),
+		Longitude:       pgtypeNumericToFloat64Ptr(row.Longitude),
+		Rating:          pgtypeNumericToFloat64Ptr(row.Rating),
+		Services:        stringSliceFromJSONB(row.Services),
 	}
 }
