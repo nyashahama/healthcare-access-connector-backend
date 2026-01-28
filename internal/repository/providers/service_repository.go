@@ -614,7 +614,7 @@ func (r *serviceRepository) GetClinicServicesByStaff(ctx context.Context, clinic
 
 	params := sqlc.GetClinicServicesByStaffParams{
 		ClinicID:           uuidToPgtypeUUID(clinicID),
-		ProvidedByStaffIds: uuidToPgtypeUUID(staffID),
+		ProvidedByStaffIds: []pgtype.UUID{uuidToPgtypeUUID(staffID)},
 	}
 
 	rows, err := r.querier.GetClinicServicesByStaff(ctx, params)
@@ -1193,13 +1193,28 @@ func (r *serviceRepository) GetClinicServiceMetrics(ctx context.Context, clinicI
 		return providers.ServiceMetrics{}, r.handleError(err, "get clinic service metrics")
 	}
 
+	var avgCost *float64
+	if row.AverageCost != 0 {
+		avgCost = &row.AverageCost
+	}
+
+	var avgDuration *float64
+	if row.AvgDuration != 0 {
+		avgDuration = &row.AvgDuration
+	}
+
+	var overallRating *float64
+	if row.OverallRating != 0 {
+		overallRating = &row.OverallRating
+	}
+
 	metrics := providers.ServiceMetrics{
 		TotalServices:      row.TotalServices,
 		ActiveServices:     row.ActiveServices,
 		InactiveServices:   row.InactiveServices,
-		AverageCost:        row.AverageCost,
-		AverageDuration:    float64PtrToFloat64(row.AvgDuration),
-		OverallRating:      float64PtrToFloat64(row.OverallRating),
+		AverageCost:        avgCost,
+		AverageDuration:    avgDuration,
+		OverallRating:      overallRating,
 		TotalReviews:       row.TotalReviews,
 		MedicalAidServices: row.MedicalAidServices,
 		WalkInServices:     row.WalkInServices,
@@ -1223,11 +1238,21 @@ func (r *serviceRepository) GetServiceCategoryDistribution(ctx context.Context, 
 
 	distributions := make([]providers.ServiceCategoryDistribution, len(rows))
 	for i, row := range rows {
+		var avgCost *float64
+		if row.AvgCost != 0 {
+			avgCost = &row.AvgCost
+		}
+
+		var avgRating *float64
+		if row.AvgRating != 0 {
+			avgRating = &row.AvgRating
+		}
+
 		distributions[i] = providers.ServiceCategoryDistribution{
-			ServiceCategory: row.ServiceCategory,
+			ServiceCategory: pgtypeTextToString(row.ServiceCategory),
 			Count:           row.Count,
-			AverageCost:     float64PtrToFloat64(pgtypeNumericToFloat64Ptr(row.AvgCost)),
-			AverageRating:   float64PtrToFloat64(pgtypeNumericToFloat64Ptr(row.AvgRating)),
+			AverageCost:     avgCost,
+			AverageRating:   avgRating,
 		}
 	}
 
@@ -1249,10 +1274,15 @@ func (r *serviceRepository) GetServicePriceDistribution(ctx context.Context, cli
 
 	distributions := make([]providers.ServicePriceDistribution, len(rows))
 	for i, row := range rows {
+		var avgRating *float64
+		if row.AvgRating != 0 {
+			avgRating = &row.AvgRating
+		}
+
 		distributions[i] = providers.ServicePriceDistribution{
 			PriceRange:    row.PriceRange,
 			Count:         row.Count,
-			AverageRating: float64PtrToFloat64(pgtypeNumericToFloat64Ptr(row.AvgRating)),
+			AverageRating: avgRating,
 		}
 	}
 
@@ -1270,14 +1300,14 @@ func (r *serviceRepository) CountClinicServices(ctx context.Context, clinicID uu
 		serviceDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	var pgtypeIsActive pgtype.Bool
+	var column2 bool
 	if isActive != nil {
-		pgtypeIsActive = pgtype.Bool{Bool: *isActive, Valid: true}
+		column2 = *isActive
 	}
 
 	params := sqlc.CountClinicServicesParams{
 		ClinicID: uuidToPgtypeUUID(clinicID),
-		Column2:  pgtypeIsActive,
+		Column2:  column2,
 	}
 
 	count, err := r.querier.CountClinicServices(ctx, params)
@@ -1475,7 +1505,7 @@ func (r *serviceRepository) GetServicesAvailableOnDay(ctx context.Context, clini
 
 	params := sqlc.GetServicesAvailableOnDayParams{
 		ClinicID:      uuidToPgtypeUUID(clinicID),
-		AvailableDays: pgtypeTextFromString(day),
+		AvailableDays: []string{day},
 	}
 
 	rows, err := r.querier.GetServicesAvailableOnDay(ctx, params)
@@ -1536,7 +1566,7 @@ func (r *serviceRepository) GetQuickServices(ctx context.Context, clinicID uuid.
 
 	params := sqlc.GetQuickServicesParams{
 		ClinicID:        uuidToPgtypeUUID(clinicID),
-		DurationMinutes: int4(maxDurationMinutes),
+		DurationMinutes: pgtype.Int4{Int32: int32(maxDurationMinutes), Valid: true},
 	}
 
 	rows, err := r.querier.GetQuickServices(ctx, params)
