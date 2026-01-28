@@ -104,7 +104,7 @@ func (r *patientRepository) CreatePatientProfile(ctx context.Context, profile pa
 	}
 
 	patientDBQueryTotal.WithLabelValues("create_patient_profile", "success").Inc()
-	return r.mapToPatientProfileFromCreate(created), nil
+	return r.mapToPatientProfile(created), nil
 }
 
 func (r *patientRepository) GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error) {
@@ -124,7 +124,7 @@ func (r *patientRepository) GetPatientProfileByUserID(ctx context.Context, userI
 	}
 
 	patientDBQueryTotal.WithLabelValues("get_patient_profile_by_user_id", "success").Inc()
-	return r.mapToPatientProfileFromIDRow(profile), nil
+	return r.mapToPatientProfile(profile), nil
 }
 
 func (r *patientRepository) GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error) {
@@ -144,7 +144,7 @@ func (r *patientRepository) GetPatientProfileByID(ctx context.Context, id uuid.U
 	}
 
 	patientDBQueryTotal.WithLabelValues("get_patient_profile_by_id", "success").Inc()
-	return r.mapToPatientProfileFromIDRow(profile), nil
+	return r.mapToPatientProfile(profile), nil
 }
 
 func (r *patientRepository) GetPatientProfileByNationalID(ctx context.Context, nationalID string) (patients.PatientProfile, error) {
@@ -164,7 +164,7 @@ func (r *patientRepository) GetPatientProfileByNationalID(ctx context.Context, n
 	}
 
 	patientDBQueryTotal.WithLabelValues("get_patient_profile_by_national_id", "success").Inc()
-	return r.mapToPatientProfileFromNationalIDRow(profile), nil
+	return r.mapToPatientProfile(profile), nil
 }
 
 func (r *patientRepository) UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error {
@@ -254,28 +254,7 @@ func (r *patientRepository) handleError(err error, operation string) error {
 	return fmt.Errorf("%s failed: %w", operation, err)
 }
 
-func (r *patientRepository) mapToPatientProfileFromCreate(row sqlc.CreatePatientProfileRow) patients.PatientProfile {
-	return patients.PatientProfile{
-		ID:                           pgtypeUUIDToUUID(row.ID),
-		UserID:                       pgtypeUUIDToUUID(row.UserID),
-		FirstName:                    row.FirstName,
-		LastName:                     row.LastName,
-		PreferredName:                pgtypeTextToStringPtr(row.PreferredName),
-		DateOfBirth:                  pgtypeDateToTimePtr(row.DateOfBirth),
-		Gender:                       pgtypeTextToStringPtr(row.Gender),
-		City:                         pgtypeTextToStringPtr(row.City),
-		Province:                     pgtypeTextToStringPtr(row.Province),
-		Country:                      pgtypeTextToString(row.Country),
-		PreferredCommunicationMethod: pgtypeTextToString(row.PreferredCommunicationMethod),
-		HasMedicalAid:                pgtypeBoolToBool(row.HasMedicalAid),
-		Timezone:                     pgtypeTextToString(row.Timezone),
-		CreatedAt:                    row.CreatedAt.Time,
-		UpdatedAt:                    row.UpdatedAt.Time,
-	}
-}
-
-// For GetPatientProfileByID (similar structure)
-func (r *patientRepository) mapToPatientProfileFromIDRow(row sqlc.PatientProfile) patients.PatientProfile {
+func (r *patientRepository) mapToPatientProfile(row sqlc.PatientProfile) patients.PatientProfile {
 	return patients.PatientProfile{
 		ID:                           pgtypeUUIDToUUID(row.ID),
 		UserID:                       pgtypeUUIDToUUID(row.UserID),
@@ -301,7 +280,7 @@ func (r *patientRepository) mapToPatientProfileFromIDRow(row sqlc.PatientProfile
 		EmploymentStatus:             pgtypeTextToStringPtr(row.EmploymentStatus),
 		EducationLevel:               pgtypeTextToStringPtr(row.EducationLevel),
 		HouseholdIncomeRange:         pgtypeTextToStringPtr(row.HouseholdIncomeRange),
-		ProfilePictureURL:            pgtypeTextToStringPtr(row.ProfilePictureUrl), // Note: field name difference
+		ProfilePictureURL:            pgtypeTextToStringPtr(row.ProfilePictureUrl),
 		Timezone:                     pgtypeTextToString(row.Timezone),
 		LastProfileUpdate:            pgtypeTimestampToTimePtr(row.LastProfileUpdate),
 		ReferredBy:                   uuidPtrToUUID(row.ReferredBy),
@@ -309,23 +288,5 @@ func (r *patientRepository) mapToPatientProfileFromIDRow(row sqlc.PatientProfile
 		AcceptsMarketingEmails:       pgtypeBoolToBool(row.AcceptsMarketingEmails),
 		CreatedAt:                    row.CreatedAt.Time,
 		UpdatedAt:                    row.UpdatedAt.Time,
-	}
-}
-
-// For GetPatientProfileByNationalID (partial fields)
-func (r *patientRepository) mapToPatientProfileFromNationalIDRow(row sqlc.GetPatientProfileByNationalIDRow) patients.PatientProfile {
-	return patients.PatientProfile{
-		ID:            pgtypeUUIDToUUID(row.ID),
-		UserID:        pgtypeUUIDToUUID(row.UserID),
-		FirstName:     row.FirstName,
-		LastName:      row.LastName,
-		PreferredName: pgtypeTextToStringPtr(row.PreferredName),
-		DateOfBirth:   pgtypeDateToTimePtr(row.DateOfBirth),
-		Gender:        pgtypeTextToStringPtr(row.Gender),
-		City:          pgtypeTextToStringPtr(row.City),
-		Province:      pgtypeTextToStringPtr(row.Province),
-		HasMedicalAid: pgtypeBoolToBool(row.HasMedicalAid),
-		CreatedAt:     row.CreatedAt.Time,
-		UpdatedAt:     row.UpdatedAt.Time,
 	}
 }
