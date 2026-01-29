@@ -869,6 +869,72 @@ type EmergencyContactRepository interface {
 }
 
 // ============================================
+// DEPENDENT HEALTH RECORD REPOSITORY
+// Maps to: dependent_health_records.sql
+// Domain: Dependent Health Records, Growth Tracking, & Pediatric Care
+// ============================================
+
+type DependentHealthRecordRepository interface {
+	// ===== Core CRUD Operations =====
+	AddDependentHealthRecord(ctx context.Context, record patients.DependentHealthRecord) (patients.DependentHealthRecord, error)
+	GetDependentHealthRecord(ctx context.Context, id uuid.UUID) (patients.DependentHealthRecord, error)
+	UpdateDependentHealthRecord(ctx context.Context, record patients.DependentHealthRecord) error
+	DeleteDependentHealthRecord(ctx context.Context, id uuid.UUID) error
+	DeleteDependentHealthRecords(ctx context.Context, dependentID uuid.UUID) error
+
+	// ===== Querying by Dependent =====
+	GetDependentHealthRecords(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+	GetHealthRecordsByType(ctx context.Context, dependentID uuid.UUID, recordType string) ([]patients.DependentHealthRecord, error)
+	GetGrowthRecords(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+	GetVaccinationRecords(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+	GetCheckupRecords(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+	GetEmergencyRecords(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+
+	// ===== Growth Tracking =====
+	GetLatestGrowthMeasurements(ctx context.Context, dependentID uuid.UUID) (patients.GrowthMeasurement, error)
+	GetWeightHistory(ctx context.Context, dependentID uuid.UUID) ([]patients.VitalHistory, error)
+	GetHeightHistory(ctx context.Context, dependentID uuid.UUID) ([]patients.VitalHistory, error)
+	GetHeadCircumferenceHistory(ctx context.Context, dependentID uuid.UUID) ([]patients.VitalHistory, error)
+	GetGrowthTrend(ctx context.Context, dependentID uuid.UUID) ([]patients.GrowthMeasurement, error)
+
+	// ===== Vital Signs Tracking =====
+	GetTemperatureHistory(ctx context.Context, dependentID uuid.UUID) ([]patients.VitalHistory, error)
+	GetAbnormalTemperatures(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+
+	// ===== Appointment Management =====
+	GetUpcomingAppointments(ctx context.Context) ([]patients.DependentHealthRecord, error)
+	UpdateNextAppointment(ctx context.Context, id uuid.UUID, appointmentDate time.Time) error
+
+	// ===== Provider & Clinic Queries =====
+	GetRecordsByProvider(ctx context.Context, dependentID uuid.UUID, providerName string) ([]patients.DependentHealthRecord, error)
+	GetRecordsByClinic(ctx context.Context, dependentID uuid.UUID, clinicName string) ([]patients.DependentHealthRecord, error)
+	GetProviderList(ctx context.Context, dependentID uuid.UUID) ([]string, error)
+	GetClinicList(ctx context.Context, dependentID uuid.UUID) ([]string, error)
+
+	// ===== Document Management =====
+	UpdateRecordDocuments(ctx context.Context, id uuid.UUID, documents interface{}) error
+	AddRecordDocument(ctx context.Context, id uuid.UUID, document interface{}) error
+	GetRecordsWithDocuments(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+
+	// ===== Date Range Queries =====
+	GetRecordsByDateRange(ctx context.Context, dependentID uuid.UUID, startDate, endDate time.Time) ([]patients.DependentHealthRecord, error)
+	GetRecentRecords(ctx context.Context, dependentID uuid.UUID, monthsBack int) ([]patients.DependentHealthRecord, error)
+
+	// ===== Statistics & Analytics =====
+	CountHealthRecords(ctx context.Context, dependentID uuid.UUID) (patients.HealthRecordStatistics, error)
+	GetRecordTypeDistribution(ctx context.Context, dependentID uuid.UUID) ([]patients.RecordTypeDistribution, error)
+	GetGrowthStatistics(ctx context.Context, dependentID uuid.UUID) (patients.GrowthStatistics, error)
+
+	// ===== Bulk Operations =====
+	GetRecordsByDependentIDs(ctx context.Context, dependentIDs []uuid.UUID) ([]patients.DependentHealthRecord, error)
+
+	// ===== Validation & Utilities =====
+	HasHealthRecords(ctx context.Context, dependentID uuid.UUID) (bool, error)
+	GetLastCheckupDate(ctx context.Context, dependentID uuid.UUID) (*time.Time, error)
+	GetLastGrowthCheckDate(ctx context.Context, dependentID uuid.UUID) (*time.Time, error)
+}
+
+// ============================================
 // NOTIFICATION REPOSITORY
 // ============================================
 
