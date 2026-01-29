@@ -2,6 +2,7 @@ package providers
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -273,4 +274,26 @@ func float64PtrToFloat64(f *float64) float64 {
 		return 0
 	}
 	return *f
+}
+
+// Interface to string conversion helper
+func interfaceToString(i interface{}) string {
+	if i == nil {
+		return ""
+	}
+
+	switch v := i.(type) {
+	case string:
+		return v
+	case *string:
+		if v == nil {
+			return ""
+		}
+		return *v
+	case pgtype.Text:
+		return pgtypeTextToString(v)
+	default:
+		// Fallback: convert to string using fmt
+		return fmt.Sprintf("%v", i)
+	}
 }

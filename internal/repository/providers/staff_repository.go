@@ -110,7 +110,7 @@ func (r *staffRepository) CreateStaffMember(ctx context.Context, staff providers
 		WorkingHours:           workingHoursJSON,
 		AvailableDays:          staff.AvailableDays,
 		IsAcceptingNewPatients: pgtype.Bool{Bool: staff.IsAcceptingNewPatients, Valid: true},
-		EmploymentStatus:       pgtypeTextFromString(staff.EmploymentStatus),
+		EmploymentStatus:       pgtype.Text{String: staff.EmploymentStatus, Valid: true},
 		StartDate:              datePtrToPgtypeDate(staff.StartDate),
 		EndDate:                datePtrToPgtypeDate(staff.EndDate),
 		ProfilePictureUrl:      pgtypeTextFromStringPtr(staff.ProfilePictureURL),
@@ -395,7 +395,7 @@ func (r *staffRepository) UpdateStaffStatus(ctx context.Context, id uuid.UUID, s
 
 	params := sqlc.UpdateStaffStatusParams{
 		ID:               uuidToPgtypeUUID(id),
-		EmploymentStatus: pgtypeTextFromString(status),
+		EmploymentStatus: pgtype.Text{String: status, Valid: true},
 		EndDate:          datePtrToPgtypeDate(endDate),
 	}
 
@@ -652,27 +652,12 @@ func (r *staffRepository) GetAllClinicStaff(ctx context.Context, clinicID uuid.U
 			LastName:               row.LastName,
 			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
 			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-			WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
-			PersonalPhone:          pgtypeTextToStringPtr(row.PersonalPhone),
-			HPCSNumber:             pgtypeTextToStringPtr(row.HpcsNumber),
-			OtherLicenseNumbers:    mapFromJSONB(row.OtherLicenseNumbers),
-			Qualifications:         row.Qualifications,
-			YearsExperience:        pgtypeInt4ToIntPtr(row.YearsExperience),
-			Bio:                    pgtypeTextToStringPtr(row.Bio),
 			StaffRole:              row.StaffRole,
-			Department:             pgtypeTextToStringPtr(row.Department),
-			IsPrimaryContact:       pgtypeBoolToBool(row.IsPrimaryContact),
-			WorkingHours:           mapFromJSONB(row.WorkingHours),
-			AvailableDays:          row.AvailableDays,
 			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
+			EmploymentStatus:       pgtypeTextToString(row.EmploymentStatus),
 			StartDate:              pgtypeDateToTimePtr(row.StartDate),
 			EndDate:                pgtypeDateToTimePtr(row.EndDate),
-			ProfilePictureURL:      pgtypeTextToStringPtr(row.ProfilePictureUrl),
-			LanguagesSpoken:        row.LanguagesSpoken,
 			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
 		}
 	}
 
@@ -696,7 +681,6 @@ func (r *staffRepository) GetActiveClinicStaff(ctx context.Context, clinicID uui
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
 			ID:                     pgtypeUUIDToUUID(row.ID),
-			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
 			UserID:                 pgtypeUUIDToUUID(row.UserID),
 			Title:                  pgtypeTextToStringPtr(row.Title),
 			FirstName:              row.FirstName,
@@ -704,12 +688,9 @@ func (r *staffRepository) GetActiveClinicStaff(ctx context.Context, clinicID uui
 			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
 			Specialization:         pgtypeTextToStringPtr(row.Specialization),
 			StaffRole:              row.StaffRole,
-			Department:             pgtypeTextToStringPtr(row.Department),
 			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
+			WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
 			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
 		}
 	}
 
@@ -737,22 +718,16 @@ func (r *staffRepository) GetClinicStaffByRole(ctx context.Context, clinicID uui
 	staffList := make([]providers.ClinicStaff, len(rows))
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
-			ID:                     pgtypeUUIDToUUID(row.ID),
-			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-			UserID:                 pgtypeUUIDToUUID(row.UserID),
-			Title:                  pgtypeTextToStringPtr(row.Title),
-			FirstName:              row.FirstName,
-			LastName:               row.LastName,
-			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
-			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			StaffRole:              row.StaffRole,
-			Department:             pgtypeTextToStringPtr(row.Department),
-			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-			WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
-			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
+			ID:                pgtypeUUIDToUUID(row.ID),
+			UserID:            pgtypeUUIDToUUID(row.UserID),
+			Title:             pgtypeTextToStringPtr(row.Title),
+			FirstName:         row.FirstName,
+			LastName:          row.LastName,
+			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
+			Specialization:    pgtypeTextToStringPtr(row.Specialization),
+			WorkEmail:         pgtypeTextToStringPtr(row.WorkEmail),
+			WorkPhone:         pgtypeTextToStringPtr(row.WorkPhone),
+			EmploymentStatus:  pgtypeTextToString(row.EmploymentStatus),
 		}
 	}
 
@@ -776,22 +751,14 @@ func (r *staffRepository) GetClinicDoctors(ctx context.Context, clinicID uuid.UU
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
 			ID:                     pgtypeUUIDToUUID(row.ID),
-			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
 			UserID:                 pgtypeUUIDToUUID(row.UserID),
 			Title:                  pgtypeTextToStringPtr(row.Title),
 			FirstName:              row.FirstName,
 			LastName:               row.LastName,
 			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
 			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-			WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
 			YearsExperience:        pgtypeInt4ToIntPtr(row.YearsExperience),
-			Bio:                    pgtypeTextToStringPtr(row.Bio),
-			StaffRole:              row.StaffRole,
 			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
 		}
 	}
 
@@ -815,21 +782,13 @@ func (r *staffRepository) GetClinicNurses(ctx context.Context, clinicID uuid.UUI
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
 			ID:                     pgtypeUUIDToUUID(row.ID),
-			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
 			UserID:                 pgtypeUUIDToUUID(row.UserID),
 			Title:                  pgtypeTextToStringPtr(row.Title),
 			FirstName:              row.FirstName,
 			LastName:               row.LastName,
 			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
 			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-			WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
-			YearsExperience:        pgtypeInt4ToIntPtr(row.YearsExperience),
-			StaffRole:              row.StaffRole,
 			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
 		}
 	}
 
@@ -854,22 +813,15 @@ func (r *staffRepository) GetClinicPrimaryContact(ctx context.Context, clinicID 
 	}
 
 	staff := providers.ClinicStaff{
-		ID:                pgtypeUUIDToUUID(row.ID),
-		ClinicID:          pgtypeUUIDToUUID(row.ClinicID),
-		UserID:            pgtypeUUIDToUUID(row.UserID),
-		Title:             pgtypeTextToStringPtr(row.Title),
-		FirstName:         row.FirstName,
-		LastName:          row.LastName,
-		ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
-		WorkEmail:         pgtypeTextToStringPtr(row.WorkEmail),
-		WorkPhone:         pgtypeTextToStringPtr(row.WorkPhone),
-		PersonalPhone:     pgtypeTextToStringPtr(row.PersonalPhone),
-		StaffRole:         row.StaffRole,
-		Department:        pgtypeTextToStringPtr(row.Department),
-		IsPrimaryContact:  true,
-		EmploymentStatus:  row.EmploymentStatus,
-		CreatedAt:         row.CreatedAt.Time,
-		UpdatedAt:         row.UpdatedAt.Time,
+		ID:               pgtypeUUIDToUUID(row.ID),
+		UserID:           pgtypeUUIDToUUID(row.UserID),
+		Title:            pgtypeTextToStringPtr(row.Title),
+		FirstName:        row.FirstName,
+		LastName:         row.LastName,
+		WorkEmail:        pgtypeTextToStringPtr(row.WorkEmail),
+		WorkPhone:        pgtypeTextToStringPtr(row.WorkPhone),
+		StaffRole:        row.StaffRole,
+		IsPrimaryContact: true,
 	}
 
 	staffDBQueryTotal.WithLabelValues("get_clinic_primary_contact", "success").Inc()
@@ -887,10 +839,10 @@ func (r *staffRepository) SearchStaffByName(ctx context.Context, name string, cl
 	}()
 
 	params := sqlc.SearchStaffByNameParams{
-		Column1:  "%" + name + "%",
-		ClinicID: uuidPtrToPgtypeUUID(clinicID),
-		Limit:    int32(limit),
-		Offset:   int32(offset),
+		Column1: pgtypeTextFromString(name),
+		Column2: uuidPtrToPgtypeUUID(clinicID),
+		Limit:   int32(limit),
+		Offset:  int32(offset),
 	}
 
 	rows, err := r.querier.SearchStaffByName(ctx, params)
@@ -902,23 +854,14 @@ func (r *staffRepository) SearchStaffByName(ctx context.Context, name string, cl
 	staffList := make([]providers.ClinicStaff, len(rows))
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
-			ID:                     pgtypeUUIDToUUID(row.ID),
-			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-			UserID:                 pgtypeUUIDToUUID(row.UserID),
-			Title:                  pgtypeTextToStringPtr(row.Title),
-			FirstName:              row.FirstName,
-			LastName:               row.LastName,
-			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
-			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-			WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
-			StaffRole:              row.StaffRole,
-			Department:             pgtypeTextToStringPtr(row.Department),
-			YearsExperience:        pgtypeInt4ToIntPtr(row.YearsExperience),
-			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
+			ID:                pgtypeUUIDToUUID(row.ID),
+			ClinicID:          pgtypeUUIDToUUID(row.ClinicID),
+			Title:             pgtypeTextToStringPtr(row.Title),
+			FirstName:         row.FirstName,
+			LastName:          row.LastName,
+			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
+			Specialization:    pgtypeTextToStringPtr(row.Specialization),
+			StaffRole:         row.StaffRole,
 		}
 	}
 
@@ -933,10 +876,8 @@ func (r *staffRepository) SearchStaffBySpecialization(ctx context.Context, speci
 	}()
 
 	params := sqlc.GetStaffBySpecializationParams{
-		Specialization: pgtypeTextFromString("%" + specialization + "%"),
-		ClinicID:       uuidPtrToPgtypeUUID(clinicID),
-		Limit:          int32(limit),
-		Offset:         int32(offset),
+		Column1: pgtypeTextFromString("%" + specialization + "%"),
+		Column2: uuidPtrToPgtypeUUID(clinicID),
 	}
 
 	rows, err := r.querier.GetStaffBySpecialization(ctx, params)
@@ -950,20 +891,12 @@ func (r *staffRepository) SearchStaffBySpecialization(ctx context.Context, speci
 		staffList[i] = providers.ClinicStaff{
 			ID:                     pgtypeUUIDToUUID(row.ID),
 			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-			UserID:                 pgtypeUUIDToUUID(row.UserID),
 			Title:                  pgtypeTextToStringPtr(row.Title),
 			FirstName:              row.FirstName,
 			LastName:               row.LastName,
 			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
 			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-			WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
-			StaffRole:              row.StaffRole,
-			YearsExperience:        pgtypeInt4ToIntPtr(row.YearsExperience),
 			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
 		}
 	}
 
@@ -991,22 +924,13 @@ func (r *staffRepository) GetStaffByDepartment(ctx context.Context, clinicID uui
 	staffList := make([]providers.ClinicStaff, len(rows))
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
-			ID:                     pgtypeUUIDToUUID(row.ID),
-			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-			UserID:                 pgtypeUUIDToUUID(row.UserID),
-			Title:                  pgtypeTextToStringPtr(row.Title),
-			FirstName:              row.FirstName,
-			LastName:               row.LastName,
-			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
-			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			StaffRole:              row.StaffRole,
-			Department:             pgtypeTextToStringPtr(row.Department),
-			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-			WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
-			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
+			ID:                pgtypeUUIDToUUID(row.ID),
+			Title:             pgtypeTextToStringPtr(row.Title),
+			FirstName:         row.FirstName,
+			LastName:          row.LastName,
+			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
+			StaffRole:         row.StaffRole,
+			Department:        pgtypeTextToStringPtr(row.Department),
 		}
 	}
 
@@ -1038,22 +962,14 @@ func (r *staffRepository) GetStaffAvailableOnDay(ctx context.Context, clinicID u
 	staffList := make([]providers.ClinicStaff, len(rows))
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
-			ID:                     pgtypeUUIDToUUID(row.ID),
-			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-			UserID:                 pgtypeUUIDToUUID(row.UserID),
-			Title:                  pgtypeTextToStringPtr(row.Title),
-			FirstName:              row.FirstName,
-			LastName:               row.LastName,
-			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
-			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			StaffRole:              row.StaffRole,
-			Department:             pgtypeTextToStringPtr(row.Department),
-			WorkingHours:           mapFromJSONB(row.WorkingHours),
-			AvailableDays:          row.AvailableDays,
-			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
+			ID:                pgtypeUUIDToUUID(row.ID),
+			Title:             pgtypeTextToStringPtr(row.Title),
+			FirstName:         row.FirstName,
+			LastName:          row.LastName,
+			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
+			StaffRole:         row.StaffRole,
+			WorkingHours:      mapFromJSONB(row.WorkingHours),
+			AvailableDays:     row.AvailableDays,
 		}
 	}
 
@@ -1149,14 +1065,12 @@ func (r *staffRepository) GetStaffWithExpiredLicenses(ctx context.Context) ([]pr
 	staffList := make([]providers.ClinicStaff, len(rows))
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
-			ID:                pgtypeUUIDToUUID(row.ID),
-			ClinicID:          pgtypeUUIDToUUID(row.ClinicID),
-			FirstName:         row.FirstName,
-			LastName:          row.LastName,
-			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
-			HPCSNumber:        pgtypeTextToStringPtr(row.HpcsNumber),
-			WorkEmail:         pgtypeTextToStringPtr(row.WorkEmail),
-			EmploymentStatus:  row.EmploymentStatus,
+			ID:         pgtypeUUIDToUUID(row.ID),
+			ClinicID:   pgtypeUUIDToUUID(row.ClinicID),
+			FirstName:  row.FirstName,
+			LastName:   row.LastName,
+			HPCSNumber: pgtypeTextToStringPtr(row.HpcsNumber),
+			WorkEmail:  pgtypeTextToStringPtr(row.WorkEmail),
 		}
 	}
 
@@ -1185,7 +1099,7 @@ func (r *staffRepository) GetStaffNeedingCredentialRenewal(ctx context.Context) 
 			LastName:       row.LastName,
 			WorkEmail:      pgtypeTextToStringPtr(row.WorkEmail),
 			CredentialType: "HPCS License",
-			ExpiryDate:     nil, // This would come from license_expiry_date if it existed in the schema
+			ExpiryDate:     &row.ExpiryDate.Time,
 		})
 	}
 
@@ -1204,8 +1118,8 @@ func (r *staffRepository) TransferStaffToClinic(ctx context.Context, staffID, ne
 	}()
 
 	params := sqlc.TransferStaffToClinicParams{
-		Column1: uuidToPgtypeUUID(staffID),
-		Column2: uuidToPgtypeUUID(newClinicID),
+		ID:       uuidToPgtypeUUID(staffID),
+		ClinicID: uuidToPgtypeUUID(newClinicID),
 	}
 
 	err := r.querier.TransferStaffToClinic(ctx, params)
@@ -1233,17 +1147,13 @@ func (r *staffRepository) GetStaffTransferHistory(ctx context.Context, userID uu
 	staffList := make([]providers.ClinicStaff, len(rows))
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
-			ID:               pgtypeUUIDToUUID(row.ID),
-			ClinicID:         pgtypeUUIDToUUID(row.ClinicID),
-			UserID:           pgtypeUUIDToUUID(row.UserID),
-			FirstName:        row.FirstName,
-			LastName:         row.LastName,
-			StaffRole:        row.StaffRole,
-			EmploymentStatus: row.EmploymentStatus,
-			StartDate:        pgtypeDateToTimePtr(row.StartDate),
-			EndDate:          pgtypeDateToTimePtr(row.EndDate),
-			CreatedAt:        row.CreatedAt.Time,
-			UpdatedAt:        row.UpdatedAt.Time,
+			ID:        pgtypeUUIDToUUID(row.ID),
+			ClinicID:  pgtypeUUIDToUUID(row.ClinicID),
+			FirstName: row.FirstName,
+			LastName:  row.LastName,
+			StaffRole: row.StaffRole,
+			StartDate: pgtypeDateToTimePtr(row.StartDate),
+			EndDate:   pgtypeDateToTimePtr(row.EndDate),
 		}
 	}
 
@@ -1273,11 +1183,11 @@ func (r *staffRepository) GetStaffStatistics(ctx context.Context, id uuid.UUID) 
 
 	stats := providers.StaffStatistics{
 		ID:                     pgtypeUUIDToUUID(row.ID),
-		FullName:               row.FirstName + " " + row.LastName,
+		FullName:               interfaceToString(row.FullName),
 		ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
 		Specialization:         pgtypeTextToStringPtr(row.Specialization),
 		YearsExperience:        pgtypeInt4ToIntPtr(row.YearsExperience),
-		EmploymentStatus:       row.EmploymentStatus,
+		EmploymentStatus:       pgtypeTextToString(row.EmploymentStatus),
 		IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
 		CreatedAt:              row.CreatedAt.Time,
 	}
@@ -1307,7 +1217,7 @@ func (r *staffRepository) GetClinicStaffMetrics(ctx context.Context, clinicID uu
 		NurseCount:             row.NurseCount,
 		AdminCount:             row.AdminCount,
 		AcceptingPatientsCount: row.AcceptingPatientsCount,
-		AverageExperience:      pgtypeNumericToFloat64Ptr(row.AverageExperience),
+		AverageExperience:      float64ToFloat64Ptr(row.AvgExperience),
 	}
 
 	staffDBQueryTotal.WithLabelValues("get_clinic_staff_metrics", "success").Inc()
@@ -1331,7 +1241,7 @@ func (r *staffRepository) GetStaffRoleDistribution(ctx context.Context, clinicID
 		distribution[i] = providers.StaffRoleDistribution{
 			StaffRole:         row.StaffRole,
 			Count:             row.Count,
-			AverageExperience: pgtypeNumericToFloat64Ptr(row.AverageExperience),
+			AverageExperience: float64ToFloat64Ptr(row.AvgExperience),
 		}
 	}
 
@@ -1359,21 +1269,12 @@ func (r *staffRepository) GetStaffByExperience(ctx context.Context, clinicID uui
 	staffList := make([]providers.ClinicStaff, len(rows))
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
-			ID:                     pgtypeUUIDToUUID(row.ID),
-			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-			UserID:                 pgtypeUUIDToUUID(row.UserID),
-			Title:                  pgtypeTextToStringPtr(row.Title),
-			FirstName:              row.FirstName,
-			LastName:               row.LastName,
-			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
-			Specialization:         pgtypeTextToStringPtr(row.Specialization),
-			YearsExperience:        pgtypeInt4ToIntPtr(row.YearsExperience),
-			StaffRole:              row.StaffRole,
-			WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
-			EmploymentStatus:       row.EmploymentStatus,
-			CreatedAt:              row.CreatedAt.Time,
-			UpdatedAt:              row.UpdatedAt.Time,
+			ID:                pgtypeUUIDToUUID(row.ID),
+			Title:             pgtypeTextToStringPtr(row.Title),
+			FirstName:         row.FirstName,
+			LastName:          row.LastName,
+			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
+			YearsExperience:   pgtypeInt4ToIntPtr(row.YearsExperience),
 		}
 	}
 
@@ -1397,7 +1298,7 @@ func (r *staffRepository) GetStaffDemographics(ctx context.Context, clinicID uui
 		TotalStaff:             row.TotalStaff,
 		UniqueSpecializations:  row.UniqueSpecializations,
 		UniqueRoles:            row.UniqueRoles,
-		AverageLanguagesSpoken: pgtypeNumericToFloat64Ptr(row.AverageLanguagesSpoken),
+		AverageLanguagesSpoken: float64ToFloat64Ptr(row.AvgLanguagesSpoken),
 	}
 
 	staffDBQueryTotal.WithLabelValues("get_staff_demographics", "success").Inc()
@@ -1415,8 +1316,8 @@ func (r *staffRepository) CountClinicStaff(ctx context.Context, clinicID uuid.UU
 	}()
 
 	params := sqlc.CountClinicStaffParams{
-		ClinicID:         uuidToPgtypeUUID(clinicID),
-		EmploymentStatus: pgtypeTextFromStringPtr(employmentStatus),
+		ClinicID: uuidToPgtypeUUID(clinicID),
+		Column2:  stringPtrToString(employmentStatus),
 	}
 
 	count, err := r.querier.CountClinicStaff(ctx, params)
@@ -1546,7 +1447,7 @@ func (r *staffRepository) BulkUpdateStaffStatus(ctx context.Context, ids []uuid.
 
 	params := sqlc.BulkUpdateStaffStatusParams{
 		Column1:          pgtypeIDs,
-		EmploymentStatus: pgtypeTextFromString(status),
+		EmploymentStatus: pgtype.Text{String: status, Valid: true},
 	}
 
 	err := r.querier.BulkUpdateStaffStatus(ctx, params)
@@ -1626,18 +1527,12 @@ func (r *staffRepository) GetStaffByLanguage(ctx context.Context, clinicID uuid.
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
 			ID:                pgtypeUUIDToUUID(row.ID),
-			ClinicID:          pgtypeUUIDToUUID(row.ClinicID),
-			UserID:            pgtypeUUIDToUUID(row.UserID),
 			Title:             pgtypeTextToStringPtr(row.Title),
 			FirstName:         row.FirstName,
 			LastName:          row.LastName,
 			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
 			StaffRole:         row.StaffRole,
-			WorkEmail:         pgtypeTextToStringPtr(row.WorkEmail),
 			LanguagesSpoken:   row.LanguagesSpoken,
-			EmploymentStatus:  row.EmploymentStatus,
-			CreatedAt:         row.CreatedAt.Time,
-			UpdatedAt:         row.UpdatedAt.Time,
 		}
 	}
 
@@ -1645,15 +1540,15 @@ func (r *staffRepository) GetStaffByLanguage(ctx context.Context, clinicID uuid.
 	return staffList, nil
 }
 
-func (r *staffRepository) GetMultilingualStaff(ctx context.Context, clinicID uuid.UUID, minLanguages int) ([]providers.StaffLanguageInfo, error) {
+func (r *staffRepository) GetMultilingualStaff(ctx context.Context, clinicID uuid.UUID, minLanguages []string) ([]providers.StaffLanguageInfo, error) {
 	start := time.Now()
 	defer func() {
 		staffDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	params := sqlc.GetMultilingualStaffParams{
-		ClinicID: uuidToPgtypeUUID(clinicID),
-		Column2:  int64(minLanguages),
+		ClinicID:        uuidToPgtypeUUID(clinicID),
+		LanguagesSpoken: minLanguages,
 	}
 
 	rows, err := r.querier.GetMultilingualStaff(ctx, params)
@@ -1739,15 +1634,15 @@ func (r *staffRepository) GetStaffWithIncompleteProfiles(ctx context.Context) ([
 	return staffList, nil
 }
 
-func (r *staffRepository) GetStaffHiredBetweenDates(ctx context.Context, startDate, endDate time.Time) ([]providers.ClinicStaff, error) {
+func (r *staffRepository) GetStaffHiredBetweenDates(ctx context.Context, startDate, startDat2 time.Time) ([]providers.ClinicStaff, error) {
 	start := time.Now()
 	defer func() {
 		staffDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	params := sqlc.GetStaffHiredBetweenDatesParams{
-		StartDate: datePtrToPgtypeDate(&startDate),
-		EndDate:   datePtrToPgtypeDate(&endDate),
+		StartDate:   datePtrToPgtypeDate(&startDate),
+		StartDate_2: datePtrToPgtypeDate(&startDat2),
 	}
 
 	rows, err := r.querier.GetStaffHiredBetweenDates(ctx, params)
@@ -1773,14 +1668,14 @@ func (r *staffRepository) GetStaffHiredBetweenDates(ctx context.Context, startDa
 	return staffList, nil
 }
 
-func (r *staffRepository) GetStaffTerminatedBetweenDates(ctx context.Context, startDate, endDate time.Time) ([]providers.ClinicStaff, error) {
+func (r *staffRepository) GetStaffTerminatedBetweenDates(ctx context.Context, endDate1, endDate time.Time) ([]providers.ClinicStaff, error) {
 	start := time.Now()
 	defer func() {
 		staffDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
 	params := sqlc.GetStaffTerminatedBetweenDatesParams{
-		StartDate: datePtrToPgtypeDate(&startDate),
+		EndDate_2: datePtrToPgtypeDate(&endDate1),
 		EndDate:   datePtrToPgtypeDate(&endDate),
 	}
 

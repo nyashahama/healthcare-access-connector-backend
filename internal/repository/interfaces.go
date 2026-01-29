@@ -508,13 +508,13 @@ type StaffRepository interface {
 
 	// ===== Language & Communication =====
 	GetStaffByLanguage(ctx context.Context, clinicID uuid.UUID, language string) ([]providers.ClinicStaff, error)
-	GetMultilingualStaff(ctx context.Context, clinicID uuid.UUID, minLanguages int) ([]providers.StaffLanguageInfo, error)
+	GetMultilingualStaff(ctx context.Context, clinicID uuid.UUID, minLanguages []string) ([]providers.StaffLanguageInfo, error)
 
 	// ===== Reporting & Compliance =====
 	GetStaffWithoutHPCSNumber(ctx context.Context) ([]providers.ClinicStaff, error)
 	GetStaffWithIncompleteProfiles(ctx context.Context) ([]providers.ClinicStaff, error)
-	GetStaffHiredBetweenDates(ctx context.Context, startDate, endDate time.Time) ([]providers.ClinicStaff, error)
-	GetStaffTerminatedBetweenDates(ctx context.Context, startDate, endDate time.Time) ([]providers.ClinicStaff, error)
+	GetStaffHiredBetweenDates(ctx context.Context, startDate, startDate2 time.Time) ([]providers.ClinicStaff, error)
+	GetStaffTerminatedBetweenDates(ctx context.Context, endDate1, endDate time.Time) ([]providers.ClinicStaff, error)
 }
 
 // ============================================

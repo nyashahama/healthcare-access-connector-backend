@@ -54,6 +54,9 @@ var (
 	ErrCredentialExpired     = errors.New("credential has expired")
 	ErrCredentialNotVerified = errors.New("credential not verified")
 	ErrInvalidHPCSNumber     = errors.New("invalid HPCS number")
+	ErrDuplicateStaffEmail   = errors.New("staff email already exists")
+	ErrDuplicateHPCSNumber   = errors.New("HPCS number already exists")
+	ErrDuplicateUserStaff    = errors.New("user already has staff profile")
 
 	// Session errors
 	ErrSessionNotFound = errors.New("session not found")
@@ -220,7 +223,10 @@ func HTTPStatusCode(err error) int {
 		errors.Is(err, ErrDuplicateUsername),
 		errors.Is(err, ErrPatientProfileExists),
 		errors.Is(err, ErrClinicAlreadyVerified),
-		errors.Is(err, ErrAppointmentConflict):
+		errors.Is(err, ErrAppointmentConflict),
+		errors.Is(err, ErrDuplicateStaffEmail),
+		errors.Is(err, ErrDuplicateHPCSNumber),
+		errors.Is(err, ErrDuplicateUserStaff):
 		return http.StatusConflict
 
 	// 410 Gone
@@ -304,6 +310,12 @@ func ErrorMessage(err error) string {
 		return "This staff member is not currently active"
 	case errors.Is(err, ErrCredentialExpired):
 		return "Professional credential has expired"
+	case errors.Is(err, ErrDuplicateStaffEmail):
+		return "Staff email is already registered"
+	case errors.Is(err, ErrDuplicateHPCSNumber):
+		return "HPCS number is already in use"
+	case errors.Is(err, ErrDuplicateUserStaff):
+		return "User already has a staff profile"
 
 	// Session errors
 	case errors.Is(err, ErrSessionExpired):
@@ -405,5 +417,8 @@ func IsDuplicateError(err error) bool {
 		errors.Is(err, ErrDuplicatePhone) ||
 		errors.Is(err, ErrDuplicateUsername) ||
 		errors.Is(err, ErrPatientProfileExists) ||
-		errors.Is(err, ErrClinicAlreadyVerified)
+		errors.Is(err, ErrClinicAlreadyVerified) ||
+		errors.Is(err, ErrDuplicateStaffEmail) ||
+		errors.Is(err, ErrDuplicateHPCSNumber) ||
+		errors.Is(err, ErrDuplicateUserStaff)
 }
