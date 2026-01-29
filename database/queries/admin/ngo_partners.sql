@@ -292,7 +292,7 @@ WHERE
     AND np.partnership_status = 'active'
 ORDER BY np.organization_name;
 
--- name: GetRegionCoverage :many
+-- name: GetNGORegionCoverage :many
 SELECT 
     unnest(operating_regions) as region,
     COUNT(*) as ngo_count,
@@ -301,7 +301,6 @@ FROM ngo_partners
 WHERE operating_regions IS NOT NULL
 GROUP BY region
 ORDER BY ngo_count DESC;
-
 -- name: CheckNGOOperatesInRegion :one
 SELECT EXISTS(
     SELECT 1 FROM ngo_partners
