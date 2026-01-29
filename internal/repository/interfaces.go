@@ -568,6 +568,51 @@ type PatientImmunizationRepository interface {
 }
 
 // ============================================
+// PATIENT FAMILY HISTORY REPOSITORY
+// Maps to: patient_family_history.sql
+// Domain: Family Medical History, Genetic Risk Assessment, & Hereditary Conditions
+// ============================================
+
+type PatientFamilyHistoryRepository interface {
+	// ===== Core CRUD Operations =====
+	AddFamilyHistory(ctx context.Context, history patients.PatientFamilyHistory) (patients.PatientFamilyHistory, error)
+	GetFamilyHistoryEntry(ctx context.Context, id uuid.UUID) (patients.PatientFamilyHistory, error)
+	UpdateFamilyHistory(ctx context.Context, history patients.PatientFamilyHistory) error
+	DeleteFamilyHistory(ctx context.Context, id uuid.UUID) error
+	DeletePatientFamilyHistory(ctx context.Context, patientID uuid.UUID) error
+
+	// ===== Querying by Patient =====
+	GetPatientFamilyHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientFamilyHistory, error)
+	GetFamilyHistoryByRelative(ctx context.Context, patientID uuid.UUID, relative string) ([]patients.PatientFamilyHistory, error)
+	GetFamilyHistoryByCondition(ctx context.Context, patientID uuid.UUID, conditionName string) ([]patients.PatientFamilyHistory, error)
+
+	// ===== Genetic Risk Assessment =====
+	GetGeneticConditions(ctx context.Context, patientID uuid.UUID) ([]patients.GeneticConditionRisk, error)
+	GetHeritableConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientFamilyHistory, error)
+	GetPatientsWithFamilyCondition(ctx context.Context, conditionName string, limit, offset int) ([]patients.PatientFamilyHistory, error)
+	CalculateGeneticRisk(ctx context.Context, patientID uuid.UUID, conditionName string) (interface{}, error)
+
+	// ===== Mortality Tracking =====
+	GetDeceasedRelatives(ctx context.Context, patientID uuid.UUID) ([]patients.PatientFamilyHistory, error)
+	GetEarlyDeaths(ctx context.Context, maxAge int) ([]patients.PatientFamilyHistory, error)
+	GetMortalityPatterns(ctx context.Context, patientID uuid.UUID) (interface{}, error)
+
+	// ===== Statistics & Analytics =====
+	CountFamilyHistoryEntries(ctx context.Context, patientID uuid.UUID) (patients.FamilyHistoryStatistics, error)
+	GetFamilyHistoryStatistics(ctx context.Context) (patients.FamilyHistorySystemMetrics, error)
+	GetMostCommonFamilyConditions(ctx context.Context, limit int) ([]patients.FamilyConditionStats, error)
+	GetHereditaryConditionPrevalence(ctx context.Context) (map[string]int64, error)
+
+	// ===== Bulk Operations =====
+	GetFamilyHistoryByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientFamilyHistory, error)
+
+	// ===== Validation & Utilities =====
+	HasFamilyHistory(ctx context.Context, patientID uuid.UUID) (bool, error)
+	HasConditionInFamily(ctx context.Context, patientID uuid.UUID, conditionName string) (bool, error)
+	CountRelativesWithCondition(ctx context.Context, patientID uuid.UUID, conditionName string) (int64, error)
+}
+
+// ============================================
 // NOTIFICATION REPOSITORY
 // ============================================
 
