@@ -440,6 +440,72 @@ type PatientSurgeryRepository interface {
 }
 
 // ============================================
+// PATIENT MEDICATION REPOSITORY
+// Maps to: patient_medications.sql
+// Domain: Medication Management, Prescriptions, & Pharmacy Records
+// ============================================
+
+type PatientMedicationRepository interface {
+	// ===== Core CRUD Operations =====
+	AddPatientMedication(ctx context.Context, medication patients.PatientMedication) (patients.PatientMedication, error)
+	GetPatientMedication(ctx context.Context, id uuid.UUID) (patients.PatientMedication, error)
+	UpdatePatientMedication(ctx context.Context, medication patients.PatientMedication) error
+	DeletePatientMedication(ctx context.Context, id uuid.UUID) error
+	DeletePatientMedications(ctx context.Context, patientID uuid.UUID) error
+
+	// ===== Querying by Patient =====
+	GetPatientMedications(ctx context.Context, patientID uuid.UUID, status *string) ([]patients.PatientMedication, error)
+	GetActiveMedications(ctx context.Context, patientID uuid.UUID) ([]patients.PatientMedication, error)
+	GetCurrentMedications(ctx context.Context, patientID uuid.UUID) ([]patients.PatientMedication, error)
+	GetMedicationHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientMedication, error)
+
+	// ===== Status Management =====
+	UpdateMedicationStatus(ctx context.Context, id uuid.UUID, status string) error
+	DiscontinueMedication(ctx context.Context, id uuid.UUID, endDate *time.Time, instructions *string) error
+	CompleteMedication(ctx context.Context, id uuid.UUID) error
+	ReactivateMedication(ctx context.Context, id uuid.UUID) error
+
+	// ===== Side Effects & Monitoring =====
+	RecordSideEffects(ctx context.Context, id uuid.UUID, sideEffects string) error
+	GetMedicationsWithSideEffects(ctx context.Context) ([]patients.PatientMedication, error)
+	GetMedicationsByRoute(ctx context.Context, patientID uuid.UUID, route string) ([]patients.PatientMedication, error)
+
+	// ===== Prescriber & Pharmacy Queries =====
+	GetMedicationsByPrescriber(ctx context.Context, prescriberName string, limit, offset int) ([]patients.PatientMedication, error)
+	GetMedicationsByPharmacy(ctx context.Context, pharmacyName string, limit, offset int) ([]patients.PatientMedication, error)
+	UpdatePharmacy(ctx context.Context, id uuid.UUID, pharmacyName string) error
+
+	// ===== Expiration & Refill Management =====
+	GetExpiringMedications(ctx context.Context, beforeDate time.Time) ([]patients.PatientMedication, error)
+	GetExpiredMedications(ctx context.Context) ([]patients.PatientMedication, error)
+	UpdateMedicationEndDate(ctx context.Context, id uuid.UUID, endDate time.Time) error
+
+	// ===== Search & Filtering =====
+	SearchMedicationsByName(ctx context.Context, patientID uuid.UUID, searchTerm string) ([]patients.PatientMedication, error)
+	GetPatientsByMedication(ctx context.Context, medicationName string) ([]patients.PatientMedication, error)
+
+	// ===== Statistics & Analytics =====
+	CountPatientMedications(ctx context.Context, patientID uuid.UUID) (patients.MedicationStatistics, error)
+	GetMedicationStatistics(ctx context.Context) (patients.MedicationSystemMetrics, error)
+	GetMostPrescribedMedications(ctx context.Context, limit int) ([]patients.MedicationDistribution, error)
+	GetPrescriptionTrends(ctx context.Context, since time.Time) ([]patients.PrescriptionTrend, error)
+	GetPolypharmacyPatients(ctx context.Context, minMedications int) ([]interface{}, error)
+
+	// ===== Reporting Queries =====
+	GetPatientsOnMultipleMedications(ctx context.Context, minCount int) ([]interface{}, error)
+	GetLongTermMedications(ctx context.Context, yearsOnMedication int) ([]patients.PatientMedication, error)
+	GetEmergencyMedicationInfo(ctx context.Context, patientID uuid.UUID) ([]patients.PatientMedication, error)
+
+	// ===== Bulk Operations =====
+	GetMedicationsByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientMedication, error)
+	BulkUpdateMedicationStatus(ctx context.Context, ids []uuid.UUID, status string) error
+
+	// ===== Validation & Utilities =====
+	CheckMedicationConflict(ctx context.Context, patientID uuid.UUID, medicationName string, excludeID *uuid.UUID) (bool, error)
+	GetActiveMedicationCount(ctx context.Context, patientID uuid.UUID) (int64, error)
+}
+
+// ============================================
 // NOTIFICATION REPOSITORY
 // ============================================
 
