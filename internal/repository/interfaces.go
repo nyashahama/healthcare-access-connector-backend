@@ -733,6 +733,71 @@ type PatientConditionRepository interface {
 }
 
 // ============================================
+// PATIENT ALLERGY REPOSITORY
+// Maps to: patient_allergies.sql
+// Domain: Allergy Management, Severity Tracking, & Safety Monitoring
+// ============================================
+
+type PatientAllergyRepository interface {
+	// ===== Core CRUD Operations =====
+	AddPatientAllergy(ctx context.Context, allergy patients.PatientAllergy) (patients.PatientAllergy, error)
+	GetPatientAllergy(ctx context.Context, id uuid.UUID) (patients.PatientAllergy, error)
+	UpdatePatientAllergy(ctx context.Context, allergy patients.PatientAllergy) error
+	DeletePatientAllergy(ctx context.Context, id uuid.UUID) error
+	DeletePatientAllergies(ctx context.Context, patientID uuid.UUID) error
+
+	// ===== Querying by Patient =====
+	GetPatientAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
+	GetActivePatientAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
+	GetPatientAllergiesByStatus(ctx context.Context, patientID uuid.UUID, status string) ([]patients.PatientAllergy, error)
+
+	// ===== Severity-Based Queries =====
+	GetSevereAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
+	GetLifeThreateningAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
+	GetPatientsBySeverity(ctx context.Context, severity string) ([]patients.PatientAllergy, error)
+
+	// ===== Status Management =====
+	UpdateAllergyStatus(ctx context.Context, id uuid.UUID, status string) error
+	MarkAllergyResolved(ctx context.Context, id uuid.UUID, notes *string) error
+	MarkAllergyInactive(ctx context.Context, id uuid.UUID, notes *string) error
+	ReactivateAllergy(ctx context.Context, id uuid.UUID) error
+
+	// ===== Occurrence Tracking =====
+	RecordAllergyOccurrence(ctx context.Context, id uuid.UUID, occurrenceDate time.Time, reaction *string) error
+	UpdateLastOccurrence(ctx context.Context, id uuid.UUID, occurrenceDate time.Time) error
+	GetRecentAllergyOccurrences(ctx context.Context, since time.Time) ([]patients.PatientAllergy, error)
+
+	// ===== Allergy Type Queries =====
+	GetPatientsByAllergyName(ctx context.Context, allergyName string) ([]patients.PatientAllergy, error)
+	SearchAllergiesByName(ctx context.Context, patientID uuid.UUID, searchTerm string) ([]patients.PatientAllergy, error)
+
+	// ===== Statistics & Analytics =====
+	CountPatientAllergies(ctx context.Context, patientID uuid.UUID) (patients.AllergyStatistics, error)
+	GetAllergySeverityDistribution(ctx context.Context) ([]patients.AllergySeverityDistribution, error)
+	GetMostCommonAllergies(ctx context.Context, limit int) ([]patients.AllergyDistribution, error)
+	GetAllergyStatistics(ctx context.Context) (patients.AllergySystemMetrics, error)
+
+	// ===== Reporting Queries =====
+	GetPatientsWithMultipleAllergies(ctx context.Context, minCount int) ([]interface{}, error)
+	GetPatientsWithNoAllergies(ctx context.Context, limit, offset int) ([]interface{}, error)
+	GetUnresolvedAllergies(ctx context.Context, yearsActive int) ([]patients.PatientAllergy, error)
+	GetAllergiesByDateRange(ctx context.Context, startDate, endDate time.Time) ([]patients.PatientAllergy, error)
+
+	// ===== Bulk Operations =====
+	GetAllergiesByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientAllergy, error)
+	BulkUpdateAllergyStatus(ctx context.Context, ids []uuid.UUID, status string) error
+
+	// ===== Validation & Utilities =====
+	CheckAllergyExists(ctx context.Context, patientID uuid.UUID, allergyName string) (bool, error)
+	HasLifeThreateningAllergies(ctx context.Context, patientID uuid.UUID) (bool, error)
+	GetPatientAllergyCount(ctx context.Context, patientID uuid.UUID) (int64, error)
+
+	// ===== Emergency Access =====
+	GetEmergencyAllergyInfo(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
+	GetCriticalAllergyWarnings(ctx context.Context, patientID uuid.UUID) (patients.CriticalAllergyWarnings, error)
+}
+
+// ============================================
 // NOTIFICATION REPOSITORY
 // ============================================
 
