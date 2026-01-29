@@ -321,6 +321,73 @@ type PatientProfileRepository interface {
 }
 
 // ============================================
+// PATIENT MEDICAL INFO REPOSITORY
+// Maps to: patient_medical_info.sql
+// Domain: Patient Vital Signs, Blood Type, Health Status, & Advance Directives
+// ============================================
+
+type PatientMedicalInfoRepository interface {
+	// ===== Core CRUD Operations =====
+	CreateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) (patients.PatientMedicalInfo, error)
+	GetMedicalInfoByID(ctx context.Context, id uuid.UUID) (patients.PatientMedicalInfo, error)
+	GetMedicalInfoByPatientID(ctx context.Context, patientID uuid.UUID) (patients.PatientMedicalInfo, error)
+	UpdateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) error
+	DeleteMedicalInfo(ctx context.Context, id uuid.UUID) error
+	DeleteMedicalInfoByPatientID(ctx context.Context, patientID uuid.UUID) error
+
+	// ===== Blood Type Management =====
+	UpdateBloodType(ctx context.Context, id uuid.UUID, bloodType string, testedDate time.Time) error
+	GetPatientsByBloodType(ctx context.Context, bloodType string, limit, offset int) ([]patients.PatientMedicalInfo, error)
+	CountPatientsByBloodType(ctx context.Context, bloodType string) (int64, error)
+	GetBloodTypeDistribution(ctx context.Context) (map[string]int64, error)
+
+	// ===== Vital Signs & Measurements =====
+	UpdateVitalStats(ctx context.Context, id uuid.UUID, heightCm, weightKg, bmi *float64, measuredDate time.Time) error
+	UpdateHeight(ctx context.Context, id uuid.UUID, heightCm float64, measuredDate time.Time) error
+	UpdateWeight(ctx context.Context, id uuid.UUID, weightKg float64, measuredDate time.Time) error
+	UpdateBMI(ctx context.Context, id uuid.UUID, bmi float64) error
+	GetPatientsByBMIRange(ctx context.Context, minBMI, maxBMI float64) ([]patients.PatientMedicalInfo, error)
+	GetVitalStatistics(ctx context.Context) (patients.MedicalInfoSummary, error)
+
+	// ===== Health Status Management =====
+	UpdateHealthStatus(ctx context.Context, id uuid.UUID, status string) error
+	UpdateHealthSummary(ctx context.Context, id uuid.UUID, summary string) error
+	GetPatientsByHealthStatus(ctx context.Context, status string, limit, offset int) ([]patients.PatientMedicalInfo, error)
+	CountPatientsByHealthStatus(ctx context.Context, status string) (int64, error)
+	GetHealthStatusDistribution(ctx context.Context) (map[string]int64, error)
+
+	// ===== Primary Care Provider =====
+	UpdatePrimaryCareProvider(ctx context.Context, id uuid.UUID, physicianName string, clinicID *uuid.UUID) error
+	UpdatePrimaryClinic(ctx context.Context, id uuid.UUID, clinicID uuid.UUID) error
+	GetPatientsByPrimaryClinic(ctx context.Context, clinicID uuid.UUID) ([]patients.PatientMedicalInfo, error)
+	GetPatientsByPhysician(ctx context.Context, physicianName string) ([]patients.PatientMedicalInfo, error)
+
+	// ===== Advance Directives & End-of-Life =====
+	UpdateOrganDonorStatus(ctx context.Context, id uuid.UUID, isOrganDonor bool) error
+	UpdateDNRStatus(ctx context.Context, id uuid.UUID, dnrStatus bool) error
+	UpdateAdvanceDirective(ctx context.Context, id uuid.UUID, exists bool, url *string) error
+	GetOrganDonors(ctx context.Context, limit, offset int) ([]patients.PatientMedicalInfo, error)
+	GetPatientsWithDNR(ctx context.Context) ([]patients.PatientMedicalInfo, error)
+	GetPatientsWithAdvanceDirective(ctx context.Context) ([]patients.PatientMedicalInfo, error)
+	CountOrganDonors(ctx context.Context) (int64, error)
+	CountPatientsWithDNR(ctx context.Context) (int64, error)
+
+	// ===== Statistics & Analytics =====
+	GetMedicalInfoSummary(ctx context.Context) (patients.MedicalInfoSummary, error)
+	GetAverageVitalsByAgeGroup(ctx context.Context) (interface{}, error)
+	GetHealthTrends(ctx context.Context, startDate, endDate time.Time) (interface{}, error)
+
+	// ===== Bulk Operations =====
+	GetMedicalInfoByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientMedicalInfo, error)
+	BulkUpdateHealthStatus(ctx context.Context, ids []uuid.UUID, status string) error
+
+	// ===== Validation & Utilities =====
+	MedicalInfoExists(ctx context.Context, patientID uuid.UUID) (bool, error)
+	GetLastMeasurementDate(ctx context.Context, patientID uuid.UUID) (*time.Time, error)
+	GetPatientsNeedingVitalUpdate(ctx context.Context, daysSinceUpdate int) ([]patients.PatientMedicalInfo, error)
+}
+
+// ============================================
 // NOTIFICATION REPOSITORY
 // ============================================
 
