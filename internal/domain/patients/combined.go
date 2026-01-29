@@ -1,6 +1,35 @@
 package patients
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// ComprehensiveHealthRecord combines all patient health information
+type ComprehensiveHealthRecord struct {
+	Profile       PatientProfile         `json:"profile"`
+	MedicalInfo   *PatientMedicalInfo    `json:"medical_info,omitempty"`
+	Surgeries     []PatientSurgery       `json:"surgeries,omitempty"`
+	Medications   []PatientMedication    `json:"medications,omitempty"`
+	Immunizations []PatientImmunization  `json:"immunizations,omitempty"`
+	FamilyHistory []PatientFamilyHistory `json:"family_history,omitempty"`
+}
+
+// EmergencyHealthInfo contains critical health information for emergency access
+type EmergencyHealthInfo struct {
+	PatientID            uuid.UUID             `json:"patient_id"`
+	FirstName            string                `json:"first_name"`
+	LastName             string                `json:"last_name"`
+	DateOfBirth          *time.Time            `json:"date_of_birth,omitempty"`
+	BloodType            *string               `json:"blood_type,omitempty"`
+	DNRStatus            bool                  `json:"dnr_status"`
+	OrganDonor           bool                  `json:"organ_donor"`
+	PrimaryCarePhysician *string               `json:"primary_care_physician,omitempty"`
+	ActiveMedications    []PatientMedication   `json:"active_medications"`
+	RecentSurgeries      []PatientSurgery      `json:"recent_surgeries"`
+	RecentImmunizations  []PatientImmunization `json:"recent_immunizations"`
+}
 
 // DependentWithRecords combines dependent info with health records
 type DependentWithRecords struct {

@@ -935,6 +935,47 @@ type DependentHealthRecordRepository interface {
 }
 
 // ============================================
+// PATIENT SAFETY & COMPREHENSIVE REPOSITORY
+// Combines allergies, conditions, and emergency contacts for safety-critical operations
+// ============================================
+
+type PatientSafetyRepository interface {
+	// ===== Comprehensive Safety Profiles =====
+	GetPatientSafetyProfile(ctx context.Context, patientID uuid.UUID) (patients.PatientSafetyProfile, error)
+	GetPatientAllergyProfile(ctx context.Context, patientID uuid.UUID) (patients.PatientAllergyProfile, error)
+
+	// ===== Critical Safety Information =====
+	GetCriticalSafetyInfo(ctx context.Context, patientID uuid.UUID) (interface{}, error)
+	GetDrugInteractionWarnings(ctx context.Context, patientID uuid.UUID, medicationName string) (interface{}, error)
+
+	// ===== Emergency Response =====
+	GetEmergencyResponseInfo(ctx context.Context, patientID uuid.UUID) (interface{}, error)
+	GetPatientRiskAssessment(ctx context.Context, patientID uuid.UUID) (interface{}, error)
+}
+
+// ============================================
+// COMPREHENSIVE PATIENT HEALTH REPOSITORY
+// Combines all patient health records for unified access
+// ============================================
+
+type ComprehensiveHealthRepository interface {
+	// ===== Comprehensive Health Records =====
+	GetComprehensiveHealthRecord(ctx context.Context, patientID uuid.UUID) (patients.ComprehensiveHealthRecord, error)
+	GetEmergencyHealthInfo(ctx context.Context, patientID uuid.UUID) (patients.EmergencyHealthInfo, error)
+
+	// ===== Bulk Comprehensive Records =====
+	GetComprehensiveHealthRecordsByIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.ComprehensiveHealthRecord, error)
+
+	// ===== Export & Compliance =====
+	ExportPatientHealthData(ctx context.Context, patientID uuid.UUID) ([]byte, error)
+	AnonymizePatientHealthData(ctx context.Context, patientID uuid.UUID) error
+
+	// ===== Health Record Analytics =====
+	GetPatientHealthSummary(ctx context.Context, patientID uuid.UUID) (interface{}, error)
+	GetPopulationHealthMetrics(ctx context.Context) (interface{}, error)
+}
+
+// ============================================
 // NOTIFICATION REPOSITORY
 // ============================================
 
