@@ -130,9 +130,9 @@ func (r *credentialRepository) UpdateCredential(ctx context.Context, credential 
 
 	params := sqlc.UpdateCredentialParams{
 		ID:               uuidToPgtypeUUID(credential.ID),
-		CredentialType:   pgtypeTextFromString(&credential.CredentialType),
+		CredentialType:   credential.CredentialType,
 		CredentialNumber: pgtypeTextFromStringPtr(credential.CredentialNumber),
-		IssuingAuthority: pgtypeTextFromString(&credential.IssuingAuthority),
+		IssuingAuthority: credential.IssuingAuthority,
 		IssueDate:        datePtrToPgtypeDate(credential.IssueDate),
 		ExpiryDate:       datePtrToPgtypeDate(credential.ExpiryDate),
 		Status:           pgtypeTextFromString(&credential.Status),
