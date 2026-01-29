@@ -506,6 +506,68 @@ type PatientMedicationRepository interface {
 }
 
 // ============================================
+// PATIENT IMMUNIZATION REPOSITORY
+// Maps to: patient_immunizations.sql
+// Domain: Vaccination Records, Schedules, & Coverage Tracking
+// ============================================
+
+type PatientImmunizationRepository interface {
+	// ===== Core CRUD Operations =====
+	AddPatientImmunization(ctx context.Context, immunization patients.PatientImmunization) (patients.PatientImmunization, error)
+	GetPatientImmunization(ctx context.Context, id uuid.UUID) (patients.PatientImmunization, error)
+	UpdatePatientImmunization(ctx context.Context, immunization patients.PatientImmunization) error
+	DeletePatientImmunization(ctx context.Context, id uuid.UUID) error
+	DeletePatientImmunizations(ctx context.Context, patientID uuid.UUID) error
+
+	// ===== Querying by Patient =====
+	GetPatientImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+	GetImmunizationHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+	GetImmunizationsByType(ctx context.Context, patientID uuid.UUID, vaccineType string) ([]patients.PatientImmunization, error)
+	GetRoutineImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+
+	// ===== Due Date & Scheduling =====
+	GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+	GetOverdueImmunizations(ctx context.Context) ([]patients.PatientImmunization, error)
+	GetImmunizationsDueInPeriod(ctx context.Context, beforeDate time.Time) ([]patients.PatientImmunization, error)
+	UpdateNextDueDate(ctx context.Context, id uuid.UUID, nextDueDate time.Time) error
+
+	// ===== Vaccine Series Tracking =====
+	GetIncompleteVaccineSeries(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+	GetCompleteVaccineSeries(ctx context.Context, patientID uuid.UUID) ([]interface{}, error)
+	GetVaccineSeriesProgress(ctx context.Context, patientID uuid.UUID) ([]patients.VaccineSeriesProgress, error)
+	IsVaccineSeriesComplete(ctx context.Context, patientID uuid.UUID, vaccineName string) (bool, error)
+
+	// ===== Vaccine & Provider Queries =====
+	GetImmunizationsByVaccine(ctx context.Context, vaccineName string, limit, offset int) ([]patients.PatientImmunization, error)
+	GetImmunizationsByAdministrator(ctx context.Context, administratorName string, limit, offset int) ([]patients.PatientImmunization, error)
+	GetImmunizationsByClinic(ctx context.Context, clinicName string, limit, offset int) ([]patients.PatientImmunization, error)
+	GetImmunizationsByLotNumber(ctx context.Context, lotNumber string) ([]patients.PatientImmunization, error)
+
+	// ===== Statistics & Analytics =====
+	CountPatientImmunizations(ctx context.Context, patientID uuid.UUID) (patients.ImmunizationStatistics, error)
+	GetImmunizationStatistics(ctx context.Context) (patients.ImmunizationSystemMetrics, error)
+	GetVaccineDistribution(ctx context.Context) ([]patients.VaccineDistribution, error)
+	GetImmunizationCoverage(ctx context.Context) ([]patients.VaccineCoverage, error)
+	GetVaccinationRates(ctx context.Context, vaccineType *string) (interface{}, error)
+
+	// ===== Compliance & Reporting =====
+	GetPatientsNeedingImmunizations(ctx context.Context) ([]interface{}, error)
+	GetChildrenNeedingVaccines(ctx context.Context, limit, offset int) ([]interface{}, error)
+	GetImmunizationRecordsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]patients.PatientImmunization, error)
+	GetImmunizationGaps(ctx context.Context, patientID uuid.UUID) ([]interface{}, error)
+
+	// ===== Bulk Operations =====
+	GetImmunizationsByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientImmunization, error)
+
+	// ===== Validation & Utilities =====
+	CheckVaccineReceived(ctx context.Context, patientID uuid.UUID, vaccineName string) (bool, error)
+	GetLastVaccineDate(ctx context.Context, patientID uuid.UUID, vaccineName string) (*time.Time, error)
+
+	// ===== Emergency Access =====
+	GetEmergencyImmunizationInfo(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+}
+
+// ============================================
 // NOTIFICATION REPOSITORY
 // ============================================
 
