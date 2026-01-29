@@ -82,6 +82,50 @@ func stringToStringPtr(s string) *string {
 	return &s
 }
 
+// Interface to string conversion helper
+func interfaceToString(i interface{}) string {
+	if i == nil {
+		return ""
+	}
+
+	switch v := i.(type) {
+	case string:
+		return v
+	case *string:
+		if v == nil {
+			return ""
+		}
+		return *v
+	case pgtype.Text:
+		return pgtypeTextToString(v)
+	default:
+		// Fallback: convert to string using fmt
+		return fmt.Sprintf("%v", i)
+	}
+}
+
+// Interface to string pointer conversion helper
+func interfaceToStringPtr(i interface{}) *string {
+	if i == nil {
+		return nil
+	}
+
+	switch v := i.(type) {
+	case string:
+		if v == "" {
+			return nil
+		}
+		return &v
+	case *string:
+		return v
+	case pgtype.Text:
+		return pgtypeTextToStringPtr(v)
+	default:
+		str := fmt.Sprintf("%v", i)
+		return &str
+	}
+}
+
 // Boolean conversion helpers
 func pgtypeBoolToBool(b pgtype.Bool) bool {
 	if !b.Valid {
@@ -274,26 +318,4 @@ func float64PtrToFloat64(f *float64) float64 {
 		return 0
 	}
 	return *f
-}
-
-// Interface to string conversion helper
-func interfaceToString(i interface{}) string {
-	if i == nil {
-		return ""
-	}
-
-	switch v := i.(type) {
-	case string:
-		return v
-	case *string:
-		if v == nil {
-			return ""
-		}
-		return *v
-	case pgtype.Text:
-		return pgtypeTextToString(v)
-	default:
-		// Fallback: convert to string using fmt
-		return fmt.Sprintf("%v", i)
-	}
 }
