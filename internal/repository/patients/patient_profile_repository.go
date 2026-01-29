@@ -107,26 +107,6 @@ func (r *patientRepository) CreatePatientProfile(ctx context.Context, profile pa
 	return r.mapToPatientProfile(created), nil
 }
 
-func (r *patientRepository) GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error) {
-	start := time.Now()
-	defer func() {
-		patientDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	profile, err := r.querier.GetPatientProfileByUserID(ctx, uuidToPgtypeUUID(userID))
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
-			patientDBQueryTotal.WithLabelValues("get_patient_profile_by_user_id", "not_found").Inc()
-			return patients.PatientProfile{}, domain.ErrNotFound
-		}
-		patientDBQueryTotal.WithLabelValues("get_patient_profile_by_user_id", "error").Inc()
-		return patients.PatientProfile{}, r.handleError(err, "get patient profile by user ID")
-	}
-
-	patientDBQueryTotal.WithLabelValues("get_patient_profile_by_user_id", "success").Inc()
-	return r.mapToPatientProfile(profile), nil
-}
-
 func (r *patientRepository) GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error) {
 	start := time.Now()
 	defer func() {
@@ -144,6 +124,26 @@ func (r *patientRepository) GetPatientProfileByID(ctx context.Context, id uuid.U
 	}
 
 	patientDBQueryTotal.WithLabelValues("get_patient_profile_by_id", "success").Inc()
+	return r.mapToPatientProfile(profile), nil
+}
+
+func (r *patientRepository) GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error) {
+	start := time.Now()
+	defer func() {
+		patientDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	profile, err := r.querier.GetPatientProfileByUserID(ctx, uuidToPgtypeUUID(userID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			patientDBQueryTotal.WithLabelValues("get_patient_profile_by_user_id", "not_found").Inc()
+			return patients.PatientProfile{}, domain.ErrNotFound
+		}
+		patientDBQueryTotal.WithLabelValues("get_patient_profile_by_user_id", "error").Inc()
+		return patients.PatientProfile{}, r.handleError(err, "get patient profile by user ID")
+	}
+
+	patientDBQueryTotal.WithLabelValues("get_patient_profile_by_user_id", "success").Inc()
 	return r.mapToPatientProfile(profile), nil
 }
 
