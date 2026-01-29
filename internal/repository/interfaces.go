@@ -613,6 +613,67 @@ type PatientFamilyHistoryRepository interface {
 }
 
 // ============================================
+// PATIENT DEPENDENT REPOSITORY
+// Maps to: patient_dependents.sql
+// Domain: Dependent (Children/Wards) Management & Growth Tracking
+// ============================================
+
+type PatientDependentRepository interface {
+	// ===== Core CRUD Operations =====
+	AddPatientDependent(ctx context.Context, dependent patients.PatientDependent) (patients.PatientDependent, error)
+	GetPatientDependent(ctx context.Context, id uuid.UUID) (patients.PatientDependent, error)
+	UpdatePatientDependent(ctx context.Context, dependent patients.PatientDependent) error
+	DeletePatientDependent(ctx context.Context, id uuid.UUID) error
+	DeletePatientDependents(ctx context.Context, patientID uuid.UUID) error
+
+	// ===== Querying by Patient =====
+	GetPatientDependents(ctx context.Context, patientID uuid.UUID) ([]patients.PatientDependent, error)
+	GetDependentChildren(ctx context.Context, patientID uuid.UUID) ([]patients.PatientDependent, error)
+	GetDependentsByRelationship(ctx context.Context, patientID uuid.UUID, relationship string) ([]patients.PatientDependent, error)
+
+	// ===== Health & Development Tracking =====
+	UpdateDependentHealth(ctx context.Context, id uuid.UUID, healthStatus string, pediatrician *string, clinicID *uuid.UUID) error
+	UpdateBirthMetrics(ctx context.Context, id uuid.UUID, birthWeightKg, birthHeightCm float64) error
+	GetDependentsByHealthStatus(ctx context.Context, healthStatus string) ([]patients.PatientDependent, error)
+
+	// ===== Special Needs Management =====
+	GetDependentsWithSpecialNeeds(ctx context.Context) ([]patients.PatientDependent, error)
+	UpdateSpecialNeeds(ctx context.Context, id uuid.UUID, hasSpecialNeeds bool, description *string) error
+
+	// ===== Guardianship & Legal =====
+	UpdateGuardianship(ctx context.Context, id uuid.UUID, hasGuardianship bool, documentURL *string) error
+	GetDependentsWithoutGuardianship(ctx context.Context) ([]patients.PatientDependent, error)
+
+	// ===== Education & School =====
+	UpdateSchoolInfo(ctx context.Context, id uuid.UUID, schoolName, grade *string) error
+	GetDependentsBySchool(ctx context.Context, schoolName string) ([]patients.PatientDependent, error)
+	GetSchoolAgeChildren(ctx context.Context, patientID uuid.UUID) ([]patients.PatientDependent, error)
+
+	// ===== Healthcare Provider Tracking =====
+	UpdatePediatrician(ctx context.Context, id uuid.UUID, pediatricianName string, clinicID *uuid.UUID) error
+	GetDependentsByPediatrician(ctx context.Context, pediatricianName string) ([]patients.PatientDependent, error)
+	GetDependentsByClinic(ctx context.Context, clinicID uuid.UUID) ([]patients.PatientDependent, error)
+
+	// ===== Age & Demographic Queries =====
+	GetDependentsByAgeRange(ctx context.Context, patientID uuid.UUID, minAge, maxAge int) ([]patients.PatientDependent, error)
+	GetInfants(ctx context.Context) ([]patients.PatientDependent, error)
+	GetToddlers(ctx context.Context) ([]patients.PatientDependent, error)
+
+	// ===== Statistics & Analytics =====
+	CountPatientDependents(ctx context.Context, patientID uuid.UUID) (patients.DependentStatistics, error)
+	GetDependentStatistics(ctx context.Context) (patients.DependentSystemMetrics, error)
+	GetDependentAgeDistribution(ctx context.Context) ([]patients.AgeGroupDistribution, error)
+
+	// ===== Bulk Operations =====
+	GetDependentsByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientDependent, error)
+
+	// ===== Validation & Utilities =====
+	HasDependents(ctx context.Context, patientID uuid.UUID) (bool, error)
+	GetDependentAge(ctx context.Context, id uuid.UUID) (int, error)
+	GetDependentFullName(ctx context.Context, id uuid.UUID) (string, error)
+}
+
+// ============================================
 // NOTIFICATION REPOSITORY
 // ============================================
 
