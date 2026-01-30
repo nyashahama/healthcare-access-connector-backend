@@ -319,3 +319,19 @@ func float64PtrToFloat64(f *float64) float64 {
 	}
 	return *f
 }
+
+// Helper conversion functions
+func int32PtrToPgtypeInt4(val *int) pgtype.Int4 {
+	if val == nil {
+		return pgtype.Int4{Valid: false}
+	}
+	return pgtype.Int4{Int32: int32(*val), Valid: true}
+}
+
+func pgtypeBoolToBoolPtr(val pgtype.Bool) *bool {
+	if !val.Valid {
+		return nil
+	}
+	result := val.Bool
+	return &result
+}
