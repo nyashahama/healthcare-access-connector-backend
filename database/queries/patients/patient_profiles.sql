@@ -777,7 +777,7 @@ ORDER BY updated_at DESC;
 
 -- name: GetPatientRegistrationTrends :many
 SELECT 
-    DATE_TRUNC('day', created_at) as registration_date,
+    DATE_TRUNC('day', created_at)::timestamp as registration_date,
     COUNT(*) as new_patients,
     COUNT(*) FILTER (WHERE has_medical_aid = true) as with_medical_aid,
     COUNT(DISTINCT province) as provinces

@@ -85,10 +85,10 @@ func (r *credentialRepository) CreateCredential(ctx context.Context, credential 
 		IssuingAuthority: credential.IssuingAuthority,
 		IssueDate:        datePtrToPgtypeDate(credential.IssueDate),
 		ExpiryDate:       datePtrToPgtypeDate(credential.ExpiryDate),
-		Status:           credential.Status,
+		Status:           pgtypeTextFromString(credential.Status),
 		VerifiedBy:       uuidPtrToPgtypeUUID(credential.VerifiedBy),
 		VerificationDate: timePtrToPgtypeTimestamp(credential.VerificationDate),
-		DocumentURL:      pgtypeTextFromStringPtr(credential.DocumentURL),
+		DocumentUrl:      pgtypeTextFromStringPtr(credential.DocumentURL),
 		Notes:            pgtypeTextFromStringPtr(credential.Notes),
 	}
 
@@ -135,8 +135,8 @@ func (r *credentialRepository) UpdateCredential(ctx context.Context, credential 
 		IssuingAuthority: credential.IssuingAuthority,
 		IssueDate:        datePtrToPgtypeDate(credential.IssueDate),
 		ExpiryDate:       datePtrToPgtypeDate(credential.ExpiryDate),
-		Status:           pgtypeTextFromString(&credential.Status),
-		DocumentURL:      pgtypeTextFromStringPtr(credential.DocumentURL),
+		DocumentUrl:      pgtypeTextFromStringPtr(credential.DocumentURL),
+		Status:           pgtypeTextFromString(credential.Status),
 		Notes:            pgtypeTextFromStringPtr(credential.Notes),
 	}
 
@@ -201,7 +201,7 @@ func (r *credentialRepository) RejectCredential(ctx context.Context, id, verifie
 	params := sqlc.RejectCredentialParams{
 		ID:         uuidToPgtypeUUID(id),
 		VerifiedBy: uuidToPgtypeUUID(verifiedBy),
-		Notes:      pgtypeTextFromString(&notes),
+		Notes:      pgtypeTextFromString(notes),
 	}
 
 	err := r.querier.RejectCredential(ctx, params)
@@ -222,7 +222,7 @@ func (r *credentialRepository) RevokeCredential(ctx context.Context, id uuid.UUI
 
 	params := sqlc.RevokeCredentialParams{
 		ID:    uuidToPgtypeUUID(id),
-		Notes: pgtypeTextFromString(&notes),
+		Notes: pgtypeTextFromString(notes),
 	}
 
 	err := r.querier.RevokeCredential(ctx, params)
@@ -347,7 +347,7 @@ func (r *credentialRepository) UpdateCredentialDocument(ctx context.Context, id 
 
 	params := sqlc.UpdateCredentialDocumentParams{
 		ID:          uuidToPgtypeUUID(id),
-		DocumentURL: pgtypeTextFromString(documentURL),
+		DocumentUrl: pgtypeTextFromString(documentURL),
 	}
 
 	err := r.querier.UpdateCredentialDocument(ctx, params)
@@ -504,7 +504,7 @@ func (r *credentialRepository) GetStaffCredentialsByType(ctx context.Context, st
 			IssuingAuthority: row.IssuingAuthority,
 			IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
 			ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
-			Status:           row.Status,
+			Status:           pgtypeTextToString(row.Status),
 		}
 	}
 
@@ -539,7 +539,7 @@ func (r *credentialRepository) GetCredentialsByType(ctx context.Context, credent
 				IssuingAuthority: row.IssuingAuthority,
 				IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
 				ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
-				Status:           row.Status,
+				Status:           pgtypeTextToString(row.Status),
 			},
 			StaffInfo: providers.StaffBasicInfo{
 				ID:        pgtypeUUIDToUUID(row.StaffID),
@@ -581,7 +581,7 @@ func (r *credentialRepository) GetLicenseCredentials(ctx context.Context, clinic
 				CredentialNumber: pgtypeTextToStringPtr(row.CredentialNumber),
 				IssuingAuthority: row.IssuingAuthority,
 				ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
-				Status:           row.Status,
+				Status:           pgtypeTextToString(row.Status),
 			},
 			StaffInfo: providers.StaffBasicInfo{
 				ID:        pgtypeUUIDToUUID(row.StaffID),
@@ -618,7 +618,7 @@ func (r *credentialRepository) GetSpecializationCredentials(ctx context.Context)
 				CredentialNumber: pgtypeTextToStringPtr(row.CredentialNumber),
 				IssuingAuthority: row.IssuingAuthority,
 				IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
-				Status:           row.Status,
+				Status:           pgtypeTextToString(row.Status),
 			},
 			StaffInfo: providers.StaffBasicInfo{
 				ID:        pgtypeUUIDToUUID(row.StaffID),
@@ -690,7 +690,7 @@ func (r *credentialRepository) GetCertificationCredentials(ctx context.Context) 
 				IssuingAuthority: row.IssuingAuthority,
 				IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
 				ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
-				Status:           row.Status,
+				Status:           pgtypeTextToString(row.Status),
 			},
 			StaffInfo: providers.StaffBasicInfo{
 				ID:        pgtypeUUIDToUUID(row.StaffID),
@@ -984,7 +984,7 @@ func (r *credentialRepository) GetCredentialsByAuthority(ctx context.Context, is
 				CredentialNumber: pgtypeTextToStringPtr(row.CredentialNumber),
 				IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
 				ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
-				Status:           row.Status,
+				Status:           pgtypeTextToString(row.Status),
 			},
 			StaffInfo: providers.StaffBasicInfo{
 				ID:        pgtypeUUIDToUUID(row.StaffID),
@@ -1025,7 +1025,7 @@ func (r *credentialRepository) GetCredentialsByAuthorityAndType(ctx context.Cont
 				CredentialNumber: pgtypeTextToStringPtr(row.CredentialNumber),
 				IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
 				ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
-				Status:           row.Status,
+				Status:           pgtypeTextToString(row.Status),
 			},
 			StaffInfo: providers.StaffBasicInfo{
 				ID:        pgtypeUUIDToUUID(row.StaffID),
@@ -1140,7 +1140,7 @@ func (r *credentialRepository) GetCredentialStatusDistribution(ctx context.Conte
 	distributions := make([]providers.CredentialStatusDistribution, len(rows))
 	for i, row := range rows {
 		distributions[i] = providers.CredentialStatusDistribution{
-			Status:     row.Status,
+			Status:     pgtypeTextToString(row.Status),
 			Count:      row.Count,
 			WithExpiry: row.WithExpiry,
 		}
@@ -1194,7 +1194,7 @@ func (r *credentialRepository) CountStaffCredentials(ctx context.Context, staffI
 
 	params := sqlc.CountStaffCredentialsParams{
 		StaffID: uuidToPgtypeUUID(staffID),
-		Status:  pgtypeTextFromStringPtr(status),
+		Column2: stringPtrToString(status),
 	}
 
 	count, err := r.querier.CountStaffCredentials(ctx, params)
@@ -1253,7 +1253,7 @@ func (r *credentialRepository) CheckCredentialNumberExists(ctx context.Context, 
 	params := sqlc.CheckCredentialNumberExistsParams{
 		CredentialNumber: pgtypeTextFromString(credentialNumber),
 		IssuingAuthority: issuingAuthority,
-		ID:               uuidPtrToPgtypeUUID(excludeID),
+		Column3:          uuidPtrToPgtypeUUID(excludeID),
 	}
 
 	exists, err := r.querier.CheckCredentialNumberExists(ctx, params)
@@ -1272,7 +1272,10 @@ func (r *credentialRepository) HasVerifiedCredentialOfType(ctx context.Context, 
 		credentialDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	exists, err := r.querier.HasVerifiedCredentialOfType(ctx, uuidToPgtypeUUID(staffID), credentialType)
+	exists, err := r.querier.HasVerifiedCredentialOfType(ctx, sqlc.HasVerifiedCredentialOfTypeParams{
+		StaffID:        staffID,
+		CredentialType: credentialType,
+	})
 	if err != nil {
 		credentialDBQueryTotal.WithLabelValues("has_verified_credential_of_type", "error").Inc()
 		return false, r.handleError(err, "check has verified credential of type")
@@ -1324,7 +1327,7 @@ func (r *credentialRepository) BulkVerifyCredentials(ctx context.Context, ids []
 	}
 
 	params := sqlc.BulkVerifyCredentialsParams{
-		IDs:        pgtypeIDs,
+		Column1:    pgtypeIDs,
 		VerifiedBy: uuidToPgtypeUUID(verifiedBy),
 	}
 
@@ -1350,7 +1353,7 @@ func (r *credentialRepository) BulkRejectCredentials(ctx context.Context, ids []
 	}
 
 	params := sqlc.BulkRejectCredentialsParams{
-		IDs:        pgtypeIDs,
+		Column1:    pgtypeIDs,
 		VerifiedBy: uuidToPgtypeUUID(verifiedBy),
 		Notes:      pgtypeTextFromString(notes),
 	}
@@ -1377,8 +1380,8 @@ func (r *credentialRepository) BulkUpdateCredentialStatus(ctx context.Context, i
 	}
 
 	params := sqlc.BulkUpdateCredentialStatusParams{
-		IDs:    pgtypeIDs,
-		Status: status,
+		Column1: pgtypeIDs,
+		Status:  pgtypeTextFromString(status),
 	}
 
 	err := r.querier.BulkUpdateCredentialStatus(ctx, params)
@@ -1430,7 +1433,7 @@ func (r *credentialRepository) GetStaffWithoutRequiredCredentials(ctx context.Co
 			ClinicID:          pgtypeUUIDToUUID(row.ClinicID),
 			FirstName:         row.FirstName,
 			LastName:          row.LastName,
-			ProfessionalTitle: row.ProfessionalTitle,
+			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
 			StaffRole:         row.StaffRole,
 			WorkEmail:         pgtypeTextToStringPtr(row.WorkEmail),
 		}
@@ -1477,8 +1480,8 @@ func (r *credentialRepository) GetVerifierWorkload(ctx context.Context, startDat
 	}()
 
 	params := sqlc.GetVerifierWorkloadParams{
-		StartDate: pgtype.Timestamp{Time: startDate, Valid: true},
-		EndDate:   pgtype.Timestamp{Time: endDate, Valid: true},
+		VerificationDate:   pgtype.Timestamp{Time: startDate, Valid: true},
+		VerificationDate_2: pgtype.Timestamp{Time: endDate, Valid: true},
 	}
 
 	rows, err := r.querier.GetVerifierWorkload(ctx, params)
@@ -1509,8 +1512,8 @@ func (r *credentialRepository) GetCredentialsByDateRange(ctx context.Context, st
 	}()
 
 	params := sqlc.GetCredentialsByDateRangeParams{
-		StartDate: pgtype.Timestamp{Time: startDate, Valid: true},
-		EndDate:   pgtype.Timestamp{Time: endDate, Valid: true},
+		CreatedAt:   pgtype.Timestamp{Time: startDate, Valid: true},
+		CreatedAt_2: pgtype.Timestamp{Time: endDate, Valid: true},
 	}
 
 	rows, err := r.querier.GetCredentialsByDateRange(ctx, params)
@@ -1527,7 +1530,7 @@ func (r *credentialRepository) GetCredentialsByDateRange(ctx context.Context, st
 				StaffID:          pgtypeUUIDToUUID(row.StaffID),
 				CredentialType:   row.CredentialType,
 				CredentialNumber: pgtypeTextToStringPtr(row.CredentialNumber),
-				Status:           row.Status,
+				Status:           pgtypeTextToString(row.Status),
 				CreatedAt:        row.CreatedAt.Time,
 			},
 			StaffInfo: providers.StaffBasicInfo{
@@ -1607,7 +1610,7 @@ func (r *credentialRepository) GetCredentialRenewalHistory(ctx context.Context, 
 			CredentialNumber: pgtypeTextToStringPtr(row.CredentialNumber),
 			IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
 			ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
-			Status:           row.Status,
+			Status:           pgtypeTextToString(row.Status),
 			UpdatedAt:        row.UpdatedAt.Time,
 		}
 	}
@@ -1656,7 +1659,7 @@ func (r *credentialRepository) mapToProfessionalCredential(row sqlc.Professional
 		IssuingAuthority: row.IssuingAuthority,
 		IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
 		ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
-		Status:           row.Status,
+		Status:           pgtypeTextToString(row.Status),
 		VerifiedBy:       uuidPtrToUUID(row.VerifiedBy),
 		VerificationDate: pgtypeTimestampToTimePtr(row.VerificationDate),
 		DocumentURL:      pgtypeTextToStringPtr(row.DocumentUrl),

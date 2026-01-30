@@ -1335,7 +1335,7 @@ func (q *Queries) GetPatientProfilesByUserIDs(ctx context.Context, dollar_1 []pg
 
 const getPatientRegistrationTrends = `-- name: GetPatientRegistrationTrends :many
 SELECT 
-    DATE_TRUNC('day', created_at) as registration_date,
+    DATE_TRUNC('day', created_at)::timestamp as registration_date,
     COUNT(*) as new_patients,
     COUNT(*) FILTER (WHERE has_medical_aid = true) as with_medical_aid,
     COUNT(DISTINCT province) as provinces
@@ -1346,10 +1346,10 @@ ORDER BY registration_date DESC
 `
 
 type GetPatientRegistrationTrendsRow struct {
-	RegistrationDate pgtype.Interval `json:"registration_date"`
-	NewPatients      int64           `json:"new_patients"`
-	WithMedicalAid   int64           `json:"with_medical_aid"`
-	Provinces        int64           `json:"provinces"`
+	RegistrationDate pgtype.Timestamp `json:"registration_date"`
+	NewPatients      int64            `json:"new_patients"`
+	WithMedicalAid   int64            `json:"with_medical_aid"`
+	Provinces        int64            `json:"provinces"`
 }
 
 func (q *Queries) GetPatientRegistrationTrends(ctx context.Context, createdAt pgtype.Timestamp) ([]GetPatientRegistrationTrendsRow, error) {
