@@ -682,54 +682,54 @@ type PatientDependentRepository interface {
 type PatientConditionRepository interface {
 	// ===== Core CRUD Operations =====
 	AddPatientCondition(ctx context.Context, condition patients.PatientCondition) (patients.PatientCondition, error)
-	GetPatientCondition(ctx context.Context, id uuid.UUID) (patients.PatientCondition, error)
+	//	GetPatientCondition(ctx context.Context, id uuid.UUID) (patients.PatientCondition, error)
 	UpdatePatientCondition(ctx context.Context, condition patients.PatientCondition) error
 	DeletePatientCondition(ctx context.Context, id uuid.UUID) error
-	DeletePatientConditions(ctx context.Context, patientID uuid.UUID) error
+	//	DeletePatientConditions(ctx context.Context, patientID uuid.UUID) error
 
 	// ===== Querying by Patient =====
 	GetPatientConditions(ctx context.Context, patientID uuid.UUID, status *string) ([]patients.PatientCondition, error)
 	GetActiveConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
-	GetChronicConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
-	GetAcuteConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
-	GetConditionsByType(ctx context.Context, patientID uuid.UUID, conditionType string) ([]patients.PatientCondition, error)
-
-	// ===== Status Management =====
-	UpdateConditionStatus(ctx context.Context, id uuid.UUID, status string, notes *string) error
-	MarkConditionResolved(ctx context.Context, id uuid.UUID, notes *string) error
-	MarkConditionInRemission(ctx context.Context, id uuid.UUID, notes *string) error
-	UpdateConditionSeverity(ctx context.Context, id uuid.UUID, severity string, notes *string) error
-
-	// ===== Flare-Up & Checkup Tracking =====
-	RecordFlareUp(ctx context.Context, id uuid.UUID, flareUpDate time.Time, notes *string) error
-	UpdateNextCheckup(ctx context.Context, id uuid.UUID, checkupDate time.Time) error
-	GetUpcomingCheckups(ctx context.Context, beforeDate time.Time) ([]patients.PatientCondition, error)
-	GetOverdueCheckups(ctx context.Context) ([]patients.PatientCondition, error)
-	GetRecentFlareUps(ctx context.Context, since time.Time) ([]patients.PatientCondition, error)
-
-	// ===== Search & Filtering =====
-	SearchConditionsByName(ctx context.Context, patientID uuid.UUID, searchTerm string) ([]patients.PatientCondition, error)
-	GetConditionsByICD10(ctx context.Context, icd10Code string) ([]patients.PatientCondition, error)
-	GetPatientsByCondition(ctx context.Context, conditionName string) ([]patients.PatientCondition, error)
-
-	// ===== Statistics & Analytics =====
-	CountPatientConditions(ctx context.Context, patientID uuid.UUID) (patients.ConditionStatistics, error)
-	GetConditionStatistics(ctx context.Context) (patients.ConditionSystemMetrics, error)
-	GetMostCommonConditions(ctx context.Context, limit int) ([]patients.ConditionDistribution, error)
-	GetConditionTypeDistribution(ctx context.Context) ([]patients.ConditionTypeDistribution, error)
-
-	// ===== Reporting Queries =====
-	GetPatientsWithMultipleConditions(ctx context.Context, minCount int) ([]interface{}, error)
-	GetHighRiskPatients(ctx context.Context) ([]patients.HighRiskPatient, error)
-	GetEmergencyConditionInfo(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
-
-	// ===== Bulk Operations =====
-	GetConditionsByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientCondition, error)
-	BulkUpdateConditionStatus(ctx context.Context, ids []uuid.UUID, status string) error
-
-	// ===== Validation & Utilities =====
-	HasChronicConditions(ctx context.Context, patientID uuid.UUID) (bool, error)
-	CheckConditionExists(ctx context.Context, patientID uuid.UUID, conditionName string) (bool, error)
+	// GetChronicConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
+	// GetAcuteConditions(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
+	// GetConditionsByType(ctx context.Context, patientID uuid.UUID, conditionType string) ([]patients.PatientCondition, error)
+	//
+	// // ===== Status Management =====
+	// UpdateConditionStatus(ctx context.Context, id uuid.UUID, status string, notes *string) error
+	// MarkConditionResolved(ctx context.Context, id uuid.UUID, notes *string) error
+	// MarkConditionInRemission(ctx context.Context, id uuid.UUID, notes *string) error
+	// UpdateConditionSeverity(ctx context.Context, id uuid.UUID, severity string, notes *string) error
+	//
+	// // ===== Flare-Up & Checkup Tracking =====
+	// RecordFlareUp(ctx context.Context, id uuid.UUID, flareUpDate time.Time, notes *string) error
+	// UpdateNextCheckup(ctx context.Context, id uuid.UUID, checkupDate time.Time) error
+	// GetUpcomingCheckups(ctx context.Context, beforeDate time.Time) ([]patients.PatientCondition, error)
+	// GetOverdueCheckups(ctx context.Context) ([]patients.PatientCondition, error)
+	// GetRecentFlareUps(ctx context.Context, since time.Time) ([]patients.PatientCondition, error)
+	//
+	// // ===== Search & Filtering =====
+	// SearchConditionsByName(ctx context.Context, patientID uuid.UUID, searchTerm string) ([]patients.PatientCondition, error)
+	// GetConditionsByICD10(ctx context.Context, icd10Code string) ([]patients.PatientCondition, error)
+	// GetPatientsByCondition(ctx context.Context, conditionName string) ([]patients.PatientCondition, error)
+	//
+	// // ===== Statistics & Analytics =====
+	// CountPatientConditions(ctx context.Context, patientID uuid.UUID) (patients.ConditionStatistics, error)
+	// GetConditionStatistics(ctx context.Context) (patients.ConditionSystemMetrics, error)
+	// GetMostCommonConditions(ctx context.Context, limit int) ([]patients.ConditionDistribution, error)
+	// GetConditionTypeDistribution(ctx context.Context) ([]patients.ConditionTypeDistribution, error)
+	//
+	// // ===== Reporting Queries =====
+	// GetPatientsWithMultipleConditions(ctx context.Context, minCount int) ([]interface{}, error)
+	// GetHighRiskPatients(ctx context.Context) ([]patients.HighRiskPatient, error)
+	// GetEmergencyConditionInfo(ctx context.Context, patientID uuid.UUID) ([]patients.PatientCondition, error)
+	//
+	// // ===== Bulk Operations =====
+	// GetConditionsByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientCondition, error)
+	// BulkUpdateConditionStatus(ctx context.Context, ids []uuid.UUID, status string) error
+	//
+	// // ===== Validation & Utilities =====
+	// HasChronicConditions(ctx context.Context, patientID uuid.UUID) (bool, error)
+	// CheckConditionExists(ctx context.Context, patientID uuid.UUID, conditionName string) (bool, error)
 }
 
 // ============================================
