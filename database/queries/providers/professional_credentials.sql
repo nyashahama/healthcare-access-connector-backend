@@ -315,12 +315,12 @@ SELECT
     pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
     pc.issuing_authority, pc.expiry_date,
     cs.first_name, cs.last_name, cs.clinic_id, cs.work_email,
-    CURRENT_DATE - pc.expiry_date as days_until_expiry
+    pc.expiry_date - CURRENT_DATE as days_until_expiry
 FROM professional_credentials pc
 JOIN clinic_staff cs ON pc.staff_id = cs.id
 WHERE 
-    pc.expiry_date <= CURRENT_DATE + ($1 || ' days')::INTERVAL
-    AND pc.expiry_date >= CURRENT_DATE
+    pc.expiry_date >= CURRENT_DATE
+    AND pc.expiry_date <= CURRENT_DATE + make_interval(days => $1::INTEGER)
     AND pc.status = 'verified'
 ORDER BY pc.expiry_date ASC;
 
@@ -408,7 +408,7 @@ SELECT
     COUNT(DISTINCT pc.id) FILTER (WHERE pc.status = 'pending') as pending_credentials,
     COUNT(DISTINCT pc.id) FILTER (WHERE pc.expiry_date < CURRENT_DATE AND pc.status = 'verified') as expired_credentials,
     COUNT(DISTINCT pc.staff_id) as staff_with_credentials,
-    AVG(EXTRACT(YEAR FROM AGE(pc.expiry_date, pc.issue_date))) FILTER (WHERE pc.expiry_date IS NOT NULL) as avg_credential_duration
+    AVG(EXTRACT(YEAR FROM AGE(pc.expiry_date, pc.issue_date))) FILTER (WHERE pc.expiry_date IS NOT NULL)::numeric as avg_credential_duration
 FROM professional_credentials pc
 JOIN clinic_staff cs ON pc.staff_id = cs.id
 WHERE cs.clinic_id = $1;
@@ -449,7 +449,7 @@ SELECT
     COUNT(*) FILTER (WHERE expiry_date < CURRENT_DATE AND status = 'verified') as expired_credentials,
     COUNT(*) FILTER (WHERE expiry_date <= CURRENT_DATE + INTERVAL '30 days' AND expiry_date >= CURRENT_DATE) as expiring_soon,
     COUNT(DISTINCT issuing_authority) as unique_authorities,
-    AVG(EXTRACT(DAY FROM AGE(verification_date, created_at))) FILTER (WHERE verification_date IS NOT NULL) as avg_verification_time_days
+    AVG(EXTRACT(DAY FROM AGE(verification_date, created_at))) FILTER (WHERE verification_date IS NOT NULL)::numeric as avg_verification_time_days
 FROM professional_credentials;
 
 -- ============================================
@@ -558,7 +558,7 @@ ORDER BY cs.clinic_id, cs.last_name;
 SELECT 
     DATE(pc.created_at) as submission_date,
     COUNT(*) as pending_count,
-    AVG(EXTRACT(DAY FROM AGE(CURRENT_TIMESTAMP, pc.created_at))) as avg_days_pending
+    AVG(EXTRACT(DAY FROM AGE(CURRENT_TIMESTAMP, pc.created_at)))::numeric as avg_days_pending
 FROM professional_credentials pc
 WHERE pc.status = 'pending'
 GROUP BY DATE(pc.created_at)
@@ -569,8 +569,8 @@ SELECT
     u.id as verifier_id,
     u.email as verifier_email,
     COUNT(*) as verified_count,
-    MIN(pc.verification_date) as first_verification,
-    MAX(pc.verification_date) as last_verification
+    MIN(pc.verification_date)::timestamp as first_verification,
+    MAX(pc.verification_date)::timestamp as last_verification
 FROM professional_credentials pc
 JOIN users u ON pc.verified_by = u.id
 WHERE 

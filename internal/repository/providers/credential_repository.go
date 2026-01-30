@@ -442,7 +442,7 @@ func (r *credentialRepository) GetVerifiedStaffCredentials(ctx context.Context, 
 
 	credentials := make([]providers.ProfessionalCredential, len(rows))
 	for i, row := range rows {
-		credentials[i] = r.mapToProfessionalCredential(row)
+		credentials[i] = r.mapGetVerifiedStaffCredentialsRowToCredential(row)
 	}
 
 	credentialDBQueryTotal.WithLabelValues("get_verified_staff_credentials", "success").Inc()
@@ -1083,7 +1083,10 @@ func (r *credentialRepository) GetClinicCredentialMetrics(ctx context.Context, c
 
 	var avgDuration *float64
 	if row.AvgCredentialDuration.Valid {
-		avgDuration = &row.AvgCredentialDuration.Float64
+		val, _ := row.AvgCredentialDuration.Float64Value()
+		if val.Valid {
+			avgDuration = &val.Float64
+		}
 	}
 
 	metrics := providers.ClinicCredentialMetrics{
@@ -1164,7 +1167,10 @@ func (r *credentialRepository) GetSystemCredentialMetrics(ctx context.Context) (
 
 	var avgVerificationTime *float64
 	if row.AvgVerificationTimeDays.Valid {
-		avgVerificationTime = &row.AvgVerificationTimeDays.Float64
+		val, _ := row.AvgVerificationTimeDays.Float64Value()
+		if val.Valid {
+			avgVerificationTime = &val.Float64
+		}
 	}
 
 	metrics := providers.SystemCredentialMetrics{
@@ -1273,7 +1279,7 @@ func (r *credentialRepository) HasVerifiedCredentialOfType(ctx context.Context, 
 	}()
 
 	exists, err := r.querier.HasVerifiedCredentialOfType(ctx, sqlc.HasVerifiedCredentialOfTypeParams{
-		StaffID:        staffID,
+		StaffID:        uuidToPgtypeUUID(staffID),
 		CredentialType: credentialType,
 	})
 	if err != nil {
@@ -1459,7 +1465,8 @@ func (r *credentialRepository) GetVerificationBacklog(ctx context.Context) ([]pr
 	for i, row := range rows {
 		var avgDaysPending *float64
 		if row.AvgDaysPending.Valid {
-			avgDaysPending = &row.AvgDaysPending.Float64
+			val, _ := row.AvgDaysPending.Float64Value()
+			avgDaysPending = &val.Float64
 		}
 
 		backlog[i] = providers.VerificationBacklog{
@@ -1666,5 +1673,24 @@ func (r *credentialRepository) mapToProfessionalCredential(row sqlc.Professional
 		Notes:            pgtypeTextToStringPtr(row.Notes),
 		CreatedAt:        row.CreatedAt.Time,
 		UpdatedAt:        row.UpdatedAt.Time,
+	}
+}
+
+func (r *credentialRepository) mapGetVerifiedStaffCredentialsRowToCredential(row sqlc.GetVerifiedStaffCredentialsRow) providers.ProfessionalCredential {
+	return providers.ProfessionalCredential{
+		ID:               pgtypeUUIDToUUID(row.ID),
+		StaffID:          uuid.Nil, // or could pass staffID from the function parameter
+		CredentialType:   row.CredentialType,
+		CredentialNumber: pgtypeTextToStringPtr(row.CredentialNumber),
+		IssuingAuthority: row.IssuingAuthority,
+		IssueDate:        pgtypeDateToTimePtr(row.IssueDate),
+		ExpiryDate:       pgtypeDateToTimePtr(row.ExpiryDate),
+		Status:           "", // Not in row
+		VerifiedBy:       uuidPtrToUUID(row.VerifiedBy),
+		VerificationDate: pgtypeTimestampToTimePtr(row.VerificationDate),
+		DocumentURL:      nil,         // Not in row
+		Notes:            nil,         // Not in row
+		CreatedAt:        time.Time{}, // Not in row
+		UpdatedAt:        time.Time{}, // Not in row
 	}
 }

@@ -573,7 +573,7 @@ type Querier interface {
 	// CREDENTIAL TYPE QUERIES
 	// ============================================
 	GetCredentialsByType(ctx context.Context, credentialType string) ([]GetCredentialsByTypeRow, error)
-	GetCredentialsExpiringWithinDays(ctx context.Context, dollar_1 pgtype.Text) ([]GetCredentialsExpiringWithinDaysRow, error)
+	GetCredentialsExpiringWithinDays(ctx context.Context, dollar_1 int32) ([]GetCredentialsExpiringWithinDaysRow, error)
 	GetCredentialsNeedingRenewal(ctx context.Context) ([]GetCredentialsNeedingRenewalRow, error)
 	GetCriticalAllergyWarnings(ctx context.Context, patientID pgtype.UUID) (GetCriticalAllergyWarningsRow, error)
 	GetCriticalPatientInfo(ctx context.Context, patientID pgtype.UUID) (GetCriticalPatientInfoRow, error)

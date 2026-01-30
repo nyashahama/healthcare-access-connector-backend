@@ -362,19 +362,19 @@ SELECT
     COUNT(DISTINCT pc.id) FILTER (WHERE pc.status = 'pending') as pending_credentials,
     COUNT(DISTINCT pc.id) FILTER (WHERE pc.expiry_date < CURRENT_DATE AND pc.status = 'verified') as expired_credentials,
     COUNT(DISTINCT pc.staff_id) as staff_with_credentials,
-    AVG(EXTRACT(YEAR FROM AGE(pc.expiry_date, pc.issue_date))) FILTER (WHERE pc.expiry_date IS NOT NULL) as avg_credential_duration
+    AVG(EXTRACT(YEAR FROM AGE(pc.expiry_date, pc.issue_date))) FILTER (WHERE pc.expiry_date IS NOT NULL)::numeric as avg_credential_duration
 FROM professional_credentials pc
 JOIN clinic_staff cs ON pc.staff_id = cs.id
 WHERE cs.clinic_id = $1
 `
 
 type GetClinicCredentialMetricsRow struct {
-	TotalCredentials      int64   `json:"total_credentials"`
-	VerifiedCredentials   int64   `json:"verified_credentials"`
-	PendingCredentials    int64   `json:"pending_credentials"`
-	ExpiredCredentials    int64   `json:"expired_credentials"`
-	StaffWithCredentials  int64   `json:"staff_with_credentials"`
-	AvgCredentialDuration float64 `json:"avg_credential_duration"`
+	TotalCredentials      int64          `json:"total_credentials"`
+	VerifiedCredentials   int64          `json:"verified_credentials"`
+	PendingCredentials    int64          `json:"pending_credentials"`
+	ExpiredCredentials    int64          `json:"expired_credentials"`
+	StaffWithCredentials  int64          `json:"staff_with_credentials"`
+	AvgCredentialDuration pgtype.Numeric `json:"avg_credential_duration"`
 }
 
 func (q *Queries) GetClinicCredentialMetrics(ctx context.Context, clinicID pgtype.UUID) (GetClinicCredentialMetricsRow, error) {
@@ -885,12 +885,12 @@ SELECT
     pc.id, pc.staff_id, pc.credential_type, pc.credential_number,
     pc.issuing_authority, pc.expiry_date,
     cs.first_name, cs.last_name, cs.clinic_id, cs.work_email,
-    CURRENT_DATE - pc.expiry_date as days_until_expiry
+    pc.expiry_date - CURRENT_DATE as days_until_expiry
 FROM professional_credentials pc
 JOIN clinic_staff cs ON pc.staff_id = cs.id
 WHERE 
-    pc.expiry_date <= CURRENT_DATE + ($1 || ' days')::INTERVAL
-    AND pc.expiry_date >= CURRENT_DATE
+    pc.expiry_date >= CURRENT_DATE
+    AND pc.expiry_date <= CURRENT_DATE + make_interval(days => $1::INTEGER)
     AND pc.status = 'verified'
 ORDER BY pc.expiry_date ASC
 `
@@ -909,7 +909,7 @@ type GetCredentialsExpiringWithinDaysRow struct {
 	DaysUntilExpiry  int32       `json:"days_until_expiry"`
 }
 
-func (q *Queries) GetCredentialsExpiringWithinDays(ctx context.Context, dollar_1 pgtype.Text) ([]GetCredentialsExpiringWithinDaysRow, error) {
+func (q *Queries) GetCredentialsExpiringWithinDays(ctx context.Context, dollar_1 int32) ([]GetCredentialsExpiringWithinDaysRow, error) {
 	rows, err := q.db.Query(ctx, getCredentialsExpiringWithinDays, dollar_1)
 	if err != nil {
 		return nil, err
@@ -1734,19 +1734,19 @@ SELECT
     COUNT(*) FILTER (WHERE expiry_date < CURRENT_DATE AND status = 'verified') as expired_credentials,
     COUNT(*) FILTER (WHERE expiry_date <= CURRENT_DATE + INTERVAL '30 days' AND expiry_date >= CURRENT_DATE) as expiring_soon,
     COUNT(DISTINCT issuing_authority) as unique_authorities,
-    AVG(EXTRACT(DAY FROM AGE(verification_date, created_at))) FILTER (WHERE verification_date IS NOT NULL) as avg_verification_time_days
+    AVG(EXTRACT(DAY FROM AGE(verification_date, created_at))) FILTER (WHERE verification_date IS NOT NULL)::numeric as avg_verification_time_days
 FROM professional_credentials
 `
 
 type GetSystemCredentialMetricsRow struct {
-	TotalCredentials          int64   `json:"total_credentials"`
-	TotalStaffWithCredentials int64   `json:"total_staff_with_credentials"`
-	VerifiedCredentials       int64   `json:"verified_credentials"`
-	PendingVerifications      int64   `json:"pending_verifications"`
-	ExpiredCredentials        int64   `json:"expired_credentials"`
-	ExpiringSoon              int64   `json:"expiring_soon"`
-	UniqueAuthorities         int64   `json:"unique_authorities"`
-	AvgVerificationTimeDays   float64 `json:"avg_verification_time_days"`
+	TotalCredentials          int64          `json:"total_credentials"`
+	TotalStaffWithCredentials int64          `json:"total_staff_with_credentials"`
+	VerifiedCredentials       int64          `json:"verified_credentials"`
+	PendingVerifications      int64          `json:"pending_verifications"`
+	ExpiredCredentials        int64          `json:"expired_credentials"`
+	ExpiringSoon              int64          `json:"expiring_soon"`
+	UniqueAuthorities         int64          `json:"unique_authorities"`
+	AvgVerificationTimeDays   pgtype.Numeric `json:"avg_verification_time_days"`
 }
 
 func (q *Queries) GetSystemCredentialMetrics(ctx context.Context) (GetSystemCredentialMetricsRow, error) {
@@ -1769,7 +1769,7 @@ const getVerificationBacklog = `-- name: GetVerificationBacklog :many
 SELECT 
     DATE(pc.created_at) as submission_date,
     COUNT(*) as pending_count,
-    AVG(EXTRACT(DAY FROM AGE(CURRENT_TIMESTAMP, pc.created_at))) as avg_days_pending
+    AVG(EXTRACT(DAY FROM AGE(CURRENT_TIMESTAMP, pc.created_at)))::numeric as avg_days_pending
 FROM professional_credentials pc
 WHERE pc.status = 'pending'
 GROUP BY DATE(pc.created_at)
@@ -1777,9 +1777,9 @@ ORDER BY submission_date DESC
 `
 
 type GetVerificationBacklogRow struct {
-	SubmissionDate pgtype.Date `json:"submission_date"`
-	PendingCount   int64       `json:"pending_count"`
-	AvgDaysPending float64     `json:"avg_days_pending"`
+	SubmissionDate pgtype.Date    `json:"submission_date"`
+	PendingCount   int64          `json:"pending_count"`
+	AvgDaysPending pgtype.Numeric `json:"avg_days_pending"`
 }
 
 func (q *Queries) GetVerificationBacklog(ctx context.Context) ([]GetVerificationBacklogRow, error) {
@@ -1859,8 +1859,8 @@ SELECT
     u.id as verifier_id,
     u.email as verifier_email,
     COUNT(*) as verified_count,
-    MIN(pc.verification_date) as first_verification,
-    MAX(pc.verification_date) as last_verification
+    MIN(pc.verification_date)::timestamp as first_verification,
+    MAX(pc.verification_date)::timestamp as last_verification
 FROM professional_credentials pc
 JOIN users u ON pc.verified_by = u.id
 WHERE 
@@ -1876,11 +1876,11 @@ type GetVerifierWorkloadParams struct {
 }
 
 type GetVerifierWorkloadRow struct {
-	VerifierID        pgtype.UUID `json:"verifier_id"`
-	VerifierEmail     string      `json:"verifier_email"`
-	VerifiedCount     int64       `json:"verified_count"`
-	FirstVerification interface{} `json:"first_verification"`
-	LastVerification  interface{} `json:"last_verification"`
+	VerifierID        pgtype.UUID      `json:"verifier_id"`
+	VerifierEmail     string           `json:"verifier_email"`
+	VerifiedCount     int64            `json:"verified_count"`
+	FirstVerification pgtype.Timestamp `json:"first_verification"`
+	LastVerification  pgtype.Timestamp `json:"last_verification"`
 }
 
 func (q *Queries) GetVerifierWorkload(ctx context.Context, arg GetVerifierWorkloadParams) ([]GetVerifierWorkloadRow, error) {
