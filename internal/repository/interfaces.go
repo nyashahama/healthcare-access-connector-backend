@@ -396,47 +396,47 @@ type PatientMedicalInfoRepository interface {
 type PatientSurgeryRepository interface {
 	// ===== Core CRUD Operations =====
 	AddPatientSurgery(ctx context.Context, surgery patients.PatientSurgery) (patients.PatientSurgery, error)
-	GetPatientSurgery(ctx context.Context, id uuid.UUID) (patients.PatientSurgery, error)
+	//	GetPatientSurgery(ctx context.Context, id uuid.UUID) (patients.PatientSurgery, error)
 	UpdatePatientSurgery(ctx context.Context, surgery patients.PatientSurgery) error
 	DeletePatientSurgery(ctx context.Context, id uuid.UUID) error
-	DeletePatientSurgeries(ctx context.Context, patientID uuid.UUID) error
+	//	DeletePatientSurgeries(ctx context.Context, patientID uuid.UUID) error
 
 	// ===== Querying by Patient =====
 	GetPatientSurgeries(ctx context.Context, patientID uuid.UUID) ([]patients.PatientSurgery, error)
-	GetRecentSurgeries(ctx context.Context, patientID uuid.UUID, yearsBack int) ([]patients.PatientSurgery, error)
-	GetSurgeriesWithComplications(ctx context.Context, patientID uuid.UUID) ([]patients.PatientSurgery, error)
-
-	// ===== Outcome & Complications Management =====
-	UpdateSurgeryOutcome(ctx context.Context, id uuid.UUID, outcome string, recoveryNotes *string) error
-	RecordComplications(ctx context.Context, id uuid.UUID, complications string, outcome *string) error
-	GetSurgeriesByOutcome(ctx context.Context, outcome string, limit, offset int) ([]patients.PatientSurgery, error)
-
-	// ===== Search & Filtering =====
-	SearchSurgeriesByProcedure(ctx context.Context, patientID uuid.UUID, procedureName string) ([]patients.PatientSurgery, error)
-	GetPatientsByProcedure(ctx context.Context, procedureName string, limit, offset int) ([]patients.PatientSurgery, error)
-	GetSurgeriesBySurgeon(ctx context.Context, surgeonName string, limit, offset int) ([]patients.PatientSurgery, error)
-	GetSurgeriesByHospital(ctx context.Context, hospitalName string, limit, offset int) ([]patients.PatientSurgery, error)
-	GetSurgeriesByDateRange(ctx context.Context, startDate, endDate time.Time) ([]patients.PatientSurgery, error)
-
-	// ===== Statistics & Analytics =====
-	CountPatientSurgeries(ctx context.Context, patientID uuid.UUID) (patients.SurgeryStatistics, error)
-	GetSurgeryStatistics(ctx context.Context) (patients.SurgerySystemMetrics, error)
-	GetMostCommonProcedures(ctx context.Context, limit int) ([]patients.ProcedureStats, error)
-	GetSurgeryTrends(ctx context.Context, startDate time.Time) ([]patients.SurgeryTrend, error)
-	GetProcedureSuccessRate(ctx context.Context, procedureName string) (float64, error)
-	GetHospitalPerformanceMetrics(ctx context.Context, hospitalName string) (interface{}, error)
-
-	// ===== Reporting Queries =====
-	GetPatientsWithMultipleSurgeries(ctx context.Context, minCount int) ([]interface{}, error)
-	GetRecentSurgicalPatients(ctx context.Context, since time.Time) ([]patients.PatientSurgery, error)
-	GetEmergencySurgeryInfo(ctx context.Context, patientID uuid.UUID) ([]patients.PatientSurgery, error)
-
-	// ===== Bulk Operations =====
-	GetSurgeriesByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientSurgery, error)
-
-	// ===== Validation & Utilities =====
-	HasSurgicalHistory(ctx context.Context, patientID uuid.UUID) (bool, error)
-	GetLastSurgeryDate(ctx context.Context, patientID uuid.UUID) (*time.Time, error)
+	GetRecentSurgeries(ctx context.Context, patientID uuid.UUID) ([]patients.PatientSurgery, error)
+	// GetSurgeriesWithComplications(ctx context.Context, patientID uuid.UUID) ([]patients.PatientSurgery, error)
+	//
+	// // ===== Outcome & Complications Management =====
+	// UpdateSurgeryOutcome(ctx context.Context, id uuid.UUID, outcome string, recoveryNotes *string) error
+	// RecordComplications(ctx context.Context, id uuid.UUID, complications string, outcome *string) error
+	// GetSurgeriesByOutcome(ctx context.Context, outcome string, limit, offset int) ([]patients.PatientSurgery, error)
+	//
+	// // ===== Search & Filtering =====
+	// SearchSurgeriesByProcedure(ctx context.Context, patientID uuid.UUID, procedureName string) ([]patients.PatientSurgery, error)
+	// GetPatientsByProcedure(ctx context.Context, procedureName string, limit, offset int) ([]patients.PatientSurgery, error)
+	// GetSurgeriesBySurgeon(ctx context.Context, surgeonName string, limit, offset int) ([]patients.PatientSurgery, error)
+	// GetSurgeriesByHospital(ctx context.Context, hospitalName string, limit, offset int) ([]patients.PatientSurgery, error)
+	// GetSurgeriesByDateRange(ctx context.Context, startDate, endDate time.Time) ([]patients.PatientSurgery, error)
+	//
+	// // ===== Statistics & Analytics =====
+	// CountPatientSurgeries(ctx context.Context, patientID uuid.UUID) (patients.SurgeryStatistics, error)
+	// GetSurgeryStatistics(ctx context.Context) (patients.SurgerySystemMetrics, error)
+	// GetMostCommonProcedures(ctx context.Context, limit int) ([]patients.ProcedureStats, error)
+	// GetSurgeryTrends(ctx context.Context, startDate time.Time) ([]patients.SurgeryTrend, error)
+	// GetProcedureSuccessRate(ctx context.Context, procedureName string) (float64, error)
+	// GetHospitalPerformanceMetrics(ctx context.Context, hospitalName string) (interface{}, error)
+	//
+	// // ===== Reporting Queries =====
+	// GetPatientsWithMultipleSurgeries(ctx context.Context, minCount int) ([]interface{}, error)
+	// GetRecentSurgicalPatients(ctx context.Context, since time.Time) ([]patients.PatientSurgery, error)
+	// GetEmergencySurgeryInfo(ctx context.Context, patientID uuid.UUID) ([]patients.PatientSurgery, error)
+	//
+	// // ===== Bulk Operations =====
+	// GetSurgeriesByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.PatientSurgery, error)
+	//
+	// // ===== Validation & Utilities =====
+	// HasSurgicalHistory(ctx context.Context, patientID uuid.UUID) (bool, error)
+	// GetLastSurgeryDate(ctx context.Context, patientID uuid.UUID) (*time.Time, error)
 }
 
 // ============================================
