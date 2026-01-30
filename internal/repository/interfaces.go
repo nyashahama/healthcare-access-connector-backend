@@ -806,66 +806,66 @@ type PatientAllergyRepository interface {
 type EmergencyContactRepository interface {
 	// ===== Core CRUD Operations =====
 	AddEmergencyContact(ctx context.Context, contact patients.EmergencyContact) (patients.EmergencyContact, error)
-	GetEmergencyContact(ctx context.Context, id uuid.UUID) (patients.EmergencyContact, error)
+	//	GetEmergencyContact(ctx context.Context, id uuid.UUID) (patients.EmergencyContact, error)
 	UpdateEmergencyContact(ctx context.Context, contact patients.EmergencyContact) error
 	DeleteEmergencyContact(ctx context.Context, id uuid.UUID) error
-	DeletePatientEmergencyContacts(ctx context.Context, patientID uuid.UUID) error
+	//	DeletePatientEmergencyContacts(ctx context.Context, patientID uuid.UUID) error
 
 	// ===== Querying by Patient =====
 	GetPatientEmergencyContacts(ctx context.Context, patientID uuid.UUID) ([]patients.EmergencyContact, error)
 	GetPrimaryEmergencyContact(ctx context.Context, patientID uuid.UUID) (patients.EmergencyContact, error)
-	GetEmergencyContactsByRelationship(ctx context.Context, patientID uuid.UUID, relationship string) ([]patients.EmergencyContact, error)
-
-	// ===== Primary Contact Management =====
-	SetPrimaryPatientContact(ctx context.Context, patientID, contactID uuid.UUID) error
-	UpdatePrimaryContact(ctx context.Context, id uuid.UUID) error
-	ClearPrimaryContacts(ctx context.Context, patientID uuid.UUID) error
-
-	// ===== Access Level Management =====
-	UpdateAccessLevel(ctx context.Context, id uuid.UUID, canAccess bool, accessLevel string) error
-	GrantMedicalAccess(ctx context.Context, id uuid.UUID, accessLevel string) error
-	RevokeMedicalAccess(ctx context.Context, id uuid.UUID) error
-	GetContactsWithMedicalAccess(ctx context.Context, accessLevel *string) ([]patients.EmergencyContact, error)
-	GetFullAccessContacts(ctx context.Context, patientID uuid.UUID) ([]patients.EmergencyContact, error)
-
-	// ===== Verification Management =====
-	VerifyRelationship(ctx context.Context, id uuid.UUID, notes string) error
-	UpdateVerificationNotes(ctx context.Context, id uuid.UUID, notes string) error
-	GetUnverifiedContacts(ctx context.Context) ([]patients.EmergencyContact, error)
-
-	// ===== Contact Information Updates =====
-	UpdateContactPhone(ctx context.Context, id uuid.UUID, phoneNumber string) error
-	UpdateContactEmail(ctx context.Context, id uuid.UUID, email string) error
-	UpdateContactAddress(ctx context.Context, id uuid.UUID, address string) error
-	UpdateContactDetails(ctx context.Context, id uuid.UUID, phone, email, address *string) error
-
-	// ===== Search & Filtering =====
-	SearchEmergencyContacts(ctx context.Context, searchTerm string) ([]patients.EmergencyContact, error)
-	GetContactsByPhone(ctx context.Context, phoneNumber string) ([]patients.EmergencyContact, error)
-
-	// ===== Statistics & Analytics =====
-	CountPatientEmergencyContacts(ctx context.Context, patientID uuid.UUID) (patients.EmergencyContactStatistics, error)
-	GetEmergencyContactStatistics(ctx context.Context) (patients.EmergencyContactSystemMetrics, error)
-	GetRelationshipDistribution(ctx context.Context) ([]patients.RelationshipDistribution, error)
-	GetAccessLevelDistribution(ctx context.Context) ([]patients.AccessLevelDistribution, error)
-
-	// ===== Reporting Queries =====
-	GetPatientsWithoutEmergencyContacts(ctx context.Context, limit, offset int) ([]interface{}, error)
-	GetPatientsWithoutPrimaryContact(ctx context.Context, limit, offset int) ([]interface{}, error)
-	GetContactsNeedingVerification(ctx context.Context, daysUnverified int) ([]patients.EmergencyContact, error)
-
-	// ===== Bulk Operations =====
-	GetEmergencyContactsByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.EmergencyContact, error)
-	BulkVerifyContacts(ctx context.Context, ids []uuid.UUID) error
-
-	// ===== Validation & Utilities =====
-	HasEmergencyContacts(ctx context.Context, patientID uuid.UUID) (bool, error)
-	HasPrimaryContact(ctx context.Context, patientID uuid.UUID) (bool, error)
-	CheckPhonePatientExists(ctx context.Context, patientID uuid.UUID, phoneNumber string, excludeID *uuid.UUID) (bool, error)
-
-	// ===== Emergency Access =====
-	GetEmergencyContactInfo(ctx context.Context, patientID uuid.UUID) ([]patients.EmergencyContact, error)
-	GetEmergencyNotificationList(ctx context.Context, patientID uuid.UUID) ([]patients.EmergencyContact, error)
+	// GetEmergencyContactsByRelationship(ctx context.Context, patientID uuid.UUID, relationship string) ([]patients.EmergencyContact, error)
+	//
+	// // ===== Primary Contact Management =====
+	// SetPrimaryPatientContact(ctx context.Context, patientID, contactID uuid.UUID) error
+	// UpdatePrimaryContact(ctx context.Context, id uuid.UUID) error
+	// ClearPrimaryContacts(ctx context.Context, patientID uuid.UUID) error
+	//
+	// // ===== Access Level Management =====
+	// UpdateAccessLevel(ctx context.Context, id uuid.UUID, canAccess bool, accessLevel string) error
+	// GrantMedicalAccess(ctx context.Context, id uuid.UUID, accessLevel string) error
+	// RevokeMedicalAccess(ctx context.Context, id uuid.UUID) error
+	// GetContactsWithMedicalAccess(ctx context.Context, accessLevel *string) ([]patients.EmergencyContact, error)
+	// GetFullAccessContacts(ctx context.Context, patientID uuid.UUID) ([]patients.EmergencyContact, error)
+	//
+	// // ===== Verification Management =====
+	// VerifyRelationship(ctx context.Context, id uuid.UUID, notes string) error
+	// UpdateVerificationNotes(ctx context.Context, id uuid.UUID, notes string) error
+	// GetUnverifiedContacts(ctx context.Context) ([]patients.EmergencyContact, error)
+	//
+	// // ===== Contact Information Updates =====
+	// UpdateContactPhone(ctx context.Context, id uuid.UUID, phoneNumber string) error
+	// UpdateContactEmail(ctx context.Context, id uuid.UUID, email string) error
+	// UpdateContactAddress(ctx context.Context, id uuid.UUID, address string) error
+	// UpdateContactDetails(ctx context.Context, id uuid.UUID, phone, email, address *string) error
+	//
+	// // ===== Search & Filtering =====
+	// SearchEmergencyContacts(ctx context.Context, searchTerm string) ([]patients.EmergencyContact, error)
+	// GetContactsByPhone(ctx context.Context, phoneNumber string) ([]patients.EmergencyContact, error)
+	//
+	// // ===== Statistics & Analytics =====
+	// CountPatientEmergencyContacts(ctx context.Context, patientID uuid.UUID) (patients.EmergencyContactStatistics, error)
+	// GetEmergencyContactStatistics(ctx context.Context) (patients.EmergencyContactSystemMetrics, error)
+	// GetRelationshipDistribution(ctx context.Context) ([]patients.RelationshipDistribution, error)
+	// GetAccessLevelDistribution(ctx context.Context) ([]patients.AccessLevelDistribution, error)
+	//
+	// // ===== Reporting Queries =====
+	// GetPatientsWithoutEmergencyContacts(ctx context.Context, limit, offset int) ([]interface{}, error)
+	// GetPatientsWithoutPrimaryContact(ctx context.Context, limit, offset int) ([]interface{}, error)
+	// GetContactsNeedingVerification(ctx context.Context, daysUnverified int) ([]patients.EmergencyContact, error)
+	//
+	// // ===== Bulk Operations =====
+	// GetEmergencyContactsByPatientIDs(ctx context.Context, patientIDs []uuid.UUID) ([]patients.EmergencyContact, error)
+	// BulkVerifyContacts(ctx context.Context, ids []uuid.UUID) error
+	//
+	// // ===== Validation & Utilities =====
+	// HasEmergencyContacts(ctx context.Context, patientID uuid.UUID) (bool, error)
+	// HasPrimaryContact(ctx context.Context, patientID uuid.UUID) (bool, error)
+	// CheckPhonePatientExists(ctx context.Context, patientID uuid.UUID, phoneNumber string, excludeID *uuid.UUID) (bool, error)
+	//
+	// // ===== Emergency Access =====
+	// GetEmergencyContactInfo(ctx context.Context, patientID uuid.UUID) ([]patients.EmergencyContact, error)
+	// GetEmergencyNotificationList(ctx context.Context, patientID uuid.UUID) ([]patients.EmergencyContact, error)
 }
 
 // ============================================
