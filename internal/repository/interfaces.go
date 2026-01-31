@@ -1402,97 +1402,97 @@ type CredentialRepository interface {
 type SystemAdminRepository interface {
 	// ===== Core CRUD Operations =====
 	CreateSystemAdmin(ctx context.Context, admin admin.SystemAdmin) (admin.SystemAdmin, error)
-	GetSystemAdmin(ctx context.Context, id uuid.UUID) (admin.SystemAdmin, error)
+	//	GetSystemAdmin(ctx context.Context, id uuid.UUID) (admin.SystemAdmin, error)
 	GetSystemAdminByUserID(ctx context.Context, userID uuid.UUID) (admin.SystemAdmin, error)
-	UpdateSystemAdmin(ctx context.Context, admin admin.SystemAdmin) error
-	DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error
+	//	UpdateSystemAdmin(ctx context.Context, admin admin.SystemAdmin) error
+	//	DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error
 
 	// ===== Permissions Management =====
 	UpdateAdminPermissions(ctx context.Context, id uuid.UUID, permissions interface{}, canManageUsers, canManageClinics, canManageContent, canViewAnalytics, canManageSystem bool) error
-	GrantUserManagement(ctx context.Context, id uuid.UUID) error
-	RevokeUserManagement(ctx context.Context, id uuid.UUID) error
-	GrantClinicManagement(ctx context.Context, id uuid.UUID) error
-	RevokeClinicManagement(ctx context.Context, id uuid.UUID) error
-	GrantContentManagement(ctx context.Context, id uuid.UUID) error
-	RevokeContentManagement(ctx context.Context, id uuid.UUID) error
-	GrantAnalyticsAccess(ctx context.Context, id uuid.UUID) error
-	RevokeAnalyticsAccess(ctx context.Context, id uuid.UUID) error
-	GrantSystemManagement(ctx context.Context, id uuid.UUID) error
-	RevokeSystemManagement(ctx context.Context, id uuid.UUID) error
-	UpdatePermissionsJSON(ctx context.Context, id uuid.UUID, permissions interface{}) error
-
-	// ===== Admin Level Management =====
-	GetAdminsByLevel(ctx context.Context, adminLevel string) ([]admin.SystemAdmin, error)
-	GetSuperAdmins(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetRegionalAdmins(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetSupportAdmins(ctx context.Context) ([]admin.SystemAdmin, error)
-	UpdateAdminLevel(ctx context.Context, id uuid.UUID, adminLevel string) error
-	PromoteToSuperAdmin(ctx context.Context, id uuid.UUID) error
+	// GrantUserManagement(ctx context.Context, id uuid.UUID) error
+	// RevokeUserManagement(ctx context.Context, id uuid.UUID) error
+	// GrantClinicManagement(ctx context.Context, id uuid.UUID) error
+	// RevokeClinicManagement(ctx context.Context, id uuid.UUID) error
+	// GrantContentManagement(ctx context.Context, id uuid.UUID) error
+	// RevokeContentManagement(ctx context.Context, id uuid.UUID) error
+	// GrantAnalyticsAccess(ctx context.Context, id uuid.UUID) error
+	// RevokeAnalyticsAccess(ctx context.Context, id uuid.UUID) error
+	// GrantSystemManagement(ctx context.Context, id uuid.UUID) error
+	// RevokeSystemManagement(ctx context.Context, id uuid.UUID) error
+	// UpdatePermissionsJSON(ctx context.Context, id uuid.UUID, permissions interface{}) error
+	//
+	// // ===== Admin Level Management =====
+	// GetAdminsByLevel(ctx context.Context, adminLevel string) ([]admin.SystemAdmin, error)
+	// GetSuperAdmins(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetRegionalAdmins(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetSupportAdmins(ctx context.Context) ([]admin.SystemAdmin, error)
+	// UpdateAdminLevel(ctx context.Context, id uuid.UUID, adminLevel string) error
+	// PromoteToSuperAdmin(ctx context.Context, id uuid.UUID) error
 
 	// ===== Region Management =====
-	UpdateAssignedRegions(ctx context.Context, id uuid.UUID, regions []string) error
+	//	UpdateAssignedRegions(ctx context.Context, id uuid.UUID, regions []string) error
 	AddRegionAssignment(ctx context.Context, id uuid.UUID, region string) error
-	RemoveRegionAssignment(ctx context.Context, id uuid.UUID, region string) error
-	GetAdminsByRegion(ctx context.Context, region string) ([]admin.SystemAdmin, error)
-	GetRegionsForAdmin(ctx context.Context, id uuid.UUID) ([]string, error)
-	CheckAdminHasRegion(ctx context.Context, id uuid.UUID, region string) (bool, error)
-
-	// ===== Department Management =====
-	GetAdminsByDepartment(ctx context.Context, department string) ([]admin.SystemAdmin, error)
-	UpdateDepartment(ctx context.Context, id uuid.UUID, department string) error
-	GetDepartmentList(ctx context.Context) ([]string, error)
-	CountAdminsByDepartment(ctx context.Context) ([]admin.DepartmentCount, error)
-
-	// ===== Permission Queries =====
-	GetAdminsWithUserManagement(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetAdminsWithClinicManagement(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetAdminsWithContentManagement(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetAdminsWithAnalyticsAccess(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetAdminsWithSystemManagement(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetAdminsWithPermission(ctx context.Context, permission string) ([]admin.SystemAdmin, error)
-
-	// ===== Contact Management =====
-	UpdateContactInfo(ctx context.Context, id uuid.UUID, workPhone, extension *string) error
-	UpdateWorkPhone(ctx context.Context, id uuid.UUID, workPhone string) error
-	UpdateExtension(ctx context.Context, id uuid.UUID, extension string) error
-	GetAdminContactInfo(ctx context.Context, id uuid.UUID) (admin.AdminContactInfo, error)
-
-	// ===== Search & Lookup =====
-	SearchSystemAdmins(ctx context.Context, searchTerm string, limit, offset int) ([]admin.SystemAdmin, error)
-	FindAdminByEmail(ctx context.Context, email string) (admin.SystemAdmin, error)
-	FindAdminByPhone(ctx context.Context, phone string) (admin.SystemAdmin, error)
-
-	// ===== Statistics & Analytics =====
-	CountSystemAdmins(ctx context.Context) (int64, error)
-	GetAdminLevelDistribution(ctx context.Context) ([]admin.AdminLevelDistribution, error)
-	GetPermissionStatistics(ctx context.Context) (admin.PermissionStatistics, error)
-	GetRegionCoverage(ctx context.Context) ([]admin.RegionCoverage, error)
-
-	// ===== List Operations =====
-	ListSystemAdmins(ctx context.Context, limit, offset int) ([]admin.SystemAdmin, error)
-	GetAllSystemAdmins(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetAdminsByUserIDs(ctx context.Context, userIDs []uuid.UUID) ([]admin.SystemAdmin, error)
-
-	// ===== Bulk Operations =====
-	BulkUpdatePermissions(ctx context.Context, adminIDs []uuid.UUID, permissions interface{}) error
-	BulkAssignRegion(ctx context.Context, adminIDs []uuid.UUID, region string) error
-	BulkRemoveRegion(ctx context.Context, adminIDs []uuid.UUID, region string) error
-	BulkUpdateDepartment(ctx context.Context, adminIDs []uuid.UUID, department string) error
-
-	// ===== Validation & Utilities =====
-	CheckAdminExists(ctx context.Context, userID uuid.UUID) (bool, error)
-	CheckIsSuperAdmin(ctx context.Context, id uuid.UUID) (bool, error)
-	CheckHasPermission(ctx context.Context, id uuid.UUID, permission string) (bool, error)
-	GetAdminPermissions(ctx context.Context, id uuid.UUID) (admin.AdminPermissions, error)
-	CountAdminsByLevel(ctx context.Context, adminLevel string) (int64, error)
-
-	// ===== Activity & Monitoring =====
-	GetRecentlyCreatedAdmins(ctx context.Context, days int, limit int) ([]admin.SystemAdmin, error)
-	GetRecentlyUpdatedAdmins(ctx context.Context, days int, limit int) ([]admin.SystemAdmin, error)
-	GetAdminsWithoutRegions(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetAdminsWithLimitedPermissions(ctx context.Context) ([]admin.SystemAdmin, error)
-	GetAdminActivitySummary(ctx context.Context) (admin.AdminActivitySummary, error)
-	GetAdminsWithNoRecentActivity(ctx context.Context, days int) ([]admin.SystemAdmin, error)
+	// RemoveRegionAssignment(ctx context.Context, id uuid.UUID, region string) error
+	// GetAdminsByRegion(ctx context.Context, region string) ([]admin.SystemAdmin, error)
+	// GetRegionsForAdmin(ctx context.Context, id uuid.UUID) ([]string, error)
+	// CheckAdminHasRegion(ctx context.Context, id uuid.UUID, region string) (bool, error)
+	//
+	// // ===== Department Management =====
+	// GetAdminsByDepartment(ctx context.Context, department string) ([]admin.SystemAdmin, error)
+	// UpdateDepartment(ctx context.Context, id uuid.UUID, department string) error
+	// GetDepartmentList(ctx context.Context) ([]string, error)
+	// CountAdminsByDepartment(ctx context.Context) ([]admin.DepartmentCount, error)
+	//
+	// // ===== Permission Queries =====
+	// GetAdminsWithUserManagement(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetAdminsWithClinicManagement(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetAdminsWithContentManagement(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetAdminsWithAnalyticsAccess(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetAdminsWithSystemManagement(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetAdminsWithPermission(ctx context.Context, permission string) ([]admin.SystemAdmin, error)
+	//
+	// // ===== Contact Management =====
+	// UpdateContactInfo(ctx context.Context, id uuid.UUID, workPhone, extension *string) error
+	// UpdateWorkPhone(ctx context.Context, id uuid.UUID, workPhone string) error
+	// UpdateExtension(ctx context.Context, id uuid.UUID, extension string) error
+	// GetAdminContactInfo(ctx context.Context, id uuid.UUID) (admin.AdminContactInfo, error)
+	//
+	// // ===== Search & Lookup =====
+	// SearchSystemAdmins(ctx context.Context, searchTerm string, limit, offset int) ([]admin.SystemAdmin, error)
+	// FindAdminByEmail(ctx context.Context, email string) (admin.SystemAdmin, error)
+	// FindAdminByPhone(ctx context.Context, phone string) (admin.SystemAdmin, error)
+	//
+	// // ===== Statistics & Analytics =====
+	// CountSystemAdmins(ctx context.Context) (int64, error)
+	// GetAdminLevelDistribution(ctx context.Context) ([]admin.AdminLevelDistribution, error)
+	// GetPermissionStatistics(ctx context.Context) (admin.PermissionStatistics, error)
+	// GetRegionCoverage(ctx context.Context) ([]admin.RegionCoverage, error)
+	//
+	// // ===== List Operations =====
+	// ListSystemAdmins(ctx context.Context, limit, offset int) ([]admin.SystemAdmin, error)
+	// GetAllSystemAdmins(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetAdminsByUserIDs(ctx context.Context, userIDs []uuid.UUID) ([]admin.SystemAdmin, error)
+	//
+	// // ===== Bulk Operations =====
+	// BulkUpdatePermissions(ctx context.Context, adminIDs []uuid.UUID, permissions interface{}) error
+	// BulkAssignRegion(ctx context.Context, adminIDs []uuid.UUID, region string) error
+	// BulkRemoveRegion(ctx context.Context, adminIDs []uuid.UUID, region string) error
+	// BulkUpdateDepartment(ctx context.Context, adminIDs []uuid.UUID, department string) error
+	//
+	// // ===== Validation & Utilities =====
+	// CheckAdminExists(ctx context.Context, userID uuid.UUID) (bool, error)
+	// CheckIsSuperAdmin(ctx context.Context, id uuid.UUID) (bool, error)
+	// CheckHasPermission(ctx context.Context, id uuid.UUID, permission string) (bool, error)
+	// GetAdminPermissions(ctx context.Context, id uuid.UUID) (admin.AdminPermissions, error)
+	// CountAdminsByLevel(ctx context.Context, adminLevel string) (int64, error)
+	//
+	// // ===== Activity & Monitoring =====
+	// GetRecentlyCreatedAdmins(ctx context.Context, days int, limit int) ([]admin.SystemAdmin, error)
+	// GetRecentlyUpdatedAdmins(ctx context.Context, days int, limit int) ([]admin.SystemAdmin, error)
+	// GetAdminsWithoutRegions(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetAdminsWithLimitedPermissions(ctx context.Context) ([]admin.SystemAdmin, error)
+	// GetAdminActivitySummary(ctx context.Context) (admin.AdminActivitySummary, error)
+	// GetAdminsWithNoRecentActivity(ctx context.Context, days int) ([]admin.SystemAdmin, error)
 }
 
 // ============================================

@@ -380,31 +380,6 @@ func (r *medicalInfoRepository) GetPatientsByBMIRange(ctx context.Context, minBM
 	return result, nil
 }
 
-func (r *medicalInfoRepository) GetVitalStatistics(ctx context.Context) (patients.MedicalInfoSummary, error) {
-	start := time.Now()
-	defer func() {
-		medicalInfoDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	stats, err := r.querier.GetVitalStatisticsSummary(ctx)
-	if err != nil {
-		medicalInfoDBQueryTotal.WithLabelValues("get_vital_statistics", "error").Inc()
-		return patients.MedicalInfoSummary{}, r.handleError(err, "get vital statistics")
-	}
-
-	summary := patients.MedicalInfoSummary{
-		WithCompleteVitals:    stats.WithCompleteVitals,
-		RecentlyMeasured:      stats.RecentlyMeasured,
-		OutdatedMeasurements:  stats.OutdatedMeasurements,
-		AverageBMI:            pgtypeNumericToFloat64Ptr(stats.AvgBmi),
-		OldestMeasurement:     pgtypeDateToTimePtr(stats.OldestMeasurement),
-		MostRecentMeasurement: pgtypeDateToTimePtr(stats.MostRecentMeasurement),
-	}
-
-	medicalInfoDBQueryTotal.WithLabelValues("get_vital_statistics", "success").Inc()
-	return summary, nil
-}
-
 // ===== Health Status Management =====
 
 func (r *medicalInfoRepository) UpdateHealthStatus(ctx context.Context, id uuid.UUID, status string) error {
