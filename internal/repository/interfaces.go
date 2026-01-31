@@ -1496,6 +1496,122 @@ type SystemAdminRepository interface {
 }
 
 // ============================================
+// NGO PARTNER REPOSITORY
+// Maps to: ngo_partners.sql
+// Domain: NGO Partnership Management & Collaboration
+// ============================================
+
+type NGOPartnerRepository interface {
+	// ===== Core CRUD Operations =====
+	CreateNGOPartner(ctx context.Context, partner admin.NGOPartner) (admin.NGOPartner, error)
+	GetNGOPartner(ctx context.Context, id uuid.UUID) (admin.NGOPartner, error)
+	GetNGOPartnerByUserID(ctx context.Context, userID uuid.UUID) (admin.NGOPartner, error)
+	UpdateNGOPartner(ctx context.Context, partner admin.NGOPartner) error
+	DeleteNGOPartner(ctx context.Context, id uuid.UUID) error
+
+	// ===== Organization Information Management =====
+	UpdateOrganizationInfo(ctx context.Context, id uuid.UUID, name, orgType *string) error
+	UpdateOrganizationContact(ctx context.Context, id uuid.UUID, address, phone, email, website *string) error
+	UpdateRegistrationInfo(ctx context.Context, id uuid.UUID, registrationNumber, taxID *string) error
+	GetNGOsByType(ctx context.Context, orgType string) ([]admin.NGOPartner, error)
+
+	// ===== Contact Person Management =====
+	UpdateContactPerson(ctx context.Context, id uuid.UUID, name, role, phone, email *string) error
+	GetContactPersonInfo(ctx context.Context, id uuid.UUID) (admin.ContactPersonInfo, error)
+	FindNGOByContactEmail(ctx context.Context, email string) (admin.NGOPartner, error)
+	FindNGOByContactPhone(ctx context.Context, phone string) (admin.NGOPartner, error)
+
+	// ===== Partnership Management =====
+	UpdatePartnershipDetails(ctx context.Context, id uuid.UUID, partnershipType *string, startDate, endDate *time.Time) error
+	UpdatePartnershipStatus(ctx context.Context, id uuid.UUID, status string) error
+	ActivatePartnership(ctx context.Context, id uuid.UUID) error
+	SuspendPartnership(ctx context.Context, id uuid.UUID) error
+	TerminatePartnership(ctx context.Context, id uuid.UUID) error
+	RenewPartnership(ctx context.Context, id uuid.UUID, newEndDate time.Time) error
+	GetActivePartnerships(ctx context.Context) ([]admin.NGOPartner, error)
+	GetPartnershipsByStatus(ctx context.Context, status string) ([]admin.NGOPartner, error)
+	GetPartnershipsByType(ctx context.Context, partnershipType string) ([]admin.NGOPartner, error)
+	GetExpiringPartnerships(ctx context.Context, days int) ([]admin.NGOPartner, error)
+	GetExpiredPartnerships(ctx context.Context) ([]admin.NGOPartner, error)
+
+	// ===== Operating Regions Management =====
+	UpdateOperatingRegions(ctx context.Context, id uuid.UUID, regions []string) error
+	AddOperatingRegion(ctx context.Context, id uuid.UUID, region string) error
+	RemoveOperatingRegion(ctx context.Context, id uuid.UUID, region string) error
+	GetNGOsByRegion(ctx context.Context, region string) ([]admin.NGOPartner, error)
+	GetNGORegionCoverage(ctx context.Context) ([]admin.NGORegionCoverage, error)
+	CheckNGOOperatesInRegion(ctx context.Context, id uuid.UUID, region string) (bool, error)
+
+	// ===== Focus Areas Management =====
+	UpdateFocusAreas(ctx context.Context, id uuid.UUID, focusAreas []string) error
+	AddFocusArea(ctx context.Context, id uuid.UUID, focusArea string) error
+	RemoveFocusArea(ctx context.Context, id uuid.UUID, focusArea string) error
+	GetNGOsByFocusArea(ctx context.Context, focusArea string) ([]admin.NGOPartner, error)
+	GetFocusAreaDistribution(ctx context.Context) ([]admin.FocusAreaDistribution, error)
+	CheckNGOHasFocusArea(ctx context.Context, id uuid.UUID, focusArea string) (bool, error)
+
+	// ===== Report Access Management =====
+	UpdateReportAccess(ctx context.Context, id uuid.UUID, canAccess bool, accessLevel *string) error
+	GrantReportAccess(ctx context.Context, id uuid.UUID, accessLevel string) error
+	RevokeReportAccess(ctx context.Context, id uuid.UUID) error
+	UpdateReportAccessLevel(ctx context.Context, id uuid.UUID, accessLevel string) error
+	UpdateCustomReportFilters(ctx context.Context, id uuid.UUID, filters interface{}) error
+	GetNGOsWithReportAccess(ctx context.Context) ([]admin.NGOPartner, error)
+	GetNGOsByAccessLevel(ctx context.Context, accessLevel string) ([]admin.NGOPartner, error)
+	GetReportAccessInfo(ctx context.Context, id uuid.UUID) (admin.ReportAccessInfo, error)
+
+	// ===== Branding Management =====
+	UpdateBranding(ctx context.Context, id uuid.UUID, logoURL, brandingColor *string) error
+	UpdateLogo(ctx context.Context, id uuid.UUID, logoURL string) error
+	UpdateBrandingColor(ctx context.Context, id uuid.UUID, color string) error
+	GetNGOBranding(ctx context.Context, id uuid.UUID) (admin.NGOBranding, error)
+
+	// ===== Search & Lookup =====
+	SearchNGOPartners(ctx context.Context, searchTerm string, limit, offset int) ([]admin.NGOPartner, error)
+	FindNGOByName(ctx context.Context, name string) (admin.NGOPartner, error)
+	FindNGOByRegistration(ctx context.Context, registrationNumber string) (admin.NGOPartner, error)
+	FindNGOByTaxID(ctx context.Context, taxID string) (admin.NGOPartner, error)
+	FindNGOByEmail(ctx context.Context, email string) (admin.NGOPartner, error)
+
+	// ===== Statistics & Analytics =====
+	CountNGOPartners(ctx context.Context) (int64, error)
+	GetPartnershipStatistics(ctx context.Context) (admin.PartnershipStatistics, error)
+	GetOrganizationTypeDistribution(ctx context.Context) ([]admin.OrganizationTypeDistribution, error)
+	GetPartnershipTypeDistribution(ctx context.Context) ([]admin.PartnershipTypeDistribution, error)
+	GetReportAccessStatistics(ctx context.Context) (admin.ReportAccessStatistics, error)
+
+	// ===== List Operations =====
+	ListNGOPartners(ctx context.Context, limit, offset int) ([]admin.NGOPartner, error)
+	GetAllNGOPartners(ctx context.Context) ([]admin.NGOPartner, error)
+	GetNGOsByIDs(ctx context.Context, ids []uuid.UUID) ([]admin.NGOPartner, error)
+	GetNGOsByUserIDs(ctx context.Context, userIDs []uuid.UUID) ([]admin.NGOPartner, error)
+
+	// ===== Bulk Operations =====
+	BulkUpdatePartnershipStatus(ctx context.Context, ids []uuid.UUID, status string) error
+	BulkGrantReportAccess(ctx context.Context, ids []uuid.UUID, accessLevel string) error
+	BulkRevokeReportAccess(ctx context.Context, ids []uuid.UUID) error
+	BulkAddOperatingRegion(ctx context.Context, ids []uuid.UUID, region string) error
+	BulkAddFocusArea(ctx context.Context, ids []uuid.UUID, focusArea string) error
+
+	// ===== Validation & Utilities =====
+	CheckNGOExists(ctx context.Context, userID uuid.UUID) (bool, error)
+	CheckRegistrationExists(ctx context.Context, registrationNumber string) (bool, error)
+	CheckTaxIDExists(ctx context.Context, taxID string) (bool, error)
+	IsPartnershipActive(ctx context.Context, id uuid.UUID) (bool, error)
+	GetPartnershipDuration(ctx context.Context, id uuid.UUID) (int64, error)
+
+	// ===== Special Queries =====
+	GetRecentlyAddedPartners(ctx context.Context, days int, limit int) ([]admin.NGOPartner, error)
+	GetRecentlyUpdatedPartners(ctx context.Context, days int, limit int) ([]admin.NGOPartner, error)
+	GetLongTermPartners(ctx context.Context, minYears int) ([]admin.NGOPartner, error)
+	GetPartnersNeedingRenewal(ctx context.Context, days int) ([]admin.NGOPartner, error)
+	GetMultiRegionalPartners(ctx context.Context, minRegions int) ([]admin.NGOPartner, error)
+	GetPartnersByRegionAndFocus(ctx context.Context, region, focusArea string) ([]admin.NGOPartner, error)
+	GetPartnerContactDirectory(ctx context.Context) ([]admin.PartnerContactDirectory, error)
+	GetPartnersWithIncompleteInfo(ctx context.Context) ([]admin.NGOPartner, error)
+}
+
+// ============================================
 // SMS REPOSITORY
 // ============================================
 
