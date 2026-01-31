@@ -335,3 +335,27 @@ func pgtypeBoolToBoolPtr(val pgtype.Bool) *bool {
 	result := val.Bool
 	return &result
 }
+
+func interfaceToPgtypeJSON(data interface{}) []byte {
+	if data == nil {
+		return nil
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return nil
+	}
+	return jsonBytes
+}
+
+func pgtypeJSONToInterface(data []byte) interface{} {
+	if len(data) == 0 {
+		return nil
+	}
+
+	var result interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil
+	}
+	return result
+}
