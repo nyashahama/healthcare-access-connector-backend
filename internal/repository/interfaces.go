@@ -347,7 +347,7 @@ type PatientMedicalInfoRepository interface {
 	UpdateWeight(ctx context.Context, id uuid.UUID, weightKg float64, measuredDate time.Time) error
 	UpdateBMI(ctx context.Context, id uuid.UUID, bmi float64) error
 	GetPatientsByBMIRange(ctx context.Context, minBMI, maxBMI float64) ([]patients.PatientMedicalInfo, error)
-	GetVitalStatistics(ctx context.Context) (patients.MedicalInfoSummary, error)
+	//	GetVitalStatistics(ctx context.Context) (patients.MedicalInfoSummary, error)
 
 	// ===== Health Status Management =====
 	UpdateHealthStatus(ctx context.Context, id uuid.UUID, status string) error
