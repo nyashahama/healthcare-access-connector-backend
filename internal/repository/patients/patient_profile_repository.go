@@ -347,12 +347,20 @@ func (r *patientRepository) NationalIDExists(ctx context.Context, nationalID str
 	return result, nil
 }
 
-// Helper function to convert *bool to pgtype.Bool
-func pgtypeBoolFromBoolPtr(b *bool) pgtype.Bool {
-	if b == nil {
-		return pgtype.Bool{}
+func (r *patientRepository) DeletePatientProfileByUserID(ctx context.Context, userID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		patientDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.DeletePatientProfileByUserID(ctx, uuidToPgtypeUUID(userID))
+	if err != nil {
+		patientDBQueryTotal.WithLabelValues("delete_patient_profile_by_user_id", "error").Inc()
+		return r.handleError(err, "delete patient profile by user ID")
 	}
-	return pgtype.Bool{Bool: *b, Valid: true}
+
+	patientDBQueryTotal.WithLabelValues("delete_patient_profile_by_user_id", "success").Inc()
+	return nil
 }
 
 // handleError converts database errors to domain errors
