@@ -172,153 +172,26 @@ type AuditRepository interface {
 }
 
 // ============================================
-// PATIENT REPOSITORY
+// PATIENTPROFILE  REPOSITORY
 // Maps to: patient_profiles.sql & related health records tables
 // ============================================
-
 type PatientProfileRepository interface {
-	// ===== Core CRUD Operations =====
+	// ===== Core CRUD =====
 	CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error)
 	GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error)
 	GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
 	GetPatientProfileByNationalID(ctx context.Context, nationalID string) (patients.PatientProfile, error)
 	UpdatePatientProfile(ctx context.Context, profile patients.PatientProfile) error
 	DeletePatientProfile(ctx context.Context, id uuid.UUID) error
-	DeletePatientProfileByUserID(ctx context.Context, userID uuid.UUID) error
 
-	// ===== Personal Information Updates =====
-	UpdatePersonalInfo(ctx context.Context, id uuid.UUID, firstName, lastName string, preferredName *string) error
-	UpdateDateOfBirth(ctx context.Context, id uuid.UUID, dob time.Time) error
-	UpdateGenderInfo(ctx context.Context, id uuid.UUID, gender *string, pronouns *string) error
-	UpdateProfilePicture(ctx context.Context, id uuid.UUID, pictureURL string) error
-	UpdatePreferredName(ctx context.Context, id uuid.UUID, preferredName *string) error
-
-	// ===== Contact Information Updates =====
-	UpdateContactInfo(ctx context.Context, id uuid.UUID, address, city, province, postalCode *string) error
-	UpdateAddress(ctx context.Context, id uuid.UUID, address, city, province, postalCode, country *string) error
-	UpdatePrimaryAddress(ctx context.Context, id uuid.UUID, address string) error
-	UpdateLocation(ctx context.Context, id uuid.UUID, city, province *string) error
-
-	// ===== Communication Preferences =====
-	UpdateCommunicationPreferences(ctx context.Context, id uuid.UUID, method string, languages []string) error
-	UpdatePreferredCommunicationMethod(ctx context.Context, id uuid.UUID, method string) error
-	UpdateLanguagePreferences(ctx context.Context, id uuid.UUID, languages []string) error
-	UpdateHomeLanguage(ctx context.Context, id uuid.UUID, language string) error
-	UpdateInterpreterRequirement(ctx context.Context, id uuid.UUID, requiresInterpreter bool) error
-
-	// ===== Medical Aid Information =====
-	UpdateMedicalAidInfo(ctx context.Context, id uuid.UUID, hasMedicalAid bool, provider, number *string) error
-	UpdateMedicalAidNumber(ctx context.Context, id uuid.UUID, number string) error
-	UpdateMedicalAidProvider(ctx context.Context, id uuid.UUID, provider string) error
-	UpdateMedicalAidStatus(ctx context.Context, id uuid.UUID, hasMedicalAid bool) error
-
-	// ===== Health System Identifiers =====
-	UpdateNationalIDNumber(ctx context.Context, id uuid.UUID, nationalID string) error
-	UpdateHealthSystemIdentifiers(ctx context.Context, id uuid.UUID, nationalID *string, medicalAidNumber *string) error
-
-	// ===== Demographic & Socioeconomic Information =====
-	UpdateEmploymentStatus(ctx context.Context, id uuid.UUID, status string) error
-	UpdateEducationLevel(ctx context.Context, id uuid.UUID, level string) error
-	UpdateHouseholdIncomeRange(ctx context.Context, id uuid.UUID, incomeRange string) error
-	UpdateDemographicInfo(ctx context.Context, id uuid.UUID, employmentStatus, educationLevel, incomeRange *string) error
-
-	// ===== Profile Settings & Preferences =====
-	UpdateTimezone(ctx context.Context, id uuid.UUID, timezone string) error
-	UpdateMarketingPreferences(ctx context.Context, id uuid.UUID, acceptsMarketing bool) error
-	UpdateReferralInfo(ctx context.Context, id uuid.UUID, referredBy *uuid.UUID, referralCode *string) error
-	UpdateLastProfileUpdate(ctx context.Context, id uuid.UUID) error
-
-	// ===== Querying & Search =====
+	// ===== Basic Search =====
 	ListPatientProfiles(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
 	SearchPatientProfiles(ctx context.Context, query string, limit, offset int) ([]patients.PatientProfile, error)
-	AdvancedSearchPatients(ctx context.Context, params patients.AdvancedSearchParams) ([]patients.PatientProfile, error)
 
-	// ===== Geographic Queries =====
-	GetPatientsByProvince(ctx context.Context, province string, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsByCity(ctx context.Context, city string, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsByProvinceAndCity(ctx context.Context, province, city string, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsInArea(ctx context.Context, province, city *string) ([]patients.PatientProfile, error)
-
-	// ===== Medical Aid Queries =====
-	GetPatientsByMedicalAidProvider(ctx context.Context, provider string, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsWithMedicalAid(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsWithoutMedicalAid(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
-
-	// ===== Communication & Language Queries =====
-	GetPatientsByPreferredLanguage(ctx context.Context, language string) ([]patients.PatientProfile, error)
-	GetPatientsRequiringInterpreter(ctx context.Context) ([]patients.PatientProfile, error)
-	GetPatientsByHomeLanguage(ctx context.Context, language string) ([]patients.PatientProfile, error)
-	GetPatientsByCommunicationMethod(ctx context.Context, method string, limit, offset int) ([]patients.PatientProfile, error)
-
-	// ===== Demographic Queries =====
-	GetPatientsByGender(ctx context.Context, gender string, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsByAgeRange(ctx context.Context, minAge, maxAge int, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsByEmploymentStatus(ctx context.Context, status string, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsByEducationLevel(ctx context.Context, level string, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsByIncomeRange(ctx context.Context, incomeRange string, limit, offset int) ([]patients.PatientProfile, error)
-
-	// ===== Marketing & Consent =====
-	GetPatientsAcceptingMarketing(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
-	GetPatientsOptedOutOfMarketing(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
-
-	// ===== Referral Queries =====
-	GetPatientsByReferrer(ctx context.Context, referrerID uuid.UUID) ([]patients.PatientProfile, error)
-	GetPatientsByReferralCode(ctx context.Context, referralCode string) ([]patients.PatientProfile, error)
-	GetReferralStatistics(ctx context.Context, referrerID uuid.UUID) (int64, error)
-
-	// ===== Profile Completion & Quality =====
-	GetIncompleteProfiles(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
-	GetProfilesWithMissingContactInfo(ctx context.Context) ([]patients.PatientProfile, error)
-	GetProfilesWithMissingDemographics(ctx context.Context) ([]patients.PatientProfile, error)
-	GetRecentlyUpdatedProfiles(ctx context.Context, since time.Time, limit, offset int) ([]patients.PatientProfile, error)
-	GetStaleProfiles(ctx context.Context, olderThan time.Time) ([]patients.PatientProfile, error)
-
-	// ===== Statistics & Analytics =====
-	GetPatientDemographicsSummary(ctx context.Context) (patients.PatientDemographicsSummary, error)
-	GetProvinceDistribution(ctx context.Context) (map[string]int64, error)
-	GetCityDistribution(ctx context.Context, province *string) (map[string]int64, error)
-	GetGenderDistribution(ctx context.Context) (map[string]int64, error)
-	GetAgeDistribution(ctx context.Context) (map[string]int64, error)
-	GetMedicalAidProviderDistribution(ctx context.Context) (map[string]int64, error)
-	GetLanguageDistribution(ctx context.Context) (map[string]int64, error)
-	GetCommunicationMethodDistribution(ctx context.Context) (map[string]int64, error)
-	GetEmploymentStatusDistribution(ctx context.Context) (map[string]int64, error)
-	GetEducationLevelDistribution(ctx context.Context) (map[string]int64, error)
-	GetIncomeRangeDistribution(ctx context.Context) (map[string]int64, error)
-
-	// ===== Counting & Existence Checks =====
-	CountPatientProfiles(ctx context.Context) (int64, error)
-	CountPatientsByProvince(ctx context.Context, province string) (int64, error)
-	CountPatientsByCity(ctx context.Context, city string) (int64, error)
-	CountPatientsWithMedicalAid(ctx context.Context) (int64, error)
-	CountPatientsRequiringInterpreter(ctx context.Context) (int64, error)
-	CountPatientsAcceptingMarketing(ctx context.Context) (int64, error)
+	// ===== Validation =====
 	ProfileExists(ctx context.Context, id uuid.UUID) (bool, error)
 	ProfileExistsByUserID(ctx context.Context, userID uuid.UUID) (bool, error)
 	NationalIDExists(ctx context.Context, nationalID string, excludeID *uuid.UUID) (bool, error)
-
-	// ===== Bulk Operations =====
-	GetPatientsByIDs(ctx context.Context, ids []uuid.UUID) ([]patients.PatientProfile, error)
-	GetPatientsByUserIDs(ctx context.Context, userIDs []uuid.UUID) ([]patients.PatientProfile, error)
-	BulkUpdateCommunicationMethod(ctx context.Context, ids []uuid.UUID, method string) error
-	BulkUpdateMarketingPreferences(ctx context.Context, ids []uuid.UUID, acceptsMarketing bool) error
-	BulkUpdateTimezone(ctx context.Context, ids []uuid.UUID, timezone string) error
-
-	// ===== Compliance & Data Management =====
-	ExportPatientData(ctx context.Context, patientID uuid.UUID) ([]byte, error)
-	AnonymizePatientProfile(ctx context.Context, id uuid.UUID) error
-	GetProfilesForDataRetentionReview(ctx context.Context, inactiveDays int) ([]patients.PatientProfile, error)
-
-	// ===== Time-based Queries =====
-	GetProfilesCreatedBetween(ctx context.Context, startDate, endDate time.Time, limit, offset int) ([]patients.PatientProfile, error)
-	GetProfilesUpdatedBetween(ctx context.Context, startDate, endDate time.Time, limit, offset int) ([]patients.PatientProfile, error)
-	GetNewPatientsInPeriod(ctx context.Context, startDate, endDate time.Time) ([]patients.PatientProfile, error)
-
-	// ===== Reporting =====
-	GeneratePatientDemographicsReport(ctx context.Context, startDate, endDate *time.Time) (interface{}, error)
-	GenerateGeographicDistributionReport(ctx context.Context) (interface{}, error)
-	GenerateMedicalAidCoverageReport(ctx context.Context) (interface{}, error)
-	GetPatientGrowthMetrics(ctx context.Context, startDate, endDate time.Time) (interface{}, error)
 }
 
 // ============================================
