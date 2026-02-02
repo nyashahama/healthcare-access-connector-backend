@@ -12,6 +12,7 @@ import (
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
+	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
@@ -57,6 +58,7 @@ type Server struct {
 	notificationHandler *handlercore.NotificationHandler
 	sessionHandler      *handlercore.SessionHandler
 	patientHandler      *patients.PatientHandler
+	adminHandler        *handleradmin.AdminHandler
 	healthHandler       *handler.HealthHandler
 	authService         service.AuthService
 }
@@ -73,6 +75,7 @@ func NewServer(
 	notificationHandler *handlercore.NotificationHandler,
 	sessionHandler *handlercore.SessionHandler,
 	patientHandler *patients.PatientHandler,
+	adminHandler *handleradmin.AdminHandler,
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
 	txManager repository.TxManager,
@@ -88,6 +91,7 @@ func NewServer(
 		notificationHandler: notificationHandler,
 		sessionHandler:      sessionHandler,
 		patientHandler:      patientHandler,
+		adminHandler:        adminHandler,
 		healthHandler:       healthHandler,
 		authService:         authService,
 	}
@@ -289,6 +293,11 @@ func (s *Server) setupRoutes() http.Handler {
 			// Admin-only routes
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole("system_admin"))
+
+				// System Admin management routes
+				r.Route("/admin", func(r chi.Router) {
+					r.Post("/system-admins", s.adminHandler.CreateSystemAdmin)
+				})
 
 				// Admin user management
 				r.Put("/users/{id}/role", s.userHandler.UpdateUserRole)

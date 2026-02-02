@@ -290,7 +290,7 @@ INSERT INTO system_admins (
     can_manage_content, can_view_analytics, can_manage_system,
     work_phone, extension
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12)
 RETURNING id, user_id, admin_level, assigned_regions, department, permissions, can_manage_users, can_manage_clinics, can_manage_content, can_view_analytics, can_manage_system, work_phone, extension, created_at, updated_at
 `
 
@@ -299,7 +299,7 @@ type CreateSystemAdminParams struct {
 	AdminLevel       string      `json:"admin_level"`
 	AssignedRegions  []string    `json:"assigned_regions"`
 	Department       pgtype.Text `json:"department"`
-	Permissions      []byte      `json:"permissions"`
+	Column5          []byte      `json:"column_5"`
 	CanManageUsers   pgtype.Bool `json:"can_manage_users"`
 	CanManageClinics pgtype.Bool `json:"can_manage_clinics"`
 	CanManageContent pgtype.Bool `json:"can_manage_content"`
@@ -323,7 +323,7 @@ func (q *Queries) CreateSystemAdmin(ctx context.Context, arg CreateSystemAdminPa
 		arg.AdminLevel,
 		arg.AssignedRegions,
 		arg.Department,
-		arg.Permissions,
+		arg.Column5,
 		arg.CanManageUsers,
 		arg.CanManageClinics,
 		arg.CanManageContent,

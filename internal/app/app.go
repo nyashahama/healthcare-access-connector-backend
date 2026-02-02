@@ -12,13 +12,16 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
+	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	handlerpatients "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
+	repoadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/admin"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
 	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
+	serviceadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/service/admin"
 	servicecore "github.com/nyashahama/healthcare-access-connector-backend/internal/service/core"
 	servicepatients "github.com/nyashahama/healthcare-access-connector-backend/internal/service/patients"
 	"github.com/rs/zerolog"
@@ -75,10 +78,10 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	// Initialize repositories
-	/* patients*/
+	/* patients */
 	patientRepo := repopatients.NewPatientRepository(pool)
 
-	/*core */
+	/* core */
 	authRepo := repocore.NewAuthRepository(pool)
 	userRepo := repocore.NewUserRepository(pool, patientRepo)
 	otpRepo := repocore.NewOTPRepository(pool)
@@ -86,6 +89,9 @@ func New(cfg *config.Config) (*App, error) {
 	notificationRepo := repocore.NewNotificationRepository(pool)
 	consentRepo := repocore.NewConsentRepository(pool)
 	auditRepo := repocore.NewAuditRepository(pool)
+
+	/* admin */
+	systemAdminRepo := repoadmin.NewSystemAdminRepository(pool)
 
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
@@ -164,6 +170,14 @@ func New(cfg *config.Config) (*App, error) {
 		logger,
 	)
 
+	systemAdminService := serviceadmin.NewSystemAdminService(
+		systemAdminRepo,
+		userRepo,
+		auditService,
+		cacheService,
+		logger,
+	)
+
 	// Initialize handlers
 	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
 	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
@@ -181,6 +195,13 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.Timeout,
 	)
 
+	// Initialize admin handler
+	adminHandler := handleradmin.NewAdminHandler(
+		systemAdminService,
+		logger,
+		cfg.Timeout,
+	)
+
 	// Initialize server with all handlers
 	srv := server.NewServer(
 		cfg,
@@ -193,6 +214,7 @@ func New(cfg *config.Config) (*App, error) {
 		notificationHandler,
 		sessionHandler,
 		patientHandler,
+		adminHandler,
 		healthHandler,
 		authService,
 		txManager,

@@ -30,7 +30,7 @@ type authService struct {
 	userRepo     repository.UserRepository
 	otpRepo      repository.OTPRepository
 	patientRepo  repository.PatientProfileRepository
-	sessionSvc   service.SessionService // Changed from sessionRepo
+	sessionSvc   service.SessionService
 	consentRepo  repository.ConsentRepository
 	cache        cache.Service
 	broker       messaging.Broker

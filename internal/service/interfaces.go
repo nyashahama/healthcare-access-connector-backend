@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/admin"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
@@ -160,6 +161,10 @@ type ClinicService interface {
 	ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
 	SearchClinics(ctx context.Context, query string, province string, city string, limit, offset int) ([]providers.Clinic, error)
 	SearchClinicsByLocation(ctx context.Context, lat, lng float64, radiusKm float64) ([]providers.Clinic, error)
+}
+
+type SystemAdminService interface {
+	CreateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error)
 }
 
 // TokenClaims represents JWT token claims for health project

@@ -65,7 +65,7 @@ func (r *systemAdminRepository) CreateSystemAdmin(ctx context.Context, sysAdmin 
 		AdminLevel:       sysAdmin.AdminLevel,
 		AssignedRegions:  sysAdmin.AssignedRegions,
 		Department:       pgtypeTextFromStringPtr(sysAdmin.Department),
-		Permissions:      interfaceToPgtypeJSON(sysAdmin.Permissions),
+		Column5:          interfaceToPgtypeJSON(sysAdmin.Permissions),
 		CanManageUsers:   pgtype.Bool{Bool: sysAdmin.CanManageUsers, Valid: true},
 		CanManageClinics: pgtype.Bool{Bool: sysAdmin.CanManageClinics, Valid: true},
 		CanManageContent: pgtype.Bool{Bool: sysAdmin.CanManageContent, Valid: true},

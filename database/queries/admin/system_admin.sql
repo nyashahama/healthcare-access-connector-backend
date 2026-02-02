@@ -15,7 +15,7 @@ INSERT INTO system_admins (
     can_manage_content, can_view_analytics, can_manage_system,
     work_phone, extension
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: GetSystemAdmin :one

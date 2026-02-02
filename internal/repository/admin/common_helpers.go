@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/rs/zerolog/log"
 )
 
 // UUID conversion helpers
@@ -336,15 +337,48 @@ func pgtypeBoolToBoolPtr(val pgtype.Bool) *bool {
 	return &result
 }
 
+// FIXED: Proper JSONB conversion for PostgreSQL
+// This is the key fix - we need to ensure valid JSON is returned
 func interfaceToPgtypeJSON(data interface{}) []byte {
+	// Handle nil case - return valid empty JSON object
 	if data == nil {
-		return nil
+		return []byte("{}")
 	}
 
+	// If it's already a byte slice, validate it's proper JSON
+	if bytes, ok := data.([]byte); ok {
+		if json.Valid(bytes) {
+			return bytes
+		}
+		// If invalid, fall through to marshaling
+	}
+
+	// Marshal the data to JSON
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {
-		return nil
+		// Log the error and return empty object
+		log.Error().
+			Err(err).
+			Interface("data", data).
+			Type("data_type", data).
+			Msg("Failed to marshal data to JSON for permissions field")
+		return []byte("{}")
 	}
+
+	// Ensure we have valid JSON (not empty)
+	if len(jsonBytes) == 0 || !json.Valid(jsonBytes) {
+		log.Warn().
+			Str("json_bytes", string(jsonBytes)).
+			Msg("Generated invalid JSON, using empty object")
+		return []byte("{}")
+	}
+
+	// Log successful conversion for debugging
+	log.Debug().
+		Str("json_output", string(jsonBytes)).
+		Interface("input_data", data).
+		Msg("Successfully converted to JSON")
+
 	return jsonBytes
 }
 
@@ -355,6 +389,10 @@ func pgtypeJSONToInterface(data []byte) interface{} {
 
 	var result interface{}
 	if err := json.Unmarshal(data, &result); err != nil {
+		log.Error().
+			Err(err).
+			Str("data", string(data)).
+			Msg("Failed to unmarshal JSON")
 		return nil
 	}
 	return result
