@@ -49,15 +49,11 @@ var (
 
 type credentialRepository struct {
 	querier sqlc.Querier
-	pool    *pgxpool.Pool
 }
 
 // NewCredentialRepository creates a new credential repository using a pool
 func NewCredentialRepository(pool *pgxpool.Pool) repository.CredentialRepository {
-	return &credentialRepository{
-		querier: sqlc.New(pool),
-		pool:    pool,
-	}
+	return NewCredentialRepositoryWithQuerier(sqlc.New(pool))
 }
 
 // NewCredentialRepositoryWithQuerier creates a new credential repository using a provided querier (for transactions)

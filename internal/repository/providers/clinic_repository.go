@@ -50,15 +50,11 @@ var (
 
 type clinicRepository struct {
 	querier sqlc.Querier
-	pool    *pgxpool.Pool
 }
 
 // NewClinicRepository creates a new clinic repository using a pool
 func NewClinicRepository(pool *pgxpool.Pool) repository.ClinicRepository {
-	return &clinicRepository{
-		querier: sqlc.New(pool),
-		pool:    pool,
-	}
+	return NewClinicRepositoryWithQuerier(sqlc.New(pool))
 }
 
 // NewClinicRepositoryWithQuerier creates a new clinic repository using a provided querier (for transactions)

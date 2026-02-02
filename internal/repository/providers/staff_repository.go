@@ -50,15 +50,11 @@ var (
 
 type staffRepository struct {
 	querier sqlc.Querier
-	pool    *pgxpool.Pool
 }
 
 // NewStaffRepository creates a new staff repository using a pool
 func NewStaffRepository(pool *pgxpool.Pool) repository.StaffRepository {
-	return &staffRepository{
-		querier: sqlc.New(pool),
-		pool:    pool,
-	}
+	return NewStaffRepositoryWithQuerier(sqlc.New(pool))
 }
 
 // NewStaffRepositoryWithQuerier creates a new staff repository using a provided querier (for transactions)

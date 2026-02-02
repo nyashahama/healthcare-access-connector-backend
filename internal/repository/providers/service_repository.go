@@ -50,15 +50,11 @@ var (
 
 type serviceRepository struct {
 	querier sqlc.Querier
-	pool    *pgxpool.Pool
 }
 
 // NewServiceRepository creates a new service repository using a pool
 func NewServiceRepository(pool *pgxpool.Pool) repository.ServiceRepository {
-	return &serviceRepository{
-		querier: sqlc.New(pool),
-		pool:    pool,
-	}
+	return NewServiceRepositoryWithQuerier(sqlc.New(pool))
 }
 
 // NewServiceRepositoryWithQuerier creates a new service repository using a provided querier (for transactions)
