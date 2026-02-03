@@ -180,6 +180,19 @@ type StaffService interface {
 	StaffExists(ctx context.Context, id uuid.UUID) (bool, error)
 }
 
+// ServiceCatalogService handles clinic service operations
+type ServiceCatalogService interface {
+	CreateClinicService(ctx context.Context, service providers.ClinicService) (providers.ClinicService, error)
+	GetServiceByID(ctx context.Context, id uuid.UUID) (providers.ClinicService, error)
+	UpdateClinicService(ctx context.Context, service providers.ClinicService) error
+	DeleteClinicService(ctx context.Context, id uuid.UUID) error
+
+	GetClinicServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	GetActiveClinicServices(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicService, error)
+	ServiceExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CheckServiceNameExists(ctx context.Context, clinicID uuid.UUID, name string, excludeID *uuid.UUID) (bool, error)
+}
+
 type SystemAdminService interface {
 	CreateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error)
 }
