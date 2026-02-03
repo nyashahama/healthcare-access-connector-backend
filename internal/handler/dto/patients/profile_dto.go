@@ -34,6 +34,8 @@ type CreatePatientProfileRequest struct {
 	HouseholdIncomeRange         *string    `json:"household_income_range,omitempty"`
 	ProfilePictureURL            *string    `json:"profile_picture_url,omitempty"`
 	Timezone                     string     `json:"timezone"`
+	ReferredBy                   *uuid.UUID `json:"referred_by,omitempty"`
+	ReferralCode                 *string    `json:"referral_code,omitempty"`
 	AcceptsMarketingEmails       bool       `json:"accepts_marketing_emails"`
 }
 
@@ -63,6 +65,8 @@ type UpdatePatientProfileRequest struct {
 	HouseholdIncomeRange         *string    `json:"household_income_range,omitempty"`
 	ProfilePictureURL            *string    `json:"profile_picture_url,omitempty"`
 	Timezone                     string     `json:"timezone"`
+	ReferredBy                   *uuid.UUID `json:"referred_by,omitempty"`
+	ReferralCode                 *string    `json:"referral_code,omitempty"`
 	AcceptsMarketingEmails       bool       `json:"accepts_marketing_emails"`
 }
 
@@ -94,6 +98,8 @@ type PatientProfileResponse struct {
 	HouseholdIncomeRange         *string    `json:"household_income_range,omitempty"`
 	ProfilePictureURL            *string    `json:"profile_picture_url,omitempty"`
 	Timezone                     string     `json:"timezone"`
+	ReferredBy                   *uuid.UUID `json:"referred_by,omitempty"`
+	ReferralCode                 *string    `json:"referral_code,omitempty"`
 	LastProfileUpdate            *time.Time `json:"last_profile_update,omitempty"`
 	AcceptsMarketingEmails       bool       `json:"accepts_marketing_emails"`
 	CreatedAt                    time.Time  `json:"created_at"`
@@ -166,6 +172,8 @@ func ToPatientProfileResponse(profile patients.PatientProfile) PatientProfileRes
 		HouseholdIncomeRange:         profile.HouseholdIncomeRange,
 		ProfilePictureURL:            profile.ProfilePictureURL,
 		Timezone:                     profile.Timezone,
+		ReferredBy:                   profile.ReferredBy,
+		ReferralCode:                 profile.ReferralCode,
 		LastProfileUpdate:            profile.LastProfileUpdate,
 		AcceptsMarketingEmails:       profile.AcceptsMarketingEmails,
 		CreatedAt:                    profile.CreatedAt,
@@ -201,6 +209,8 @@ func ToDomainPatientProfile(req CreatePatientProfileRequest) patients.PatientPro
 		HouseholdIncomeRange:         req.HouseholdIncomeRange,
 		ProfilePictureURL:            req.ProfilePictureURL,
 		Timezone:                     req.Timezone,
+		ReferredBy:                   req.ReferredBy,
+		ReferralCode:                 req.ReferralCode,
 		AcceptsMarketingEmails:       req.AcceptsMarketingEmails,
 	}
 }
@@ -233,6 +243,8 @@ func UpdateToDomainPatientProfile(existing patients.PatientProfile, req UpdatePa
 	existing.HouseholdIncomeRange = req.HouseholdIncomeRange
 	existing.ProfilePictureURL = req.ProfilePictureURL
 	existing.Timezone = req.Timezone
+	existing.ReferredBy = req.ReferredBy
+	existing.ReferralCode = req.ReferralCode
 	existing.AcceptsMarketingEmails = req.AcceptsMarketingEmails
 	return existing
 }
