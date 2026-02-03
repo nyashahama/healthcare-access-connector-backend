@@ -170,6 +170,15 @@ type MedicalInfoService interface {
 	DeleteMedicalInfoByPatientID(ctx context.Context, patientID uuid.UUID) error
 }
 
+// ImmunizationService handles patient immunization operations
+type ImmunizationService interface {
+	AddPatientImmunization(ctx context.Context, immunization patients.PatientImmunization) (patients.PatientImmunization, error)
+	GetPatientImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+	GetUpcomingImmunizations(ctx context.Context, patientID uuid.UUID) ([]patients.PatientImmunization, error)
+	UpdatePatientImmunization(ctx context.Context, immunization patients.PatientImmunization) error
+	DeletePatientImmunization(ctx context.Context, id uuid.UUID) error
+}
+
 // MedicationService handles patient medication operations
 type MedicationService interface {
 	AddPatientMedication(ctx context.Context, medication patients.PatientMedication) (patients.PatientMedication, error)
