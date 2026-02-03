@@ -223,6 +223,15 @@ type ConditionService interface {
 	DeletePatientCondition(ctx context.Context, id uuid.UUID) error
 }
 
+// AllergyService handles patient allergy operations
+type AllergyService interface {
+	AddPatientAllergy(ctx context.Context, allergy patients.PatientAllergy) (patients.PatientAllergy, error)
+	GetPatientAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
+	GetActivePatientAllergies(ctx context.Context, patientID uuid.UUID) ([]patients.PatientAllergy, error)
+	UpdatePatientAllergy(ctx context.Context, allergy patients.PatientAllergy) error
+	DeletePatientAllergy(ctx context.Context, id uuid.UUID) error
+}
+
 // ClinicService handles clinic operations
 type ClinicService interface {
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
