@@ -161,6 +161,15 @@ type SurgeryService interface {
 	DeletePatientSurgery(ctx context.Context, id uuid.UUID) error
 }
 
+// MedicalInfoService handles patient medical info operations
+type MedicalInfoService interface {
+	CreateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) (patients.PatientMedicalInfo, error)
+	GetMedicalInfoByID(ctx context.Context, id uuid.UUID) (patients.PatientMedicalInfo, error)
+	GetMedicalInfoByPatientID(ctx context.Context, patientID uuid.UUID) (patients.PatientMedicalInfo, error)
+	UpdateMedicalInfo(ctx context.Context, info patients.PatientMedicalInfo) error
+	DeleteMedicalInfoByPatientID(ctx context.Context, patientID uuid.UUID) error
+}
+
 // ClinicService handles clinic operations
 type ClinicService interface {
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
