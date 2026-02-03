@@ -168,7 +168,7 @@ type UpdateVerificationStatusRequest struct {
 }
 
 // Helper function to convert domain to response
-func clinicToResponse(clinic providers.Clinic) ClinicResponse {
+func ClinicToResponse(clinic providers.Clinic) ClinicResponse {
 	return ClinicResponse{
 		ID:                     clinic.ID,
 		ClinicName:             clinic.ClinicName,
@@ -220,4 +220,46 @@ func clinicToResponse(clinic providers.Clinic) ClinicResponse {
 		CreatedAt:              clinic.CreatedAt,
 		UpdatedAt:              clinic.UpdatedAt,
 	}
+}
+
+// ErrorResponse represents an error response
+type ErrorResponse struct {
+	Error  string            `json:"error"`
+	Fields map[string]string `json:"fields,omitempty"`
+	Code   string            `json:"code,omitempty"`
+}
+
+// MessageResponse represents a simple message response
+type MessageResponse struct {
+	Message string `json:"message"`
+}
+
+// ExistsResponse represents an existence check response
+type ExistsResponse struct {
+	Exists bool `json:"exists"`
+}
+
+// ClinicSearchResult represents a single search result
+type ClinicSearchResult struct {
+	ID              string   `json:"id"`
+	ClinicName      string   `json:"clinic_name"`
+	ClinicType      string   `json:"clinic_type"`
+	City            *string  `json:"city,omitempty"`
+	Province        *string  `json:"province,omitempty"`
+	Distance        *float64 `json:"distance,omitempty"`
+	Rating          *float64 `json:"rating,omitempty"`
+	IsVerified      bool     `json:"is_verified"`
+	PhysicalAddress string   `json:"physical_address"`
+}
+
+// Helper functions for string pointer conversions
+func stringPtr(s string) *string {
+	return &s
+}
+
+func stringPtrToString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
