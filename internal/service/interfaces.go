@@ -193,6 +193,13 @@ type ServiceCatalogService interface {
 	CheckServiceNameExists(ctx context.Context, clinicID uuid.UUID, name string, excludeID *uuid.UUID) (bool, error)
 }
 
+// CredentialService handles professional credential operations
+type CredentialService interface {
+	CreateCredential(ctx context.Context, credential providers.ProfessionalCredential) (providers.ProfessionalCredential, error)
+	GetStaffCredentials(ctx context.Context, staffID uuid.UUID) ([]providers.ProfessionalCredential, error)
+	DeleteCredential(ctx context.Context, id uuid.UUID) error
+}
+
 type SystemAdminService interface {
 	CreateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error)
 }
