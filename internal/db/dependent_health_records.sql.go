@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -89,8 +90,8 @@ WHERE id = $1
 `
 
 type AddRecordDocumentParams struct {
-	ID      pgtype.UUID `json:"id"`
-	Column2 []byte      `json:"column_2"`
+	ID      pgtype.UUID     `json:"id"`
+	Column2 json.RawMessage `json:"column_2"`
 }
 
 func (q *Queries) AddRecordDocument(ctx context.Context, arg AddRecordDocumentParams) error {

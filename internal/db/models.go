@@ -5,6 +5,7 @@
 package sqlc
 
 import (
+	"encoding/json"
 	"net/netip"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -511,7 +512,7 @@ type SystemAdmin struct {
 	AdminLevel       string           `json:"admin_level"`
 	AssignedRegions  []string         `json:"assigned_regions"`
 	Department       pgtype.Text      `json:"department"`
-	Permissions      []byte           `json:"permissions"`
+	Permissions      json.RawMessage  `json:"permissions"`
 	CanManageUsers   pgtype.Bool      `json:"can_manage_users"`
 	CanManageClinics pgtype.Bool      `json:"can_manage_clinics"`
 	CanManageContent pgtype.Bool      `json:"can_manage_content"`

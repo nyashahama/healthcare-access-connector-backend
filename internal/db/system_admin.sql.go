@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -94,8 +95,8 @@ WHERE id = ANY($1::uuid[])
 `
 
 type BulkUpdatePermissionsParams struct {
-	Column1     []pgtype.UUID `json:"column_1"`
-	Permissions []byte        `json:"permissions"`
+	Column1     []pgtype.UUID   `json:"column_1"`
+	Permissions json.RawMessage `json:"permissions"`
 }
 
 func (q *Queries) BulkUpdatePermissions(ctx context.Context, arg BulkUpdatePermissionsParams) error {
@@ -295,18 +296,18 @@ RETURNING id, user_id, admin_level, assigned_regions, department, permissions, c
 `
 
 type CreateSystemAdminParams struct {
-	UserID           pgtype.UUID `json:"user_id"`
-	AdminLevel       string      `json:"admin_level"`
-	AssignedRegions  []string    `json:"assigned_regions"`
-	Department       pgtype.Text `json:"department"`
-	Column5          []byte      `json:"column_5"`
-	CanManageUsers   pgtype.Bool `json:"can_manage_users"`
-	CanManageClinics pgtype.Bool `json:"can_manage_clinics"`
-	CanManageContent pgtype.Bool `json:"can_manage_content"`
-	CanViewAnalytics pgtype.Bool `json:"can_view_analytics"`
-	CanManageSystem  pgtype.Bool `json:"can_manage_system"`
-	WorkPhone        pgtype.Text `json:"work_phone"`
-	Extension        pgtype.Text `json:"extension"`
+	UserID           pgtype.UUID     `json:"user_id"`
+	AdminLevel       string          `json:"admin_level"`
+	AssignedRegions  []string        `json:"assigned_regions"`
+	Department       pgtype.Text     `json:"department"`
+	Column5          json.RawMessage `json:"column_5"`
+	CanManageUsers   pgtype.Bool     `json:"can_manage_users"`
+	CanManageClinics pgtype.Bool     `json:"can_manage_clinics"`
+	CanManageContent pgtype.Bool     `json:"can_manage_content"`
+	CanViewAnalytics pgtype.Bool     `json:"can_view_analytics"`
+	CanManageSystem  pgtype.Bool     `json:"can_manage_system"`
+	WorkPhone        pgtype.Text     `json:"work_phone"`
+	Extension        pgtype.Text     `json:"extension"`
 }
 
 // ============================================
@@ -375,11 +376,11 @@ WHERE u.email = $1
 `
 
 type FindAdminByEmailRow struct {
-	ID          pgtype.UUID `json:"id"`
-	UserID      pgtype.UUID `json:"user_id"`
-	AdminLevel  string      `json:"admin_level"`
-	Department  pgtype.Text `json:"department"`
-	Permissions []byte      `json:"permissions"`
+	ID          pgtype.UUID     `json:"id"`
+	UserID      pgtype.UUID     `json:"user_id"`
+	AdminLevel  string          `json:"admin_level"`
+	Department  pgtype.Text     `json:"department"`
+	Permissions json.RawMessage `json:"permissions"`
 }
 
 func (q *Queries) FindAdminByEmail(ctx context.Context, email string) (FindAdminByEmailRow, error) {
@@ -441,13 +442,13 @@ GROUP BY sa.id, sa.admin_level, sa.department, sa.assigned_regions, sa.permissio
 `
 
 type GetAdminActivitySummaryRow struct {
-	ID              pgtype.UUID `json:"id"`
-	AdminLevel      string      `json:"admin_level"`
-	Department      pgtype.Text `json:"department"`
-	AssignedRegions []string    `json:"assigned_regions"`
-	Permissions     []byte      `json:"permissions"`
-	TotalActivities int64       `json:"total_activities"`
-	LastActivity    interface{} `json:"last_activity"`
+	ID              pgtype.UUID     `json:"id"`
+	AdminLevel      string          `json:"admin_level"`
+	Department      pgtype.Text     `json:"department"`
+	AssignedRegions []string        `json:"assigned_regions"`
+	Permissions     json.RawMessage `json:"permissions"`
+	TotalActivities int64           `json:"total_activities"`
+	LastActivity    interface{}     `json:"last_activity"`
 }
 
 func (q *Queries) GetAdminActivitySummary(ctx context.Context, id pgtype.UUID) (GetAdminActivitySummaryRow, error) {
@@ -558,14 +559,14 @@ WHERE user_id = $1
 `
 
 type GetAdminPermissionsRow struct {
-	AdminLevel       string      `json:"admin_level"`
-	Permissions      []byte      `json:"permissions"`
-	CanManageUsers   pgtype.Bool `json:"can_manage_users"`
-	CanManageClinics pgtype.Bool `json:"can_manage_clinics"`
-	CanManageContent pgtype.Bool `json:"can_manage_content"`
-	CanViewAnalytics pgtype.Bool `json:"can_view_analytics"`
-	CanManageSystem  pgtype.Bool `json:"can_manage_system"`
-	AssignedRegions  []string    `json:"assigned_regions"`
+	AdminLevel       string          `json:"admin_level"`
+	Permissions      json.RawMessage `json:"permissions"`
+	CanManageUsers   pgtype.Bool     `json:"can_manage_users"`
+	CanManageClinics pgtype.Bool     `json:"can_manage_clinics"`
+	CanManageContent pgtype.Bool     `json:"can_manage_content"`
+	CanViewAnalytics pgtype.Bool     `json:"can_view_analytics"`
+	CanManageSystem  pgtype.Bool     `json:"can_manage_system"`
+	AssignedRegions  []string        `json:"assigned_regions"`
 }
 
 func (q *Queries) GetAdminPermissions(ctx context.Context, userID pgtype.UUID) (GetAdminPermissionsRow, error) {
@@ -768,11 +769,11 @@ ORDER BY sa.admin_level
 `
 
 type GetAdminsByUserIDsRow struct {
-	ID          pgtype.UUID `json:"id"`
-	UserID      pgtype.UUID `json:"user_id"`
-	AdminLevel  string      `json:"admin_level"`
-	Department  pgtype.Text `json:"department"`
-	Permissions []byte      `json:"permissions"`
+	ID          pgtype.UUID     `json:"id"`
+	UserID      pgtype.UUID     `json:"user_id"`
+	AdminLevel  string          `json:"admin_level"`
+	Department  pgtype.Text     `json:"department"`
+	Permissions json.RawMessage `json:"permissions"`
 }
 
 // ============================================
@@ -962,11 +963,11 @@ ORDER BY sa.admin_level, sa.created_at
 `
 
 type GetAdminsWithLimitedPermissionsRow struct {
-	ID          pgtype.UUID `json:"id"`
-	UserID      pgtype.UUID `json:"user_id"`
-	Email       string      `json:"email"`
-	AdminLevel  string      `json:"admin_level"`
-	Permissions []byte      `json:"permissions"`
+	ID          pgtype.UUID     `json:"id"`
+	UserID      pgtype.UUID     `json:"user_id"`
+	Email       string          `json:"email"`
+	AdminLevel  string          `json:"admin_level"`
+	Permissions json.RawMessage `json:"permissions"`
 }
 
 func (q *Queries) GetAdminsWithLimitedPermissions(ctx context.Context) ([]GetAdminsWithLimitedPermissionsRow, error) {
@@ -1066,11 +1067,11 @@ ORDER BY sa.admin_level, sa.created_at
 `
 
 type GetAdminsWithPermissionRow struct {
-	ID          pgtype.UUID `json:"id"`
-	UserID      pgtype.UUID `json:"user_id"`
-	Email       string      `json:"email"`
-	AdminLevel  string      `json:"admin_level"`
-	Permissions []byte      `json:"permissions"`
+	ID          pgtype.UUID     `json:"id"`
+	UserID      pgtype.UUID     `json:"user_id"`
+	Email       string          `json:"email"`
+	AdminLevel  string          `json:"admin_level"`
+	Permissions json.RawMessage `json:"permissions"`
 }
 
 func (q *Queries) GetAdminsWithPermission(ctx context.Context, dollar_1 interface{}) ([]GetAdminsWithPermissionRow, error) {
@@ -2093,13 +2094,13 @@ WHERE id = $1
 `
 
 type UpdateAdminPermissionsParams struct {
-	ID               pgtype.UUID `json:"id"`
-	Permissions      []byte      `json:"permissions"`
-	CanManageUsers   pgtype.Bool `json:"can_manage_users"`
-	CanManageClinics pgtype.Bool `json:"can_manage_clinics"`
-	CanManageContent pgtype.Bool `json:"can_manage_content"`
-	CanViewAnalytics pgtype.Bool `json:"can_view_analytics"`
-	CanManageSystem  pgtype.Bool `json:"can_manage_system"`
+	ID               pgtype.UUID     `json:"id"`
+	Permissions      json.RawMessage `json:"permissions"`
+	CanManageUsers   pgtype.Bool     `json:"can_manage_users"`
+	CanManageClinics pgtype.Bool     `json:"can_manage_clinics"`
+	CanManageContent pgtype.Bool     `json:"can_manage_content"`
+	CanViewAnalytics pgtype.Bool     `json:"can_view_analytics"`
+	CanManageSystem  pgtype.Bool     `json:"can_manage_system"`
 }
 
 // ============================================
@@ -2209,8 +2210,8 @@ WHERE id = $1
 `
 
 type UpdatePermissionsJSONParams struct {
-	ID          pgtype.UUID `json:"id"`
-	Permissions []byte      `json:"permissions"`
+	ID          pgtype.UUID     `json:"id"`
+	Permissions json.RawMessage `json:"permissions"`
 }
 
 func (q *Queries) UpdatePermissionsJSON(ctx context.Context, arg UpdatePermissionsJSONParams) error {
@@ -2232,13 +2233,13 @@ WHERE id = $1
 `
 
 type UpdateSystemAdminParams struct {
-	ID              pgtype.UUID `json:"id"`
-	AdminLevel      string      `json:"admin_level"`
-	AssignedRegions []string    `json:"assigned_regions"`
-	Department      pgtype.Text `json:"department"`
-	Permissions     []byte      `json:"permissions"`
-	WorkPhone       pgtype.Text `json:"work_phone"`
-	Extension       pgtype.Text `json:"extension"`
+	ID              pgtype.UUID     `json:"id"`
+	AdminLevel      string          `json:"admin_level"`
+	AssignedRegions []string        `json:"assigned_regions"`
+	Department      pgtype.Text     `json:"department"`
+	Permissions     json.RawMessage `json:"permissions"`
+	WorkPhone       pgtype.Text     `json:"work_phone"`
+	Extension       pgtype.Text     `json:"extension"`
 }
 
 func (q *Queries) UpdateSystemAdmin(ctx context.Context, arg UpdateSystemAdminParams) error {

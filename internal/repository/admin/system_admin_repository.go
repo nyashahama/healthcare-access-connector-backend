@@ -60,12 +60,14 @@ func (r *systemAdminRepository) CreateSystemAdmin(ctx context.Context, sysAdmin 
 		systemAdminDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
+	// After sqlc regeneration with json.RawMessage override:
+	// The field will be named "Permissions" and expect json.RawMessage
 	created, err := r.querier.CreateSystemAdmin(ctx, sqlc.CreateSystemAdminParams{
 		UserID:           uuidToPgtypeUUID(sysAdmin.UserID),
 		AdminLevel:       sysAdmin.AdminLevel,
 		AssignedRegions:  sysAdmin.AssignedRegions,
 		Department:       pgtypeTextFromStringPtr(sysAdmin.Department),
-		Column5:          interfaceToPgtypeJSON(sysAdmin.Permissions),
+		Column5:          interfaceToJSONRawMessage(sysAdmin.Permissions), // Use json.RawMessage helper
 		CanManageUsers:   pgtype.Bool{Bool: sysAdmin.CanManageUsers, Valid: true},
 		CanManageClinics: pgtype.Bool{Bool: sysAdmin.CanManageClinics, Valid: true},
 		CanManageContent: pgtype.Bool{Bool: sysAdmin.CanManageContent, Valid: true},
@@ -107,7 +109,7 @@ func (r *systemAdminRepository) UpdateAdminPermissions(ctx context.Context, id u
 
 	err := r.querier.UpdateAdminPermissions(ctx, sqlc.UpdateAdminPermissionsParams{
 		ID:               uuidToPgtypeUUID(id),
-		Permissions:      interfaceToPgtypeJSON(permissions),
+		Permissions:      interfaceToJSONRawMessage(permissions), // Use json.RawMessage helper
 		CanManageUsers:   pgtype.Bool{Bool: canManageUsers, Valid: true},
 		CanManageClinics: pgtype.Bool{Bool: canManageClinics, Valid: true},
 		CanManageContent: pgtype.Bool{Bool: canManageContent, Valid: true},
@@ -151,7 +153,7 @@ func (r *systemAdminRepository) mapToSystemAdmin(row sqlc.SystemAdmin) admin.Sys
 		AdminLevel:       row.AdminLevel,
 		AssignedRegions:  row.AssignedRegions,
 		Department:       pgtypeTextToStringPtr(row.Department),
-		Permissions:      pgtypeJSONToInterface(row.Permissions),
+		Permissions:      jsonRawMessageToInterface(row.Permissions), // Use json.RawMessage helper
 		CanManageUsers:   pgtypeBoolToBool(row.CanManageUsers),
 		CanManageClinics: pgtypeBoolToBool(row.CanManageClinics),
 		CanManageContent: pgtypeBoolToBool(row.CanManageContent),

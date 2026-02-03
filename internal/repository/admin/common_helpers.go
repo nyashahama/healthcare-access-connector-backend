@@ -337,12 +337,11 @@ func pgtypeBoolToBoolPtr(val pgtype.Bool) *bool {
 	return &result
 }
 
-// FIXED: Proper JSONB conversion for PostgreSQL
-// This is the key fix - we need to ensure valid JSON is returned
+// FIXED: Proper JSONB conversion for PostgreSQL using pgtype
 func interfaceToPgtypeJSON(data interface{}) []byte {
-	// Handle nil case - return valid empty JSON object
+	// Handle nil case - return nil (pgx will handle as NULL)
 	if data == nil {
-		return []byte("{}")
+		return nil
 	}
 
 	// If it's already a byte slice, validate it's proper JSON
@@ -356,21 +355,21 @@ func interfaceToPgtypeJSON(data interface{}) []byte {
 	// Marshal the data to JSON
 	jsonBytes, err := json.Marshal(data)
 	if err != nil {
-		// Log the error and return empty object
+		// Log the error and return nil
 		log.Error().
 			Err(err).
 			Interface("data", data).
 			Type("data_type", data).
 			Msg("Failed to marshal data to JSON for permissions field")
-		return []byte("{}")
+		return nil
 	}
 
-	// Ensure we have valid JSON (not empty)
+	// Ensure we have valid JSON
 	if len(jsonBytes) == 0 || !json.Valid(jsonBytes) {
 		log.Warn().
 			Str("json_bytes", string(jsonBytes)).
-			Msg("Generated invalid JSON, using empty object")
-		return []byte("{}")
+			Msg("Generated invalid JSON, returning nil")
+		return nil
 	}
 
 	// Log successful conversion for debugging
@@ -381,6 +380,72 @@ func interfaceToPgtypeJSON(data interface{}) []byte {
 
 	return jsonBytes
 }
+
+// Convert interface{} to json.RawMessage for JSONB columns
+func interfaceToJSONRawMessage(data interface{}) json.RawMessage {
+	if data == nil {
+		return nil
+	}
+
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Interface("data", data).
+			Msg("Failed to marshal data to JSON RawMessage")
+		return nil
+	}
+
+	// Validate JSON
+	if !json.Valid(jsonBytes) {
+		log.Error().
+			Str("json_bytes", string(jsonBytes)).
+			Msg("Generated invalid JSON for RawMessage")
+		return nil
+	}
+
+	log.Debug().
+		Str("json_output", string(jsonBytes)).
+		Interface("input_data", data).
+		Msg("Successfully converted to JSON RawMessage")
+
+	return json.RawMessage(jsonBytes)
+}
+
+// NEW: Use this instead for JSONB columns - returns pgtype.JSONB
+// NOTE: This may not work with all pgx versions - use interfaceToJSONRawMessage instead
+// func interfaceToPgtypeJSONB(data interface{}) pgtype.JSONB {
+// 	if data == nil {
+// 		return pgtype.JSONB{Valid: false}
+// 	}
+//
+// 	jsonBytes, err := json.Marshal(data)
+// 	if err != nil {
+// 		log.Error().
+// 			Err(err).
+// 			Interface("data", data).
+// 			Msg("Failed to marshal data to JSONB")
+// 		return pgtype.JSONB{Valid: false}
+// 	}
+//
+// 	// Validate JSON
+// 	if !json.Valid(jsonBytes) {
+// 		log.Error().
+// 			Str("json_bytes", string(jsonBytes)).
+// 			Msg("Generated invalid JSON for JSONB")
+// 		return pgtype.JSONB{Valid: false}
+// 	}
+//
+// 	log.Debug().
+// 		Str("json_output", string(jsonBytes)).
+// 		Interface("input_data", data).
+// 		Msg("Successfully converted to JSONB")
+//
+// 	return pgtype.JSONB{
+// 		Bytes: jsonBytes,
+// 		Valid: true,
+// 	}
+// }
 
 func pgtypeJSONToInterface(data []byte) interface{} {
 	if len(data) == 0 {
@@ -397,3 +462,38 @@ func pgtypeJSONToInterface(data []byte) interface{} {
 	}
 	return result
 }
+
+// Helper to convert json.RawMessage to interface{}
+func jsonRawMessageToInterface(data json.RawMessage) interface{} {
+	if len(data) == 0 {
+		return nil
+	}
+
+	var result interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		log.Error().
+			Err(err).
+			Str("data", string(data)).
+			Msg("Failed to unmarshal JSON RawMessage")
+		return nil
+	}
+	return result
+}
+
+// Helper to convert pgtype.JSONB to interface{}
+// NOTE: This may not work with all pgx versions
+// func pgtypeJSONBToInterface(data pgtype.JSONB) interface{} {
+// 	if !data.Valid || len(data.Bytes) == 0 {
+// 		return nil
+// 	}
+//
+// 	var result interface{}
+// 	if err := json.Unmarshal(data.Bytes, &result); err != nil {
+// 		log.Error().
+// 			Err(err).
+// 			Str("data", string(data.Bytes)).
+// 			Msg("Failed to unmarshal JSONB")
+// 		return nil
+// 	}
+// 	return result
+// }

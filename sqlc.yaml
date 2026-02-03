@@ -13,3 +13,7 @@ sql:
         emit_exact_table_names: false
         emit_empty_slices: true
         sql_package: "pgx/v5"
+        # Use json.RawMessage for JSONB - this works with all pgx versions
+        overrides:
+          - db_type: "jsonb"
+            go_type: "encoding/json.RawMessage"

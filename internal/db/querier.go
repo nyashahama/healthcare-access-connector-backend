@@ -6,6 +6,7 @@ package sqlc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -1016,7 +1017,7 @@ type Querier interface {
 	// BULK OPERATIONS
 	// ============================================
 	GetServicesByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]ClinicService, error)
-	GetServicesByMedicalAidCode(ctx context.Context, dollar_1 []byte) ([]GetServicesByMedicalAidCodeRow, error)
+	GetServicesByMedicalAidCode(ctx context.Context, dollar_1 json.RawMessage) ([]GetServicesByMedicalAidCodeRow, error)
 	GetServicesByPriceRange(ctx context.Context, arg GetServicesByPriceRangeParams) ([]GetServicesByPriceRangeRow, error)
 	// ============================================
 	// AGE & ELIGIBILITY FILTERING

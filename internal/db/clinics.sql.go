@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -854,10 +855,10 @@ LIMIT $3 OFFSET $4
 `
 
 type GetClinicsAcceptingMedicalAidParams struct {
-	Column1 string `json:"column_1"`
-	Column2 []byte `json:"column_2"`
-	Limit   int32  `json:"limit"`
-	Offset  int32  `json:"offset"`
+	Column1 string          `json:"column_1"`
+	Column2 json.RawMessage `json:"column_2"`
+	Limit   int32           `json:"limit"`
+	Offset  int32           `json:"offset"`
 }
 
 type GetClinicsAcceptingMedicalAidRow struct {
@@ -1131,10 +1132,10 @@ LIMIT $3 OFFSET $4
 `
 
 type GetClinicsByPaymentMethodParams struct {
-	Column1 []byte `json:"column_1"`
-	Column2 string `json:"column_2"`
-	Limit   int32  `json:"limit"`
-	Offset  int32  `json:"offset"`
+	Column1 json.RawMessage `json:"column_1"`
+	Column2 string          `json:"column_2"`
+	Limit   int32           `json:"limit"`
+	Offset  int32           `json:"offset"`
 }
 
 type GetClinicsByPaymentMethodRow struct {
@@ -1255,10 +1256,10 @@ LIMIT $3 OFFSET $4
 `
 
 type GetClinicsByServiceParams struct {
-	Column1 []byte `json:"column_1"`
-	Column2 string `json:"column_2"`
-	Limit   int32  `json:"limit"`
-	Offset  int32  `json:"offset"`
+	Column1 json.RawMessage `json:"column_1"`
+	Column2 string          `json:"column_2"`
+	Limit   int32           `json:"limit"`
+	Offset  int32           `json:"offset"`
 }
 
 type GetClinicsByServiceRow struct {
@@ -1327,10 +1328,10 @@ LIMIT $3 OFFSET $4
 `
 
 type GetClinicsBySpecialtyParams struct {
-	Column1 []byte `json:"column_1"`
-	Column2 string `json:"column_2"`
-	Limit   int32  `json:"limit"`
-	Offset  int32  `json:"offset"`
+	Column1 json.RawMessage `json:"column_1"`
+	Column2 string          `json:"column_2"`
+	Limit   int32           `json:"limit"`
+	Offset  int32           `json:"offset"`
 }
 
 type GetClinicsBySpecialtyRow struct {
@@ -1564,10 +1565,10 @@ LIMIT $3 OFFSET $4
 `
 
 type GetClinicsWithFacilityParams struct {
-	Column1 []byte `json:"column_1"`
-	Column2 string `json:"column_2"`
-	Limit   int32  `json:"limit"`
-	Offset  int32  `json:"offset"`
+	Column1 json.RawMessage `json:"column_1"`
+	Column2 string          `json:"column_2"`
+	Limit   int32           `json:"limit"`
+	Offset  int32           `json:"offset"`
 }
 
 type GetClinicsWithFacilityRow struct {
@@ -1704,11 +1705,11 @@ LIMIT $5
 `
 
 type GetNearbyClinicsByServiceParams struct {
-	Radians   float64        `json:"radians"`
-	Radians_2 float64        `json:"radians_2"`
-	Column3   []byte         `json:"column_3"`
-	Latitude  pgtype.Numeric `json:"latitude"`
-	Limit     int32          `json:"limit"`
+	Radians   float64         `json:"radians"`
+	Radians_2 float64         `json:"radians_2"`
+	Column3   json.RawMessage `json:"column_3"`
+	Latitude  pgtype.Numeric  `json:"latitude"`
+	Limit     int32           `json:"limit"`
 }
 
 type GetNearbyClinicsByServiceRow struct {
@@ -2326,16 +2327,16 @@ LIMIT $9 OFFSET $10
 `
 
 type SearchClinicsAdvancedParams struct {
-	Column1 string `json:"column_1"`
-	Column2 string `json:"column_2"`
-	Column3 string `json:"column_3"`
-	Column4 string `json:"column_4"`
-	Column5 string `json:"column_5"`
-	Column6 bool   `json:"column_6"`
-	Column7 []byte `json:"column_7"`
-	Column8 []byte `json:"column_8"`
-	Limit   int32  `json:"limit"`
-	Offset  int32  `json:"offset"`
+	Column1 string          `json:"column_1"`
+	Column2 string          `json:"column_2"`
+	Column3 string          `json:"column_3"`
+	Column4 string          `json:"column_4"`
+	Column5 string          `json:"column_5"`
+	Column6 bool            `json:"column_6"`
+	Column7 json.RawMessage `json:"column_7"`
+	Column8 json.RawMessage `json:"column_8"`
+	Limit   int32           `json:"limit"`
+	Offset  int32           `json:"offset"`
 }
 
 type SearchClinicsAdvancedRow struct {

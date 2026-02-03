@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -1430,7 +1431,7 @@ type GetServicesByMedicalAidCodeRow struct {
 	MedicalAidCodes []byte         `json:"medical_aid_codes"`
 }
 
-func (q *Queries) GetServicesByMedicalAidCode(ctx context.Context, dollar_1 []byte) ([]GetServicesByMedicalAidCodeRow, error) {
+func (q *Queries) GetServicesByMedicalAidCode(ctx context.Context, dollar_1 json.RawMessage) ([]GetServicesByMedicalAidCodeRow, error) {
 	rows, err := q.db.Query(ctx, getServicesByMedicalAidCode, dollar_1)
 	if err != nil {
 		return nil, err
