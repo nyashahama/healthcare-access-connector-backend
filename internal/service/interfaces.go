@@ -167,8 +167,17 @@ type ClinicService interface {
 
 	SearchClinics(ctx context.Context, params providers.ClinicSearchParams) ([]providers.ClinicSearchResult, error)
 	GetClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
-	ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
-	SearchClinicsByQuery(ctx context.Context, query string, province string, city string, limit, offset int) ([]providers.Clinic, error)
+}
+
+type StaffService interface {
+	CreateStaffMember(ctx context.Context, staff providers.ClinicStaff) (providers.ClinicStaff, error)
+	GetStaffByID(ctx context.Context, id uuid.UUID) (providers.ClinicStaff, error)
+	UpdateStaffMember(ctx context.Context, staff providers.ClinicStaff) error
+	DeleteStaffMember(ctx context.Context, id uuid.UUID) error
+
+	GetClinicStaff(ctx context.Context, clinicID uuid.UUID, role *string) ([]providers.ClinicStaff, error)
+	GetActiveClinicStaff(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
+	StaffExists(ctx context.Context, id uuid.UUID) (bool, error)
 }
 
 type SystemAdminService interface {

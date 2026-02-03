@@ -63,13 +63,11 @@ func (r *auditRepository) LogUserActivity(ctx context.Context, activity core.Use
 		auditDBQueryTotal.WithLabelValues("log_user_activity", "error").Inc()
 		return fmt.Errorf("marshal activity details: %w", err)
 	}
-
 	location, err := json.Marshal(activity.Location)
 	if err != nil {
 		auditDBQueryTotal.WithLabelValues("log_user_activity", "error").Inc()
 		return fmt.Errorf("marshal location: %w", err)
 	}
-
 	var ipAddr *netip.Addr
 	if activity.IPAddress != nil {
 		addr, err := netip.ParseAddr(*activity.IPAddress)
@@ -77,7 +75,6 @@ func (r *auditRepository) LogUserActivity(ctx context.Context, activity core.Use
 			ipAddr = &addr
 		}
 	}
-
 	err = r.querier.LogUserActivity(ctx, sqlc.LogUserActivityParams{
 		UserID:          uuidPtrToPgtypeUUID(activity.UserID),
 		ActivityType:    activity.ActivityType,
@@ -94,7 +91,6 @@ func (r *auditRepository) LogUserActivity(ctx context.Context, activity core.Use
 		auditDBQueryTotal.WithLabelValues("log_user_activity", "error").Inc()
 		return r.handleError(err, "log user activity")
 	}
-
 	auditDBQueryTotal.WithLabelValues("log_user_activity", "success").Inc()
 	return nil
 }
