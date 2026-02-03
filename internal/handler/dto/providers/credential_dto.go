@@ -45,7 +45,7 @@ type CredentialListResponse struct {
 }
 
 // Helper function to convert domain to response
-func credentialToResponse(cred providers.ProfessionalCredential) CredentialResponse {
+func CredentialToResponse(cred providers.ProfessionalCredential) CredentialResponse {
 	return CredentialResponse{
 		ID:               cred.ID,
 		StaffID:          cred.StaffID,
