@@ -92,7 +92,7 @@ type ServiceListResponse struct {
 }
 
 // Helper function to convert domain to response
-func serviceToResponse(svc providers.ClinicService) ServiceResponse {
+func ServiceToResponse(svc providers.ClinicService) ServiceResponse {
 	return ServiceResponse{
 		ID:                      svc.ID,
 		ClinicID:                svc.ClinicID,
