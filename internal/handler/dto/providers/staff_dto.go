@@ -103,7 +103,7 @@ type StaffListResponse struct {
 }
 
 // Helper function to convert domain to response
-func staffToResponse(staff providers.ClinicStaff) StaffResponse {
+func StaffToResponse(staff providers.ClinicStaff) StaffResponse {
 	return StaffResponse{
 		ID:                     staff.ID,
 		ClinicID:               staff.ClinicID,

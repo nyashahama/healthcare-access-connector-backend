@@ -152,6 +152,15 @@ type PatientService interface {
 	GetPatientByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
 }
 
+// SurgeryService handles patient surgery operations
+type SurgeryService interface {
+	AddPatientSurgery(ctx context.Context, surgery patients.PatientSurgery) (patients.PatientSurgery, error)
+	GetPatientSurgeries(ctx context.Context, patientID uuid.UUID) ([]patients.PatientSurgery, error)
+	GetRecentSurgeries(ctx context.Context, patientID uuid.UUID) ([]patients.PatientSurgery, error)
+	UpdatePatientSurgery(ctx context.Context, surgery patients.PatientSurgery) error
+	DeletePatientSurgery(ctx context.Context, id uuid.UUID) error
+}
+
 // ClinicService handles clinic operations
 type ClinicService interface {
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
