@@ -205,6 +205,15 @@ type DependentService interface {
 	DeletePatientDependent(ctx context.Context, id uuid.UUID) error
 }
 
+// DependentHealthRecordService handles dependent health record operations
+type DependentHealthRecordService interface {
+	AddDependentHealthRecord(ctx context.Context, record patients.DependentHealthRecord) (patients.DependentHealthRecord, error)
+	GetDependentHealthRecords(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+	GetGrowthRecords(ctx context.Context, dependentID uuid.UUID) ([]patients.DependentHealthRecord, error)
+	UpdateDependentHealthRecord(ctx context.Context, record patients.DependentHealthRecord) error
+	DeleteDependentHealthRecord(ctx context.Context, id uuid.UUID) error
+}
+
 // ClinicService handles clinic operations
 type ClinicService interface {
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)

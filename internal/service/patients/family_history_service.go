@@ -142,68 +142,6 @@ func (s *familyHistoryService) GetPatientFamilyHistory(ctx context.Context, pati
 	return histories, nil
 }
 
-// GetFamilyHistoryByRelative retrieves family history records for a patient by relative type
-func (s *familyHistoryService) GetFamilyHistoryByRelative(ctx context.Context, patientID uuid.UUID, relative string) ([]patients.PatientFamilyHistory, error) {
-	start := time.Now()
-	defer func() {
-		s.logger.Debug().
-			Str("patient_id", patientID.String()).
-			Str("relative", relative).
-			Dur("duration_ms", time.Since(start)).
-			Msg("Get family history by relative completed")
-	}()
-
-	// Verify patient exists
-	_, err := s.patientRepo.GetPatientProfileByID(ctx, patientID)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient not found")
-			return nil, domain.NewAppError(domain.ErrPatientNotFound, "Patient not found", 404)
-		}
-		s.logger.Error().Err(err).Str("patient_id", patientID.String()).Msg("Failed to verify patient")
-		return nil, domain.NewAppError(err, "Failed to verify patient", 500)
-	}
-
-	// Validate relative
-	if strings.TrimSpace(relative) == "" {
-		return nil, domain.NewAppError(domain.ErrValidation, "Relative is required", 400)
-	}
-
-	// Try cache first
-	cacheKey := fmt.Sprintf("family_history:relative:%s:%s", patientID.String(), relative)
-	var histories []patients.PatientFamilyHistory
-	if err := s.cache.Get(ctx, cacheKey, &histories); err == nil {
-		s.logger.Debug().
-			Str("patient_id", patientID.String()).
-			Str("relative", relative).
-			Msg("Family history by relative retrieved from cache")
-		return histories, nil
-	}
-
-	// Fetch from database
-	histories, err = s.familyHistoryRepo.GetFamilyHistoryByRelative(ctx, patientID, relative)
-	if err != nil {
-		s.logger.Error().Err(err).
-			Str("patient_id", patientID.String()).
-			Str("relative", relative).
-			Msg("Failed to get family history by relative")
-		return nil, domain.NewAppError(err, "Failed to get family history by relative", 500)
-	}
-
-	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, histories, 60*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache family history by relative")
-	}
-
-	s.logger.Debug().
-		Str("patient_id", patientID.String()).
-		Str("relative", relative).
-		Int("count", len(histories)).
-		Msg("Family history by relative retrieved successfully")
-
-	return histories, nil
-}
-
 // UpdateFamilyHistory updates a family history record
 func (s *familyHistoryService) UpdateFamilyHistory(ctx context.Context, history patients.PatientFamilyHistory) error {
 	start := time.Now()
