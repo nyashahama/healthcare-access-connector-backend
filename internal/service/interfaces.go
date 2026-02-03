@@ -155,12 +155,20 @@ type PatientService interface {
 // ClinicService handles clinic operations
 type ClinicService interface {
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
-	// GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
-	// UpdateClinic(ctx context.Context, clinic providers.Clinic) error
-	// VerifyClinic(ctx context.Context, id uuid.UUID, verifiedBy uuid.UUID, notes string) error
-	// ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
-	// SearchClinics(ctx context.Context, query string, province string, city string, limit, offset int) ([]providers.Clinic, error)
-	// SearchClinicsByLocation(ctx context.Context, lat, lng float64, radiusKm float64) ([]providers.Clinic, error)
+	GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
+	UpdateClinic(ctx context.Context, clinic providers.Clinic) error
+	DeleteClinic(ctx context.Context, id uuid.UUID) error
+
+	VerifyClinic(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error
+	RejectClinicVerification(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error
+	UpdateClinicVerificationStatus(ctx context.Context, id uuid.UUID, status string) error
+	DeactivateClinic(ctx context.Context, id uuid.UUID) error
+	ReactivateClinic(ctx context.Context, id uuid.UUID) error
+
+	SearchClinics(ctx context.Context, params providers.ClinicSearchParams) ([]providers.ClinicSearchResult, error)
+	GetClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
+	ListClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
+	SearchClinicsByQuery(ctx context.Context, query string, province string, city string, limit, offset int) ([]providers.Clinic, error)
 }
 
 type SystemAdminService interface {
