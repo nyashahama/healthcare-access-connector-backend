@@ -232,6 +232,15 @@ type AllergyService interface {
 	DeletePatientAllergy(ctx context.Context, id uuid.UUID) error
 }
 
+// EmergencyContactService handles emergency contact operations
+type EmergencyContactService interface {
+	AddEmergencyContact(ctx context.Context, contact patients.EmergencyContact) (patients.EmergencyContact, error)
+	GetPatientEmergencyContacts(ctx context.Context, patientID uuid.UUID) ([]patients.EmergencyContact, error)
+	GetPrimaryEmergencyContact(ctx context.Context, patientID uuid.UUID) (patients.EmergencyContact, error)
+	UpdateEmergencyContact(ctx context.Context, contact patients.EmergencyContact) error
+	DeleteEmergencyContact(ctx context.Context, id uuid.UUID) error
+}
+
 // ClinicService handles clinic operations
 type ClinicService interface {
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
