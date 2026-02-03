@@ -179,6 +179,14 @@ type ImmunizationService interface {
 	DeletePatientImmunization(ctx context.Context, id uuid.UUID) error
 }
 
+// FamilyHistoryService handles patient family history operations
+type FamilyHistoryService interface {
+	AddFamilyHistory(ctx context.Context, history patients.PatientFamilyHistory) (patients.PatientFamilyHistory, error)
+	GetPatientFamilyHistory(ctx context.Context, patientID uuid.UUID) ([]patients.PatientFamilyHistory, error)
+	UpdateFamilyHistory(ctx context.Context, history patients.PatientFamilyHistory) error
+	DeleteFamilyHistory(ctx context.Context, id uuid.UUID) error
+}
+
 // MedicationService handles patient medication operations
 type MedicationService interface {
 	AddPatientMedication(ctx context.Context, medication patients.PatientMedication) (patients.PatientMedication, error)
