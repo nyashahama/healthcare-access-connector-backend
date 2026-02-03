@@ -196,6 +196,15 @@ type MedicationService interface {
 	DeletePatientMedication(ctx context.Context, id uuid.UUID) error
 }
 
+// DependentService handles patient dependent operations
+type DependentService interface {
+	AddPatientDependent(ctx context.Context, dependent patients.PatientDependent) (patients.PatientDependent, error)
+	GetPatientDependents(ctx context.Context, patientID uuid.UUID) ([]patients.PatientDependent, error)
+	GetDependentChildren(ctx context.Context, patientID uuid.UUID) ([]patients.PatientDependent, error)
+	UpdatePatientDependent(ctx context.Context, dependent patients.PatientDependent) error
+	DeletePatientDependent(ctx context.Context, id uuid.UUID) error
+}
+
 // ClinicService handles clinic operations
 type ClinicService interface {
 	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
