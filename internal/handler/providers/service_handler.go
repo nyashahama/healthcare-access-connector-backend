@@ -69,29 +69,7 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert DTO to domain model
-	svc := domainmodels.ClinicService{
-		ClinicID:                req.ClinicID,
-		ServiceName:             req.ServiceName,
-		ServiceCategory:         req.ServiceCategory,
-		Description:             req.Description,
-		DurationMinutes:         req.DurationMinutes,
-		PreparationInstructions: req.PreparationInstructions,
-		FollowUpRequired:        req.FollowUpRequired,
-		FollowUpDays:            req.FollowUpDays,
-		MinimumAge:              req.MinimumAge,
-		MaximumAge:              req.MaximumAge,
-		GenderRestriction:       req.GenderRestriction,
-		Prerequisites:           req.Prerequisites,
-		Cost:                    req.Cost,
-		CostCurrency:            req.CostCurrency,
-		IsCoveredByMedicalAid:   req.IsCoveredByMedicalAid,
-		MedicalAidCodes:         req.MedicalAidCodes,
-		IsActive:                req.IsActive,
-		AvailableDays:           req.AvailableDays,
-		RequiresAppointment:     req.RequiresAppointment,
-		WalkInAllowed:           req.WalkInAllowed,
-		ProvidedByStaffIDs:      req.ProvidedByStaffIDs,
-	}
+	svc := providers.ToDomainService(req)
 
 	// Create service
 	createdService, err := h.serviceService.CreateClinicService(ctx, svc)
@@ -100,7 +78,7 @@ func (h *ServiceHandler) CreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, providers.ServiceToResponse(createdService))
+	handler.RespondJSON(w, http.StatusCreated, providers.ToServiceResponse(createdService))
 }
 
 // GetService handles getting a service by ID
@@ -123,7 +101,7 @@ func (h *ServiceHandler) GetService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, providers.ServiceToResponse(svc))
+	handler.RespondJSON(w, http.StatusOK, providers.ToServiceResponse(svc))
 }
 
 // UpdateService handles service updates
@@ -175,34 +153,11 @@ func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert DTO to domain model
-	svc := domainmodels.ClinicService{
-		ID:                      serviceID,
-		ClinicID:                existingService.ClinicID,
-		ServiceName:             req.ServiceName,
-		ServiceCategory:         req.ServiceCategory,
-		Description:             req.Description,
-		DurationMinutes:         req.DurationMinutes,
-		PreparationInstructions: req.PreparationInstructions,
-		FollowUpRequired:        req.FollowUpRequired,
-		FollowUpDays:            req.FollowUpDays,
-		MinimumAge:              req.MinimumAge,
-		MaximumAge:              req.MaximumAge,
-		GenderRestriction:       req.GenderRestriction,
-		Prerequisites:           req.Prerequisites,
-		Cost:                    req.Cost,
-		CostCurrency:            req.CostCurrency,
-		IsCoveredByMedicalAid:   req.IsCoveredByMedicalAid,
-		MedicalAidCodes:         req.MedicalAidCodes,
-		IsActive:                req.IsActive,
-		AvailableDays:           req.AvailableDays,
-		RequiresAppointment:     req.RequiresAppointment,
-		WalkInAllowed:           req.WalkInAllowed,
-		ProvidedByStaffIDs:      req.ProvidedByStaffIDs,
-	}
+	// Update service with new data
+	updated := providers.UpdateToDomainService(existingService, req)
 
 	// Update service
-	if err := h.serviceService.UpdateClinicService(ctx, svc); err != nil {
+	if err := h.serviceService.UpdateClinicService(ctx, updated); err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
@@ -214,7 +169,7 @@ func (h *ServiceHandler) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, providers.ServiceToResponse(updatedService))
+	handler.RespondJSON(w, http.StatusOK, providers.ToServiceResponse(updatedService))
 }
 
 // DeleteService handles service deletion
@@ -276,7 +231,7 @@ func (h *ServiceHandler) ListClinicServices(w http.ResponseWriter, r *http.Reque
 	}
 
 	for i, svc := range services {
-		response.Services[i] = providers.ServiceToResponse(svc)
+		response.Services[i] = providers.ToServiceResponse(svc)
 	}
 
 	handler.RespondJSON(w, http.StatusOK, response)

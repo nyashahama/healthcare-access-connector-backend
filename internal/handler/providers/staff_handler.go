@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	domainmodels "github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -84,34 +83,7 @@ func (h *StaffHandler) CreateStaff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert DTO to domain model
-	staff := domainmodels.ClinicStaff{
-		ClinicID:               req.ClinicID,
-		UserID:                 req.UserID,
-		Title:                  req.Title,
-		FirstName:              req.FirstName,
-		LastName:               req.LastName,
-		ProfessionalTitle:      req.ProfessionalTitle,
-		Specialization:         req.Specialization,
-		WorkEmail:              req.WorkEmail,
-		WorkPhone:              req.WorkPhone,
-		PersonalPhone:          req.PersonalPhone,
-		HPCSNumber:             req.HPCSNumber,
-		OtherLicenseNumbers:    req.OtherLicenseNumbers,
-		Qualifications:         req.Qualifications,
-		YearsExperience:        req.YearsExperience,
-		Bio:                    req.Bio,
-		StaffRole:              req.StaffRole,
-		Department:             req.Department,
-		IsPrimaryContact:       req.IsPrimaryContact,
-		WorkingHours:           req.WorkingHours,
-		AvailableDays:          req.AvailableDays,
-		IsAcceptingNewPatients: req.IsAcceptingNewPatients,
-		EmploymentStatus:       req.EmploymentStatus,
-		StartDate:              req.StartDate,
-		EndDate:                req.EndDate,
-		ProfilePictureURL:      req.ProfilePictureURL,
-		LanguagesSpoken:        req.LanguagesSpoken,
-	}
+	staff := providers.ToDomainStaff(req)
 
 	// Create staff member
 	createdStaff, err := h.staffService.CreateStaffMember(ctx, staff)
@@ -120,7 +92,7 @@ func (h *StaffHandler) CreateStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, providers.StaffToResponse(createdStaff))
+	handler.RespondJSON(w, http.StatusCreated, providers.ToStaffResponse(createdStaff))
 }
 
 // GetStaff handles getting a staff member by ID
@@ -143,7 +115,7 @@ func (h *StaffHandler) GetStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, providers.StaffToResponse(staff))
+	handler.RespondJSON(w, http.StatusOK, providers.ToStaffResponse(staff))
 }
 
 // UpdateStaff handles staff member updates
@@ -209,39 +181,11 @@ func (h *StaffHandler) UpdateStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert DTO to domain model
-	staff := domainmodels.ClinicStaff{
-		ID:                     staffID,
-		ClinicID:               existingStaff.ClinicID,
-		UserID:                 existingStaff.UserID,
-		Title:                  req.Title,
-		FirstName:              req.FirstName,
-		LastName:               req.LastName,
-		ProfessionalTitle:      req.ProfessionalTitle,
-		Specialization:         req.Specialization,
-		WorkEmail:              req.WorkEmail,
-		WorkPhone:              req.WorkPhone,
-		PersonalPhone:          req.PersonalPhone,
-		HPCSNumber:             req.HPCSNumber,
-		OtherLicenseNumbers:    req.OtherLicenseNumbers,
-		Qualifications:         req.Qualifications,
-		YearsExperience:        req.YearsExperience,
-		Bio:                    req.Bio,
-		StaffRole:              req.StaffRole,
-		Department:             req.Department,
-		IsPrimaryContact:       req.IsPrimaryContact,
-		WorkingHours:           req.WorkingHours,
-		AvailableDays:          req.AvailableDays,
-		IsAcceptingNewPatients: req.IsAcceptingNewPatients,
-		EmploymentStatus:       req.EmploymentStatus,
-		StartDate:              req.StartDate,
-		EndDate:                req.EndDate,
-		ProfilePictureURL:      req.ProfilePictureURL,
-		LanguagesSpoken:        req.LanguagesSpoken,
-	}
+	// Update staff with new data
+	updated := providers.UpdateToDomainStaff(existingStaff, req)
 
 	// Update staff member
-	if err := h.staffService.UpdateStaffMember(ctx, staff); err != nil {
+	if err := h.staffService.UpdateStaffMember(ctx, updated); err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
@@ -253,7 +197,7 @@ func (h *StaffHandler) UpdateStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, providers.StaffToResponse(updatedStaff))
+	handler.RespondJSON(w, http.StatusOK, providers.ToStaffResponse(updatedStaff))
 }
 
 // DeleteStaff handles staff member deletion
@@ -313,7 +257,7 @@ func (h *StaffHandler) ListClinicStaff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i, s := range staff {
-		response.Staff[i] = providers.StaffToResponse(s)
+		response.Staff[i] = providers.ToStaffResponse(s)
 	}
 
 	handler.RespondJSON(w, http.StatusOK, response)
@@ -345,7 +289,7 @@ func (h *StaffHandler) ListActiveClinicStaff(w http.ResponseWriter, r *http.Requ
 	}
 
 	for i, s := range staff {
-		response.Staff[i] = providers.StaffToResponse(s)
+		response.Staff[i] = providers.ToStaffResponse(s)
 	}
 
 	handler.RespondJSON(w, http.StatusOK, response)

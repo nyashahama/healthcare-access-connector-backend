@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	domainmodels "github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -76,47 +75,7 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert DTO to domain model
-	clinic := domainmodels.Clinic{
-		ClinicName:             req.ClinicName,
-		ClinicType:             req.ClinicType,
-		RegistrationNumber:     req.RegistrationNumber,
-		AccreditationNumber:    req.AccreditationNumber,
-		PrimaryPhone:           req.PrimaryPhone,
-		SecondaryPhone:         req.SecondaryPhone,
-		EmergencyPhone:         req.EmergencyPhone,
-		Email:                  req.Email,
-		Website:                req.Website,
-		PhysicalAddress:        req.PhysicalAddress,
-		City:                   req.City,
-		Province:               req.Province,
-		PostalCode:             req.PostalCode,
-		Country:                req.Country,
-		Latitude:               req.Latitude,
-		Longitude:              req.Longitude,
-		GooglePlaceID:          req.GooglePlaceID,
-		Description:            req.Description,
-		YearEstablished:        req.YearEstablished,
-		OwnershipType:          req.OwnershipType,
-		BedCount:               req.BedCount,
-		OperatingHours:         req.OperatingHours,
-		Services:               req.Services,
-		Specialties:            req.Specialties,
-		LanguagesSpoken:        req.LanguagesSpoken,
-		Facilities:             req.Facilities,
-		AcceptsMedicalAid:      req.AcceptsMedicalAid,
-		MedicalAidProviders:    req.MedicalAidProviders,
-		PaymentMethods:         req.PaymentMethods,
-		FeeStructure:           req.FeeStructure,
-		AccreditationBody:      req.AccreditationBody,
-		AccreditationExpiry:    req.AccreditationExpiry,
-		Certifications:         req.Certifications,
-		PatientCapacity:        req.PatientCapacity,
-		AverageWaitTimeMinutes: req.AverageWaitTimeMinutes,
-		ContactPersonName:      req.ContactPersonName,
-		ContactPersonRole:      req.ContactPersonRole,
-		ContactPersonPhone:     req.ContactPersonPhone,
-		ContactPersonEmail:     req.ContactPersonEmail,
-	}
+	clinic := providers.ToDomainClinic(req)
 
 	// Create clinic
 	createdClinic, err := h.clinicService.CreateClinic(ctx, clinic)
@@ -125,7 +84,7 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, providers.ClinicToResponse(createdClinic))
+	handler.RespondJSON(w, http.StatusCreated, providers.ToClinicResponse(createdClinic))
 }
 
 // GetClinic handles getting a clinic by ID
@@ -148,7 +107,7 @@ func (h *ClinicHandler) GetClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, providers.ClinicToResponse(clinic))
+	handler.RespondJSON(w, http.StatusOK, providers.ToClinicResponse(clinic))
 }
 
 // UpdateClinic handles clinic updates
@@ -200,52 +159,18 @@ func (h *ClinicHandler) UpdateClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert DTO to domain model
-	clinic := domainmodels.Clinic{
-		ID:                     clinicID,
-		ClinicName:             req.ClinicName,
-		ClinicType:             req.ClinicType,
-		RegistrationNumber:     req.RegistrationNumber,
-		AccreditationNumber:    req.AccreditationNumber,
-		PrimaryPhone:           req.PrimaryPhone,
-		SecondaryPhone:         req.SecondaryPhone,
-		EmergencyPhone:         req.EmergencyPhone,
-		Email:                  req.Email,
-		Website:                req.Website,
-		PhysicalAddress:        req.PhysicalAddress,
-		City:                   req.City,
-		Province:               req.Province,
-		PostalCode:             req.PostalCode,
-		Country:                req.Country,
-		Latitude:               req.Latitude,
-		Longitude:              req.Longitude,
-		GooglePlaceID:          req.GooglePlaceID,
-		Description:            req.Description,
-		YearEstablished:        req.YearEstablished,
-		OwnershipType:          req.OwnershipType,
-		BedCount:               req.BedCount,
-		OperatingHours:         req.OperatingHours,
-		Services:               req.Services,
-		Specialties:            req.Specialties,
-		LanguagesSpoken:        req.LanguagesSpoken,
-		Facilities:             req.Facilities,
-		AcceptsMedicalAid:      req.AcceptsMedicalAid,
-		MedicalAidProviders:    req.MedicalAidProviders,
-		PaymentMethods:         req.PaymentMethods,
-		FeeStructure:           req.FeeStructure,
-		AccreditationBody:      req.AccreditationBody,
-		AccreditationExpiry:    req.AccreditationExpiry,
-		Certifications:         req.Certifications,
-		PatientCapacity:        req.PatientCapacity,
-		AverageWaitTimeMinutes: req.AverageWaitTimeMinutes,
-		ContactPersonName:      req.ContactPersonName,
-		ContactPersonRole:      req.ContactPersonRole,
-		ContactPersonPhone:     req.ContactPersonPhone,
-		ContactPersonEmail:     req.ContactPersonEmail,
+	// Get existing clinic
+	existing, err := h.clinicService.GetClinicByID(ctx, clinicID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
 	}
 
+	// Update clinic with new data
+	updated := providers.UpdateToDomainClinic(existing, req)
+
 	// Update clinic
-	if err := h.clinicService.UpdateClinic(ctx, clinic); err != nil {
+	if err := h.clinicService.UpdateClinic(ctx, updated); err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
@@ -257,7 +182,7 @@ func (h *ClinicHandler) UpdateClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, providers.ClinicToResponse(updatedClinic))
+	handler.RespondJSON(w, http.StatusOK, providers.ToClinicResponse(updatedClinic))
 }
 
 // DeleteClinic handles clinic deletion

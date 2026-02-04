@@ -7,21 +7,34 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 )
 
-// DTOs for Credentials
-
+// CreateCredentialRequest represents a request to create a credential
 type CreateCredentialRequest struct {
-	StaffID          uuid.UUID  `json:"staff_id" binding:"required"`
-	CredentialType   string     `json:"credential_type" binding:"required,oneof=professional_license specialization degree certification"`
+	StaffID          uuid.UUID  `json:"staff_id"`
+	CredentialType   string     `json:"credential_type"`
 	CredentialNumber *string    `json:"credential_number,omitempty"`
-	IssuingAuthority string     `json:"issuing_authority" binding:"required,min=1"`
+	IssuingAuthority string     `json:"issuing_authority"`
 	IssueDate        *time.Time `json:"issue_date,omitempty"`
 	ExpiryDate       *time.Time `json:"expiry_date,omitempty"`
-	Status           string     `json:"status" binding:"oneof=verified pending expired revoked"`
+	Status           string     `json:"status"`
 	VerifiedBy       *uuid.UUID `json:"verified_by,omitempty"`
 	DocumentURL      *string    `json:"document_url,omitempty"`
 	Notes            *string    `json:"notes,omitempty"`
 }
 
+// UpdateCredentialRequest represents a request to update a credential
+type UpdateCredentialRequest struct {
+	CredentialType   string     `json:"credential_type"`
+	CredentialNumber *string    `json:"credential_number,omitempty"`
+	IssuingAuthority string     `json:"issuing_authority"`
+	IssueDate        *time.Time `json:"issue_date,omitempty"`
+	ExpiryDate       *time.Time `json:"expiry_date,omitempty"`
+	Status           string     `json:"status"`
+	VerifiedBy       *uuid.UUID `json:"verified_by,omitempty"`
+	DocumentURL      *string    `json:"document_url,omitempty"`
+	Notes            *string    `json:"notes,omitempty"`
+}
+
+// CredentialResponse represents a credential in responses
 type CredentialResponse struct {
 	ID               uuid.UUID  `json:"id"`
 	StaffID          uuid.UUID  `json:"staff_id"`
@@ -39,27 +52,60 @@ type CredentialResponse struct {
 	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
+// CredentialListResponse represents a list of credentials
 type CredentialListResponse struct {
 	Credentials []CredentialResponse `json:"credentials"`
 	Total       int                  `json:"total"`
+	Limit       int                  `json:"limit,omitempty"`
+	Offset      int                  `json:"offset,omitempty"`
 }
 
-// Helper function to convert domain to response
-func CredentialToResponse(cred providers.ProfessionalCredential) CredentialResponse {
+// ToCredentialResponse converts domain ProfessionalCredential to response DTO
+func ToCredentialResponse(credential providers.ProfessionalCredential) CredentialResponse {
 	return CredentialResponse{
-		ID:               cred.ID,
-		StaffID:          cred.StaffID,
-		CredentialType:   cred.CredentialType,
-		CredentialNumber: cred.CredentialNumber,
-		IssuingAuthority: cred.IssuingAuthority,
-		IssueDate:        cred.IssueDate,
-		ExpiryDate:       cred.ExpiryDate,
-		Status:           cred.Status,
-		VerifiedBy:       cred.VerifiedBy,
-		VerificationDate: cred.VerificationDate,
-		DocumentURL:      cred.DocumentURL,
-		Notes:            cred.Notes,
-		CreatedAt:        cred.CreatedAt,
-		UpdatedAt:        cred.UpdatedAt,
+		ID:               credential.ID,
+		StaffID:          credential.StaffID,
+		CredentialType:   credential.CredentialType,
+		CredentialNumber: credential.CredentialNumber,
+		IssuingAuthority: credential.IssuingAuthority,
+		IssueDate:        credential.IssueDate,
+		ExpiryDate:       credential.ExpiryDate,
+		Status:           credential.Status,
+		VerifiedBy:       credential.VerifiedBy,
+		VerificationDate: credential.VerificationDate,
+		DocumentURL:      credential.DocumentURL,
+		Notes:            credential.Notes,
+		CreatedAt:        credential.CreatedAt,
+		UpdatedAt:        credential.UpdatedAt,
 	}
+}
+
+// ToDomainCredential converts request DTO to domain model
+func ToDomainCredential(req CreateCredentialRequest) providers.ProfessionalCredential {
+	return providers.ProfessionalCredential{
+		StaffID:          req.StaffID,
+		CredentialType:   req.CredentialType,
+		CredentialNumber: req.CredentialNumber,
+		IssuingAuthority: req.IssuingAuthority,
+		IssueDate:        req.IssueDate,
+		ExpiryDate:       req.ExpiryDate,
+		Status:           req.Status,
+		VerifiedBy:       req.VerifiedBy,
+		DocumentURL:      req.DocumentURL,
+		Notes:            req.Notes,
+	}
+}
+
+// UpdateToDomainCredential updates existing domain model with request data
+func UpdateToDomainCredential(existing providers.ProfessionalCredential, req UpdateCredentialRequest) providers.ProfessionalCredential {
+	existing.CredentialType = req.CredentialType
+	existing.CredentialNumber = req.CredentialNumber
+	existing.IssuingAuthority = req.IssuingAuthority
+	existing.IssueDate = req.IssueDate
+	existing.ExpiryDate = req.ExpiryDate
+	existing.Status = req.Status
+	existing.VerifiedBy = req.VerifiedBy
+	existing.DocumentURL = req.DocumentURL
+	existing.Notes = req.Notes
+	return existing
 }

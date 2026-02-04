@@ -7,11 +7,10 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 )
 
-// DTOs for Clinic
-
+// CreateClinicRequest represents a request to create a clinic
 type CreateClinicRequest struct {
-	ClinicName             string         `json:"clinic_name" binding:"required,min=1"`
-	ClinicType             string         `json:"clinic_type" binding:"required,oneof=public_health_clinic private_clinic community_health_center mobile_clinic"`
+	ClinicName             string         `json:"clinic_name"`
+	ClinicType             string         `json:"clinic_type"`
 	RegistrationNumber     *string        `json:"registration_number,omitempty"`
 	AccreditationNumber    *string        `json:"accreditation_number,omitempty"`
 	PrimaryPhone           *string        `json:"primary_phone,omitempty"`
@@ -19,18 +18,18 @@ type CreateClinicRequest struct {
 	EmergencyPhone         *string        `json:"emergency_phone,omitempty"`
 	Email                  *string        `json:"email,omitempty"`
 	Website                *string        `json:"website,omitempty"`
-	PhysicalAddress        string         `json:"physical_address" binding:"required,min=1"`
+	PhysicalAddress        string         `json:"physical_address"`
 	City                   *string        `json:"city,omitempty"`
 	Province               *string        `json:"province,omitempty"`
 	PostalCode             *string        `json:"postal_code,omitempty"`
-	Country                string         `json:"country" binding:"required"`
+	Country                string         `json:"country"`
 	Latitude               *float64       `json:"latitude,omitempty"`
 	Longitude              *float64       `json:"longitude,omitempty"`
 	GooglePlaceID          *string        `json:"google_place_id,omitempty"`
 	Description            *string        `json:"description,omitempty"`
 	YearEstablished        *int           `json:"year_established,omitempty"`
 	OwnershipType          *string        `json:"ownership_type,omitempty"`
-	BedCount               *int           `json:"bed_count,omitempty" binding:"min=0"`
+	BedCount               *int           `json:"bed_count,omitempty"`
 	OperatingHours         map[string]any `json:"operating_hours,omitempty"`
 	Services               []string       `json:"services,omitempty"`
 	Specialties            []string       `json:"specialties,omitempty"`
@@ -51,9 +50,10 @@ type CreateClinicRequest struct {
 	ContactPersonEmail     *string        `json:"contact_person_email,omitempty"`
 }
 
+// UpdateClinicRequest represents a request to update a clinic
 type UpdateClinicRequest struct {
-	ClinicName             string         `json:"clinic_name" binding:"required,min=1"`
-	ClinicType             string         `json:"clinic_type" binding:"required,oneof=public_health_clinic private_clinic community_health_center mobile_clinic"`
+	ClinicName             string         `json:"clinic_name"`
+	ClinicType             string         `json:"clinic_type"`
 	RegistrationNumber     *string        `json:"registration_number,omitempty"`
 	AccreditationNumber    *string        `json:"accreditation_number,omitempty"`
 	PrimaryPhone           *string        `json:"primary_phone,omitempty"`
@@ -61,18 +61,18 @@ type UpdateClinicRequest struct {
 	EmergencyPhone         *string        `json:"emergency_phone,omitempty"`
 	Email                  *string        `json:"email,omitempty"`
 	Website                *string        `json:"website,omitempty"`
-	PhysicalAddress        string         `json:"physical_address" binding:"required,min=1"`
+	PhysicalAddress        string         `json:"physical_address"`
 	City                   *string        `json:"city,omitempty"`
 	Province               *string        `json:"province,omitempty"`
 	PostalCode             *string        `json:"postal_code,omitempty"`
-	Country                string         `json:"country" binding:"required"`
+	Country                string         `json:"country"`
 	Latitude               *float64       `json:"latitude,omitempty"`
 	Longitude              *float64       `json:"longitude,omitempty"`
 	GooglePlaceID          *string        `json:"google_place_id,omitempty"`
 	Description            *string        `json:"description,omitempty"`
 	YearEstablished        *int           `json:"year_established,omitempty"`
 	OwnershipType          *string        `json:"ownership_type,omitempty"`
-	BedCount               *int           `json:"bed_count,omitempty" binding:"min=0"`
+	BedCount               *int           `json:"bed_count,omitempty"`
 	OperatingHours         map[string]any `json:"operating_hours,omitempty"`
 	Services               []string       `json:"services,omitempty"`
 	Specialties            []string       `json:"specialties,omitempty"`
@@ -93,6 +93,7 @@ type UpdateClinicRequest struct {
 	ContactPersonEmail     *string        `json:"contact_person_email,omitempty"`
 }
 
+// ClinicResponse represents a clinic in responses
 type ClinicResponse struct {
 	ID                     uuid.UUID      `json:"id"`
 	ClinicName             string         `json:"clinic_name"`
@@ -145,30 +146,27 @@ type ClinicResponse struct {
 	UpdatedAt              time.Time      `json:"updated_at"`
 }
 
+// VerifyClinicRequest represents a request to verify a clinic
+type VerifyClinicRequest struct {
+	VerifiedBy uuid.UUID `json:"verified_by"`
+	Notes      string    `json:"notes"`
+}
+
+// UpdateVerificationStatusRequest represents a request to update verification status
+type UpdateVerificationStatusRequest struct {
+	Status string `json:"status"`
+}
+
+// ClinicListResponse represents a list of clinics
 type ClinicListResponse struct {
 	Clinics []ClinicResponse `json:"clinics"`
 	Total   int              `json:"total"`
-	Limit   int              `json:"limit"`
-	Offset  int              `json:"offset"`
+	Limit   int              `json:"limit,omitempty"`
+	Offset  int              `json:"offset,omitempty"`
 }
 
-type ClinicSearchResponse struct {
-	Results []ClinicSearchResult `json:"results"`
-	Total   int                  `json:"total"`
-	Query   string               `json:"query"`
-}
-
-type VerifyClinicRequest struct {
-	VerifiedBy uuid.UUID `json:"verified_by" binding:"required"`
-	Notes      string    `json:"notes" binding:"required,min=1"`
-}
-
-type UpdateVerificationStatusRequest struct {
-	Status string `json:"status" binding:"required,oneof=pending verified rejected in_review unverified"`
-}
-
-// Helper function to convert domain to response
-func ClinicToResponse(clinic providers.Clinic) ClinicResponse {
+// ToClinicResponse converts domain Clinic to response DTO
+func ToClinicResponse(clinic providers.Clinic) ClinicResponse {
 	return ClinicResponse{
 		ID:                     clinic.ID,
 		ClinicName:             clinic.ClinicName,
@@ -222,44 +220,103 @@ func ClinicToResponse(clinic providers.Clinic) ClinicResponse {
 	}
 }
 
-// ErrorResponse represents an error response
-type ErrorResponse struct {
-	Error  string            `json:"error"`
-	Fields map[string]string `json:"fields,omitempty"`
-	Code   string            `json:"code,omitempty"`
-}
-
-// MessageResponse represents a simple message response
-type MessageResponse struct {
-	Message string `json:"message"`
-}
-
-// ExistsResponse represents an existence check response
-type ExistsResponse struct {
-	Exists bool `json:"exists"`
-}
-
-// ClinicSearchResult represents a single search result
-type ClinicSearchResult struct {
-	ID              string   `json:"id"`
-	ClinicName      string   `json:"clinic_name"`
-	ClinicType      string   `json:"clinic_type"`
-	City            *string  `json:"city,omitempty"`
-	Province        *string  `json:"province,omitempty"`
-	Distance        *float64 `json:"distance,omitempty"`
-	Rating          *float64 `json:"rating,omitempty"`
-	IsVerified      bool     `json:"is_verified"`
-	PhysicalAddress string   `json:"physical_address"`
-}
-
-// Helper functions for string pointer conversions
-func stringPtr(s string) *string {
-	return &s
-}
-
-func stringPtrToString(s *string) string {
-	if s == nil {
-		return ""
+// ToDomainClinic converts request DTO to domain model
+func ToDomainClinic(req CreateClinicRequest) providers.Clinic {
+	return providers.Clinic{
+		ClinicName:             req.ClinicName,
+		ClinicType:             req.ClinicType,
+		RegistrationNumber:     req.RegistrationNumber,
+		AccreditationNumber:    req.AccreditationNumber,
+		PrimaryPhone:           req.PrimaryPhone,
+		SecondaryPhone:         req.SecondaryPhone,
+		EmergencyPhone:         req.EmergencyPhone,
+		Email:                  req.Email,
+		Website:                req.Website,
+		PhysicalAddress:        req.PhysicalAddress,
+		City:                   req.City,
+		Province:               req.Province,
+		PostalCode:             req.PostalCode,
+		Country:                req.Country,
+		Latitude:               req.Latitude,
+		Longitude:              req.Longitude,
+		GooglePlaceID:          req.GooglePlaceID,
+		Description:            req.Description,
+		YearEstablished:        req.YearEstablished,
+		OwnershipType:          req.OwnershipType,
+		BedCount:               req.BedCount,
+		OperatingHours:         req.OperatingHours,
+		Services:               req.Services,
+		Specialties:            req.Specialties,
+		LanguagesSpoken:        req.LanguagesSpoken,
+		Facilities:             req.Facilities,
+		AcceptsMedicalAid:      req.AcceptsMedicalAid,
+		MedicalAidProviders:    req.MedicalAidProviders,
+		PaymentMethods:         req.PaymentMethods,
+		FeeStructure:           req.FeeStructure,
+		AccreditationBody:      req.AccreditationBody,
+		AccreditationExpiry:    req.AccreditationExpiry,
+		Certifications:         req.Certifications,
+		PatientCapacity:        req.PatientCapacity,
+		AverageWaitTimeMinutes: req.AverageWaitTimeMinutes,
+		ContactPersonName:      req.ContactPersonName,
+		ContactPersonRole:      req.ContactPersonRole,
+		ContactPersonPhone:     req.ContactPersonPhone,
+		ContactPersonEmail:     req.ContactPersonEmail,
 	}
-	return *s
+}
+
+// UpdateToDomainClinic updates existing domain model with request data
+func UpdateToDomainClinic(existing providers.Clinic, req UpdateClinicRequest) providers.Clinic {
+	existing.ClinicName = req.ClinicName
+	existing.ClinicType = req.ClinicType
+	existing.RegistrationNumber = req.RegistrationNumber
+	existing.AccreditationNumber = req.AccreditationNumber
+	existing.PrimaryPhone = req.PrimaryPhone
+	existing.SecondaryPhone = req.SecondaryPhone
+	existing.EmergencyPhone = req.EmergencyPhone
+	existing.Email = req.Email
+	existing.Website = req.Website
+	existing.PhysicalAddress = req.PhysicalAddress
+	existing.City = req.City
+	existing.Province = req.Province
+	existing.PostalCode = req.PostalCode
+	existing.Country = req.Country
+	existing.Latitude = req.Latitude
+	existing.Longitude = req.Longitude
+	existing.GooglePlaceID = req.GooglePlaceID
+	existing.Description = req.Description
+	existing.YearEstablished = req.YearEstablished
+	existing.OwnershipType = req.OwnershipType
+	existing.BedCount = req.BedCount
+	existing.OperatingHours = req.OperatingHours
+	if len(req.Services) > 0 {
+		existing.Services = req.Services
+	}
+	if len(req.Specialties) > 0 {
+		existing.Specialties = req.Specialties
+	}
+	if len(req.LanguagesSpoken) > 0 {
+		existing.LanguagesSpoken = req.LanguagesSpoken
+	}
+	if len(req.Facilities) > 0 {
+		existing.Facilities = req.Facilities
+	}
+	existing.AcceptsMedicalAid = req.AcceptsMedicalAid
+	if len(req.MedicalAidProviders) > 0 {
+		existing.MedicalAidProviders = req.MedicalAidProviders
+	}
+	if len(req.PaymentMethods) > 0 {
+		existing.PaymentMethods = req.PaymentMethods
+	}
+	existing.FeeStructure = req.FeeStructure
+	existing.AccreditationBody = req.AccreditationBody
+	existing.AccreditationExpiry = req.AccreditationExpiry
+	existing.Certifications = req.Certifications
+	existing.PatientCapacity = req.PatientCapacity
+	existing.AverageWaitTimeMinutes = req.AverageWaitTimeMinutes
+	existing.ContactPersonName = req.ContactPersonName
+	existing.ContactPersonRole = req.ContactPersonRole
+	existing.ContactPersonPhone = req.ContactPersonPhone
+	existing.ContactPersonEmail = req.ContactPersonEmail
+	return existing
 }

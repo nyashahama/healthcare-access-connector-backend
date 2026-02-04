@@ -8,7 +8,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	domainmodels "github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -72,18 +71,7 @@ func (h *CredentialHandler) CreateCredential(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Convert DTO to domain model
-	credential := domainmodels.ProfessionalCredential{
-		StaffID:          req.StaffID,
-		CredentialType:   req.CredentialType,
-		CredentialNumber: req.CredentialNumber,
-		IssuingAuthority: req.IssuingAuthority,
-		IssueDate:        req.IssueDate,
-		ExpiryDate:       req.ExpiryDate,
-		Status:           req.Status,
-		VerifiedBy:       req.VerifiedBy,
-		DocumentURL:      req.DocumentURL,
-		Notes:            req.Notes,
-	}
+	credential := providers.ToDomainCredential(req)
 
 	// Create credential
 	createdCredential, err := h.credentialService.CreateCredential(ctx, credential)
@@ -92,7 +80,7 @@ func (h *CredentialHandler) CreateCredential(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, providers.CredentialToResponse(createdCredential))
+	handler.RespondJSON(w, http.StatusCreated, providers.ToCredentialResponse(createdCredential))
 }
 
 // GetStaffCredentials handles getting all credentials for a staff member
@@ -121,7 +109,7 @@ func (h *CredentialHandler) GetStaffCredentials(w http.ResponseWriter, r *http.R
 	}
 
 	for i, cred := range credentials {
-		response.Credentials[i] = providers.CredentialToResponse(cred)
+		response.Credentials[i] = providers.ToCredentialResponse(cred)
 	}
 
 	handler.RespondJSON(w, http.StatusOK, response)
