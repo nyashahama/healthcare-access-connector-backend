@@ -192,52 +192,53 @@ INSERT INTO clinics (
 )
 VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-    $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
-    $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39
+    $15, $16, $17, $18, $19, $20, $21, $22::jsonb, $23::jsonb, $24::jsonb, $25,
+    $26::jsonb, $27, $28::jsonb, $29::jsonb, $30, $31, $32,
+    $33::jsonb, $34, $35, $36, $37, $38, $39
 )
 RETURNING id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at
 `
 
 type CreateClinicParams struct {
-	ClinicName             string         `json:"clinic_name"`
-	ClinicType             string         `json:"clinic_type"`
-	RegistrationNumber     pgtype.Text    `json:"registration_number"`
-	AccreditationNumber    pgtype.Text    `json:"accreditation_number"`
-	PrimaryPhone           pgtype.Text    `json:"primary_phone"`
-	SecondaryPhone         pgtype.Text    `json:"secondary_phone"`
-	EmergencyPhone         pgtype.Text    `json:"emergency_phone"`
-	Email                  pgtype.Text    `json:"email"`
-	Website                pgtype.Text    `json:"website"`
-	PhysicalAddress        string         `json:"physical_address"`
-	City                   pgtype.Text    `json:"city"`
-	Province               pgtype.Text    `json:"province"`
-	PostalCode             pgtype.Text    `json:"postal_code"`
-	Country                pgtype.Text    `json:"country"`
-	Latitude               pgtype.Numeric `json:"latitude"`
-	Longitude              pgtype.Numeric `json:"longitude"`
-	GooglePlaceID          pgtype.Text    `json:"google_place_id"`
-	Description            pgtype.Text    `json:"description"`
-	YearEstablished        pgtype.Int4    `json:"year_established"`
-	OwnershipType          pgtype.Text    `json:"ownership_type"`
-	BedCount               pgtype.Int4    `json:"bed_count"`
-	OperatingHours         []byte         `json:"operating_hours"`
-	Services               []byte         `json:"services"`
-	Specialties            []byte         `json:"specialties"`
-	LanguagesSpoken        []string       `json:"languages_spoken"`
-	Facilities             []byte         `json:"facilities"`
-	AcceptsMedicalAid      pgtype.Bool    `json:"accepts_medical_aid"`
-	MedicalAidProviders    []byte         `json:"medical_aid_providers"`
-	PaymentMethods         []byte         `json:"payment_methods"`
-	FeeStructure           pgtype.Text    `json:"fee_structure"`
-	AccreditationBody      pgtype.Text    `json:"accreditation_body"`
-	AccreditationExpiry    pgtype.Date    `json:"accreditation_expiry"`
-	Certifications         []byte         `json:"certifications"`
-	PatientCapacity        pgtype.Int4    `json:"patient_capacity"`
-	AverageWaitTimeMinutes pgtype.Int4    `json:"average_wait_time_minutes"`
-	ContactPersonName      pgtype.Text    `json:"contact_person_name"`
-	ContactPersonRole      pgtype.Text    `json:"contact_person_role"`
-	ContactPersonPhone     pgtype.Text    `json:"contact_person_phone"`
-	ContactPersonEmail     pgtype.Text    `json:"contact_person_email"`
+	ClinicName             string          `json:"clinic_name"`
+	ClinicType             string          `json:"clinic_type"`
+	RegistrationNumber     pgtype.Text     `json:"registration_number"`
+	AccreditationNumber    pgtype.Text     `json:"accreditation_number"`
+	PrimaryPhone           pgtype.Text     `json:"primary_phone"`
+	SecondaryPhone         pgtype.Text     `json:"secondary_phone"`
+	EmergencyPhone         pgtype.Text     `json:"emergency_phone"`
+	Email                  pgtype.Text     `json:"email"`
+	Website                pgtype.Text     `json:"website"`
+	PhysicalAddress        string          `json:"physical_address"`
+	City                   pgtype.Text     `json:"city"`
+	Province               pgtype.Text     `json:"province"`
+	PostalCode             pgtype.Text     `json:"postal_code"`
+	Country                pgtype.Text     `json:"country"`
+	Latitude               pgtype.Numeric  `json:"latitude"`
+	Longitude              pgtype.Numeric  `json:"longitude"`
+	GooglePlaceID          pgtype.Text     `json:"google_place_id"`
+	Description            pgtype.Text     `json:"description"`
+	YearEstablished        pgtype.Int4     `json:"year_established"`
+	OwnershipType          pgtype.Text     `json:"ownership_type"`
+	BedCount               pgtype.Int4     `json:"bed_count"`
+	Column22               json.RawMessage `json:"column_22"`
+	Column23               json.RawMessage `json:"column_23"`
+	Column24               json.RawMessage `json:"column_24"`
+	LanguagesSpoken        []string        `json:"languages_spoken"`
+	Column26               json.RawMessage `json:"column_26"`
+	AcceptsMedicalAid      pgtype.Bool     `json:"accepts_medical_aid"`
+	Column28               json.RawMessage `json:"column_28"`
+	Column29               json.RawMessage `json:"column_29"`
+	FeeStructure           pgtype.Text     `json:"fee_structure"`
+	AccreditationBody      pgtype.Text     `json:"accreditation_body"`
+	AccreditationExpiry    pgtype.Date     `json:"accreditation_expiry"`
+	Column33               json.RawMessage `json:"column_33"`
+	PatientCapacity        pgtype.Int4     `json:"patient_capacity"`
+	AverageWaitTimeMinutes pgtype.Int4     `json:"average_wait_time_minutes"`
+	ContactPersonName      pgtype.Text     `json:"contact_person_name"`
+	ContactPersonRole      pgtype.Text     `json:"contact_person_role"`
+	ContactPersonPhone     pgtype.Text     `json:"contact_person_phone"`
+	ContactPersonEmail     pgtype.Text     `json:"contact_person_email"`
 }
 
 // ============================================
@@ -271,18 +272,18 @@ func (q *Queries) CreateClinic(ctx context.Context, arg CreateClinicParams) (Cli
 		arg.YearEstablished,
 		arg.OwnershipType,
 		arg.BedCount,
-		arg.OperatingHours,
-		arg.Services,
-		arg.Specialties,
+		arg.Column22,
+		arg.Column23,
+		arg.Column24,
 		arg.LanguagesSpoken,
-		arg.Facilities,
+		arg.Column26,
 		arg.AcceptsMedicalAid,
-		arg.MedicalAidProviders,
-		arg.PaymentMethods,
+		arg.Column28,
+		arg.Column29,
 		arg.FeeStructure,
 		arg.AccreditationBody,
 		arg.AccreditationExpiry,
-		arg.Certifications,
+		arg.Column33,
 		arg.PatientCapacity,
 		arg.AverageWaitTimeMinutes,
 		arg.ContactPersonName,

@@ -253,15 +253,27 @@ func float64PtrToPgtypeNumeric(f *float64) pgtype.Numeric {
 	}
 }
 
-// JSONB conversion helpers for map[string]any
-func jsonbFromMap(m map[string]any) ([]byte, error) {
+// ============================================
+// JSONB CONVERSION HELPERS (using json.RawMessage)
+// ============================================
+
+// CRITICAL: These functions return json.RawMessage instead of []byte
+// This is essential for proper JSONB handling with sqlc and pgx
+
+// jsonbFromMap converts a map to json.RawMessage for JSONB columns
+func jsonbFromMap(m map[string]any) (json.RawMessage, error) {
 	if m == nil {
 		return nil, nil
 	}
-	return json.Marshal(m)
+	data, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(data), nil
 }
 
-func mapFromJSONB(data []byte) map[string]any {
+// mapFromJSONB converts json.RawMessage back to a map
+func mapFromJSONB(data json.RawMessage) map[string]any {
 	if len(data) == 0 {
 		return nil
 	}
@@ -273,20 +285,58 @@ func mapFromJSONB(data []byte) map[string]any {
 	return result
 }
 
-// JSONB conversion helpers for string slices
-func jsonbFromStringSlice(s []string) ([]byte, error) {
+// jsonbFromStringSlice converts a string slice to json.RawMessage for JSONB columns
+func jsonbFromStringSlice(s []string) (json.RawMessage, error) {
 	if s == nil {
 		return nil, nil
 	}
-	return json.Marshal(s)
+	data, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(data), nil
 }
 
-func stringSliceFromJSONB(data []byte) []string {
+// stringSliceFromJSONB converts json.RawMessage back to a string slice
+func stringSliceFromJSONB(data json.RawMessage) []string {
 	if len(data) == 0 {
 		return nil
 	}
 
 	var result []string
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil
+	}
+	return result
+}
+
+// interfaceToJSONRawMessage converts any interface to json.RawMessage for JSONB columns
+func interfaceToJSONRawMessage(data interface{}) (json.RawMessage, error) {
+	if data == nil {
+		return nil, nil
+	}
+
+	// If it's already json.RawMessage, return it
+	if raw, ok := data.(json.RawMessage); ok {
+		return raw, nil
+	}
+
+	// Marshal to JSON
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal to JSON: %w", err)
+	}
+
+	return json.RawMessage(jsonBytes), nil
+}
+
+// jsonRawMessageToInterface converts json.RawMessage to interface{}
+func jsonRawMessageToInterface(data json.RawMessage) interface{} {
+	if len(data) == 0 {
+		return nil
+	}
+
+	var result interface{}
 	if err := json.Unmarshal(data, &result); err != nil {
 		return nil
 	}
@@ -318,4 +368,63 @@ func float64PtrToFloat64(f *float64) float64 {
 		return 0
 	}
 	return *f
+}
+
+// ============================================
+// WORKAROUND HELPERS FOR SQLC MISCONFIGURATIONS
+// ============================================
+// These functions handle cases where sqlc incorrectly maps BOOLEAN or DATE
+// columns as json.RawMessage due to query issues
+
+// boolToPgtypeJSON - workaround for when sqlc maps a BOOLEAN as json.RawMessage
+// This shouldn't be needed if your SQL queries are correct, but provides a fallback
+func boolToPgtypeJSON(b bool) json.RawMessage {
+	if b {
+		return json.RawMessage(`true`)
+	}
+	return json.RawMessage(`false`)
+}
+
+// pgtypeJSONToBool - workaround to extract boolean from json.RawMessage
+func pgtypeJSONToBool(data json.RawMessage) bool {
+	if len(data) == 0 {
+		return false
+	}
+
+	var result bool
+	if err := json.Unmarshal(data, &result); err != nil {
+		return false
+	}
+	return result
+}
+
+// dateToPgtypeJSON - workaround for when sqlc maps a DATE as json.RawMessage
+// This shouldn't be needed if your SQL queries are correct
+func dateToPgtypeJSON(t *time.Time) json.RawMessage {
+	if t == nil {
+		return nil
+	}
+
+	// Format date as JSON string
+	dateStr := t.Format("2006-01-02")
+	data, _ := json.Marshal(dateStr)
+	return json.RawMessage(data)
+}
+
+// pgtypeJSONToTimePtr - workaround to extract date from json.RawMessage
+func pgtypeJSONToTimePtr(data json.RawMessage) *time.Time {
+	if len(data) == 0 {
+		return nil
+	}
+
+	var dateStr string
+	if err := json.Unmarshal(data, &dateStr); err != nil {
+		return nil
+	}
+
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return nil
+	}
+	return &t
 }

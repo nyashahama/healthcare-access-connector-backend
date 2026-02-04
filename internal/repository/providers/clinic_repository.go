@@ -74,9 +74,10 @@ func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Cl
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
+	// Convert JSONB fields to json.RawMessage
 	operatingHoursJSON, err := jsonbFromMap(clinic.OperatingHours)
 	if err != nil {
-		return providers.Clinic{}, fmt.Errorf("marshal operating hours: %w", err)
+		return providers.Clinic{}, fmt.Errorf("marshal operating_hours: %w", err)
 	}
 
 	servicesJSON, err := jsonbFromStringSlice(clinic.Services)
@@ -89,60 +90,80 @@ func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Cl
 		return providers.Clinic{}, fmt.Errorf("marshal specialties: %w", err)
 	}
 
+	// languagesSpokenJSON, err := jsonbFromStringSlice(clinic.LanguagesSpoken)
+	// if err != nil {
+	// 	return providers.Clinic{}, fmt.Errorf("marshal languages_spoken: %w", err)
+	// }
+
 	facilitiesJSON, err := jsonbFromStringSlice(clinic.Facilities)
 	if err != nil {
 		return providers.Clinic{}, fmt.Errorf("marshal facilities: %w", err)
 	}
 
+	// Workaround for accepts_medical_aid (BOOLEAN mapped as json.RawMessage)
+	/* acceptsMedicalAidJSON := boolToPgtypeJSON(clinic.AcceptsMedicalAid) */
+
 	medicalAidProvidersJSON, err := jsonbFromStringSlice(clinic.MedicalAidProviders)
 	if err != nil {
-		return providers.Clinic{}, fmt.Errorf("marshal medical aid providers: %w", err)
+		return providers.Clinic{}, fmt.Errorf("marshal medical_aid_providers: %w", err)
 	}
 
 	paymentMethodsJSON, err := jsonbFromStringSlice(clinic.PaymentMethods)
 	if err != nil {
-		return providers.Clinic{}, fmt.Errorf("marshal payment methods: %w", err)
+		return providers.Clinic{}, fmt.Errorf("marshal payment_methods: %w", err)
 	}
+
+	// Convert fee_structure string to JSON
+	// var feeStructureJSON json.RawMessage
+	// if clinic.FeeStructure != nil && *clinic.FeeStructure != "" {
+	// 	feeStructureJSON = json.RawMessage(fmt.Sprintf(`"%s"`, *clinic.FeeStructure))
+	// }
 
 	certificationsJSON, err := jsonbFromMap(clinic.Certifications)
 	if err != nil {
 		return providers.Clinic{}, fmt.Errorf("marshal certifications: %w", err)
 	}
 
+	// Map to sqlc params with the auto-generated ColumnXX names
 	params := sqlc.CreateClinicParams{
-		ClinicName:             clinic.ClinicName,
-		ClinicType:             clinic.ClinicType,
-		RegistrationNumber:     pgtypeTextFromStringPtr(clinic.RegistrationNumber),
-		AccreditationNumber:    pgtypeTextFromStringPtr(clinic.AccreditationNumber),
-		PrimaryPhone:           pgtypeTextFromStringPtr(clinic.PrimaryPhone),
-		SecondaryPhone:         pgtypeTextFromStringPtr(clinic.SecondaryPhone),
-		EmergencyPhone:         pgtypeTextFromStringPtr(clinic.EmergencyPhone),
-		Email:                  pgtypeTextFromStringPtr(clinic.Email),
-		Website:                pgtypeTextFromStringPtr(clinic.Website),
-		PhysicalAddress:        clinic.PhysicalAddress,
-		City:                   pgtypeTextFromStringPtr(clinic.City),
-		Province:               pgtypeTextFromStringPtr(clinic.Province),
-		PostalCode:             pgtypeTextFromStringPtr(clinic.PostalCode),
-		Country:                pgtypeTextFromString(clinic.Country),
-		Latitude:               float64PtrToPgtypeNumeric(clinic.Latitude),
-		Longitude:              float64PtrToPgtypeNumeric(clinic.Longitude),
-		GooglePlaceID:          pgtypeTextFromStringPtr(clinic.GooglePlaceID),
-		Description:            pgtypeTextFromStringPtr(clinic.Description),
-		YearEstablished:        intPtrToPgtypeInt4(clinic.YearEstablished),
-		OwnershipType:          pgtypeTextFromStringPtr(clinic.OwnershipType),
-		BedCount:               intPtrToPgtypeInt4(clinic.BedCount),
-		OperatingHours:         operatingHoursJSON,
-		Services:               servicesJSON,
-		Specialties:            specialtiesJSON,
-		LanguagesSpoken:        stringSliceToArray(clinic.LanguagesSpoken),
-		Facilities:             facilitiesJSON,
-		AcceptsMedicalAid:      pgtype.Bool{Bool: clinic.AcceptsMedicalAid, Valid: true},
-		MedicalAidProviders:    medicalAidProvidersJSON,
-		PaymentMethods:         paymentMethodsJSON,
-		FeeStructure:           pgtypeTextFromStringPtr(clinic.FeeStructure),
-		AccreditationBody:      pgtypeTextFromStringPtr(clinic.AccreditationBody),
-		AccreditationExpiry:    datePtrToPgtypeDate(clinic.AccreditationExpiry),
-		Certifications:         certificationsJSON,
+		ClinicName:          clinic.ClinicName,
+		ClinicType:          clinic.ClinicType,
+		RegistrationNumber:  pgtypeTextFromStringPtr(clinic.RegistrationNumber),
+		AccreditationNumber: pgtypeTextFromStringPtr(clinic.AccreditationNumber),
+		PrimaryPhone:        pgtypeTextFromStringPtr(clinic.PrimaryPhone),
+		SecondaryPhone:      pgtypeTextFromStringPtr(clinic.SecondaryPhone),
+		EmergencyPhone:      pgtypeTextFromStringPtr(clinic.EmergencyPhone),
+		Email:               pgtypeTextFromStringPtr(clinic.Email),
+		Website:             pgtypeTextFromStringPtr(clinic.Website),
+		PhysicalAddress:     clinic.PhysicalAddress,
+		City:                pgtypeTextFromStringPtr(clinic.City),
+		Province:            pgtypeTextFromStringPtr(clinic.Province),
+		PostalCode:          pgtypeTextFromStringPtr(clinic.PostalCode),
+		Country:             pgtypeTextFromString(clinic.Country),
+		Latitude:            float64PtrToPgtypeNumeric(clinic.Latitude),
+		Longitude:           float64PtrToPgtypeNumeric(clinic.Longitude),
+		GooglePlaceID:       pgtypeTextFromStringPtr(clinic.GooglePlaceID),
+		Description:         pgtypeTextFromStringPtr(clinic.Description),
+		YearEstablished:     intPtrToPgtypeInt4(clinic.YearEstablished),
+		OwnershipType:       pgtypeTextFromStringPtr(clinic.OwnershipType),
+		BedCount:            intPtrToPgtypeInt4(clinic.BedCount),
+
+		// JSONB fields - mapped to ColumnXX by sqlc
+		Column22:          operatingHoursJSON,                           // operating_hours
+		Column23:          servicesJSON,                                 // services
+		Column24:          specialtiesJSON,                              // specialties
+		LanguagesSpoken:   clinic.LanguagesSpoken,                       // languages_spoken
+		Column26:          facilitiesJSON,                               // facilities
+		AcceptsMedicalAid: pgtype.Bool{Bool: clinic.AcceptsMedicalAid},  // accepts_medical_aid (workaround)
+		Column28:          medicalAidProvidersJSON,                      // medical_aid_providers
+		Column29:          paymentMethodsJSON,                           // payment_methods
+		FeeStructure:      pgtypeTextFromStringPtr(clinic.FeeStructure), // fee_structure
+
+		AccreditationBody: pgtypeTextFromStringPtr(clinic.AccreditationBody),
+
+		AccreditationExpiry: pgtype.Date{Time: *clinic.AccreditationExpiry}, // accreditation_expiry (workaround)
+		Column33:            certificationsJSON,                             // certifications
+
 		PatientCapacity:        intPtrToPgtypeInt4(clinic.PatientCapacity),
 		AverageWaitTimeMinutes: intPtrToPgtypeInt4(clinic.AverageWaitTimeMinutes),
 		ContactPersonName:      pgtypeTextFromStringPtr(clinic.ContactPersonName),
