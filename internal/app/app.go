@@ -15,15 +15,18 @@ import (
 	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	handlerpatients "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
+	handlerproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	repoadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/admin"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
 	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
+	repoproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	serviceadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/service/admin"
 	servicecore "github.com/nyashahama/healthcare-access-connector-backend/internal/service/core"
 	servicepatients "github.com/nyashahama/healthcare-access-connector-backend/internal/service/patients"
+	serviceproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/service/providers"
 	"github.com/rs/zerolog"
 )
 
@@ -92,6 +95,12 @@ func New(cfg *config.Config) (*App, error) {
 
 	/* admin */
 	systemAdminRepo := repoadmin.NewSystemAdminRepository(pool)
+
+	/* providers */
+	clinicRepo := repoproviders.NewClinicRepository(pool)
+	staffRepo := repoproviders.NewStaffRepository(pool)
+	serviceRepo := repoproviders.NewServiceRepository(pool)
+	credentialRepo := repoproviders.NewCredentialRepository(pool)
 
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
@@ -178,6 +187,41 @@ func New(cfg *config.Config) (*App, error) {
 		logger,
 	)
 
+	clinicService := serviceproviders.NewClinicService(
+		clinicRepo,
+		auditRepo,
+		userRepo,
+		cacheService,
+		logger,
+	)
+
+	staffService := serviceproviders.NewStaffService(
+		staffRepo,
+		clinicRepo,
+		userRepo,
+		auditRepo,
+		cacheService,
+		logger,
+	)
+
+	serviceService := serviceproviders.NewServiceCatalogService(
+		serviceRepo,
+		clinicRepo,
+		staffRepo,
+		auditRepo,
+		cacheService,
+		logger,
+	)
+
+	credentialService := serviceproviders.NewCredentialService(
+		credentialRepo,
+		staffRepo,
+		userRepo,
+		auditRepo,
+		cacheService,
+		logger,
+	)
+
 	// Initialize handlers
 	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
 	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
@@ -202,6 +246,31 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.Timeout,
 	)
 
+	// Initialize provider handlers
+	staffHandler := handlerproviders.NewStaffHandler(
+		staffService,
+		logger,
+		cfg.Timeout,
+	)
+
+	clinicHandler := handlerproviders.NewClinicHandler(
+		clinicService,
+		logger,
+		cfg.Timeout,
+	)
+
+	serviceHandler := handlerproviders.NewServiceHandler(
+		serviceService,
+		logger,
+		cfg.Timeout,
+	)
+
+	credentialHandler := handlerproviders.NewCredentialHandler(
+		credentialService,
+		logger,
+		cfg.Timeout,
+	)
+
 	// Initialize server with all handlers
 	srv := server.NewServer(
 		cfg,
@@ -214,6 +283,10 @@ func New(cfg *config.Config) (*App, error) {
 		notificationHandler,
 		sessionHandler,
 		patientHandler,
+		staffHandler,
+		clinicHandler,
+		serviceHandler,
+		credentialHandler,
 		adminHandler,
 		healthHandler,
 		authService,

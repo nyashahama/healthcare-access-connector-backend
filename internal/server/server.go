@@ -15,6 +15,7 @@ import (
 	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -58,6 +59,10 @@ type Server struct {
 	notificationHandler *handlercore.NotificationHandler
 	sessionHandler      *handlercore.SessionHandler
 	patientHandler      *patients.PatientHandler
+	staffHandler        *providers.StaffHandler
+	clinicHandler       *providers.ClinicHandler
+	serviceHandler      *providers.ServiceHandler
+	credentialHandler   *providers.CredentialHandler
 	adminHandler        *handleradmin.AdminHandler
 	healthHandler       *handler.HealthHandler
 	authService         service.AuthService
@@ -75,6 +80,10 @@ func NewServer(
 	notificationHandler *handlercore.NotificationHandler,
 	sessionHandler *handlercore.SessionHandler,
 	patientHandler *patients.PatientHandler,
+	staffHandler *providers.StaffHandler,
+	clinicHandler *providers.ClinicHandler,
+	serviceHandler *providers.ServiceHandler,
+	credentialHandler *providers.CredentialHandler,
 	adminHandler *handleradmin.AdminHandler,
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
@@ -91,6 +100,10 @@ func NewServer(
 		notificationHandler: notificationHandler,
 		sessionHandler:      sessionHandler,
 		patientHandler:      patientHandler,
+		staffHandler:        staffHandler,
+		clinicHandler:       clinicHandler,
+		serviceHandler:      serviceHandler,
+		credentialHandler:   credentialHandler,
 		adminHandler:        adminHandler,
 		healthHandler:       healthHandler,
 		authService:         authService,
@@ -220,6 +233,59 @@ func (s *Server) setupRoutes() http.Handler {
 			r.Route("/patients", func(r chi.Router) {
 				// Register patient routes from patient handler
 				s.patientHandler.RegisterRoutes(r)
+			})
+
+			// Provider routes
+			r.Route("/providers", func(r chi.Router) {
+				// Clinic routes
+				r.Route("/clinics", func(r chi.Router) {
+					r.Post("/", s.clinicHandler.CreateClinic)
+					r.Get("/{id}", s.clinicHandler.GetClinic)
+					r.Put("/{id}", s.clinicHandler.UpdateClinic)
+					r.Delete("/{id}", s.clinicHandler.DeleteClinic)
+					r.Put("/{id}/verify", s.clinicHandler.VerifyClinic)
+					r.Put("/{id}/verification-status", s.clinicHandler.UpdateVerificationStatus)
+				})
+
+				// Staff routes
+				r.Route("/staff", func(r chi.Router) {
+					r.Post("/", s.staffHandler.CreateStaff)
+					r.Get("/{id}", s.staffHandler.GetStaff)
+					r.Put("/{id}", s.staffHandler.UpdateStaff)
+					r.Delete("/{id}", s.staffHandler.DeleteStaff)
+					r.Get("/{id}/exists", s.staffHandler.CheckStaffExists)
+				})
+
+				// Clinic-specific staff routes
+				r.Route("/clinics/{clinic_id}/staff", func(r chi.Router) {
+					r.Get("/", s.staffHandler.ListClinicStaff)
+					r.Get("/active", s.staffHandler.ListActiveClinicStaff)
+				})
+
+				// Service routes
+				r.Route("/services", func(r chi.Router) {
+					r.Post("/", s.serviceHandler.CreateService)
+					r.Get("/{id}", s.serviceHandler.GetService)
+					r.Put("/{id}", s.serviceHandler.UpdateService)
+					r.Delete("/{id}", s.serviceHandler.DeleteService)
+					r.Get("/{id}/exists", s.serviceHandler.CheckServiceExists)
+				})
+
+				// Clinic-specific service routes
+				r.Route("/clinics/{clinic_id}/services", func(r chi.Router) {
+					r.Get("/", s.serviceHandler.ListClinicServices)
+				})
+
+				// Credential routes
+				r.Route("/credentials", func(r chi.Router) {
+					r.Post("/", s.credentialHandler.CreateCredential)
+					r.Delete("/{id}", s.credentialHandler.DeleteCredential)
+				})
+
+				// Staff-specific credential routes
+				r.Route("/staff/{staff_id}/credentials", func(r chi.Router) {
+					r.Get("/", s.credentialHandler.GetStaffCredentials)
+				})
 			})
 
 			// Session management routes
