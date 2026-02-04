@@ -76,16 +76,16 @@ func (r *auditRepository) LogUserActivity(ctx context.Context, activity core.Use
 		}
 	}
 	err = r.querier.LogUserActivity(ctx, sqlc.LogUserActivityParams{
-		UserID:          uuidPtrToPgtypeUUID(activity.UserID),
-		ActivityType:    activity.ActivityType,
-		ActivityDetails: activityDetails,
-		IpAddress:       ipAddr,
-		UserAgent:       pgtypeTextFromStringPtr(activity.UserAgent),
-		DeviceType:      pgtypeTextFromStringPtr(activity.DeviceType),
-		DeviceID:        pgtypeTextFromStringPtr(activity.DeviceID),
-		Location:        location,
-		ResourceType:    pgtypeTextFromStringPtr(activity.ResourceType),
-		ResourceID:      uuidPtrToPgtypeUUID(activity.ResourceID),
+		UserID:       uuidPtrToPgtypeUUID(activity.UserID),
+		ActivityType: activity.ActivityType,
+		Column3:      activityDetails,
+		IpAddress:    ipAddr,
+		UserAgent:    pgtypeTextFromStringPtr(activity.UserAgent),
+		DeviceType:   pgtypeTextFromStringPtr(activity.DeviceType),
+		DeviceID:     pgtypeTextFromStringPtr(activity.DeviceID),
+		Column8:      location,
+		ResourceType: pgtypeTextFromStringPtr(activity.ResourceType),
+		ResourceID:   uuidPtrToPgtypeUUID(activity.ResourceID),
 	})
 	if err != nil {
 		auditDBQueryTotal.WithLabelValues("log_user_activity", "error").Inc()

@@ -7,6 +7,7 @@ package sqlc
 
 import (
 	"context"
+	"encoding/json"
 	"net/netip"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -275,20 +276,20 @@ INSERT INTO user_activities (
     user_agent, device_type, device_id, location, 
     resource_type, resource_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8::jsonb, $9, $10)
 `
 
 type LogUserActivityParams struct {
-	UserID          pgtype.UUID `json:"user_id"`
-	ActivityType    string      `json:"activity_type"`
-	ActivityDetails []byte      `json:"activity_details"`
-	IpAddress       *netip.Addr `json:"ip_address"`
-	UserAgent       pgtype.Text `json:"user_agent"`
-	DeviceType      pgtype.Text `json:"device_type"`
-	DeviceID        pgtype.Text `json:"device_id"`
-	Location        []byte      `json:"location"`
-	ResourceType    pgtype.Text `json:"resource_type"`
-	ResourceID      pgtype.UUID `json:"resource_id"`
+	UserID       pgtype.UUID     `json:"user_id"`
+	ActivityType string          `json:"activity_type"`
+	Column3      json.RawMessage `json:"column_3"`
+	IpAddress    *netip.Addr     `json:"ip_address"`
+	UserAgent    pgtype.Text     `json:"user_agent"`
+	DeviceType   pgtype.Text     `json:"device_type"`
+	DeviceID     pgtype.Text     `json:"device_id"`
+	Column8      json.RawMessage `json:"column_8"`
+	ResourceType pgtype.Text     `json:"resource_type"`
+	ResourceID   pgtype.UUID     `json:"resource_id"`
 }
 
 // ============================================
@@ -298,12 +299,12 @@ func (q *Queries) LogUserActivity(ctx context.Context, arg LogUserActivityParams
 	_, err := q.db.Exec(ctx, logUserActivity,
 		arg.UserID,
 		arg.ActivityType,
-		arg.ActivityDetails,
+		arg.Column3,
 		arg.IpAddress,
 		arg.UserAgent,
 		arg.DeviceType,
 		arg.DeviceID,
-		arg.Location,
+		arg.Column8,
 		arg.ResourceType,
 		arg.ResourceID,
 	)

@@ -8,7 +8,7 @@ INSERT INTO user_activities (
     user_agent, device_type, device_id, location, 
     resource_type, resource_id
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
+VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8::jsonb, $9, $10);
 
 -- name: GetUserActivities :many
 SELECT id, user_id, activity_type, activity_details, ip_address,
