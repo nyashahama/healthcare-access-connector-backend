@@ -7,107 +7,149 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 )
 
-// CreateConditionRequest represents a request to create a condition record
-type CreateConditionRequest struct {
-	PatientID       uuid.UUID  `json:"patient_id"`
-	ConditionName   string     `json:"condition_name"`
-	ICD10Code       *string    `json:"icd10_code,omitempty"`
-	Type            *string    `json:"type,omitempty"`
-	DiagnosedDate   *time.Time `json:"diagnosed_date,omitempty"`
-	DiagnosedBy     *string    `json:"diagnosed_by,omitempty"`
-	Severity        *string    `json:"severity,omitempty"`
-	Status          string     `json:"status"`
-	Notes           *string    `json:"notes,omitempty"`
-	LastFlareUp     *time.Time `json:"last_flare_up,omitempty"`
-	NextCheckupDate *time.Time `json:"next_checkup_date,omitempty"`
+// CreateDependentRequest represents a request to create a dependent record
+type CreateDependentRequest struct {
+	PatientID               uuid.UUID  `json:"patient_id"`
+	FirstName               string     `json:"first_name"`
+	LastName                string     `json:"last_name"`
+	DateOfBirth             time.Time  `json:"date_of_birth"`
+	Gender                  *string    `json:"gender,omitempty"`
+	Relationship            string     `json:"relationship"` // 'child', 'ward', 'dependent_adult'
+	BloodType               *string    `json:"blood_type,omitempty"`
+	HealthStatus            *string    `json:"health_status,omitempty"` // 'excellent', 'good', 'fair', 'poor'
+	PrimaryPediatrician     *string    `json:"primary_pediatrician,omitempty"`
+	ClinicID                *uuid.UUID `json:"clinic_id,omitempty"`
+	BirthWeightKg           *float64   `json:"birth_weight_kg,omitempty"`
+	BirthHeightCm           *float64   `json:"birth_height_cm,omitempty"`
+	SchoolName              *string    `json:"school_name,omitempty"`
+	Grade                   *string    `json:"grade,omitempty"`
+	HasLegalGuardianship    bool       `json:"has_legal_guardianship"`
+	GuardianshipDocumentURL *string    `json:"guardianship_document_url,omitempty"`
+	HasSpecialNeeds         bool       `json:"has_special_needs"`
+	SpecialNeedsDescription *string    `json:"special_needs_description,omitempty"`
 }
 
-// UpdateConditionRequest represents a request to update a condition record
-type UpdateConditionRequest struct {
-	ConditionName   string     `json:"condition_name"`
-	ICD10Code       *string    `json:"icd10_code,omitempty"`
-	Type            *string    `json:"type,omitempty"`
-	DiagnosedDate   *time.Time `json:"diagnosed_date,omitempty"`
-	DiagnosedBy     *string    `json:"diagnosed_by,omitempty"`
-	Severity        *string    `json:"severity,omitempty"`
-	Status          string     `json:"status"`
-	Notes           *string    `json:"notes,omitempty"`
-	LastFlareUp     *time.Time `json:"last_flare_up,omitempty"`
-	NextCheckupDate *time.Time `json:"next_checkup_date,omitempty"`
+// UpdateDependentRequest represents a request to update a dependent record
+type UpdateDependentRequest struct {
+	FirstName               string     `json:"first_name"`
+	LastName                string     `json:"last_name"`
+	DateOfBirth             time.Time  `json:"date_of_birth"`
+	Gender                  *string    `json:"gender,omitempty"`
+	Relationship            string     `json:"relationship"` // 'child', 'ward', 'dependent_adult'
+	BloodType               *string    `json:"blood_type,omitempty"`
+	HealthStatus            *string    `json:"health_status,omitempty"` // 'excellent', 'good', 'fair', 'poor'
+	PrimaryPediatrician     *string    `json:"primary_pediatrician,omitempty"`
+	ClinicID                *uuid.UUID `json:"clinic_id,omitempty"`
+	BirthWeightKg           *float64   `json:"birth_weight_kg,omitempty"`
+	BirthHeightCm           *float64   `json:"birth_height_cm,omitempty"`
+	SchoolName              *string    `json:"school_name,omitempty"`
+	Grade                   *string    `json:"grade,omitempty"`
+	HasLegalGuardianship    bool       `json:"has_legal_guardianship"`
+	GuardianshipDocumentURL *string    `json:"guardianship_document_url,omitempty"`
+	HasSpecialNeeds         bool       `json:"has_special_needs"`
+	SpecialNeedsDescription *string    `json:"special_needs_description,omitempty"`
 }
 
-// ConditionResponse represents a condition record in responses
-type ConditionResponse struct {
-	ID              uuid.UUID  `json:"id"`
-	PatientID       uuid.UUID  `json:"patient_id"`
-	ConditionName   string     `json:"condition_name"`
-	ICD10Code       *string    `json:"icd10_code,omitempty"`
-	Type            *string    `json:"type,omitempty"`
-	DiagnosedDate   *time.Time `json:"diagnosed_date,omitempty"`
-	DiagnosedBy     *string    `json:"diagnosed_by,omitempty"`
-	Severity        *string    `json:"severity,omitempty"`
-	Status          string     `json:"status"`
-	Notes           *string    `json:"notes,omitempty"`
-	LastFlareUp     *time.Time `json:"last_flare_up,omitempty"`
-	NextCheckupDate *time.Time `json:"next_checkup_date,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+// DependentResponse represents a dependent record in responses
+type DependentResponse struct {
+	ID                      uuid.UUID  `json:"id"`
+	PatientID               uuid.UUID  `json:"patient_id"`
+	FirstName               string     `json:"first_name"`
+	LastName                string     `json:"last_name"`
+	DateOfBirth             time.Time  `json:"date_of_birth"`
+	Gender                  *string    `json:"gender,omitempty"`
+	Relationship            string     `json:"relationship"` // 'child', 'ward', 'dependent_adult'
+	BloodType               *string    `json:"blood_type,omitempty"`
+	HealthStatus            *string    `json:"health_status,omitempty"` // 'excellent', 'good', 'fair', 'poor'
+	PrimaryPediatrician     *string    `json:"primary_pediatrician,omitempty"`
+	ClinicID                *uuid.UUID `json:"clinic_id,omitempty"`
+	BirthWeightKg           *float64   `json:"birth_weight_kg,omitempty"`
+	BirthHeightCm           *float64   `json:"birth_height_cm,omitempty"`
+	SchoolName              *string    `json:"school_name,omitempty"`
+	Grade                   *string    `json:"grade,omitempty"`
+	HasLegalGuardianship    bool       `json:"has_legal_guardianship"`
+	GuardianshipDocumentURL *string    `json:"guardianship_document_url,omitempty"`
+	HasSpecialNeeds         bool       `json:"has_special_needs"`
+	SpecialNeedsDescription *string    `json:"special_needs_description,omitempty"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
 }
 
-// ConditionsListResponse represents a list of conditions
-type ConditionsListResponse struct {
-	Conditions []ConditionResponse `json:"conditions"`
+// DependentsListResponse represents a list of dependents
+type DependentsListResponse struct {
+	Dependents []DependentResponse `json:"dependents"`
 	Count      int                 `json:"count"`
 }
 
-// ToConditionResponse converts domain PatientCondition to response DTO
-func ToConditionResponse(condition patients.PatientCondition) ConditionResponse {
-	return ConditionResponse{
-		ID:              condition.ID,
-		PatientID:       condition.PatientID,
-		ConditionName:   condition.ConditionName,
-		ICD10Code:       condition.ICD10Code,
-		Type:            condition.Type,
-		DiagnosedDate:   condition.DiagnosedDate,
-		DiagnosedBy:     condition.DiagnosedBy,
-		Severity:        condition.Severity,
-		Status:          condition.Status,
-		Notes:           condition.Notes,
-		LastFlareUp:     condition.LastFlareUp,
-		NextCheckupDate: condition.NextCheckupDate,
-		CreatedAt:       condition.CreatedAt,
-		UpdatedAt:       condition.UpdatedAt,
+// ToDependentResponse converts domain PatientDependent to response DTO
+func ToDependentResponse(dependent patients.PatientDependent) DependentResponse {
+	return DependentResponse{
+		ID:                      dependent.ID,
+		PatientID:               dependent.PatientID,
+		FirstName:               dependent.FirstName,
+		LastName:                dependent.LastName,
+		DateOfBirth:             dependent.DateOfBirth,
+		Gender:                  dependent.Gender,
+		Relationship:            dependent.Relationship,
+		BloodType:               dependent.BloodType,
+		HealthStatus:            dependent.HealthStatus,
+		PrimaryPediatrician:     dependent.PrimaryPediatrician,
+		ClinicID:                dependent.ClinicID,
+		BirthWeightKg:           dependent.BirthWeightKg,
+		BirthHeightCm:           dependent.BirthHeightCm,
+		SchoolName:              dependent.SchoolName,
+		Grade:                   dependent.Grade,
+		HasLegalGuardianship:    dependent.HasLegalGuardianship,
+		GuardianshipDocumentURL: dependent.GuardianshipDocumentURL,
+		HasSpecialNeeds:         dependent.HasSpecialNeeds,
+		SpecialNeedsDescription: dependent.SpecialNeedsDescription,
+		CreatedAt:               dependent.CreatedAt,
+		UpdatedAt:               dependent.UpdatedAt,
 	}
 }
 
-// ToDomainCondition converts request DTO to domain model
-func ToDomainCondition(req CreateConditionRequest) patients.PatientCondition {
-	return patients.PatientCondition{
-		PatientID:       req.PatientID,
-		ConditionName:   req.ConditionName,
-		ICD10Code:       req.ICD10Code,
-		Type:            req.Type,
-		DiagnosedDate:   req.DiagnosedDate,
-		DiagnosedBy:     req.DiagnosedBy,
-		Severity:        req.Severity,
-		Status:          req.Status,
-		Notes:           req.Notes,
-		LastFlareUp:     req.LastFlareUp,
-		NextCheckupDate: req.NextCheckupDate,
+// ToDomainDependent converts request DTO to domain model
+func ToDomainDependent(req CreateDependentRequest) patients.PatientDependent {
+	return patients.PatientDependent{
+		PatientID:               req.PatientID,
+		FirstName:               req.FirstName,
+		LastName:                req.LastName,
+		DateOfBirth:             req.DateOfBirth,
+		Gender:                  req.Gender,
+		Relationship:            req.Relationship,
+		BloodType:               req.BloodType,
+		HealthStatus:            req.HealthStatus,
+		PrimaryPediatrician:     req.PrimaryPediatrician,
+		ClinicID:                req.ClinicID,
+		BirthWeightKg:           req.BirthWeightKg,
+		BirthHeightCm:           req.BirthHeightCm,
+		SchoolName:              req.SchoolName,
+		Grade:                   req.Grade,
+		HasLegalGuardianship:    req.HasLegalGuardianship,
+		GuardianshipDocumentURL: req.GuardianshipDocumentURL,
+		HasSpecialNeeds:         req.HasSpecialNeeds,
+		SpecialNeedsDescription: req.SpecialNeedsDescription,
 	}
 }
 
-// UpdateToDomainCondition updates existing domain model with request data
-func UpdateToDomainCondition(existing patients.PatientCondition, req UpdateConditionRequest) patients.PatientCondition {
-	existing.ConditionName = req.ConditionName
-	existing.ICD10Code = req.ICD10Code
-	existing.Type = req.Type
-	existing.DiagnosedDate = req.DiagnosedDate
-	existing.DiagnosedBy = req.DiagnosedBy
-	existing.Severity = req.Severity
-	existing.Status = req.Status
-	existing.Notes = req.Notes
-	existing.LastFlareUp = req.LastFlareUp
-	existing.NextCheckupDate = req.NextCheckupDate
+// UpdateToDomainDependent updates existing domain model with request data
+func UpdateToDomainDependent(existing patients.PatientDependent, req UpdateDependentRequest) patients.PatientDependent {
+	existing.FirstName = req.FirstName
+	existing.LastName = req.LastName
+	existing.DateOfBirth = req.DateOfBirth
+	existing.Gender = req.Gender
+	existing.Relationship = req.Relationship
+	existing.BloodType = req.BloodType
+	existing.HealthStatus = req.HealthStatus
+	existing.PrimaryPediatrician = req.PrimaryPediatrician
+	existing.ClinicID = req.ClinicID
+	existing.BirthWeightKg = req.BirthWeightKg
+	existing.BirthHeightCm = req.BirthHeightCm
+	existing.SchoolName = req.SchoolName
+	existing.Grade = req.Grade
+	existing.HasLegalGuardianship = req.HasLegalGuardianship
+	existing.GuardianshipDocumentURL = req.GuardianshipDocumentURL
+	existing.HasSpecialNeeds = req.HasSpecialNeeds
+	existing.SpecialNeedsDescription = req.SpecialNeedsDescription
 	return existing
 }

@@ -83,6 +83,16 @@ func New(cfg *config.Config) (*App, error) {
 	// Initialize repositories
 	/* patients */
 	patientRepo := repopatients.NewPatientRepository(pool)
+	allergyRepo := repopatients.NewAllergyRepository(pool)
+	conditionRepo := repopatients.NewConditionRepository(pool)
+	medicationRepo := repopatients.NewMedicationRepository(pool)
+	surgeryRepo := repopatients.NewSurgeryRepository(pool)
+	immunizationRepo := repopatients.NewImmunizationRepository(pool)
+	familyHistoryRepo := repopatients.NewFamilyHistoryRepository(pool)
+	medicalInfoRepo := repopatients.NewMedicalInfoRepository(pool)
+	emergencyContactRepo := repopatients.NewEmergencyContactRepository(pool)
+	dependentRepo := repopatients.NewDependentRepository(pool)
+	dependentHealthRepo := repopatients.NewDependentHealthRecordRepository(pool)
 
 	/* core */
 	authRepo := repocore.NewAuthRepository(pool)
@@ -179,6 +189,76 @@ func New(cfg *config.Config) (*App, error) {
 		logger,
 	)
 
+	allergyService := servicepatients.NewAllergyService(
+		allergyRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	conditionService := servicepatients.NewConditionService(
+		conditionRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	medicationService := servicepatients.NewMedicationService(
+		medicationRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	surgeryService := servicepatients.NewSurgeryService(
+		surgeryRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	immunizationService := servicepatients.NewImmunizationService(
+		immunizationRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	familyHistoryService := servicepatients.NewFamilyHistoryService(
+		familyHistoryRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	medicalInfoService := servicepatients.NewMedicalInfoService(
+		medicalInfoRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	emergencyContactService := servicepatients.NewEmergencyContactService(
+		emergencyContactRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	dependentService := servicepatients.NewDependentService(
+		dependentRepo,
+		patientRepo,
+		cacheService,
+		logger,
+	)
+
+	dependentHealthService := servicepatients.NewDependentHealthRecordService(
+		dependentHealthRepo,
+		dependentRepo,
+		cacheService,
+		logger,
+	)
+
 	systemAdminService := serviceadmin.NewSystemAdminService(
 		systemAdminRepo,
 		userRepo,
@@ -239,6 +319,66 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.Timeout,
 	)
 
+	allergyHandler := handlerpatients.NewAllergyHandler(
+		allergyService,
+		logger,
+		cfg.Timeout,
+	)
+
+	conditionHandler := handlerpatients.NewConditionHandler(
+		conditionService,
+		logger,
+		cfg.Timeout,
+	)
+
+	medicationHandler := handlerpatients.NewMedicationHandler(
+		medicationService,
+		logger,
+		cfg.Timeout,
+	)
+
+	surgeryHandler := handlerpatients.NewSurgeryHandler(
+		surgeryService,
+		logger,
+		cfg.Timeout,
+	)
+
+	immunizationHandler := handlerpatients.NewImmunizationHandler(
+		immunizationService,
+		logger,
+		cfg.Timeout,
+	)
+
+	familyHistoryHandler := handlerpatients.NewFamilyHistoryHandler(
+		familyHistoryService,
+		logger,
+		cfg.Timeout,
+	)
+
+	medicalInfoHandler := handlerpatients.NewMedicalInfoHandler(
+		medicalInfoService,
+		logger,
+		cfg.Timeout,
+	)
+
+	emergencyContactHandler := handlerpatients.NewEmergencyContactHandler(
+		emergencyContactService,
+		logger,
+		cfg.Timeout,
+	)
+
+	dependentHandler := handlerpatients.NewDependentHandler(
+		dependentService,
+		logger,
+		cfg.Timeout,
+	)
+
+	dependentHealthHandler := handlerpatients.NewDependentHealthRecordHandler(
+		dependentHealthService,
+		logger,
+		cfg.Timeout,
+	)
+
 	// Initialize admin handler
 	adminHandler := handleradmin.NewAdminHandler(
 		systemAdminService,
@@ -283,6 +423,16 @@ func New(cfg *config.Config) (*App, error) {
 		notificationHandler,
 		sessionHandler,
 		patientHandler,
+		allergyHandler,
+		conditionHandler,
+		medicationHandler,
+		surgeryHandler,
+		immunizationHandler,
+		familyHistoryHandler,
+		medicalInfoHandler,
+		emergencyContactHandler,
+		dependentHandler,
+		dependentHealthHandler,
 		staffHandler,
 		clinicHandler,
 		serviceHandler,

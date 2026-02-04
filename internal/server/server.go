@@ -48,24 +48,34 @@ var (
 )
 
 type Server struct {
-	httpServer          *http.Server
-	config              *config.Config
-	logger              *zerolog.Logger
-	authHandler         *handlercore.AuthHandler
-	userHandler         *handlercore.UserHandler
-	otpHandler          *handlercore.OTPHandler
-	auditHandler        *handlercore.AuditHandler
-	consentHandler      *handlercore.ConsentHandler
-	notificationHandler *handlercore.NotificationHandler
-	sessionHandler      *handlercore.SessionHandler
-	patientHandler      *patients.PatientHandler
-	staffHandler        *providers.StaffHandler
-	clinicHandler       *providers.ClinicHandler
-	serviceHandler      *providers.ServiceHandler
-	credentialHandler   *providers.CredentialHandler
-	adminHandler        *handleradmin.AdminHandler
-	healthHandler       *handler.HealthHandler
-	authService         service.AuthService
+	httpServer              *http.Server
+	config                  *config.Config
+	logger                  *zerolog.Logger
+	authHandler             *handlercore.AuthHandler
+	userHandler             *handlercore.UserHandler
+	otpHandler              *handlercore.OTPHandler
+	auditHandler            *handlercore.AuditHandler
+	consentHandler          *handlercore.ConsentHandler
+	notificationHandler     *handlercore.NotificationHandler
+	sessionHandler          *handlercore.SessionHandler
+	patientHandler          *patients.PatientHandler
+	allergyHandler          *patients.AllergyHandler
+	conditionHandler        *patients.ConditionHandler
+	medicationHandler       *patients.MedicationHandler
+	surgeryHandler          *patients.SurgeryHandler
+	immunizationHandler     *patients.ImmunizationHandler
+	familyHistoryHandler    *patients.FamilyHistoryHandler
+	medicalInfoHandler      *patients.MedicalInfoHandler
+	emergencyContactHandler *patients.EmergencyContactHandler
+	dependentHandler        *patients.DependentHandler
+	dependentHealthHandler  *patients.DependentHealthRecordHandler
+	staffHandler            *providers.StaffHandler
+	clinicHandler           *providers.ClinicHandler
+	serviceHandler          *providers.ServiceHandler
+	credentialHandler       *providers.CredentialHandler
+	adminHandler            *handleradmin.AdminHandler
+	healthHandler           *handler.HealthHandler
+	authService             service.AuthService
 }
 
 // NewServer creates a new HTTP server
@@ -80,6 +90,16 @@ func NewServer(
 	notificationHandler *handlercore.NotificationHandler,
 	sessionHandler *handlercore.SessionHandler,
 	patientHandler *patients.PatientHandler,
+	allergyHandler *patients.AllergyHandler,
+	conditionHandler *patients.ConditionHandler,
+	medicationHandler *patients.MedicationHandler,
+	surgeryHandler *patients.SurgeryHandler,
+	immunizationHandler *patients.ImmunizationHandler,
+	familyHistoryHandler *patients.FamilyHistoryHandler,
+	medicalInfoHandler *patients.MedicalInfoHandler,
+	emergencyContactHandler *patients.EmergencyContactHandler,
+	dependentHandler *patients.DependentHandler,
+	dependentHealthHandler *patients.DependentHealthRecordHandler,
 	staffHandler *providers.StaffHandler,
 	clinicHandler *providers.ClinicHandler,
 	serviceHandler *providers.ServiceHandler,
@@ -90,23 +110,33 @@ func NewServer(
 	txManager repository.TxManager,
 ) *Server {
 	return &Server{
-		config:              cfg,
-		logger:              logger,
-		authHandler:         authHandler,
-		userHandler:         userHandler,
-		otpHandler:          otpHandler,
-		auditHandler:        auditHandler,
-		consentHandler:      consentHandler,
-		notificationHandler: notificationHandler,
-		sessionHandler:      sessionHandler,
-		patientHandler:      patientHandler,
-		staffHandler:        staffHandler,
-		clinicHandler:       clinicHandler,
-		serviceHandler:      serviceHandler,
-		credentialHandler:   credentialHandler,
-		adminHandler:        adminHandler,
-		healthHandler:       healthHandler,
-		authService:         authService,
+		config:                  cfg,
+		logger:                  logger,
+		authHandler:             authHandler,
+		userHandler:             userHandler,
+		otpHandler:              otpHandler,
+		auditHandler:            auditHandler,
+		consentHandler:          consentHandler,
+		notificationHandler:     notificationHandler,
+		sessionHandler:          sessionHandler,
+		patientHandler:          patientHandler,
+		allergyHandler:          allergyHandler,
+		conditionHandler:        conditionHandler,
+		medicationHandler:       medicationHandler,
+		surgeryHandler:          surgeryHandler,
+		immunizationHandler:     immunizationHandler,
+		familyHistoryHandler:    familyHistoryHandler,
+		medicalInfoHandler:      medicalInfoHandler,
+		emergencyContactHandler: emergencyContactHandler,
+		dependentHandler:        dependentHandler,
+		dependentHealthHandler:  dependentHealthHandler,
+		staffHandler:            staffHandler,
+		clinicHandler:           clinicHandler,
+		serviceHandler:          serviceHandler,
+		credentialHandler:       credentialHandler,
+		adminHandler:            adminHandler,
+		healthHandler:           healthHandler,
+		authService:             authService,
 	}
 }
 
@@ -233,6 +263,18 @@ func (s *Server) setupRoutes() http.Handler {
 			r.Route("/patients", func(r chi.Router) {
 				// Register patient routes from patient handler
 				s.patientHandler.RegisterRoutes(r)
+
+				// Register patient health record routes
+				s.allergyHandler.RegisterRoutes(r)
+				s.conditionHandler.RegisterRoutes(r)
+				s.medicationHandler.RegisterRoutes(r)
+				s.surgeryHandler.RegisterRoutes(r)
+				s.immunizationHandler.RegisterRoutes(r)
+				s.familyHistoryHandler.RegisterRoutes(r)
+				s.medicalInfoHandler.RegisterRoutes(r)
+				s.emergencyContactHandler.RegisterRoutes(r)
+				s.dependentHandler.RegisterRoutes(r)
+				s.dependentHealthHandler.RegisterRoutes(r)
 			})
 
 			// Provider routes

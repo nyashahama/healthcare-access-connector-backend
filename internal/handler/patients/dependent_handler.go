@@ -15,31 +15,31 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type ConditionHandler struct {
-	conditionService service.ConditionService
+type DependentHandler struct {
+	dependentService service.DependentService
 	logger           *zerolog.Logger
 	timeout          time.Duration
 }
 
-func NewConditionHandler(conditionService service.ConditionService, logger *zerolog.Logger, timeout time.Duration) *ConditionHandler {
-	return &ConditionHandler{conditionService: conditionService, logger: logger, timeout: timeout}
+func NewDependentHandler(dependentService service.DependentService, logger *zerolog.Logger, timeout time.Duration) *DependentHandler {
+	return &DependentHandler{dependentService: dependentService, logger: logger, timeout: timeout}
 }
 
-func (h *ConditionHandler) RegisterRoutes(router chi.Router) {
-	router.Route("/conditions", func(r chi.Router) {
-		r.Post("/", h.CreateCondition)
-		r.Get("/patient/{patientID}", h.GetPatientConditions)
-		r.Get("/patient/{patientID}/active", h.GetActiveConditions)
-		r.Put("/{id}", h.UpdateCondition)
-		r.Delete("/{id}", h.DeleteCondition)
+func (h *DependentHandler) RegisterRoutes(router chi.Router) {
+	router.Route("/dependents", func(r chi.Router) {
+		r.Post("/", h.CreateDependent)
+		r.Get("/patient/{patientID}", h.GetPatientDependents)
+		r.Get("/patient/{patientID}/children", h.GetDependentChildren)
+		r.Put("/{id}", h.UpdateDependent)
+		r.Delete("/{id}", h.DeleteDependent)
 	})
 }
 
-func (h *ConditionHandler) CreateCondition(w http.ResponseWriter, r *http.Request) {
+func (h *DependentHandler) CreateDependent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req pat_dto.CreateConditionRequest
+	var req pat_dto.CreateDependentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, pat_dto.ErrorResponse{Error: "Invalid request body"})
 		return
@@ -47,25 +47,26 @@ func (h *ConditionHandler) CreateCondition(w http.ResponseWriter, r *http.Reques
 
 	v := validator.New()
 	v.ValidateRequired("patient_id", req.PatientID.String())
-	v.ValidateRequired("condition_name", req.ConditionName)
-	v.ValidateRequired("status", req.Status)
+	v.ValidateRequired("first_name", req.FirstName)
+	v.ValidateRequired("last_name", req.LastName)
+	v.ValidateRequired("relationship", req.Relationship)
 
 	if !v.Valid() {
 		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
-	condition := pat_dto.ToDomainCondition(req)
-	created, err := h.conditionService.AddPatientCondition(ctx, condition)
+	dependent := pat_dto.ToDomainDependent(req)
+	created, err := h.dependentService.AddPatientDependent(ctx, dependent)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, pat_dto.ToConditionResponse(created))
+	handler.RespondJSON(w, http.StatusCreated, pat_dto.ToDependentResponse(created))
 }
 
-func (h *ConditionHandler) GetPatientConditions(w http.ResponseWriter, r *http.Request) {
+func (h *DependentHandler) GetPatientDependents(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
@@ -75,26 +76,21 @@ func (h *ConditionHandler) GetPatientConditions(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var status *string
-	if statusParam := r.URL.Query().Get("status"); statusParam != "" {
-		status = &statusParam
-	}
-
-	conditions, err := h.conditionService.GetPatientConditions(ctx, patientID, status)
+	dependents, err := h.dependentService.GetPatientDependents(ctx, patientID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	responses := make([]pat_dto.ConditionResponse, len(conditions))
-	for i, condition := range conditions {
-		responses[i] = pat_dto.ToConditionResponse(condition)
+	responses := make([]pat_dto.DependentResponse, len(dependents))
+	for i, dependent := range dependents {
+		responses[i] = pat_dto.ToDependentResponse(dependent)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, pat_dto.ConditionsListResponse{Conditions: responses, Count: len(responses)})
+	handler.RespondJSON(w, http.StatusOK, pat_dto.DependentsListResponse{Dependents: responses, Count: len(responses)})
 }
 
-func (h *ConditionHandler) GetActiveConditions(w http.ResponseWriter, r *http.Request) {
+func (h *DependentHandler) GetDependentChildren(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
@@ -104,39 +100,39 @@ func (h *ConditionHandler) GetActiveConditions(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	conditions, err := h.conditionService.GetActiveConditions(ctx, patientID)
+	dependents, err := h.dependentService.GetDependentChildren(ctx, patientID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	responses := make([]pat_dto.ConditionResponse, len(conditions))
-	for i, condition := range conditions {
-		responses[i] = pat_dto.ToConditionResponse(condition)
+	responses := make([]pat_dto.DependentResponse, len(dependents))
+	for i, dependent := range dependents {
+		responses[i] = pat_dto.ToDependentResponse(dependent)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, pat_dto.ConditionsListResponse{Conditions: responses, Count: len(responses)})
+	handler.RespondJSON(w, http.StatusOK, pat_dto.DependentsListResponse{Dependents: responses, Count: len(responses)})
 }
 
-func (h *ConditionHandler) UpdateCondition(w http.ResponseWriter, r *http.Request) {
+func (h *DependentHandler) UpdateDependent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	conditionID, err := uuid.Parse(chi.URLParam(r, "id"))
+	dependentID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, pat_dto.ErrorResponse{Error: "Invalid condition ID format"})
+		handler.RespondJSON(w, http.StatusBadRequest, pat_dto.ErrorResponse{Error: "Invalid dependent ID format"})
 		return
 	}
 
-	var req pat_dto.UpdateConditionRequest
+	var req pat_dto.UpdateDependentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, pat_dto.ErrorResponse{Error: "Invalid request body"})
 		return
 	}
 
 	v := validator.New()
-	v.ValidateRequired("condition_name", req.ConditionName)
-	v.ValidateRequired("status", req.Status)
+	v.ValidateRequired("first_name", req.FirstName)
+	v.ValidateRequired("last_name", req.LastName)
 
 	if !v.Valid() {
 		handler.RespondValidationError(w, v.Errors())
@@ -149,75 +145,82 @@ func (h *ConditionHandler) UpdateCondition(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	conditions, err := h.conditionService.GetPatientConditions(ctx, patientID, nil)
+	dependents, err := h.dependentService.GetPatientDependents(ctx, patientID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	var existing *pat_dto.ConditionResponse
-	for _, condition := range conditions {
-		if condition.ID == conditionID {
-			resp := pat_dto.ToConditionResponse(condition)
+	var existing *pat_dto.DependentResponse
+	for _, dependent := range dependents {
+		if dependent.ID == dependentID {
+			resp := pat_dto.ToDependentResponse(dependent)
 			existing = &resp
 			break
 		}
 	}
 
 	if existing == nil {
-		handler.RespondJSON(w, http.StatusNotFound, pat_dto.ErrorResponse{Error: "Condition not found"})
+		handler.RespondJSON(w, http.StatusNotFound, pat_dto.ErrorResponse{Error: "Dependent not found"})
 		return
 	}
 
-	existingDomain := pat_dto.ToDomainCondition(pat_dto.CreateConditionRequest{
-		PatientID:       existing.PatientID,
-		ConditionName:   existing.ConditionName,
-		ICD10Code:       existing.ICD10Code,
-		Type:            existing.Type,
-		DiagnosedDate:   existing.DiagnosedDate,
-		DiagnosedBy:     existing.DiagnosedBy,
-		Severity:        existing.Severity,
-		Status:          existing.Status,
-		Notes:           existing.Notes,
-		LastFlareUp:     existing.LastFlareUp,
-		NextCheckupDate: existing.NextCheckupDate,
+	existingDomain := pat_dto.ToDomainDependent(pat_dto.CreateDependentRequest{
+		PatientID:               existing.PatientID,
+		FirstName:               existing.FirstName,
+		LastName:                existing.LastName,
+		DateOfBirth:             existing.DateOfBirth,
+		Gender:                  existing.Gender,
+		Relationship:            existing.Relationship,
+		BloodType:               existing.BloodType,
+		HealthStatus:            existing.HealthStatus,
+		PrimaryPediatrician:     existing.PrimaryPediatrician,
+		ClinicID:                existing.ClinicID,
+		BirthWeightKg:           existing.BirthWeightKg,
+		BirthHeightCm:           existing.BirthHeightCm,
+		SchoolName:              existing.SchoolName,
+		Grade:                   existing.Grade,
+		HasLegalGuardianship:    existing.HasLegalGuardianship,
+		GuardianshipDocumentURL: existing.GuardianshipDocumentURL,
+		HasSpecialNeeds:         existing.HasSpecialNeeds,
+		SpecialNeedsDescription: existing.SpecialNeedsDescription,
 	})
 	existingDomain.ID = existing.ID
 
-	updated := pat_dto.UpdateToDomainCondition(existingDomain, req)
-	if err := h.conditionService.UpdatePatientCondition(ctx, updated); err != nil {
+	updated := pat_dto.UpdateToDomainDependent(existingDomain, req)
+	if err := h.dependentService.UpdatePatientDependent(ctx, updated); err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	updatedConditions, err := h.conditionService.GetPatientConditions(ctx, patientID, nil)
+	updatedDependents, err := h.dependentService.GetPatientDependents(ctx, patientID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	for _, condition := range updatedConditions {
-		if condition.ID == conditionID {
-			handler.RespondJSON(w, http.StatusOK, pat_dto.ToConditionResponse(condition))
+	for _, dependent := range updatedDependents {
+		if dependent.ID == dependentID {
+			handler.RespondJSON(w, http.StatusOK, pat_dto.ToDependentResponse(dependent))
 			return
 		}
 	}
 }
 
-func (h *ConditionHandler) DeleteCondition(w http.ResponseWriter, r *http.Request) {
+func (h *DependentHandler) DeleteDependent(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	conditionID, err := uuid.Parse(chi.URLParam(r, "id"))
+	dependentID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, pat_dto.ErrorResponse{Error: "Invalid condition ID format"})
+		handler.RespondJSON(w, http.StatusBadRequest, pat_dto.ErrorResponse{Error: "Invalid dependent ID format"})
 		return
 	}
 
-	if err := h.conditionService.DeletePatientCondition(ctx, conditionID); err != nil {
+	if err := h.dependentService.DeletePatientDependent(ctx, dependentID); err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Condition deleted successfully"})
+	handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Dependent deleted successfully"})
 }
