@@ -393,27 +393,13 @@ func (r *clinicRepository) SearchClinics(ctx context.Context, params providers.C
 // FILTERING & LISTING
 // ============================================
 
-func (r *clinicRepository) GetClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error) {
+func (r *clinicRepository) GetClinics(ctx context.Context) ([]providers.Clinic, error) {
 	start := time.Now()
 	defer func() {
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	clinicType := stringPtrToString(filters.ClinicType)
-	province := stringPtrToString(filters.Province)
-	city := stringPtrToString(filters.City)
-	verificationStatus := stringPtrToString(filters.VerificationStatus)
-
-	sqlParams := sqlc.ListClinicsParams{
-		Column1: clinicType,
-		Column2: province,
-		Column3: city,
-		Column4: verificationStatus,
-		Limit:   int32(limit),
-		Offset:  int32(offset),
-	}
-
-	rows, err := r.querier.ListClinics(ctx, sqlParams)
+	rows, err := r.querier.GetAllClinics(ctx)
 	if err != nil {
 		clinicDBQueryTotal.WithLabelValues("list_clinics", "error").Inc()
 		return nil, r.handleError(err, "list clinics")
@@ -421,7 +407,7 @@ func (r *clinicRepository) GetClinics(ctx context.Context, filters providers.Cli
 
 	clinics := make([]providers.Clinic, len(rows))
 	for i, row := range rows {
-		clinics[i] = r.mapToClinicFromList(row)
+		clinics[i] = r.mapToClinic(row)
 	}
 
 	clinicDBQueryTotal.WithLabelValues("list_clinics", "success").Inc()

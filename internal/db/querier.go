@@ -461,6 +461,7 @@ type Querier interface {
 	GetAdminsWithoutRegions(ctx context.Context) ([]GetAdminsWithoutRegionsRow, error)
 	GetAgeDistribution(ctx context.Context) ([]GetAgeDistributionRow, error)
 	GetAllClinicStaff(ctx context.Context, clinicID pgtype.UUID) ([]GetAllClinicStaffRow, error)
+	GetAllClinics(ctx context.Context) ([]Clinic, error)
 	GetAllNGOPartners(ctx context.Context) ([]GetAllNGOPartnersRow, error)
 	GetAllSystemAdmins(ctx context.Context) ([]GetAllSystemAdminsRow, error)
 	GetAllergiesByDateRange(ctx context.Context, arg GetAllergiesByDateRangeParams) ([]GetAllergiesByDateRangeRow, error)

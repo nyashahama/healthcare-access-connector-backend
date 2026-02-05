@@ -369,6 +369,80 @@ func (q *Queries) DeleteClinic(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const getAllClinics = `-- name: GetAllClinics :many
+SELECT id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at FROM clinics
+`
+
+func (q *Queries) GetAllClinics(ctx context.Context) ([]Clinic, error) {
+	rows, err := q.db.Query(ctx, getAllClinics)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Clinic{}
+	for rows.Next() {
+		var i Clinic
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.RegistrationNumber,
+			&i.AccreditationNumber,
+			&i.PrimaryPhone,
+			&i.SecondaryPhone,
+			&i.EmergencyPhone,
+			&i.Email,
+			&i.Website,
+			&i.PhysicalAddress,
+			&i.City,
+			&i.Province,
+			&i.PostalCode,
+			&i.Country,
+			&i.Latitude,
+			&i.Longitude,
+			&i.GooglePlaceID,
+			&i.Description,
+			&i.YearEstablished,
+			&i.OwnershipType,
+			&i.BedCount,
+			&i.OperatingHours,
+			&i.Services,
+			&i.Specialties,
+			&i.LanguagesSpoken,
+			&i.Facilities,
+			&i.AcceptsMedicalAid,
+			&i.MedicalAidProviders,
+			&i.PaymentMethods,
+			&i.FeeStructure,
+			&i.AccreditationBody,
+			&i.AccreditationExpiry,
+			&i.Certifications,
+			&i.IsVerified,
+			&i.VerificationStatus,
+			&i.VerificationNotes,
+			&i.VerifiedBy,
+			&i.VerificationDate,
+			&i.PatientCapacity,
+			&i.AverageWaitTimeMinutes,
+			&i.Rating,
+			&i.ReviewCount,
+			&i.ContactPersonName,
+			&i.ContactPersonRole,
+			&i.ContactPersonPhone,
+			&i.ContactPersonEmail,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getClinicByEmail = `-- name: GetClinicByEmail :one
 SELECT id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at FROM clinics
 WHERE email = $1

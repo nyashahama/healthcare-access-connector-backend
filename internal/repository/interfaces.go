@@ -310,7 +310,7 @@ type ClinicRepository interface {
 
 	SearchClinics(ctx context.Context, params providers.ClinicSearchParams) ([]providers.ClinicSearchResult, error)
 
-	GetClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error)
+	GetClinics(ctx context.Context) ([]providers.Clinic, error)
 }
 
 type ServiceRepository interface {

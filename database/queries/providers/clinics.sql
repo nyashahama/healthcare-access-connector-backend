@@ -28,6 +28,11 @@ VALUES (
     $33::jsonb, $34, $35, $36, $37, $38, $39
 )
 RETURNING *;
+
+
+-- name: GetAllClinics :many
+SELECT * FROM clinics;
+
 -- name: GetClinicByID :one
 SELECT * FROM clinics 
 WHERE id = $1;

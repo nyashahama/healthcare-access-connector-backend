@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/providers"
+	dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
@@ -39,9 +41,9 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	var req providers.CreateClinicRequest
+	var req dto.CreateClinicRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -75,7 +77,7 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert DTO to domain model
-	clinic := providers.ToDomainClinic(req)
+	clinic := dto.ToDomainClinic(req)
 
 	// Create clinic
 	createdClinic, err := h.clinicService.CreateClinic(ctx, clinic)
@@ -84,7 +86,7 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, providers.ToClinicResponse(createdClinic))
+	handler.RespondJSON(w, http.StatusCreated, dto.ToClinicResponse(createdClinic))
 }
 
 // GetClinic handles getting a clinic by ID
@@ -95,7 +97,7 @@ func (h *ClinicHandler) GetClinic(w http.ResponseWriter, r *http.Request) {
 	clinicIDStr := chi.URLParam(r, "id")
 	clinicID, err := uuid.Parse(clinicIDStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid clinic ID format",
 		})
 		return
@@ -107,7 +109,7 @@ func (h *ClinicHandler) GetClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, providers.ToClinicResponse(clinic))
+	handler.RespondJSON(w, http.StatusOK, dto.ToClinicResponse(clinic))
 }
 
 // UpdateClinic handles clinic updates
@@ -118,15 +120,15 @@ func (h *ClinicHandler) UpdateClinic(w http.ResponseWriter, r *http.Request) {
 	clinicIDStr := chi.URLParam(r, "id")
 	clinicID, err := uuid.Parse(clinicIDStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid clinic ID format",
 		})
 		return
 	}
 
-	var req providers.UpdateClinicRequest
+	var req dto.UpdateClinicRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -167,7 +169,7 @@ func (h *ClinicHandler) UpdateClinic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update clinic with new data
-	updated := providers.UpdateToDomainClinic(existing, req)
+	updated := dto.UpdateToDomainClinic(existing, req)
 
 	// Update clinic
 	if err := h.clinicService.UpdateClinic(ctx, updated); err != nil {
@@ -182,7 +184,7 @@ func (h *ClinicHandler) UpdateClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, providers.ToClinicResponse(updatedClinic))
+	handler.RespondJSON(w, http.StatusOK, dto.ToClinicResponse(updatedClinic))
 }
 
 // DeleteClinic handles clinic deletion
@@ -193,7 +195,7 @@ func (h *ClinicHandler) DeleteClinic(w http.ResponseWriter, r *http.Request) {
 	clinicIDStr := chi.URLParam(r, "id")
 	clinicID, err := uuid.Parse(clinicIDStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid clinic ID format",
 		})
 		return
@@ -209,55 +211,6 @@ func (h *ClinicHandler) DeleteClinic(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ListClinics handles listing clinics with pagination
-// func (h *ClinicHandler) ListClinics(w http.ResponseWriter, r *http.Request) {
-// 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-// 	defer cancel()
-//
-// 	// Parse query parameters
-// 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-// 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-// 	clinicType := r.URL.Query().Get("clinic_type")
-// 	isVerified := r.URL.Query().Get("is_verified")
-//
-// 	if limit <= 0 {
-// 		limit = 20
-// 	}
-// 	if limit > 100 {
-// 		limit = 100
-// 	}
-//
-// 	// Build filters
-// 	filters := make(map[string]interface{})
-// 	if clinicType != "" {
-// 		filters["clinic_type"] = clinicType
-// 	}
-// 	if isVerified == "true" {
-// 		filters["is_verified"] = true
-// 	} else if isVerified == "false" {
-// 		filters["is_verified"] = false
-// 	}
-//
-// 	clinics, total, err := h.clinicService.GetClinics(ctx, filters, limit, offset)
-// 	if err != nil {
-// 		handler.RespondError(w, h.logger, err)
-// 		return
-// 	}
-//
-// 	response := providers.ClinicListResponse{
-// 		Clinics: make([]providers.ClinicResponse, len(clinics)),
-// 		Total:   total,
-// 		Limit:   limit,
-// 		Offset:  offset,
-// 	}
-//
-// 	for i, clinic := range clinics {
-// 		response.Clinics[i] = providers.ClinicToResponse(clinic)
-// 	}
-//
-// 	handler.RespondJSON(w, http.StatusOK, response)
-// }
-
 // VerifyClinic handles clinic verification
 func (h *ClinicHandler) VerifyClinic(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
@@ -266,15 +219,15 @@ func (h *ClinicHandler) VerifyClinic(w http.ResponseWriter, r *http.Request) {
 	clinicIDStr := chi.URLParam(r, "id")
 	clinicID, err := uuid.Parse(clinicIDStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid clinic ID format",
 		})
 		return
 	}
 
-	var req providers.VerifyClinicRequest
+	var req dto.VerifyClinicRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -308,15 +261,15 @@ func (h *ClinicHandler) UpdateVerificationStatus(w http.ResponseWriter, r *http.
 	clinicIDStr := chi.URLParam(r, "id")
 	clinicID, err := uuid.Parse(clinicIDStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid clinic ID format",
 		})
 		return
 	}
 
-	var req providers.UpdateVerificationStatusRequest
+	var req dto.UpdateVerificationStatusRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request body",
 		})
 		return
@@ -348,38 +301,151 @@ func (h *ClinicHandler) UpdateVerificationStatus(w http.ResponseWriter, r *http.
 	})
 }
 
-// SearchClinics handles clinic search
-// func (h *ClinicHandler) SearchClinics(w http.ResponseWriter, r *http.Request) {
-// 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-// 	defer cancel()
-//
-// 	query := r.URL.Query().Get("q")
-// 	if query == "" {
-// 		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
-// 			Error: "Search query is required",
-// 		})
-// 		return
-// 	}
-//
-// 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-// 	if limit <= 0 {
-// 		limit = 20
-// 	}
-// 	if limit > 100 {
-// 		limit = 100
-// 	}
-//
-// 	results, total, err := h.clinicService.SearchClinics(ctx, query, limit)
-// 	if err != nil {
-// 		handler.RespondError(w, h.logger, err)
-// 		return
-// 	}
-//
-// 	response := providers.ClinicSearchResponse{
-// 		Results: results,
-// 		Total:   total,
-// 		Query:   query,
-// 	}
-//
-// 	handler.RespondJSON(w, http.StatusOK, response)
-// }
+// DeactivateClinic handles clinic deactivation
+func (h *ClinicHandler) DeactivateClinic(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "id")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid clinic ID format",
+		})
+		return
+	}
+
+	if err := h.clinicService.DeactivateClinic(ctx, clinicID); err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
+		"message": "Clinic deactivated successfully",
+	})
+}
+
+// ReactivateClinic handles clinic reactivation
+func (h *ClinicHandler) ReactivateClinic(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "id")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid clinic ID format",
+		})
+		return
+	}
+
+	if err := h.clinicService.ReactivateClinic(ctx, clinicID); err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
+		"message": "Clinic reactivated successfully",
+	})
+}
+
+// SearchClinics handles searching for clinics
+func (h *ClinicHandler) SearchClinics(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	// Parse query parameters
+	query := r.URL.Query().Get("q")
+	province := r.URL.Query().Get("province")
+	city := r.URL.Query().Get("city")
+	clinicType := r.URL.Query().Get("clinic_type")
+
+	limit := 50
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	// Create search params
+	searchParams := providers.ClinicSearchParams{
+		Query:      query,
+		Province:   stringToPtr(province),
+		City:       stringToPtr(city),
+		ClinicType: stringToPtr(clinicType),
+		Limit:      limit,
+		Offset:     offset,
+	}
+
+	results, err := h.clinicService.SearchClinics(ctx, searchParams)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	// Convert to response format
+	response := make([]dto.ClinicResponse, len(results))
+	for i, result := range results {
+		response[i] = dto.ToClinicResponse(result.Clinic)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"results": response,
+		"count":   len(response),
+		"limit":   limit,
+		"offset":  offset,
+	})
+}
+
+// ListClinics handles listing clinics with filters
+func (h *ClinicHandler) ListClinics(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	limit := 50
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	clinics, err := h.clinicService.GetClinics(ctx)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	// Convert to response format
+	response := make([]dto.ClinicResponse, len(clinics))
+	for i, clinic := range clinics {
+		response[i] = dto.ToClinicResponse(clinic)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"clinics": response,
+		"count":   len(response),
+		"limit":   limit,
+		"offset":  offset,
+	})
+}
+
+func stringToPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}

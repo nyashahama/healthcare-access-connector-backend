@@ -283,6 +283,7 @@ func (s *Server) setupRoutes() http.Handler {
 				r.Route("/clinics", func(r chi.Router) {
 					r.Post("/", s.clinicHandler.CreateClinic)
 					r.Get("/{id}", s.clinicHandler.GetClinic)
+					r.Get("/", s.clinicHandler.ListClinics)
 					r.Put("/{id}", s.clinicHandler.UpdateClinic)
 					r.Delete("/{id}", s.clinicHandler.DeleteClinic)
 					r.Put("/{id}/verify", s.clinicHandler.VerifyClinic)

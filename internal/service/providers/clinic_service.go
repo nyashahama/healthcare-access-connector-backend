@@ -233,6 +233,7 @@ func (c *clinicService) DeleteClinic(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+// VerifyClinic verifies a clinic - only system_admin and ngo_partner roles are authorized
 func (c *clinicService) VerifyClinic(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error {
 	start := time.Now()
 	defer func() {
@@ -243,9 +244,52 @@ func (c *clinicService) VerifyClinic(ctx context.Context, id, verifiedBy uuid.UU
 			Msg("VerifyClinic completed")
 	}()
 
-	// Verify the verifier exists
-	if _, err := c.userRepo.GetUserByID(ctx, verifiedBy); err != nil {
+	// Get the user who is attempting to verify
+	verifier, err := c.userRepo.GetUserByID(ctx, verifiedBy)
+	if err != nil {
+		c.logger.Warn().
+			Err(err).
+			Str("verifier_id", verifiedBy.String()).
+			Msg("Verifier not found")
 		return domain.NewAppError(domain.ErrUserNotFound, "Verifier not found", 404)
+	}
+
+	// Authorization check: Only system_admin and ngo_partner can verify clinics
+	if verifier.Role != "system_admin" && verifier.Role != "ngo_partner" {
+		c.logger.Warn().
+			Str("verifier_id", verifiedBy.String()).
+			Str("verifier_role", verifier.Role).
+			Str("clinic_id", id.String()).
+			Msg("Unauthorized clinic verification attempt")
+		return domain.NewAppError(
+			domain.ErrUnauthorized,
+			"Only system administrators and NGO partners can verify clinics",
+			403,
+		)
+	}
+
+	// Get existing clinic to check current verification status
+	existingClinic, err := c.clinicRepo.GetClinicByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrClinicNotFound) {
+			return domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found", 404)
+		}
+		return domain.NewAppError(err, "Failed to get clinic", 500)
+	}
+
+	// If clinic is already verified, check if it was verified by an authorized user
+	if existingClinic.IsVerified && existingClinic.VerifiedBy != nil {
+		previousVerifier, err := c.userRepo.GetUserByID(ctx, *existingClinic.VerifiedBy)
+		if err == nil {
+			// If previously verified by unauthorized user, log a warning and proceed with re-verification
+			if previousVerifier.Role != "system_admin" && previousVerifier.Role != "ngo_partner" {
+				c.logger.Warn().
+					Str("clinic_id", id.String()).
+					Str("previous_verifier_id", previousVerifier.ID.String()).
+					Str("previous_verifier_role", previousVerifier.Role).
+					Msg("Clinic was previously verified by unauthorized user - resetting verification")
+			}
+		}
 	}
 
 	// Verify clinic
@@ -264,16 +308,19 @@ func (c *clinicService) VerifyClinic(ctx context.Context, id, verifiedBy uuid.UU
 	// Log audit activity
 	c.logClinicActivity(ctx, "clinic_verified", id, &verifiedBy, map[string]interface{}{
 		"verification_notes": notes,
+		"verifier_role":      verifier.Role,
 	})
 
 	c.logger.Info().
 		Str("clinic_id", id.String()).
 		Str("verified_by", verifiedBy.String()).
+		Str("verifier_role", verifier.Role).
 		Msg("Clinic verified successfully")
 
 	return nil
 }
 
+// RejectClinicVerification rejects a clinic verification - only system_admin and ngo_partner roles are authorized
 func (c *clinicService) RejectClinicVerification(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error {
 	start := time.Now()
 	defer func() {
@@ -284,9 +331,28 @@ func (c *clinicService) RejectClinicVerification(ctx context.Context, id, verifi
 			Msg("RejectClinicVerification completed")
 	}()
 
-	// Verify the verifier exists
-	if _, err := c.userRepo.GetUserByID(ctx, verifiedBy); err != nil {
+	// Get the user who is attempting to reject verification
+	verifier, err := c.userRepo.GetUserByID(ctx, verifiedBy)
+	if err != nil {
+		c.logger.Warn().
+			Err(err).
+			Str("verifier_id", verifiedBy.String()).
+			Msg("Verifier not found")
 		return domain.NewAppError(domain.ErrUserNotFound, "Verifier not found", 404)
+	}
+
+	// Authorization check: Only system_admin and ngo_partner can reject clinic verification
+	if verifier.Role != "system_admin" && verifier.Role != "ngo_partner" {
+		c.logger.Warn().
+			Str("verifier_id", verifiedBy.String()).
+			Str("verifier_role", verifier.Role).
+			Str("clinic_id", id.String()).
+			Msg("Unauthorized clinic verification rejection attempt")
+		return domain.NewAppError(
+			domain.ErrUnauthorized,
+			"Only system administrators and NGO partners can reject clinic verifications",
+			403,
+		)
 	}
 
 	// Reject clinic verification
@@ -305,16 +371,19 @@ func (c *clinicService) RejectClinicVerification(ctx context.Context, id, verifi
 	// Log audit activity
 	c.logClinicActivity(ctx, "clinic_verification_rejected", id, &verifiedBy, map[string]interface{}{
 		"rejection_notes": notes,
+		"verifier_role":   verifier.Role,
 	})
 
 	c.logger.Info().
 		Str("clinic_id", id.String()).
 		Str("verified_by", verifiedBy.String()).
+		Str("verifier_role", verifier.Role).
 		Msg("Clinic verification rejected")
 
 	return nil
 }
 
+// UpdateClinicVerificationStatus updates clinic verification status - only system_admin and ngo_partner roles are authorized
 func (c *clinicService) UpdateClinicVerificationStatus(ctx context.Context, id uuid.UUID, status string) error {
 	start := time.Now()
 	defer func() {
@@ -502,49 +571,21 @@ func (c *clinicService) SearchClinics(ctx context.Context, params providers.Clin
 	return results, nil
 }
 
-func (c *clinicService) GetClinics(ctx context.Context, filters providers.ClinicFilters, limit, offset int) ([]providers.Clinic, error) {
+func (c *clinicService) GetClinics(ctx context.Context) ([]providers.Clinic, error) {
 	start := time.Now()
 	defer func() {
 		c.logger.Debug().
 			Dur("duration_ms", time.Since(start)).
-			Int("limit", limit).
-			Int("offset", offset).
 			Msg("GetClinics completed")
 	}()
 
-	// Validate limit and offset
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
-	if offset < 0 {
-		offset = 0
-	}
-
-	// Try cache first
-	cacheKey := fmt.Sprintf("clinic:list:%s:%s:%s:%s:%d:%d",
-		stringPtrToString(filters.ClinicType),
-		stringPtrToString(filters.Province),
-		stringPtrToString(filters.City),
-		stringPtrToString(filters.VerificationStatus),
-		limit,
-		offset,
-	)
 	var clinics []providers.Clinic
-	if err := c.cache.Get(ctx, cacheKey, &clinics); err == nil {
-		c.logger.Debug().Msg("Clinics list retrieved from cache")
-		return clinics, nil
-	}
 
 	// Get clinics
-	clinics, err := c.clinicRepo.GetClinics(ctx, filters, limit, offset)
+	clinics, err := c.clinicRepo.GetClinics(ctx)
 	if err != nil {
 		c.logger.Error().Err(err).Msg("Failed to get clinics")
 		return nil, domain.NewAppError(err, "Failed to get clinics", 500)
-	}
-
-	// Cache the result
-	if err := c.cache.Set(ctx, cacheKey, clinics, 5*time.Minute); err != nil {
-		c.logger.Warn().Err(err).Msg("Failed to cache clinics list")
 	}
 
 	c.logger.Debug().
