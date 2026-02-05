@@ -13,6 +13,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
+	handlerappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/appointments"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
@@ -74,6 +75,7 @@ type Server struct {
 	serviceHandler          *providers.ServiceHandler
 	credentialHandler       *providers.CredentialHandler
 	adminHandler            *handleradmin.AdminHandler
+	appointmentHandler      *handlerappointments.AppointmentHandler // Add appointment handler
 	healthHandler           *handler.HealthHandler
 	authService             service.AuthService
 }
@@ -105,6 +107,7 @@ func NewServer(
 	serviceHandler *providers.ServiceHandler,
 	credentialHandler *providers.CredentialHandler,
 	adminHandler *handleradmin.AdminHandler,
+	appointmentHandler *handlerappointments.AppointmentHandler, // Add appointment handler parameter
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
 	txManager repository.TxManager,
@@ -135,6 +138,7 @@ func NewServer(
 		serviceHandler:          serviceHandler,
 		credentialHandler:       credentialHandler,
 		adminHandler:            adminHandler,
+		appointmentHandler:      appointmentHandler, // Initialize appointment handler
 		healthHandler:           healthHandler,
 		authService:             authService,
 	}
@@ -275,6 +279,11 @@ func (s *Server) setupRoutes() http.Handler {
 				s.emergencyContactHandler.RegisterRoutes(r)
 				s.dependentHandler.RegisterRoutes(r)
 				s.dependentHealthHandler.RegisterRoutes(r)
+			})
+
+			// Appointment management routes
+			r.Route("/appointments", func(r chi.Router) {
+				s.appointmentHandler.RegisterRoutes(r)
 			})
 
 			// Provider routes

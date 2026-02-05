@@ -11,6 +11,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Appointment struct {
+	ID                  pgtype.UUID      `json:"id"`
+	ClinicID            pgtype.UUID      `json:"clinic_id"`
+	PatientID           pgtype.UUID      `json:"patient_id"`
+	AppointmentDate     pgtype.Date      `json:"appointment_date"`
+	AppointmentTime     pgtype.Time      `json:"appointment_time"`
+	AppointmentDatetime pgtype.Timestamp `json:"appointment_datetime"`
+	PatientName         string           `json:"patient_name"`
+	PatientPhone        string           `json:"patient_phone"`
+	PatientEmail        pgtype.Text      `json:"patient_email"`
+	ReasonForVisit      string           `json:"reason_for_visit"`
+	Notes               pgtype.Text      `json:"notes"`
+	Status              string           `json:"status"`
+	CancellationReason  pgtype.Text      `json:"cancellation_reason"`
+	CancelledBy         pgtype.UUID      `json:"cancelled_by"`
+	CancelledAt         pgtype.Timestamp `json:"cancelled_at"`
+	ConfirmedBy         pgtype.UUID      `json:"confirmed_by"`
+	ConfirmedAt         pgtype.Timestamp `json:"confirmed_at"`
+	ReminderPreferences []byte           `json:"reminder_preferences"`
+	ReminderSent        []byte           `json:"reminder_sent"`
+	CreatedAt           pgtype.Timestamp `json:"created_at"`
+	UpdatedAt           pgtype.Timestamp `json:"updated_at"`
+}
+
 type Clinic struct {
 	ID                     pgtype.UUID      `json:"id"`
 	ClinicName             string           `json:"clinic_name"`

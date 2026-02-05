@@ -13,17 +13,20 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
+	handlerappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/appointments"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	handlerpatients "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	handlerproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	repoadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/admin"
+	repoappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/appointments"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
 	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
 	repoproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	serviceadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/service/admin"
+	serviceappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/service/appointments"
 	servicecore "github.com/nyashahama/healthcare-access-connector-backend/internal/service/core"
 	servicepatients "github.com/nyashahama/healthcare-access-connector-backend/internal/service/patients"
 	serviceproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/service/providers"
@@ -111,6 +114,9 @@ func New(cfg *config.Config) (*App, error) {
 	staffRepo := repoproviders.NewStaffRepository(pool)
 	serviceRepo := repoproviders.NewServiceRepository(pool)
 	credentialRepo := repoproviders.NewCredentialRepository(pool)
+
+	/* appointments */
+	appointmentRepo := repoappointments.NewAppointmentsRepository(pool)
 
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
@@ -302,6 +308,14 @@ func New(cfg *config.Config) (*App, error) {
 		logger,
 	)
 
+	appointmentService := serviceappointments.NewAppointmentService(
+		appointmentRepo,
+		clinicRepo,
+		userRepo,
+		cacheService,
+		logger,
+	)
+
 	// Initialize handlers
 	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
 	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
@@ -411,6 +425,13 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.Timeout,
 	)
 
+	// Initialize appointment handler
+	appointmentHandler := handlerappointments.NewAppointmentHandler(
+		appointmentService,
+		logger,
+		cfg.Timeout,
+	)
+
 	// Initialize server with all handlers
 	srv := server.NewServer(
 		cfg,
@@ -438,6 +459,7 @@ func New(cfg *config.Config) (*App, error) {
 		serviceHandler,
 		credentialHandler,
 		adminHandler,
+		appointmentHandler, // Add appointment handler here
 		healthHandler,
 		authService,
 		txManager,

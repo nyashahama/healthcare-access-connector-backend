@@ -136,6 +136,7 @@ type Querier interface {
 	BulkVerifyClinics(ctx context.Context, arg BulkVerifyClinicsParams) error
 	BulkVerifyContacts(ctx context.Context, dollar_1 []pgtype.UUID) error
 	BulkVerifyCredentials(ctx context.Context, arg BulkVerifyCredentialsParams) error
+	CancelAppointment(ctx context.Context, arg CancelAppointmentParams) (Appointment, error)
 	// ============================================
 	// VALIDATION & UTILITIES
 	// ============================================
@@ -167,6 +168,7 @@ type Querier interface {
 	CheckPhonePatientExists(ctx context.Context, arg CheckPhonePatientExistsParams) (bool, error)
 	CheckRegistrationExists(ctx context.Context, registrationNumber pgtype.Text) (bool, error)
 	CheckRegistrationNumberExists(ctx context.Context, arg CheckRegistrationNumberExistsParams) (bool, error)
+	CheckSchedulingConflict(ctx context.Context, arg CheckSchedulingConflictParams) (CheckSchedulingConflictRow, error)
 	CheckServiceNameExists(ctx context.Context, arg CheckServiceNameExistsParams) (bool, error)
 	CheckStaffEmailExists(ctx context.Context, arg CheckStaffEmailExistsParams) (bool, error)
 	CheckTaxIDExists(ctx context.Context, taxID pgtype.Text) (bool, error)
@@ -181,7 +183,9 @@ type Querier interface {
 	// COMPARISON & CROSS-CLINIC QUERIES
 	// ============================================
 	CompareServiceAcrossClinics(ctx context.Context, serviceName string) ([]CompareServiceAcrossClinicsRow, error)
+	CompleteAppointment(ctx context.Context, id pgtype.UUID) (Appointment, error)
 	CompleteMedication(ctx context.Context, id pgtype.UUID) error
+	ConfirmAppointment(ctx context.Context, arg ConfirmAppointmentParams) (Appointment, error)
 	CountActiveConsents(ctx context.Context) (int64, error)
 	CountAdminsByDepartment(ctx context.Context) ([]CountAdminsByDepartmentRow, error)
 	CountAdminsByLevel(ctx context.Context, adminLevel string) (int64, error)
@@ -262,6 +266,7 @@ type Querier interface {
 	CountSystemAdmins(ctx context.Context) (CountSystemAdminsRow, error)
 	CountUsersByRole(ctx context.Context, role string) (int64, error)
 	CountVerifiedClinics(ctx context.Context) (int64, error)
+	CreateAppointment(ctx context.Context, arg CreateAppointmentParams) (Appointment, error)
 	// ============================================
 	// CLINIC REPOSITORY QUERIES
 	// Maps to: ClinicRepository interface
@@ -357,6 +362,7 @@ type Querier interface {
 	DeactivateService(ctx context.Context, id pgtype.UUID) error
 	DeactivateStaff(ctx context.Context, id pgtype.UUID) error
 	DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error
+	DeleteAppointment(ctx context.Context, id pgtype.UUID) error
 	DeleteClinic(ctx context.Context, id pgtype.UUID) error
 	DeleteClinicService(ctx context.Context, id pgtype.UUID) error
 	DeleteCredential(ctx context.Context, id pgtype.UUID) error
@@ -471,7 +477,12 @@ type Querier interface {
 	GetAllergiesByPatientIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetAllergiesByPatientIDsRow, error)
 	GetAllergySeverityDistribution(ctx context.Context) ([]GetAllergySeverityDistributionRow, error)
 	GetAllergyStatistics(ctx context.Context) (GetAllergyStatisticsRow, error)
+	GetAppointment(ctx context.Context, id pgtype.UUID) (Appointment, error)
+	GetAppointmentCount(ctx context.Context, patientID pgtype.UUID) (int64, error)
 	GetAppointmentOnlyServices(ctx context.Context, clinicID pgtype.UUID) ([]GetAppointmentOnlyServicesRow, error)
+	GetAppointmentsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]Appointment, error)
+	GetAppointmentsByClinicAndDate(ctx context.Context, arg GetAppointmentsByClinicAndDateParams) ([]Appointment, error)
+	GetAppointmentsByPatient(ctx context.Context, patientID pgtype.UUID) ([]Appointment, error)
 	// ============================================
 	// HEALTH METRICS & ANALYTICS
 	// ============================================
@@ -939,6 +950,7 @@ type Querier interface {
 	GetPatientsWithoutPrimaryCare(ctx context.Context, arg GetPatientsWithoutPrimaryCareParams) ([]GetPatientsWithoutPrimaryCareRow, error)
 	GetPatientsWithoutPrimaryContact(ctx context.Context, arg GetPatientsWithoutPrimaryContactParams) ([]GetPatientsWithoutPrimaryContactRow, error)
 	GetPediatricServices(ctx context.Context, clinicID pgtype.UUID) ([]GetPediatricServicesRow, error)
+	GetPendingAppointments(ctx context.Context, clinicID pgtype.UUID) ([]Appointment, error)
 	// ============================================
 	// VERIFICATION WORKFLOWS
 	// ============================================
@@ -1100,6 +1112,15 @@ type Querier interface {
 	// VITAL SIGNS TRACKING
 	// ============================================
 	GetTemperatureHistory(ctx context.Context, dependentID pgtype.UUID) ([]GetTemperatureHistoryRow, error)
+	// -- name: GetUpcomingAppointments :many
+	// SELECT *
+	// FROM appointments
+	// WHERE patient_id = $1
+	//   AND appointment_datetime >= CURRENT_TIMESTAMP
+	//   AND appointment_datetime <= CURRENT_TIMESTAMP + INTERVAL '7 days'
+	//   AND status NOT IN ('cancelled', 'completed')
+	// ORDER BY appointment_datetime ASC;
+	GetTodayAppointments(ctx context.Context, clinicID pgtype.UUID) ([]Appointment, error)
 	GetToddlers(ctx context.Context) ([]GetToddlersRow, error)
 	// ============================================
 	// RANKING & DISCOVERY
@@ -1246,6 +1267,7 @@ type Querier interface {
 	RemoveStaffFromService(ctx context.Context, arg RemoveStaffFromServiceParams) error
 	RenewCredential(ctx context.Context, arg RenewCredentialParams) error
 	RenewPartnership(ctx context.Context, arg RenewPartnershipParams) error
+	RescheduleAppointment(ctx context.Context, arg RescheduleAppointmentParams) (Appointment, error)
 	RevokeAnalyticsAccess(ctx context.Context, id pgtype.UUID) error
 	RevokeClinicManagement(ctx context.Context, id pgtype.UUID) error
 	RevokeContentManagement(ctx context.Context, id pgtype.UUID) error
@@ -1341,7 +1363,9 @@ type Querier interface {
 	// STATUS MANAGEMENT
 	// ============================================
 	UpdateAllergyStatus(ctx context.Context, arg UpdateAllergyStatusParams) error
+	UpdateAppointmentNotes(ctx context.Context, arg UpdateAppointmentNotesParams) (Appointment, error)
 	UpdateAppointmentReminders(ctx context.Context, arg UpdateAppointmentRemindersParams) error
+	UpdateAppointmentStatus(ctx context.Context, arg UpdateAppointmentStatusParams) (Appointment, error)
 	// ============================================
 	// REGIONAL ASSIGNMENT QUERIES
 	// ============================================

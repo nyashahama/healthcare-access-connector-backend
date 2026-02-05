@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/admin"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/appointments"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
@@ -363,6 +364,10 @@ type NGOPartnerRepository interface {
 	// DeleteNGOPartner(ctx context.Context, id uuid.UUID) error
 
 	UpdatePartnershipStatus(ctx context.Context, id uuid.UUID, status string) error
+}
+
+type AppointmentRepository interface {
+	BookAppointment(ctx context.Context, appointment appointments.Appointment) (appointments.Appointment, error)
 }
 
 type SMSRepository interface {

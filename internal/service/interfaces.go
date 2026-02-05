@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/admin"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/appointments"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
@@ -291,6 +292,10 @@ type CredentialService interface {
 
 type SystemAdminService interface {
 	CreateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error)
+}
+
+type AppointmentService interface {
+	BookAppointment(ctx context.Context, appointment appointments.Appointment) (appointments.Appointment, error)
 }
 
 // TokenClaims represents JWT token claims for health project
