@@ -367,7 +367,31 @@ type NGOPartnerRepository interface {
 }
 
 type AppointmentRepository interface {
+	// Create
 	BookAppointment(ctx context.Context, appointment appointments.Appointment) (appointments.Appointment, error)
+
+	// Read
+	GetAppointmentByID(ctx context.Context, id uuid.UUID) (appointments.Appointment, error)
+	GetAppointmentsByPatient(ctx context.Context, patientID uuid.UUID) ([]appointments.Appointment, error)
+	GetAppointmentsByClinic(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
+	GetAppointmentsByClinicAndDate(ctx context.Context, clinicID uuid.UUID, date time.Time) ([]appointments.Appointment, error)
+	GetTodayAppointments(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
+	GetPendingAppointments(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
+	GetAppointmentCount(ctx context.Context, patientID uuid.UUID) (int64, error)
+
+	// Update
+	RescheduleAppointment(ctx context.Context, id uuid.UUID, newDate time.Time, newTime time.Time, newDatetime time.Time) (appointments.Appointment, error)
+	ConfirmAppointment(ctx context.Context, id uuid.UUID, confirmedBy uuid.UUID) (appointments.Appointment, error)
+	UpdateAppointmentNotes(ctx context.Context, id uuid.UUID, notes string) (appointments.Appointment, error)
+	CompleteAppointment(ctx context.Context, id uuid.UUID) (appointments.Appointment, error)
+	CancelAppointment(ctx context.Context, id uuid.UUID, reason string, cancelledBy uuid.UUID) (appointments.Appointment, error)
+	UpdateAppointmentStatus(ctx context.Context, id uuid.UUID, status appointments.AppointmentStatus) (appointments.Appointment, error)
+
+	// Delete
+	DeleteAppointment(ctx context.Context, id uuid.UUID) error
+
+	// Utility
+	CheckSchedulingConflict(ctx context.Context, clinicID uuid.UUID, date time.Time, appointmentTime time.Time) (bool, error)
 }
 
 type SMSRepository interface {

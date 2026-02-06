@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/appointments"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	app_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/appointments"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -37,34 +39,20 @@ func NewAppointmentHandler(
 func (h *AppointmentHandler) RegisterRoutes(router chi.Router) {
 	router.Route("/appointments", func(r chi.Router) {
 		r.Post("/", h.CreateAppointment)
-		// r.Get("/", h.GetAppointments)
-		// r.Get("/today", h.GetTodayAppointments)
-		// r.Get("/pending", h.GetPendingAppointments)
-		//
-		// r.Route("/clinic/{clinicID}", func(r chi.Router) {
-		// 	r.Get("/", h.GetAppointmentsByClinic)
-		// 	r.Get("/date/{date}", h.GetAppointmentsByClinicAndDate)
-		// })
-		//
-		// r.Route("/patient/{patientID}", func(r chi.Router) {
-		// 	r.Get("/", h.GetAppointmentsByPatient)
-		// 	r.Get("/upcoming", h.GetUpcomingAppointments)
-		// 	r.Get("/count", h.GetAppointmentCount)
-		// })
-		//
-		// r.Route("/{id}", func(r chi.Router) {
-		// 	r.Get("/", h.GetAppointment)
-		// 	r.Put("/", h.UpdateAppointment)
-		// 	r.Delete("/", h.DeleteAppointment)
-		// 	r.Post("/reschedule", h.RescheduleAppointment)
-		// 	r.Post("/cancel", h.CancelAppointment)
-		// 	r.Post("/confirm", h.ConfirmAppointment)
-		// 	r.Post("/complete", h.CompleteAppointment)
-		// 	r.Put("/notes", h.UpdateAppointmentNotes)
-		// 	r.Put("/status", h.UpdateAppointmentStatus)
-		// })
-		//
-		// r.Post("/check-conflict", h.CheckSchedulingConflict)
+		r.Get("/{id}", h.GetAppointmentByID)
+		r.Get("/patient/{patientId}", h.GetAppointmentsByPatient)
+		r.Get("/clinic/{clinicId}", h.GetAppointmentsByClinic)
+		r.Get("/clinic/{clinicId}/date/{date}", h.GetAppointmentsByClinicAndDate)
+		r.Get("/clinic/{clinicId}/today", h.GetTodayAppointments)
+		r.Get("/clinic/{clinicId}/pending", h.GetPendingAppointments)
+		r.Put("/{id}/reschedule", h.RescheduleAppointment)
+		r.Put("/{id}/confirm", h.ConfirmAppointment)
+		r.Put("/{id}/notes", h.UpdateAppointmentNotes)
+		r.Put("/{id}/complete", h.CompleteAppointment)
+		r.Put("/{id}/cancel", h.CancelAppointment)
+		r.Put("/{id}/status", h.UpdateAppointmentStatus)
+		r.Delete("/{id}", h.DeleteAppointment)
+		r.Get("/patient/{patientId}/count", h.GetAppointmentCount)
 	})
 }
 
@@ -113,4 +101,483 @@ func (h *AppointmentHandler) CreateAppointment(w http.ResponseWriter, r *http.Re
 	}
 
 	handler.RespondJSON(w, http.StatusCreated, app_dto.ToAppointmentResponse(created))
+}
+
+// GetAppointmentByID retrieves an appointment by ID
+func (h *AppointmentHandler) GetAppointmentByID(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid appointment ID",
+		})
+		return
+	}
+
+	appointment, err := h.appointmentService.GetAppointmentByID(ctx, id)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.ToAppointmentResponse(appointment))
+}
+
+// GetAppointmentsByPatient retrieves all appointments for a patient
+func (h *AppointmentHandler) GetAppointmentsByPatient(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	patientIDStr := chi.URLParam(r, "patientId")
+	patientID, err := uuid.Parse(patientIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid patient ID",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetAppointmentsByPatient(ctx, patientID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	response := make([]app_dto.AppointmentResponse, len(appointmentList))
+	for i, appointment := range appointmentList {
+		response[i] = app_dto.ToAppointmentResponse(appointment)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.GetAppointmentsResponse{
+		Appointments: response,
+		Count:        len(response),
+		Total:        len(response),
+	})
+}
+
+// GetAppointmentsByClinic retrieves all appointments for a clinic
+func (h *AppointmentHandler) GetAppointmentsByClinic(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "clinicId")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid clinic ID",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetAppointmentsByClinic(ctx, clinicID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	response := make([]app_dto.AppointmentResponse, len(appointmentList))
+	for i, appointment := range appointmentList {
+		response[i] = app_dto.ToAppointmentResponse(appointment)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.GetAppointmentsResponse{
+		Appointments: response,
+		Count:        len(response),
+		Total:        len(response),
+	})
+}
+
+// GetAppointmentsByClinicAndDate retrieves appointments for a clinic on a specific date
+func (h *AppointmentHandler) GetAppointmentsByClinicAndDate(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "clinicId")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid clinic ID",
+		})
+		return
+	}
+
+	dateStr := chi.URLParam(r, "date")
+	date, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid date format. Use YYYY-MM-DD",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetAppointmentsByClinicAndDate(ctx, clinicID, date)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	response := make([]app_dto.AppointmentResponse, len(appointmentList))
+	for i, appointment := range appointmentList {
+		response[i] = app_dto.ToAppointmentResponse(appointment)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.GetAppointmentsResponse{
+		Appointments: response,
+		Count:        len(response),
+		Total:        len(response),
+	})
+}
+
+// GetTodayAppointments retrieves today's appointments for a clinic
+func (h *AppointmentHandler) GetTodayAppointments(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "clinicId")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid clinic ID",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetTodayAppointments(ctx, clinicID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	response := make([]app_dto.AppointmentResponse, len(appointmentList))
+	for i, appointment := range appointmentList {
+		response[i] = app_dto.ToAppointmentResponse(appointment)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.GetAppointmentsResponse{
+		Appointments: response,
+		Count:        len(response),
+		Total:        len(response),
+	})
+}
+
+// GetPendingAppointments retrieves all pending appointments for a clinic
+func (h *AppointmentHandler) GetPendingAppointments(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "clinicId")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid clinic ID",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetPendingAppointments(ctx, clinicID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	response := make([]app_dto.AppointmentResponse, len(appointmentList))
+	for i, appointment := range appointmentList {
+		response[i] = app_dto.ToAppointmentResponse(appointment)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.GetAppointmentsResponse{
+		Appointments: response,
+		Count:        len(response),
+		Total:        len(response),
+	})
+}
+
+// RescheduleAppointment handles rescheduling of an appointment
+func (h *AppointmentHandler) RescheduleAppointment(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid appointment ID",
+		})
+		return
+	}
+
+	var req app_dto.RescheduleAppointmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("appointment_date", req.AppointmentDate.String())
+	v.ValidateRequired("appointment_time", req.AppointmentTime.String())
+	v.ValidateRequired("appointment_datetime", req.AppointmentDatetime.String())
+
+	if !v.Valid() {
+		handler.RespondValidationError(w, v.Errors())
+		return
+	}
+
+	rescheduled, err := h.appointmentService.RescheduleAppointment(ctx, id, req.AppointmentDate, req.AppointmentTime, req.AppointmentDatetime)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.ToAppointmentResponse(rescheduled))
+}
+
+// ConfirmAppointment handles confirmation of an appointment
+func (h *AppointmentHandler) ConfirmAppointment(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid appointment ID",
+		})
+		return
+	}
+
+	var req app_dto.ConfirmAppointmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("confirmed_by", req.ConfirmedBy.String())
+
+	if !v.Valid() {
+		handler.RespondValidationError(w, v.Errors())
+		return
+	}
+
+	confirmed, err := h.appointmentService.ConfirmAppointment(ctx, id, req.ConfirmedBy)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.ToAppointmentResponse(confirmed))
+}
+
+// UpdateAppointmentNotes handles updating appointment notes
+func (h *AppointmentHandler) UpdateAppointmentNotes(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid appointment ID",
+		})
+		return
+	}
+
+	var req app_dto.UpdateAppointmentNotesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("notes", req.Notes)
+
+	if !v.Valid() {
+		handler.RespondValidationError(w, v.Errors())
+		return
+	}
+
+	updated, err := h.appointmentService.UpdateAppointmentNotes(ctx, id, req.Notes)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.ToAppointmentResponse(updated))
+}
+
+// CompleteAppointment handles marking an appointment as completed
+func (h *AppointmentHandler) CompleteAppointment(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid appointment ID",
+		})
+		return
+	}
+
+	completed, err := h.appointmentService.CompleteAppointment(ctx, id)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.ToAppointmentResponse(completed))
+}
+
+// CancelAppointment handles cancellation of an appointment
+func (h *AppointmentHandler) CancelAppointment(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid appointment ID",
+		})
+		return
+	}
+
+	var req app_dto.CancelAppointmentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("cancellation_reason", req.CancellationReason)
+	v.ValidateRequired("cancelled_by", req.CancelledBy.String())
+
+	if !v.Valid() {
+		handler.RespondValidationError(w, v.Errors())
+		return
+	}
+
+	cancelled, err := h.appointmentService.CancelAppointment(ctx, id, req.CancellationReason, req.CancelledBy)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.ToAppointmentResponse(cancelled))
+}
+
+// UpdateAppointmentStatus handles updating appointment status
+func (h *AppointmentHandler) UpdateAppointmentStatus(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid appointment ID",
+		})
+		return
+	}
+
+	var req app_dto.UpdateAppointmentStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("status", req.Status)
+
+	// Validate status value
+	validStatuses := map[string]bool{
+		string(appointments.StatusPending):   true,
+		string(appointments.StatusConfirmed): true,
+		string(appointments.StatusCancelled): true,
+		string(appointments.StatusCompleted): true,
+		string(appointments.StatusNoShow):    true,
+	}
+	if !validStatuses[req.Status] {
+		v.AddError("status", "Invalid appointment status")
+	}
+
+	if !v.Valid() {
+		handler.RespondValidationError(w, v.Errors())
+		return
+	}
+
+	updated, err := h.appointmentService.UpdateAppointmentStatus(ctx, id, appointments.AppointmentStatus(req.Status))
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, app_dto.ToAppointmentResponse(updated))
+}
+
+// DeleteAppointment handles deletion of a cancelled appointment
+func (h *AppointmentHandler) DeleteAppointment(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	idStr := chi.URLParam(r, "id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid appointment ID",
+		})
+		return
+	}
+
+	err = h.appointmentService.DeleteAppointment(ctx, id)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusNoContent, nil)
+}
+
+// GetAppointmentCount gets the total count of appointments for a patient
+func (h *AppointmentHandler) GetAppointmentCount(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	patientIDStr := chi.URLParam(r, "patientId")
+	patientID, err := uuid.Parse(patientIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
+			Error: "Invalid patient ID",
+		})
+		return
+	}
+
+	count, err := h.appointmentService.GetAppointmentCount(ctx, patientID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"patient_id": patientID,
+		"count":      count,
+	})
 }
