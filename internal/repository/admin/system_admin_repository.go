@@ -101,49 +101,6 @@ func (r *systemAdminRepository) GetSystemAdminByUserID(ctx context.Context, user
 	return r.mapToSystemAdmin(row), nil
 }
 
-func (r *systemAdminRepository) UpdateAdminPermissions(ctx context.Context, id uuid.UUID, permissions interface{}, canManageUsers, canManageClinics, canManageContent, canViewAnalytics, canManageSystem bool) error {
-	start := time.Now()
-	defer func() {
-		systemAdminDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	err := r.querier.UpdateAdminPermissions(ctx, sqlc.UpdateAdminPermissionsParams{
-		ID:               uuidToPgtypeUUID(id),
-		Permissions:      interfaceToJSONRawMessage(permissions), // Use json.RawMessage helper
-		CanManageUsers:   pgtype.Bool{Bool: canManageUsers, Valid: true},
-		CanManageClinics: pgtype.Bool{Bool: canManageClinics, Valid: true},
-		CanManageContent: pgtype.Bool{Bool: canManageContent, Valid: true},
-		CanViewAnalytics: pgtype.Bool{Bool: canViewAnalytics, Valid: true},
-		CanManageSystem:  pgtype.Bool{Bool: canManageSystem, Valid: true},
-	})
-	if err != nil {
-		systemAdminDBQueryTotal.WithLabelValues("update_admin_permissions", "error").Inc()
-		return r.handleError(err, "update admin permissions")
-	}
-
-	systemAdminDBQueryTotal.WithLabelValues("update_admin_permissions", "success").Inc()
-	return nil
-}
-
-func (r *systemAdminRepository) AddRegionAssignment(ctx context.Context, id uuid.UUID, region string) error {
-	start := time.Now()
-	defer func() {
-		systemAdminDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	err := r.querier.AddRegionAssignment(ctx, sqlc.AddRegionAssignmentParams{
-		ID:          uuidToPgtypeUUID(id),
-		ArrayAppend: region,
-	})
-	if err != nil {
-		systemAdminDBQueryTotal.WithLabelValues("add_region_assignment", "error").Inc()
-		return r.handleError(err, "add region assignment")
-	}
-
-	systemAdminDBQueryTotal.WithLabelValues("add_region_assignment", "success").Inc()
-	return nil
-}
-
 // ===== Helper Functions =====
 
 func (r *systemAdminRepository) mapToSystemAdmin(row sqlc.SystemAdmin) admin.SystemAdmin {

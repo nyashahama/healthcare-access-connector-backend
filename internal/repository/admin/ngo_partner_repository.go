@@ -111,54 +111,6 @@ func (r *ngoPartnerRepository) GetNGOPartnerByUserID(ctx context.Context, userID
 	return r.mapToNGOPartner(row), nil
 }
 
-func (r *ngoPartnerRepository) GetActivePartnerships(ctx context.Context) ([]admin.NGOPartner, error) {
-	start := time.Now()
-	defer func() {
-		ngoPartnerDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	rows, err := r.querier.GetActivePartnerships(ctx)
-	if err != nil {
-		ngoPartnerDBQueryTotal.WithLabelValues("get_active_partnerships", "error").Inc()
-		return nil, r.handleError(err, "get active partnerships")
-	}
-
-	partners := make([]admin.NGOPartner, len(rows))
-	for i, row := range rows {
-		partners[i] = r.mapToNGOPartner(sqlc.NgoPartner{
-			ID:                   row.ID,
-			OrganizationName:     row.OrganizationName,
-			OrganizationType:     row.OrganizationType,
-			PartnershipType:      row.PartnershipType,
-			PartnershipStartDate: row.PartnershipStartDate,
-			OperatingRegions:     row.OperatingRegions,
-			FocusAreas:           row.FocusAreas,
-		})
-	}
-
-	ngoPartnerDBQueryTotal.WithLabelValues("get_active_partnerships", "success").Inc()
-	return partners, nil
-}
-
-func (r *ngoPartnerRepository) UpdatePartnershipStatus(ctx context.Context, id uuid.UUID, status string) error {
-	start := time.Now()
-	defer func() {
-		ngoPartnerDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	err := r.querier.UpdatePartnershipStatus(ctx, sqlc.UpdatePartnershipStatusParams{
-		ID:                uuidToPgtypeUUID(id),
-		PartnershipStatus: pgtypeTextFromString(status),
-	})
-	if err != nil {
-		ngoPartnerDBQueryTotal.WithLabelValues("update_partnership_status", "error").Inc()
-		return r.handleError(err, "update partnership status")
-	}
-
-	ngoPartnerDBQueryTotal.WithLabelValues("update_partnership_status", "success").Inc()
-	return nil
-}
-
 // ===== Helper Functions =====
 
 func (r *ngoPartnerRepository) mapToNGOPartner(row sqlc.NgoPartner) admin.NGOPartner {

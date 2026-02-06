@@ -351,9 +351,6 @@ type SystemAdminRepository interface {
 	GetSystemAdminByUserID(ctx context.Context, userID uuid.UUID) (admin.SystemAdmin, error)
 	//	UpdateSystemAdmin(ctx context.Context, admin admin.SystemAdmin) error
 	//	DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error
-
-	UpdateAdminPermissions(ctx context.Context, id uuid.UUID, permissions interface{}, canManageUsers, canManageClinics, canManageContent, canViewAnalytics, canManageSystem bool) error
-	AddRegionAssignment(ctx context.Context, id uuid.UUID, region string) error
 }
 
 type NGOPartnerRepository interface {
@@ -362,8 +359,6 @@ type NGOPartnerRepository interface {
 	GetNGOPartnerByUserID(ctx context.Context, userID uuid.UUID) (admin.NGOPartner, error)
 	// UpdateNGOPartner(ctx context.Context, partner admin.NGOPartner) error
 	// DeleteNGOPartner(ctx context.Context, id uuid.UUID) error
-
-	UpdatePartnershipStatus(ctx context.Context, id uuid.UUID, status string) error
 }
 
 type AppointmentRepository interface {
