@@ -125,10 +125,6 @@ type Querier interface {
 	// ============================================
 	// STATISTICS & ANALYTICS
 	// ============================================
-	CountPatientDependents(ctx context.Context, patientID pgtype.UUID) (CountPatientDependentsRow, error)
-	// ============================================
-	// STATISTICS & ANALYTICS
-	// ============================================
 	CountPatientImmunizations(ctx context.Context, patientID pgtype.UUID) (CountPatientImmunizationsRow, error)
 	// ============================================
 	// STATISTICS & ANALYTICS
@@ -255,7 +251,6 @@ type Querier interface {
 	DeletePatientAllergy(ctx context.Context, id pgtype.UUID) error
 	DeletePatientCondition(ctx context.Context, id pgtype.UUID) error
 	DeletePatientDependent(ctx context.Context, id pgtype.UUID) error
-	DeletePatientDependents(ctx context.Context, patientID pgtype.UUID) error
 	DeletePatientFamilyHistory(ctx context.Context, patientID pgtype.UUID) error
 	DeletePatientImmunization(ctx context.Context, id pgtype.UUID) error
 	DeletePatientImmunizations(ctx context.Context, patientID pgtype.UUID) error
@@ -329,34 +324,12 @@ type Querier interface {
 	// MORTALITY TRACKING
 	// ============================================
 	GetDeceasedRelatives(ctx context.Context, patientID pgtype.UUID) ([]GetDeceasedRelativesRow, error)
-	GetDependentAge(ctx context.Context, id pgtype.UUID) (int32, error)
-	GetDependentAgeDistribution(ctx context.Context) ([]GetDependentAgeDistributionRow, error)
 	GetDependentChildren(ctx context.Context, patientID pgtype.UUID) ([]GetDependentChildrenRow, error)
-	GetDependentFullName(ctx context.Context, id pgtype.UUID) (interface{}, error)
 	GetDependentHealthRecord(ctx context.Context, id pgtype.UUID) (DependentHealthRecord, error)
 	// ============================================
 	// QUERYING BY DEPENDENT
 	// ============================================
 	GetDependentHealthRecords(ctx context.Context, dependentID pgtype.UUID) ([]GetDependentHealthRecordsRow, error)
-	GetDependentStatistics(ctx context.Context) (GetDependentStatisticsRow, error)
-	// ============================================
-	// AGE & DEMOGRAPHIC QUERIES
-	// ============================================
-	GetDependentsByAgeRange(ctx context.Context, arg GetDependentsByAgeRangeParams) ([]GetDependentsByAgeRangeRow, error)
-	GetDependentsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]GetDependentsByClinicRow, error)
-	GetDependentsByHealthStatus(ctx context.Context, healthStatus pgtype.Text) ([]GetDependentsByHealthStatusRow, error)
-	// ============================================
-	// BULK OPERATIONS
-	// ============================================
-	GetDependentsByPatientIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetDependentsByPatientIDsRow, error)
-	GetDependentsByPediatrician(ctx context.Context, primaryPediatrician pgtype.Text) ([]GetDependentsByPediatricianRow, error)
-	GetDependentsByRelationship(ctx context.Context, arg GetDependentsByRelationshipParams) ([]GetDependentsByRelationshipRow, error)
-	GetDependentsBySchool(ctx context.Context, schoolName pgtype.Text) ([]GetDependentsBySchoolRow, error)
-	// ============================================
-	// SPECIAL NEEDS MANAGEMENT
-	// ============================================
-	GetDependentsWithSpecialNeeds(ctx context.Context) ([]GetDependentsWithSpecialNeedsRow, error)
-	GetDependentsWithoutGuardianship(ctx context.Context) ([]GetDependentsWithoutGuardianshipRow, error)
 	GetEarlyDeaths(ctx context.Context, ageAtDeath pgtype.Int4) ([]GetEarlyDeathsRow, error)
 	GetEmergencyAccessLogs(ctx context.Context, arg GetEmergencyAccessLogsParams) ([]DataAccessLog, error)
 	GetEmergencyContact(ctx context.Context, id pgtype.UUID) (EmergencyContact, error)
@@ -425,7 +398,6 @@ type Querier interface {
 	// VACCINE SERIES TRACKING
 	// ============================================
 	GetIncompleteVaccineSeries(ctx context.Context, patientID pgtype.UUID) ([]GetIncompleteVaccineSeriesRow, error)
-	GetInfants(ctx context.Context) ([]GetInfantsRow, error)
 	GetLanguageDistribution(ctx context.Context) ([]GetLanguageDistributionRow, error)
 	GetLastSurgeryDate(ctx context.Context, patientID pgtype.UUID) (interface{}, error)
 	GetLastVaccineDate(ctx context.Context, arg GetLastVaccineDateParams) (interface{}, error)
@@ -597,7 +569,6 @@ type Querier interface {
 	GetRecentlyUpdatedProfiles(ctx context.Context, arg GetRecentlyUpdatedProfilesParams) ([]GetRecentlyUpdatedProfilesRow, error)
 	GetRoutineImmunizations(ctx context.Context, patientID pgtype.UUID) ([]GetRoutineImmunizationsRow, error)
 	GetSMSConversationByPhone(ctx context.Context, phoneNumber string) (SmsConversation, error)
-	GetSchoolAgeChildren(ctx context.Context, patientID pgtype.UUID) ([]GetSchoolAgeChildrenRow, error)
 	GetServiceByID(ctx context.Context, id pgtype.UUID) (ClinicService, error)
 	GetSession(ctx context.Context, sessionToken string) (GetSessionRow, error)
 	GetStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff, error)
@@ -626,7 +597,6 @@ type Querier interface {
 	//   AND status NOT IN ('cancelled', 'completed')
 	// ORDER BY appointment_datetime ASC;
 	GetTodayAppointments(ctx context.Context, clinicID pgtype.UUID) ([]Appointment, error)
-	GetToddlers(ctx context.Context) ([]GetToddlersRow, error)
 	GetUnderservedPatients(ctx context.Context, arg GetUnderservedPatientsParams) ([]GetUnderservedPatientsRow, error)
 	GetUnderweightPatients(ctx context.Context, arg GetUnderweightPatientsParams) ([]GetUnderweightPatientsRow, error)
 	// ============================================
@@ -652,10 +622,6 @@ type Querier interface {
 	GetWithdrawnConsents(ctx context.Context, arg GetWithdrawnConsentsParams) ([]PrivacyConsent, error)
 	HasCompleteVitals(ctx context.Context, patientID pgtype.UUID) (pgtype.Bool, error)
 	HasConditionInFamily(ctx context.Context, arg HasConditionInFamilyParams) (bool, error)
-	// ============================================
-	// VALIDATION & UTILITIES
-	// ============================================
-	HasDependents(ctx context.Context, patientID pgtype.UUID) (bool, error)
 	// ============================================
 	// VALIDATION & UTILITIES
 	// ============================================
@@ -726,7 +692,6 @@ type Querier interface {
 	UpdateAppointmentNotes(ctx context.Context, arg UpdateAppointmentNotesParams) (Appointment, error)
 	UpdateAppointmentReminders(ctx context.Context, arg UpdateAppointmentRemindersParams) error
 	UpdateAppointmentStatus(ctx context.Context, arg UpdateAppointmentStatusParams) (Appointment, error)
-	UpdateBirthMetrics(ctx context.Context, arg UpdateBirthMetricsParams) error
 	UpdateBloodTypeTestDate(ctx context.Context, arg UpdateBloodTypeTestDateParams) error
 	UpdateChannelSettings(ctx context.Context, arg UpdateChannelSettingsParams) error
 	UpdateClinic(ctx context.Context, arg UpdateClinicParams) error
@@ -736,20 +701,12 @@ type Querier interface {
 	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) error
 	UpdateDNRStatus(ctx context.Context, arg UpdateDNRStatusParams) error
 	UpdateDataSharingConsent(ctx context.Context, arg UpdateDataSharingConsentParams) error
-	// ============================================
-	// HEALTH & DEVELOPMENT TRACKING
-	// ============================================
-	UpdateDependentHealth(ctx context.Context, arg UpdateDependentHealthParams) error
 	UpdateDependentHealthRecord(ctx context.Context, arg UpdateDependentHealthRecordParams) error
 	UpdateEmergencyAccessConsent(ctx context.Context, arg UpdateEmergencyAccessConsentParams) error
 	UpdateEmergencyAlerts(ctx context.Context, arg UpdateEmergencyAlertsParams) error
 	UpdateEmergencyContact(ctx context.Context, arg UpdateEmergencyContactParams) error
 	UpdateEndOfLifePreferences(ctx context.Context, arg UpdateEndOfLifePreferencesParams) error
 	UpdateFamilyHistory(ctx context.Context, arg UpdateFamilyHistoryParams) error
-	// ============================================
-	// GUARDIANSHIP & LEGAL
-	// ============================================
-	UpdateGuardianship(ctx context.Context, arg UpdateGuardianshipParams) error
 	UpdateHealthDataConsent(ctx context.Context, arg UpdateHealthDataConsentParams) error
 	UpdateHealthSummary(ctx context.Context, arg UpdateHealthSummaryParams) error
 	UpdateHealthTips(ctx context.Context, arg UpdateHealthTipsParams) error
@@ -802,10 +759,6 @@ type Querier interface {
 	// ============================================
 	UpdatePatientVitals(ctx context.Context, arg UpdatePatientVitalsParams) error
 	UpdatePatientWeight(ctx context.Context, arg UpdatePatientWeightParams) error
-	// ============================================
-	// HEALTHCARE PROVIDER TRACKING
-	// ============================================
-	UpdatePediatrician(ctx context.Context, arg UpdatePediatricianParams) error
 	UpdatePharmacy(ctx context.Context, arg UpdatePharmacyParams) error
 	// ============================================
 	// CARE PROVIDER MANAGEMENT
@@ -817,13 +770,8 @@ type Querier interface {
 	UpdateQuietHours(ctx context.Context, arg UpdateQuietHoursParams) error
 	UpdateResearchConsent(ctx context.Context, arg UpdateResearchConsentParams) error
 	UpdateSMSConversation(ctx context.Context, arg UpdateSMSConversationParams) error
-	// ============================================
-	// EDUCATION & SCHOOL
-	// ============================================
-	UpdateSchoolInfo(ctx context.Context, arg UpdateSchoolInfoParams) error
 	UpdateSession(ctx context.Context, arg UpdateSessionParams) error
 	UpdateSessionToken(ctx context.Context, arg UpdateSessionTokenParams) error
-	UpdateSpecialNeeds(ctx context.Context, arg UpdateSpecialNeedsParams) error
 	UpdateStaffMember(ctx context.Context, arg UpdateStaffMemberParams) error
 	// ============================================
 	// OUTCOME & COMPLICATIONS
