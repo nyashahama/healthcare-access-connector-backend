@@ -313,7 +313,7 @@ type NotificationRepository interface {
 }
 
 type ClinicRepository interface {
-	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
+	CreateClinic(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error)
 	GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
 	UpdateClinic(ctx context.Context, clinic providers.Clinic) error
 	DeleteClinic(ctx context.Context, id uuid.UUID) error

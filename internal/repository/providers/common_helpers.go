@@ -428,3 +428,20 @@ func pgtypeJSONToTimePtr(data json.RawMessage) *time.Time {
 	}
 	return &t
 }
+
+func pgtypeUUIDToUUIDPtr(id pgtype.UUID) *uuid.UUID {
+	if !id.Valid {
+		return nil
+	}
+
+	var u uuid.UUID
+	u = uuid.UUID(id.Bytes) // direct array copy
+	return &u
+}
+
+func pgtypeBoolToBoolPtr(b pgtype.Bool) *bool {
+	if !b.Valid {
+		return nil
+	}
+	return &b.Bool
+}

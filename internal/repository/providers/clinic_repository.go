@@ -68,17 +68,12 @@ func NewClinicRepositoryWithQuerier(querier sqlc.Querier) repository.ClinicRepos
 // BASIC CRUD OPERATIONS
 // ============================================
 
-func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error) {
+// CreateClinic creates a new clinic with owner tracking
+func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error) {
 	start := time.Now()
 	defer func() {
 		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
-
-	// Convert JSONB fields to json.RawMessage
-	operatingHoursJSON, err := jsonbFromMap(clinic.OperatingHours)
-	if err != nil {
-		return providers.Clinic{}, fmt.Errorf("marshal operating_hours: %w", err)
-	}
 
 	servicesJSON, err := jsonbFromStringSlice(clinic.Services)
 	if err != nil {
@@ -90,80 +85,67 @@ func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Cl
 		return providers.Clinic{}, fmt.Errorf("marshal specialties: %w", err)
 	}
 
-	// languagesSpokenJSON, err := jsonbFromStringSlice(clinic.LanguagesSpoken)
-	// if err != nil {
-	// 	return providers.Clinic{}, fmt.Errorf("marshal languages_spoken: %w", err)
-	// }
-
 	facilitiesJSON, err := jsonbFromStringSlice(clinic.Facilities)
 	if err != nil {
 		return providers.Clinic{}, fmt.Errorf("marshal facilities: %w", err)
 	}
 
-	// Workaround for accepts_medical_aid (BOOLEAN mapped as json.RawMessage)
-	/* acceptsMedicalAidJSON := boolToPgtypeJSON(clinic.AcceptsMedicalAid) */
-
 	medicalAidProvidersJSON, err := jsonbFromStringSlice(clinic.MedicalAidProviders)
 	if err != nil {
-		return providers.Clinic{}, fmt.Errorf("marshal medical_aid_providers: %w", err)
+		return providers.Clinic{}, fmt.Errorf("marshal medical aid providers: %w", err)
 	}
 
 	paymentMethodsJSON, err := jsonbFromStringSlice(clinic.PaymentMethods)
 	if err != nil {
-		return providers.Clinic{}, fmt.Errorf("marshal payment_methods: %w", err)
+		return providers.Clinic{}, fmt.Errorf("marshal payment methods: %w", err)
 	}
 
-	// Convert fee_structure string to JSON
-	// var feeStructureJSON json.RawMessage
-	// if clinic.FeeStructure != nil && *clinic.FeeStructure != "" {
-	// 	feeStructureJSON = json.RawMessage(fmt.Sprintf(`"%s"`, *clinic.FeeStructure))
-	// }
+	operatingHoursJSON, err := jsonbFromMap(clinic.OperatingHours)
+	if err != nil {
+		return providers.Clinic{}, fmt.Errorf("marshal operating hours: %w", err)
+	}
 
 	certificationsJSON, err := jsonbFromMap(clinic.Certifications)
 	if err != nil {
 		return providers.Clinic{}, fmt.Errorf("marshal certifications: %w", err)
 	}
 
-	// Map to sqlc params with the auto-generated ColumnXX names
 	params := sqlc.CreateClinicParams{
-		ClinicName:          clinic.ClinicName,
-		ClinicType:          clinic.ClinicType,
-		RegistrationNumber:  pgtypeTextFromStringPtr(clinic.RegistrationNumber),
-		AccreditationNumber: pgtypeTextFromStringPtr(clinic.AccreditationNumber),
-		PrimaryPhone:        pgtypeTextFromStringPtr(clinic.PrimaryPhone),
-		SecondaryPhone:      pgtypeTextFromStringPtr(clinic.SecondaryPhone),
-		EmergencyPhone:      pgtypeTextFromStringPtr(clinic.EmergencyPhone),
-		Email:               pgtypeTextFromStringPtr(clinic.Email),
-		Website:             pgtypeTextFromStringPtr(clinic.Website),
-		PhysicalAddress:     clinic.PhysicalAddress,
-		City:                pgtypeTextFromStringPtr(clinic.City),
-		Province:            pgtypeTextFromStringPtr(clinic.Province),
-		PostalCode:          pgtypeTextFromStringPtr(clinic.PostalCode),
-		Country:             pgtypeTextFromString(clinic.Country),
-		Latitude:            float64PtrToPgtypeNumeric(clinic.Latitude),
-		Longitude:           float64PtrToPgtypeNumeric(clinic.Longitude),
-		GooglePlaceID:       pgtypeTextFromStringPtr(clinic.GooglePlaceID),
-		Description:         pgtypeTextFromStringPtr(clinic.Description),
-		YearEstablished:     intPtrToPgtypeInt4(clinic.YearEstablished),
-		OwnershipType:       pgtypeTextFromStringPtr(clinic.OwnershipType),
-		BedCount:            intPtrToPgtypeInt4(clinic.BedCount),
-
-		// JSONB fields - mapped to ColumnXX by sqlc
-		Column24:          operatingHoursJSON,                           // operating_hours
-		Column25:          servicesJSON,                                 // services
-		Column26:          specialtiesJSON,                              // specialties
-		LanguagesSpoken:   clinic.LanguagesSpoken,                       // languages_spoken
-		Column28:          facilitiesJSON,                               // facilities
-		AcceptsMedicalAid: pgtype.Bool{Bool: clinic.AcceptsMedicalAid},  // accepts_medical_aid (workaround)
-		Column30:          medicalAidProvidersJSON,                      // medical_aid_providers
-		Column31:          paymentMethodsJSON,                           // payment_methods
-		FeeStructure:      pgtypeTextFromStringPtr(clinic.FeeStructure), // fee_structure
-
-		AccreditationBody: pgtypeTextFromStringPtr(clinic.AccreditationBody),
-
-		AccreditationExpiry: pgtype.Date{Time: *clinic.AccreditationExpiry}, // accreditation_expiry (workaround)
-		Column35:            certificationsJSON,                             // certifications
-
+		CreatedBy:              uuidToPgtypeUUID(createdBy),
+		OwnerUserID:            uuidToPgtypeUUID(ownerUserID),
+		ClinicName:             clinic.ClinicName,
+		ClinicType:             clinic.ClinicType,
+		RegistrationNumber:     pgtypeTextFromStringPtr(clinic.RegistrationNumber),
+		AccreditationNumber:    pgtypeTextFromStringPtr(clinic.AccreditationNumber),
+		PrimaryPhone:           pgtypeTextFromStringPtr(clinic.PrimaryPhone),
+		SecondaryPhone:         pgtypeTextFromStringPtr(clinic.SecondaryPhone),
+		EmergencyPhone:         pgtypeTextFromStringPtr(clinic.EmergencyPhone),
+		Email:                  pgtypeTextFromStringPtr(clinic.Email),
+		Website:                pgtypeTextFromStringPtr(clinic.Website),
+		PhysicalAddress:        clinic.PhysicalAddress,
+		City:                   pgtypeTextFromStringPtr(clinic.City),
+		Province:               pgtypeTextFromStringPtr(clinic.Province),
+		PostalCode:             pgtypeTextFromStringPtr(clinic.PostalCode),
+		Country:                pgtypeTextFromString(clinic.Country),
+		Latitude:               float64PtrToPgtypeNumeric(clinic.Latitude),
+		Longitude:              float64PtrToPgtypeNumeric(clinic.Longitude),
+		GooglePlaceID:          pgtypeTextFromStringPtr(clinic.GooglePlaceID),
+		Description:            pgtypeTextFromStringPtr(clinic.Description),
+		YearEstablished:        intPtrToPgtypeInt4(clinic.YearEstablished),
+		OwnershipType:          pgtypeTextFromStringPtr(clinic.OwnershipType),
+		BedCount:               intPtrToPgtypeInt4(clinic.BedCount),
+		Column24:               operatingHoursJSON,
+		Column25:               servicesJSON,
+		Column26:               specialtiesJSON,
+		LanguagesSpoken:        clinic.LanguagesSpoken,
+		Column28:               facilitiesJSON,
+		AcceptsMedicalAid:      pgtype.Bool{Bool: clinic.AcceptsMedicalAid, Valid: true},
+		Column30:               medicalAidProvidersJSON,
+		Column31:               paymentMethodsJSON,
+		FeeStructure:           pgtypeTextFromStringPtr(clinic.FeeStructure),
+		AccreditationBody:      pgtypeTextFromStringPtr(clinic.AccreditationBody),
+		AccreditationExpiry:    pgtype.Date{Time: *clinic.AccreditationExpiry},
+		Column35:               certificationsJSON,
 		PatientCapacity:        intPtrToPgtypeInt4(clinic.PatientCapacity),
 		AverageWaitTimeMinutes: intPtrToPgtypeInt4(clinic.AverageWaitTimeMinutes),
 		ContactPersonName:      pgtypeTextFromStringPtr(clinic.ContactPersonName),
@@ -414,6 +396,158 @@ func (r *clinicRepository) GetClinics(ctx context.Context) ([]providers.Clinic, 
 	return clinics, nil
 }
 
+func (r *clinicRepository) GetClinicByOwner(ctx context.Context, ownerUserID uuid.UUID) (*providers.Clinic, error) {
+	start := time.Now()
+	defer func() {
+		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	row, err := r.querier.GetClinicByOwner(ctx, uuidToPgtypeUUID(ownerUserID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			clinicDBQueryTotal.WithLabelValues("get_clinic_by_owner", "not_found").Inc()
+			return nil, domain.ErrClinicNotFound
+		}
+		clinicDBQueryTotal.WithLabelValues("get_clinic_by_owner", "error").Inc()
+		return nil, fmt.Errorf("get clinic by owner: %w", err)
+	}
+
+	clinic := r.mapToClinic(row)
+	clinicDBQueryTotal.WithLabelValues("get_clinic_by_owner", "success").Inc()
+	return &clinic, nil
+}
+
+func (r *clinicRepository) GetClinicWithOwnerInfo(ctx context.Context, clinicID uuid.UUID) (*providers.ClinicWithOwner, error) {
+	start := time.Now()
+	defer func() {
+		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	row, err := r.querier.GetClinicWithOwnerInfo(ctx, uuidToPgtypeUUID(clinicID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			clinicDBQueryTotal.WithLabelValues("get_clinic_with_owner", "not_found").Inc()
+			return nil, domain.ErrClinicNotFound
+		}
+		clinicDBQueryTotal.WithLabelValues("get_clinic_with_owner", "error").Inc()
+		return nil, fmt.Errorf("get clinic with owner: %w", err)
+	}
+
+	clinicWithOwner := &providers.ClinicWithOwner{
+		Clinic: providers.Clinic{
+			ID:                     pgtypeUUIDToUUID(row.ID),
+			CreatedBy:              pgtypeUUIDToUUIDPtr(row.CreatedBy),
+			OwnerUserID:            pgtypeUUIDToUUIDPtr(row.OwnerUserID),
+			ClinicName:             row.ClinicName,
+			ClinicType:             row.ClinicType,
+			RegistrationNumber:     pgtypeTextToStringPtr(row.RegistrationNumber),
+			AccreditationNumber:    pgtypeTextToStringPtr(row.AccreditationNumber),
+			PrimaryPhone:           pgtypeTextToStringPtr(row.PrimaryPhone),
+			SecondaryPhone:         pgtypeTextToStringPtr(row.SecondaryPhone),
+			EmergencyPhone:         pgtypeTextToStringPtr(row.EmergencyPhone),
+			Email:                  pgtypeTextToStringPtr(row.Email),
+			Website:                pgtypeTextToStringPtr(row.Website),
+			PhysicalAddress:        row.PhysicalAddress,
+			City:                   pgtypeTextToStringPtr(row.City),
+			Province:               pgtypeTextToStringPtr(row.Province),
+			PostalCode:             pgtypeTextToStringPtr(row.PostalCode),
+			Country:                pgtypeTextToString(row.Country),
+			Latitude:               pgtypeNumericToFloat64Ptr(row.Latitude),
+			Longitude:              pgtypeNumericToFloat64Ptr(row.Longitude),
+			GooglePlaceID:          pgtypeTextToStringPtr(row.GooglePlaceID),
+			Description:            pgtypeTextToStringPtr(row.Description),
+			YearEstablished:        pgtypeInt4ToIntPtr(row.YearEstablished),
+			OwnershipType:          pgtypeTextToStringPtr(row.OwnershipType),
+			BedCount:               pgtypeInt4ToIntPtr(row.BedCount),
+			OperatingHours:         mapFromJSONB(row.OperatingHours),
+			Services:               stringSliceFromJSONB(row.Services),
+			Specialties:            stringSliceFromJSONB(row.Specialties),
+			LanguagesSpoken:        row.LanguagesSpoken,
+			Facilities:             stringSliceFromJSONB(row.Facilities),
+			AcceptsMedicalAid:      pgtypeBoolToBool(row.AcceptsMedicalAid),
+			MedicalAidProviders:    stringSliceFromJSONB(row.MedicalAidProviders),
+			PaymentMethods:         stringSliceFromJSONB(row.PaymentMethods),
+			FeeStructure:           pgtypeTextToStringPtr(row.FeeStructure),
+			AccreditationBody:      pgtypeTextToStringPtr(row.AccreditationBody),
+			AccreditationExpiry:    pgtypeDateToTimePtr(row.AccreditationExpiry),
+			Certifications:         mapFromJSONB(row.Certifications),
+			IsVerified:             pgtypeBoolToBool(row.IsVerified),
+			VerificationStatus:     pgtypeTextToString(row.VerificationStatus),
+			VerificationNotes:      pgtypeTextToStringPtr(row.VerificationNotes),
+			VerifiedBy:             pgtypeUUIDToUUIDPtr(row.VerifiedBy),
+			VerificationDate:       pgtypeTimestampToTimePtr(row.VerificationDate),
+			PatientCapacity:        pgtypeInt4ToIntPtr(row.PatientCapacity),
+			AverageWaitTimeMinutes: pgtypeInt4ToIntPtr(row.AverageWaitTimeMinutes),
+			Rating:                 pgtypeNumericToFloat64Ptr(row.Rating),
+			ReviewCount:            pgtypeInt4ToInt(row.ReviewCount),
+			ContactPersonName:      pgtypeTextToStringPtr(row.ContactPersonName),
+			ContactPersonRole:      pgtypeTextToStringPtr(row.ContactPersonRole),
+			ContactPersonPhone:     pgtypeTextToStringPtr(row.ContactPersonPhone),
+			ContactPersonEmail:     pgtypeTextToStringPtr(row.ContactPersonEmail),
+			CreatedAt:              row.CreatedAt.Time,
+			UpdatedAt:              row.UpdatedAt.Time,
+		},
+		OwnerEmail:     pgtypeTextToStringPtr(row.OwnerEmail),
+		OwnerPhone:     pgtypeTextToStringPtr(row.OwnerPhone),
+		OwnerFirstName: pgtypeTextToStringPtr(row.OwnerFirstName),
+		OwnerLastName:  pgtypeTextToStringPtr(row.OwnerLastName),
+	}
+
+	clinicDBQueryTotal.WithLabelValues("get_clinic_with_owner", "success").Inc()
+	return clinicWithOwner, nil
+}
+
+func (r *clinicRepository) UpdateClinicOwner(ctx context.Context, clinicID, newOwnerID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	params := sqlc.UpdateClinicOwnerParams{
+		ID:          uuidToPgtypeUUID(clinicID),
+		OwnerUserID: uuidToPgtypeUUID(newOwnerID),
+	}
+
+	err := r.querier.UpdateClinicOwner(ctx, params)
+	if err != nil {
+		clinicDBQueryTotal.WithLabelValues("update_clinic_owner", "error").Inc()
+		return fmt.Errorf("update clinic owner: %w", err)
+	}
+
+	clinicDBQueryTotal.WithLabelValues("update_clinic_owner", "success").Inc()
+	return nil
+}
+
+func (r *clinicRepository) GetClinicVerificationStatus(ctx context.Context, clinicID uuid.UUID) (*providers.ClinicVerification, error) {
+	start := time.Now()
+	defer func() {
+		clinicDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	row, err := r.querier.GetClinicVerificationStatus(ctx, uuidToPgtypeUUID(clinicID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			clinicDBQueryTotal.WithLabelValues("get_verification_status", "not_found").Inc()
+			return nil, domain.ErrClinicNotFound
+		}
+		clinicDBQueryTotal.WithLabelValues("get_verification_status", "error").Inc()
+		return nil, fmt.Errorf("get verification status: %w", err)
+	}
+
+	verification := &providers.ClinicVerification{
+		ID:                 pgtypeUUIDToUUID(row.ID),
+		ClinicName:         row.ClinicName,
+		VerificationStatus: pgtypeTextToString(row.VerificationStatus),
+		IsVerified:         pgtypeBoolToBool(row.IsVerified),
+		VerificationNotes:  pgtypeTextToStringPtr(row.VerificationNotes),
+		VerificationDate:   pgtypeTimestampToTimePtr(row.VerificationDate),
+		CreatedAt:          row.CreatedAt.Time,
+	}
+
+	clinicDBQueryTotal.WithLabelValues("get_verification_status", "success").Inc()
+	return verification, nil
+}
+
 // ============================================
 // ERROR HANDLING
 // ============================================
@@ -448,68 +582,57 @@ func (r *clinicRepository) handleError(err error, operation string) error {
 
 func (r *clinicRepository) mapToClinic(row sqlc.Clinic) providers.Clinic {
 	return providers.Clinic{
-		ID:         pgtypeUUIDToUUID(row.ID),
-		ClinicName: row.ClinicName,
-		ClinicType: row.ClinicType,
-
-		RegistrationNumber:  pgtypeTextToStringPtr(row.RegistrationNumber),
-		AccreditationNumber: pgtypeTextToStringPtr(row.AccreditationNumber),
-		PrimaryPhone:        pgtypeTextToStringPtr(row.PrimaryPhone),
-		SecondaryPhone:      pgtypeTextToStringPtr(row.SecondaryPhone),
-		EmergencyPhone:      pgtypeTextToStringPtr(row.EmergencyPhone),
-		Email:               pgtypeTextToStringPtr(row.Email),
-		Website:             pgtypeTextToStringPtr(row.Website),
-
-		PhysicalAddress: row.PhysicalAddress,
-		City:            pgtypeTextToStringPtr(row.City),
-		Province:        pgtypeTextToStringPtr(row.Province),
-		PostalCode:      pgtypeTextToStringPtr(row.PostalCode),
-		Country:         pgtypeTextToString(row.Country),
-
-		Latitude:      pgtypeNumericToFloat64Ptr(row.Latitude),
-		Longitude:     pgtypeNumericToFloat64Ptr(row.Longitude),
-		GooglePlaceID: pgtypeTextToStringPtr(row.GooglePlaceID),
-		Description:   pgtypeTextToStringPtr(row.Description),
-
-		YearEstablished: pgtypeInt4ToIntPtr(row.YearEstablished),
-		OwnershipType:   pgtypeTextToStringPtr(row.OwnershipType),
-		BedCount:        pgtypeInt4ToIntPtr(row.BedCount),
-
-		OperatingHours: mapFromJSONB(row.OperatingHours),
-		Services:       stringSliceFromJSONB(row.Services),
-		Specialties:    stringSliceFromJSONB(row.Specialties),
-
-		LanguagesSpoken: row.LanguagesSpoken,
-
-		Facilities:          stringSliceFromJSONB(row.Facilities),
-		AcceptsMedicalAid:   pgtypeBoolToBool(row.AcceptsMedicalAid),
-		MedicalAidProviders: stringSliceFromJSONB(row.MedicalAidProviders),
-		PaymentMethods:      stringSliceFromJSONB(row.PaymentMethods),
-
-		FeeStructure: pgtypeTextToStringPtr(row.FeeStructure),
-
-		AccreditationBody:   pgtypeTextToStringPtr(row.AccreditationBody),
-		AccreditationExpiry: pgtypeDateToTimePtr(row.AccreditationExpiry),
-		Certifications:      mapFromJSONB(row.Certifications),
-
-		IsVerified:         pgtypeBoolToBool(row.IsVerified),
-		VerificationStatus: pgtypeTextToString(row.VerificationStatus),
-		VerificationNotes:  pgtypeTextToStringPtr(row.VerificationNotes),
-		VerifiedBy:         uuidPtrToUUID(row.VerifiedBy),
-		VerificationDate:   pgtypeTimestampToTimePtr(row.VerificationDate),
-
+		ID:                     pgtypeUUIDToUUID(row.ID),
+		CreatedBy:              pgtypeUUIDToUUIDPtr(row.CreatedBy),
+		OwnerUserID:            pgtypeUUIDToUUIDPtr(row.OwnerUserID),
+		ClinicName:             row.ClinicName,
+		ClinicType:             row.ClinicType,
+		RegistrationNumber:     pgtypeTextToStringPtr(row.RegistrationNumber),
+		AccreditationNumber:    pgtypeTextToStringPtr(row.AccreditationNumber),
+		PrimaryPhone:           pgtypeTextToStringPtr(row.PrimaryPhone),
+		SecondaryPhone:         pgtypeTextToStringPtr(row.SecondaryPhone),
+		EmergencyPhone:         pgtypeTextToStringPtr(row.EmergencyPhone),
+		Email:                  pgtypeTextToStringPtr(row.Email),
+		Website:                pgtypeTextToStringPtr(row.Website),
+		PhysicalAddress:        row.PhysicalAddress,
+		City:                   pgtypeTextToStringPtr(row.City),
+		Province:               pgtypeTextToStringPtr(row.Province),
+		PostalCode:             pgtypeTextToStringPtr(row.PostalCode),
+		Country:                pgtypeTextToString(row.Country),
+		Latitude:               pgtypeNumericToFloat64Ptr(row.Latitude),
+		Longitude:              pgtypeNumericToFloat64Ptr(row.Longitude),
+		GooglePlaceID:          pgtypeTextToStringPtr(row.GooglePlaceID),
+		Description:            pgtypeTextToStringPtr(row.Description),
+		YearEstablished:        pgtypeInt4ToIntPtr(row.YearEstablished),
+		OwnershipType:          pgtypeTextToStringPtr(row.OwnershipType),
+		BedCount:               pgtypeInt4ToIntPtr(row.BedCount),
+		OperatingHours:         mapFromJSONB(row.OperatingHours),
+		Services:               stringSliceFromJSONB(row.Services),
+		Specialties:            stringSliceFromJSONB(row.Specialties),
+		LanguagesSpoken:        row.LanguagesSpoken,
+		Facilities:             stringSliceFromJSONB(row.Facilities),
+		AcceptsMedicalAid:      pgtypeBoolToBool(row.AcceptsMedicalAid),
+		MedicalAidProviders:    stringSliceFromJSONB(row.MedicalAidProviders),
+		PaymentMethods:         stringSliceFromJSONB(row.PaymentMethods),
+		FeeStructure:           pgtypeTextToStringPtr(row.FeeStructure),
+		AccreditationBody:      pgtypeTextToStringPtr(row.AccreditationBody),
+		AccreditationExpiry:    pgtypeDateToTimePtr(row.AccreditationExpiry),
+		Certifications:         mapFromJSONB(row.Certifications),
+		IsVerified:             pgtypeBoolToBool(row.IsVerified),
+		VerificationStatus:     pgtypeTextToString(row.VerificationStatus),
+		VerificationNotes:      pgtypeTextToStringPtr(row.VerificationNotes),
+		VerifiedBy:             pgtypeUUIDToUUIDPtr(row.VerifiedBy),
+		VerificationDate:       pgtypeTimestampToTimePtr(row.VerificationDate),
 		PatientCapacity:        pgtypeInt4ToIntPtr(row.PatientCapacity),
 		AverageWaitTimeMinutes: pgtypeInt4ToIntPtr(row.AverageWaitTimeMinutes),
 		Rating:                 pgtypeNumericToFloat64Ptr(row.Rating),
 		ReviewCount:            pgtypeInt4ToInt(row.ReviewCount),
-
-		ContactPersonName:  pgtypeTextToStringPtr(row.ContactPersonName),
-		ContactPersonRole:  pgtypeTextToStringPtr(row.ContactPersonRole),
-		ContactPersonPhone: pgtypeTextToStringPtr(row.ContactPersonPhone),
-		ContactPersonEmail: pgtypeTextToStringPtr(row.ContactPersonEmail),
-
-		CreatedAt: row.CreatedAt.Time,
-		UpdatedAt: row.UpdatedAt.Time,
+		ContactPersonName:      pgtypeTextToStringPtr(row.ContactPersonName),
+		ContactPersonRole:      pgtypeTextToStringPtr(row.ContactPersonRole),
+		ContactPersonPhone:     pgtypeTextToStringPtr(row.ContactPersonPhone),
+		ContactPersonEmail:     pgtypeTextToStringPtr(row.ContactPersonEmail),
+		CreatedAt:              row.CreatedAt.Time,
+		UpdatedAt:              row.UpdatedAt.Time,
 	}
 }
 

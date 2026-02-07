@@ -8,7 +8,12 @@ import (
 
 // Clinic represents a healthcare facility
 type Clinic struct {
-	ID                     uuid.UUID      `json:"id"`
+	ID uuid.UUID `json:"id"`
+
+	//  Owner tracking
+	CreatedBy   *uuid.UUID `json:"created_by,omitempty"`
+	OwnerUserID *uuid.UUID `json:"owner_user_id,omitempty"`
+
 	ClinicName             string         `json:"clinic_name"`
 	ClinicType             string         `json:"clinic_type"` // public_health_clinic, private_clinic, community_health_center, mobile_clinic
 	RegistrationNumber     *string        `json:"registration_number,omitempty"`
@@ -68,8 +73,28 @@ type ClinicFilters struct {
 	AcceptsMedicalAid  *bool
 }
 
+// ClinicWithOwner represents a clinic with owner information
+type ClinicWithOwner struct {
+	Clinic
+	OwnerEmail     *string `json:"owner_email,omitempty"`
+	OwnerPhone     *string `json:"owner_phone,omitempty"`
+	OwnerFirstName *string `json:"owner_first_name,omitempty"`
+	OwnerLastName  *string `json:"owner_last_name,omitempty"`
+}
+
+// ClinicVerification represents verification status details
+type ClinicVerification struct {
+	ID                 uuid.UUID  `json:"id"`
+	ClinicName         string     `json:"clinic_name"`
+	VerificationStatus string     `json:"verification_status"`
+	IsVerified         bool       `json:"is_verified"`
+	VerificationNotes  *string    `json:"verification_notes,omitempty"`
+	VerificationDate   *time.Time `json:"verification_date,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+}
+
 // ============================================
-// SUPPORTING TYPES - CLINIC REPOSITORY
+// EXISTING SUPPORTING TYPES
 // ============================================
 
 type ClinicLocation struct {
