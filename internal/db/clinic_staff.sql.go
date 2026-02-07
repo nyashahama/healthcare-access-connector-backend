@@ -11,91 +11,113 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createStaffMember = `-- name: CreateStaffMember :one
+const acceptStaffInvitation = `-- name: AcceptStaffInvitation :exec
+UPDATE clinic_staff
+SET 
+    user_id = $2,
+    invitation_status = 'accepted',
+    employment_status = 'active',
+    start_date = CURRENT_DATE,
+    updated_at = NOW()
+WHERE invitation_token = $1
+    AND invitation_status = 'pending'
+    AND invitation_expires > NOW()
+`
 
+type AcceptStaffInvitationParams struct {
+	InvitationToken pgtype.Text `json:"invitation_token"`
+	UserID          pgtype.UUID `json:"user_id"`
+}
+
+func (q *Queries) AcceptStaffInvitation(ctx context.Context, arg AcceptStaffInvitationParams) error {
+	_, err := q.db.Exec(ctx, acceptStaffInvitation, arg.InvitationToken, arg.UserID)
+	return err
+}
+
+const cancelStaffInvitation = `-- name: CancelStaffInvitation :exec
+DELETE FROM clinic_staff
+WHERE invitation_token = $1
+    AND invitation_status = 'pending'
+`
+
+func (q *Queries) CancelStaffInvitation(ctx context.Context, invitationToken pgtype.Text) error {
+	_, err := q.db.Exec(ctx, cancelStaffInvitation, invitationToken)
+	return err
+}
+
+const checkStaffEmailExists = `-- name: CheckStaffEmailExists :one
+SELECT EXISTS(
+    SELECT 1 FROM clinic_staff 
+    WHERE clinic_id = $1 
+        AND work_email = $2
+        AND (
+            employment_status = 'active' 
+            OR (invitation_status = 'pending' AND invitation_expires > NOW())
+        )
+) as exists
+`
+
+type CheckStaffEmailExistsParams struct {
+	ClinicID  pgtype.UUID `json:"clinic_id"`
+	WorkEmail pgtype.Text `json:"work_email"`
+}
+
+func (q *Queries) CheckStaffEmailExists(ctx context.Context, arg CheckStaffEmailExistsParams) (bool, error) {
+	row := q.db.QueryRow(ctx, checkStaffEmailExists, arg.ClinicID, arg.WorkEmail)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const createStaffInvitation = `-- name: CreateStaffInvitation :one
 
 INSERT INTO clinic_staff (
-    clinic_id, user_id, title, first_name, last_name,
-    professional_title, specialization,
-    work_email, work_phone, personal_phone,
-    hpcs_number, other_license_numbers, qualifications, years_experience, bio,
-    staff_role, department, is_primary_contact,
-    working_hours, available_days, is_accepting_new_patients,
-    employment_status, start_date, end_date,
-    profile_picture_url, languages_spoken
+    clinic_id, work_email, first_name, last_name,
+    staff_role, professional_title,
+    invitation_token, invitation_status, invited_by,
+    invited_at, invitation_expires,
+    can_manage_staff, can_approve_appointments, can_edit_clinic_info,
+    employment_status
 )
 VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-    $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+    $1, $2, $3, $4, $5, $6, $7, 'pending', $8,
+    NOW(), $9, $10, $11, $12, 'invited'
 )
 RETURNING id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at
 `
 
-type CreateStaffMemberParams struct {
-	ClinicID               pgtype.UUID `json:"clinic_id"`
-	UserID                 pgtype.UUID `json:"user_id"`
-	Title                  pgtype.Text `json:"title"`
-	FirstName              string      `json:"first_name"`
-	LastName               string      `json:"last_name"`
-	ProfessionalTitle      pgtype.Text `json:"professional_title"`
-	Specialization         pgtype.Text `json:"specialization"`
-	WorkEmail              pgtype.Text `json:"work_email"`
-	WorkPhone              pgtype.Text `json:"work_phone"`
-	PersonalPhone          pgtype.Text `json:"personal_phone"`
-	HpcsNumber             pgtype.Text `json:"hpcs_number"`
-	OtherLicenseNumbers    []byte      `json:"other_license_numbers"`
-	Qualifications         []string    `json:"qualifications"`
-	YearsExperience        pgtype.Int4 `json:"years_experience"`
-	Bio                    pgtype.Text `json:"bio"`
-	StaffRole              string      `json:"staff_role"`
-	Department             pgtype.Text `json:"department"`
-	IsPrimaryContact       pgtype.Bool `json:"is_primary_contact"`
-	WorkingHours           []byte      `json:"working_hours"`
-	AvailableDays          []string    `json:"available_days"`
-	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
-	EmploymentStatus       pgtype.Text `json:"employment_status"`
-	StartDate              pgtype.Date `json:"start_date"`
-	EndDate                pgtype.Date `json:"end_date"`
-	ProfilePictureUrl      pgtype.Text `json:"profile_picture_url"`
-	LanguagesSpoken        []string    `json:"languages_spoken"`
+type CreateStaffInvitationParams struct {
+	ClinicID               pgtype.UUID      `json:"clinic_id"`
+	WorkEmail              pgtype.Text      `json:"work_email"`
+	FirstName              string           `json:"first_name"`
+	LastName               string           `json:"last_name"`
+	StaffRole              string           `json:"staff_role"`
+	ProfessionalTitle      pgtype.Text      `json:"professional_title"`
+	InvitationToken        pgtype.Text      `json:"invitation_token"`
+	InvitedBy              pgtype.UUID      `json:"invited_by"`
+	InvitationExpires      pgtype.Timestamp `json:"invitation_expires"`
+	CanManageStaff         pgtype.Bool      `json:"can_manage_staff"`
+	CanApproveAppointments pgtype.Bool      `json:"can_approve_appointments"`
+	CanEditClinicInfo      pgtype.Bool      `json:"can_edit_clinic_info"`
 }
 
 // ============================================
-// CLINIC STAFF REPOSITORY QUERIES
-// Maps to: StaffRepository interface
-// Domain: Healthcare Staff Management
+// STAFF INVITATION FLOW
 // ============================================
-// ============================================
-// CORE CRUD OPERATIONS
-// ============================================
-func (q *Queries) CreateStaffMember(ctx context.Context, arg CreateStaffMemberParams) (ClinicStaff, error) {
-	row := q.db.QueryRow(ctx, createStaffMember,
+func (q *Queries) CreateStaffInvitation(ctx context.Context, arg CreateStaffInvitationParams) (ClinicStaff, error) {
+	row := q.db.QueryRow(ctx, createStaffInvitation,
 		arg.ClinicID,
-		arg.UserID,
-		arg.Title,
+		arg.WorkEmail,
 		arg.FirstName,
 		arg.LastName,
-		arg.ProfessionalTitle,
-		arg.Specialization,
-		arg.WorkEmail,
-		arg.WorkPhone,
-		arg.PersonalPhone,
-		arg.HpcsNumber,
-		arg.OtherLicenseNumbers,
-		arg.Qualifications,
-		arg.YearsExperience,
-		arg.Bio,
 		arg.StaffRole,
-		arg.Department,
-		arg.IsPrimaryContact,
-		arg.WorkingHours,
-		arg.AvailableDays,
-		arg.IsAcceptingNewPatients,
-		arg.EmploymentStatus,
-		arg.StartDate,
-		arg.EndDate,
-		arg.ProfilePictureUrl,
-		arg.LanguagesSpoken,
+		arg.ProfessionalTitle,
+		arg.InvitationToken,
+		arg.InvitedBy,
+		arg.InvitationExpires,
+		arg.CanManageStaff,
+		arg.CanApproveAppointments,
+		arg.CanEditClinicInfo,
 	)
 	var i ClinicStaff
 	err := row.Scan(
@@ -141,6 +163,161 @@ func (q *Queries) CreateStaffMember(ctx context.Context, arg CreateStaffMemberPa
 	return i, err
 }
 
+const createStaffMember = `-- name: CreateStaffMember :one
+
+
+INSERT INTO clinic_staff (
+    clinic_id, user_id, title, first_name, last_name,
+    professional_title, specialization,
+    work_email, work_phone, personal_phone,
+    hpcs_number, other_license_numbers, qualifications, years_experience, bio,
+    staff_role, department, is_primary_contact,
+    working_hours, available_days, is_accepting_new_patients,
+    employment_status, start_date, end_date,
+    profile_picture_url, languages_spoken,
+    invitation_status, can_manage_staff, can_approve_appointments, can_edit_clinic_info
+)
+VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
+    $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+    $27, $28, $29, $30
+)
+RETURNING id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at
+`
+
+type CreateStaffMemberParams struct {
+	ClinicID               pgtype.UUID `json:"clinic_id"`
+	UserID                 pgtype.UUID `json:"user_id"`
+	Title                  pgtype.Text `json:"title"`
+	FirstName              string      `json:"first_name"`
+	LastName               string      `json:"last_name"`
+	ProfessionalTitle      pgtype.Text `json:"professional_title"`
+	Specialization         pgtype.Text `json:"specialization"`
+	WorkEmail              pgtype.Text `json:"work_email"`
+	WorkPhone              pgtype.Text `json:"work_phone"`
+	PersonalPhone          pgtype.Text `json:"personal_phone"`
+	HpcsNumber             pgtype.Text `json:"hpcs_number"`
+	OtherLicenseNumbers    []byte      `json:"other_license_numbers"`
+	Qualifications         []string    `json:"qualifications"`
+	YearsExperience        pgtype.Int4 `json:"years_experience"`
+	Bio                    pgtype.Text `json:"bio"`
+	StaffRole              string      `json:"staff_role"`
+	Department             pgtype.Text `json:"department"`
+	IsPrimaryContact       pgtype.Bool `json:"is_primary_contact"`
+	WorkingHours           []byte      `json:"working_hours"`
+	AvailableDays          []string    `json:"available_days"`
+	IsAcceptingNewPatients pgtype.Bool `json:"is_accepting_new_patients"`
+	EmploymentStatus       pgtype.Text `json:"employment_status"`
+	StartDate              pgtype.Date `json:"start_date"`
+	EndDate                pgtype.Date `json:"end_date"`
+	ProfilePictureUrl      pgtype.Text `json:"profile_picture_url"`
+	LanguagesSpoken        []string    `json:"languages_spoken"`
+	InvitationStatus       pgtype.Text `json:"invitation_status"`
+	CanManageStaff         pgtype.Bool `json:"can_manage_staff"`
+	CanApproveAppointments pgtype.Bool `json:"can_approve_appointments"`
+	CanEditClinicInfo      pgtype.Bool `json:"can_edit_clinic_info"`
+}
+
+// ============================================
+// CLINIC STAFF REPOSITORY QUERIES
+// Maps to: StaffRepository interface
+// Domain: Healthcare Staff Management
+// ============================================
+// ============================================
+// CORE CRUD OPERATIONS
+// ============================================
+func (q *Queries) CreateStaffMember(ctx context.Context, arg CreateStaffMemberParams) (ClinicStaff, error) {
+	row := q.db.QueryRow(ctx, createStaffMember,
+		arg.ClinicID,
+		arg.UserID,
+		arg.Title,
+		arg.FirstName,
+		arg.LastName,
+		arg.ProfessionalTitle,
+		arg.Specialization,
+		arg.WorkEmail,
+		arg.WorkPhone,
+		arg.PersonalPhone,
+		arg.HpcsNumber,
+		arg.OtherLicenseNumbers,
+		arg.Qualifications,
+		arg.YearsExperience,
+		arg.Bio,
+		arg.StaffRole,
+		arg.Department,
+		arg.IsPrimaryContact,
+		arg.WorkingHours,
+		arg.AvailableDays,
+		arg.IsAcceptingNewPatients,
+		arg.EmploymentStatus,
+		arg.StartDate,
+		arg.EndDate,
+		arg.ProfilePictureUrl,
+		arg.LanguagesSpoken,
+		arg.InvitationStatus,
+		arg.CanManageStaff,
+		arg.CanApproveAppointments,
+		arg.CanEditClinicInfo,
+	)
+	var i ClinicStaff
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicID,
+		&i.UserID,
+		&i.Title,
+		&i.FirstName,
+		&i.LastName,
+		&i.ProfessionalTitle,
+		&i.Specialization,
+		&i.WorkEmail,
+		&i.WorkPhone,
+		&i.PersonalPhone,
+		&i.HpcsNumber,
+		&i.OtherLicenseNumbers,
+		&i.Qualifications,
+		&i.YearsExperience,
+		&i.Bio,
+		&i.StaffRole,
+		&i.Department,
+		&i.IsPrimaryContact,
+		&i.InvitationToken,
+		&i.InvitationStatus,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.InvitationExpires,
+		&i.Permissions,
+		&i.CanManageStaff,
+		&i.CanApproveAppointments,
+		&i.CanEditClinicInfo,
+		&i.WorkingHours,
+		&i.AvailableDays,
+		&i.IsAcceptingNewPatients,
+		&i.EmploymentStatus,
+		&i.StartDate,
+		&i.EndDate,
+		&i.ProfilePictureUrl,
+		&i.LanguagesSpoken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const declineStaffInvitation = `-- name: DeclineStaffInvitation :exec
+UPDATE clinic_staff
+SET 
+    invitation_status = 'declined',
+    employment_status = 'terminated',
+    updated_at = NOW()
+WHERE invitation_token = $1
+    AND invitation_status = 'pending'
+`
+
+func (q *Queries) DeclineStaffInvitation(ctx context.Context, invitationToken pgtype.Text) error {
+	_, err := q.db.Exec(ctx, declineStaffInvitation, invitationToken)
+	return err
+}
+
 const deleteStaffMember = `-- name: DeleteStaffMember :exec
 DELETE FROM clinic_staff 
 WHERE id = $1
@@ -148,6 +325,21 @@ WHERE id = $1
 
 func (q *Queries) DeleteStaffMember(ctx context.Context, id pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, deleteStaffMember, id)
+	return err
+}
+
+const expireStaffInvitations = `-- name: ExpireStaffInvitations :exec
+UPDATE clinic_staff
+SET 
+    invitation_status = 'expired',
+    employment_status = 'terminated',
+    updated_at = NOW()
+WHERE invitation_status = 'pending'
+    AND invitation_expires < NOW()
+`
+
+func (q *Queries) ExpireStaffInvitations(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, expireStaffInvitations)
 	return err
 }
 
@@ -160,6 +352,7 @@ FROM clinic_staff
 WHERE 
     clinic_id = $1
     AND employment_status = 'active'
+    AND invitation_status = 'accepted'
 ORDER BY staff_role, first_name, last_name
 `
 
@@ -214,7 +407,7 @@ SELECT
     id, clinic_id, user_id, title, first_name, last_name,
     professional_title, specialization, staff_role,
     employment_status, is_accepting_new_patients,
-    start_date, end_date, created_at
+    start_date, end_date, invitation_status, created_at
 FROM clinic_staff
 WHERE clinic_id = $1
 ORDER BY employment_status, first_name, last_name
@@ -234,6 +427,7 @@ type GetAllClinicStaffRow struct {
 	IsAcceptingNewPatients pgtype.Bool      `json:"is_accepting_new_patients"`
 	StartDate              pgtype.Date      `json:"start_date"`
 	EndDate                pgtype.Date      `json:"end_date"`
+	InvitationStatus       pgtype.Text      `json:"invitation_status"`
 	CreatedAt              pgtype.Timestamp `json:"created_at"`
 }
 
@@ -260,6 +454,7 @@ func (q *Queries) GetAllClinicStaff(ctx context.Context, clinicID pgtype.UUID) (
 			&i.IsAcceptingNewPatients,
 			&i.StartDate,
 			&i.EndDate,
+			&i.InvitationStatus,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -278,7 +473,9 @@ SELECT
     id, clinic_id, user_id, title, first_name, last_name,
     professional_title, specialization, staff_role,
     employment_status, is_accepting_new_patients,
-    work_email, work_phone, created_at
+    work_email, work_phone, invitation_status,
+    can_manage_staff, can_approve_appointments, can_edit_clinic_info,
+    created_at
 FROM clinic_staff
 WHERE 
     clinic_id = $1
@@ -286,10 +483,12 @@ WHERE
     AND employment_status = 'active'
 ORDER BY 
     CASE staff_role
-        WHEN 'manager' THEN 1
-        WHEN 'doctor' THEN 2
-        WHEN 'nurse' THEN 3
-        ELSE 4
+        WHEN 'owner' THEN 1
+        WHEN 'admin' THEN 2
+        WHEN 'manager' THEN 3
+        WHEN 'doctor' THEN 4
+        WHEN 'nurse' THEN 5
+        ELSE 6
     END,
     first_name, last_name
 `
@@ -313,6 +512,10 @@ type GetClinicStaffRow struct {
 	IsAcceptingNewPatients pgtype.Bool      `json:"is_accepting_new_patients"`
 	WorkEmail              pgtype.Text      `json:"work_email"`
 	WorkPhone              pgtype.Text      `json:"work_phone"`
+	InvitationStatus       pgtype.Text      `json:"invitation_status"`
+	CanManageStaff         pgtype.Bool      `json:"can_manage_staff"`
+	CanApproveAppointments pgtype.Bool      `json:"can_approve_appointments"`
+	CanEditClinicInfo      pgtype.Bool      `json:"can_edit_clinic_info"`
 	CreatedAt              pgtype.Timestamp `json:"created_at"`
 }
 
@@ -342,7 +545,68 @@ func (q *Queries) GetClinicStaff(ctx context.Context, arg GetClinicStaffParams) 
 			&i.IsAcceptingNewPatients,
 			&i.WorkEmail,
 			&i.WorkPhone,
+			&i.InvitationStatus,
+			&i.CanManageStaff,
+			&i.CanApproveAppointments,
+			&i.CanEditClinicInfo,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getPendingInvitationsByClinic = `-- name: GetPendingInvitationsByClinic :many
+SELECT 
+    id, work_email, first_name, last_name,
+    staff_role, professional_title,
+    invitation_token, invited_at, invitation_expires,
+    invited_by
+FROM clinic_staff
+WHERE clinic_id = $1
+    AND invitation_status = 'pending'
+    AND employment_status = 'invited'
+ORDER BY invited_at DESC
+`
+
+type GetPendingInvitationsByClinicRow struct {
+	ID                pgtype.UUID      `json:"id"`
+	WorkEmail         pgtype.Text      `json:"work_email"`
+	FirstName         string           `json:"first_name"`
+	LastName          string           `json:"last_name"`
+	StaffRole         string           `json:"staff_role"`
+	ProfessionalTitle pgtype.Text      `json:"professional_title"`
+	InvitationToken   pgtype.Text      `json:"invitation_token"`
+	InvitedAt         pgtype.Timestamp `json:"invited_at"`
+	InvitationExpires pgtype.Timestamp `json:"invitation_expires"`
+	InvitedBy         pgtype.UUID      `json:"invited_by"`
+}
+
+func (q *Queries) GetPendingInvitationsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]GetPendingInvitationsByClinicRow, error) {
+	rows, err := q.db.Query(ctx, getPendingInvitationsByClinic, clinicID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetPendingInvitationsByClinicRow{}
+	for rows.Next() {
+		var i GetPendingInvitationsByClinicRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkEmail,
+			&i.FirstName,
+			&i.LastName,
+			&i.StaffRole,
+			&i.ProfessionalTitle,
+			&i.InvitationToken,
+			&i.InvitedAt,
+			&i.InvitationExpires,
+			&i.InvitedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -405,9 +669,68 @@ func (q *Queries) GetStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff
 	return i, err
 }
 
+const getStaffByUserAndClinic = `-- name: GetStaffByUserAndClinic :one
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
+WHERE user_id = $1 
+    AND clinic_id = $2
+LIMIT 1
+`
+
+type GetStaffByUserAndClinicParams struct {
+	UserID   pgtype.UUID `json:"user_id"`
+	ClinicID pgtype.UUID `json:"clinic_id"`
+}
+
+func (q *Queries) GetStaffByUserAndClinic(ctx context.Context, arg GetStaffByUserAndClinicParams) (ClinicStaff, error) {
+	row := q.db.QueryRow(ctx, getStaffByUserAndClinic, arg.UserID, arg.ClinicID)
+	var i ClinicStaff
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicID,
+		&i.UserID,
+		&i.Title,
+		&i.FirstName,
+		&i.LastName,
+		&i.ProfessionalTitle,
+		&i.Specialization,
+		&i.WorkEmail,
+		&i.WorkPhone,
+		&i.PersonalPhone,
+		&i.HpcsNumber,
+		&i.OtherLicenseNumbers,
+		&i.Qualifications,
+		&i.YearsExperience,
+		&i.Bio,
+		&i.StaffRole,
+		&i.Department,
+		&i.IsPrimaryContact,
+		&i.InvitationToken,
+		&i.InvitationStatus,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.InvitationExpires,
+		&i.Permissions,
+		&i.CanManageStaff,
+		&i.CanApproveAppointments,
+		&i.CanEditClinicInfo,
+		&i.WorkingHours,
+		&i.AvailableDays,
+		&i.IsAcceptingNewPatients,
+		&i.EmploymentStatus,
+		&i.StartDate,
+		&i.EndDate,
+		&i.ProfilePictureUrl,
+		&i.LanguagesSpoken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getStaffByUserID = `-- name: GetStaffByUserID :one
 SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
 WHERE user_id = $1
+LIMIT 1
 `
 
 func (q *Queries) GetStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error) {
@@ -456,6 +779,313 @@ func (q *Queries) GetStaffByUserID(ctx context.Context, userID pgtype.UUID) (Cli
 	return i, err
 }
 
+const getStaffInvitationByToken = `-- name: GetStaffInvitationByToken :one
+SELECT 
+    cs.id, cs.clinic_id, cs.user_id, cs.title, cs.first_name, cs.last_name, cs.professional_title, cs.specialization, cs.work_email, cs.work_phone, cs.personal_phone, cs.hpcs_number, cs.other_license_numbers, cs.qualifications, cs.years_experience, cs.bio, cs.staff_role, cs.department, cs.is_primary_contact, cs.invitation_token, cs.invitation_status, cs.invited_by, cs.invited_at, cs.invitation_expires, cs.permissions, cs.can_manage_staff, cs.can_approve_appointments, cs.can_edit_clinic_info, cs.working_hours, cs.available_days, cs.is_accepting_new_patients, cs.employment_status, cs.start_date, cs.end_date, cs.profile_picture_url, cs.languages_spoken, cs.created_at, cs.updated_at,
+    c.clinic_name,
+    c.city,
+    c.province,
+    u.email as inviter_email,
+    u.phone as inviter_phone
+FROM clinic_staff cs
+INNER JOIN clinics c ON cs.clinic_id = c.id
+LEFT JOIN users u ON cs.invited_by = u.id
+WHERE cs.invitation_token = $1
+    AND cs.invitation_status = 'pending'
+    AND cs.invitation_expires > NOW()
+`
+
+type GetStaffInvitationByTokenRow struct {
+	ID                     pgtype.UUID      `json:"id"`
+	ClinicID               pgtype.UUID      `json:"clinic_id"`
+	UserID                 pgtype.UUID      `json:"user_id"`
+	Title                  pgtype.Text      `json:"title"`
+	FirstName              string           `json:"first_name"`
+	LastName               string           `json:"last_name"`
+	ProfessionalTitle      pgtype.Text      `json:"professional_title"`
+	Specialization         pgtype.Text      `json:"specialization"`
+	WorkEmail              pgtype.Text      `json:"work_email"`
+	WorkPhone              pgtype.Text      `json:"work_phone"`
+	PersonalPhone          pgtype.Text      `json:"personal_phone"`
+	HpcsNumber             pgtype.Text      `json:"hpcs_number"`
+	OtherLicenseNumbers    []byte           `json:"other_license_numbers"`
+	Qualifications         []string         `json:"qualifications"`
+	YearsExperience        pgtype.Int4      `json:"years_experience"`
+	Bio                    pgtype.Text      `json:"bio"`
+	StaffRole              string           `json:"staff_role"`
+	Department             pgtype.Text      `json:"department"`
+	IsPrimaryContact       pgtype.Bool      `json:"is_primary_contact"`
+	InvitationToken        pgtype.Text      `json:"invitation_token"`
+	InvitationStatus       pgtype.Text      `json:"invitation_status"`
+	InvitedBy              pgtype.UUID      `json:"invited_by"`
+	InvitedAt              pgtype.Timestamp `json:"invited_at"`
+	InvitationExpires      pgtype.Timestamp `json:"invitation_expires"`
+	Permissions            []byte           `json:"permissions"`
+	CanManageStaff         pgtype.Bool      `json:"can_manage_staff"`
+	CanApproveAppointments pgtype.Bool      `json:"can_approve_appointments"`
+	CanEditClinicInfo      pgtype.Bool      `json:"can_edit_clinic_info"`
+	WorkingHours           []byte           `json:"working_hours"`
+	AvailableDays          []string         `json:"available_days"`
+	IsAcceptingNewPatients pgtype.Bool      `json:"is_accepting_new_patients"`
+	EmploymentStatus       pgtype.Text      `json:"employment_status"`
+	StartDate              pgtype.Date      `json:"start_date"`
+	EndDate                pgtype.Date      `json:"end_date"`
+	ProfilePictureUrl      pgtype.Text      `json:"profile_picture_url"`
+	LanguagesSpoken        []string         `json:"languages_spoken"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
+	ClinicName             string           `json:"clinic_name"`
+	City                   pgtype.Text      `json:"city"`
+	Province               pgtype.Text      `json:"province"`
+	InviterEmail           pgtype.Text      `json:"inviter_email"`
+	InviterPhone           pgtype.Text      `json:"inviter_phone"`
+}
+
+func (q *Queries) GetStaffInvitationByToken(ctx context.Context, invitationToken pgtype.Text) (GetStaffInvitationByTokenRow, error) {
+	row := q.db.QueryRow(ctx, getStaffInvitationByToken, invitationToken)
+	var i GetStaffInvitationByTokenRow
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicID,
+		&i.UserID,
+		&i.Title,
+		&i.FirstName,
+		&i.LastName,
+		&i.ProfessionalTitle,
+		&i.Specialization,
+		&i.WorkEmail,
+		&i.WorkPhone,
+		&i.PersonalPhone,
+		&i.HpcsNumber,
+		&i.OtherLicenseNumbers,
+		&i.Qualifications,
+		&i.YearsExperience,
+		&i.Bio,
+		&i.StaffRole,
+		&i.Department,
+		&i.IsPrimaryContact,
+		&i.InvitationToken,
+		&i.InvitationStatus,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.InvitationExpires,
+		&i.Permissions,
+		&i.CanManageStaff,
+		&i.CanApproveAppointments,
+		&i.CanEditClinicInfo,
+		&i.WorkingHours,
+		&i.AvailableDays,
+		&i.IsAcceptingNewPatients,
+		&i.EmploymentStatus,
+		&i.StartDate,
+		&i.EndDate,
+		&i.ProfilePictureUrl,
+		&i.LanguagesSpoken,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ClinicName,
+		&i.City,
+		&i.Province,
+		&i.InviterEmail,
+		&i.InviterPhone,
+	)
+	return i, err
+}
+
+const getStaffInvitationsByEmail = `-- name: GetStaffInvitationsByEmail :many
+SELECT 
+    cs.id, cs.clinic_id, cs.user_id, cs.title, cs.first_name, cs.last_name, cs.professional_title, cs.specialization, cs.work_email, cs.work_phone, cs.personal_phone, cs.hpcs_number, cs.other_license_numbers, cs.qualifications, cs.years_experience, cs.bio, cs.staff_role, cs.department, cs.is_primary_contact, cs.invitation_token, cs.invitation_status, cs.invited_by, cs.invited_at, cs.invitation_expires, cs.permissions, cs.can_manage_staff, cs.can_approve_appointments, cs.can_edit_clinic_info, cs.working_hours, cs.available_days, cs.is_accepting_new_patients, cs.employment_status, cs.start_date, cs.end_date, cs.profile_picture_url, cs.languages_spoken, cs.created_at, cs.updated_at,
+    c.clinic_name,
+    c.city,
+    c.province
+FROM clinic_staff cs
+INNER JOIN clinics c ON cs.clinic_id = c.id
+WHERE cs.work_email = $1
+    AND cs.invitation_status = 'pending'
+    AND cs.invitation_expires > NOW()
+ORDER BY cs.invited_at DESC
+`
+
+type GetStaffInvitationsByEmailRow struct {
+	ID                     pgtype.UUID      `json:"id"`
+	ClinicID               pgtype.UUID      `json:"clinic_id"`
+	UserID                 pgtype.UUID      `json:"user_id"`
+	Title                  pgtype.Text      `json:"title"`
+	FirstName              string           `json:"first_name"`
+	LastName               string           `json:"last_name"`
+	ProfessionalTitle      pgtype.Text      `json:"professional_title"`
+	Specialization         pgtype.Text      `json:"specialization"`
+	WorkEmail              pgtype.Text      `json:"work_email"`
+	WorkPhone              pgtype.Text      `json:"work_phone"`
+	PersonalPhone          pgtype.Text      `json:"personal_phone"`
+	HpcsNumber             pgtype.Text      `json:"hpcs_number"`
+	OtherLicenseNumbers    []byte           `json:"other_license_numbers"`
+	Qualifications         []string         `json:"qualifications"`
+	YearsExperience        pgtype.Int4      `json:"years_experience"`
+	Bio                    pgtype.Text      `json:"bio"`
+	StaffRole              string           `json:"staff_role"`
+	Department             pgtype.Text      `json:"department"`
+	IsPrimaryContact       pgtype.Bool      `json:"is_primary_contact"`
+	InvitationToken        pgtype.Text      `json:"invitation_token"`
+	InvitationStatus       pgtype.Text      `json:"invitation_status"`
+	InvitedBy              pgtype.UUID      `json:"invited_by"`
+	InvitedAt              pgtype.Timestamp `json:"invited_at"`
+	InvitationExpires      pgtype.Timestamp `json:"invitation_expires"`
+	Permissions            []byte           `json:"permissions"`
+	CanManageStaff         pgtype.Bool      `json:"can_manage_staff"`
+	CanApproveAppointments pgtype.Bool      `json:"can_approve_appointments"`
+	CanEditClinicInfo      pgtype.Bool      `json:"can_edit_clinic_info"`
+	WorkingHours           []byte           `json:"working_hours"`
+	AvailableDays          []string         `json:"available_days"`
+	IsAcceptingNewPatients pgtype.Bool      `json:"is_accepting_new_patients"`
+	EmploymentStatus       pgtype.Text      `json:"employment_status"`
+	StartDate              pgtype.Date      `json:"start_date"`
+	EndDate                pgtype.Date      `json:"end_date"`
+	ProfilePictureUrl      pgtype.Text      `json:"profile_picture_url"`
+	LanguagesSpoken        []string         `json:"languages_spoken"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
+	ClinicName             string           `json:"clinic_name"`
+	City                   pgtype.Text      `json:"city"`
+	Province               pgtype.Text      `json:"province"`
+}
+
+func (q *Queries) GetStaffInvitationsByEmail(ctx context.Context, workEmail pgtype.Text) ([]GetStaffInvitationsByEmailRow, error) {
+	rows, err := q.db.Query(ctx, getStaffInvitationsByEmail, workEmail)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetStaffInvitationsByEmailRow{}
+	for rows.Next() {
+		var i GetStaffInvitationsByEmailRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ClinicID,
+			&i.UserID,
+			&i.Title,
+			&i.FirstName,
+			&i.LastName,
+			&i.ProfessionalTitle,
+			&i.Specialization,
+			&i.WorkEmail,
+			&i.WorkPhone,
+			&i.PersonalPhone,
+			&i.HpcsNumber,
+			&i.OtherLicenseNumbers,
+			&i.Qualifications,
+			&i.YearsExperience,
+			&i.Bio,
+			&i.StaffRole,
+			&i.Department,
+			&i.IsPrimaryContact,
+			&i.InvitationToken,
+			&i.InvitationStatus,
+			&i.InvitedBy,
+			&i.InvitedAt,
+			&i.InvitationExpires,
+			&i.Permissions,
+			&i.CanManageStaff,
+			&i.CanApproveAppointments,
+			&i.CanEditClinicInfo,
+			&i.WorkingHours,
+			&i.AvailableDays,
+			&i.IsAcceptingNewPatients,
+			&i.EmploymentStatus,
+			&i.StartDate,
+			&i.EndDate,
+			&i.ProfilePictureUrl,
+			&i.LanguagesSpoken,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ClinicName,
+			&i.City,
+			&i.Province,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getStaffWithPermissions = `-- name: GetStaffWithPermissions :one
+SELECT 
+    id, clinic_id, user_id, staff_role,
+    can_manage_staff, can_approve_appointments, can_edit_clinic_info,
+    permissions, is_primary_contact
+FROM clinic_staff
+WHERE id = $1
+`
+
+type GetStaffWithPermissionsRow struct {
+	ID                     pgtype.UUID `json:"id"`
+	ClinicID               pgtype.UUID `json:"clinic_id"`
+	UserID                 pgtype.UUID `json:"user_id"`
+	StaffRole              string      `json:"staff_role"`
+	CanManageStaff         pgtype.Bool `json:"can_manage_staff"`
+	CanApproveAppointments pgtype.Bool `json:"can_approve_appointments"`
+	CanEditClinicInfo      pgtype.Bool `json:"can_edit_clinic_info"`
+	Permissions            []byte      `json:"permissions"`
+	IsPrimaryContact       pgtype.Bool `json:"is_primary_contact"`
+}
+
+func (q *Queries) GetStaffWithPermissions(ctx context.Context, id pgtype.UUID) (GetStaffWithPermissionsRow, error) {
+	row := q.db.QueryRow(ctx, getStaffWithPermissions, id)
+	var i GetStaffWithPermissionsRow
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicID,
+		&i.UserID,
+		&i.StaffRole,
+		&i.CanManageStaff,
+		&i.CanApproveAppointments,
+		&i.CanEditClinicInfo,
+		&i.Permissions,
+		&i.IsPrimaryContact,
+	)
+	return i, err
+}
+
+const reactivateStaffMember = `-- name: ReactivateStaffMember :exec
+UPDATE clinic_staff
+SET 
+    employment_status = 'active',
+    end_date = NULL,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) ReactivateStaffMember(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, reactivateStaffMember, id)
+	return err
+}
+
+const resendStaffInvitation = `-- name: ResendStaffInvitation :exec
+UPDATE clinic_staff
+SET 
+    invitation_token = $2,
+    invitation_expires = $3,
+    invited_at = NOW(),
+    updated_at = NOW()
+WHERE id = $1
+    AND invitation_status = 'pending'
+`
+
+type ResendStaffInvitationParams struct {
+	ID                pgtype.UUID      `json:"id"`
+	InvitationToken   pgtype.Text      `json:"invitation_token"`
+	InvitationExpires pgtype.Timestamp `json:"invitation_expires"`
+}
+
+func (q *Queries) ResendStaffInvitation(ctx context.Context, arg ResendStaffInvitationParams) error {
+	_, err := q.db.Exec(ctx, resendStaffInvitation, arg.ID, arg.InvitationToken, arg.InvitationExpires)
+	return err
+}
+
 const staffExists = `-- name: StaffExists :one
 SELECT EXISTS(
     SELECT 1 FROM clinic_staff 
@@ -468,6 +1098,20 @@ func (q *Queries) StaffExists(ctx context.Context, id pgtype.UUID) (bool, error)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const terminateStaffMember = `-- name: TerminateStaffMember :exec
+UPDATE clinic_staff
+SET 
+    employment_status = 'terminated',
+    end_date = CURRENT_DATE,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) TerminateStaffMember(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, terminateStaffMember, id)
+	return err
 }
 
 const updateStaffMember = `-- name: UpdateStaffMember :exec
@@ -515,5 +1159,53 @@ func (q *Queries) UpdateStaffMember(ctx context.Context, arg UpdateStaffMemberPa
 		arg.YearsExperience,
 		arg.IsAcceptingNewPatients,
 	)
+	return err
+}
+
+const updateStaffPermissions = `-- name: UpdateStaffPermissions :exec
+UPDATE clinic_staff
+SET 
+    can_manage_staff = $2,
+    can_approve_appointments = $3,
+    can_edit_clinic_info = $4,
+    permissions = $5,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffPermissionsParams struct {
+	ID                     pgtype.UUID `json:"id"`
+	CanManageStaff         pgtype.Bool `json:"can_manage_staff"`
+	CanApproveAppointments pgtype.Bool `json:"can_approve_appointments"`
+	CanEditClinicInfo      pgtype.Bool `json:"can_edit_clinic_info"`
+	Permissions            []byte      `json:"permissions"`
+}
+
+func (q *Queries) UpdateStaffPermissions(ctx context.Context, arg UpdateStaffPermissionsParams) error {
+	_, err := q.db.Exec(ctx, updateStaffPermissions,
+		arg.ID,
+		arg.CanManageStaff,
+		arg.CanApproveAppointments,
+		arg.CanEditClinicInfo,
+		arg.Permissions,
+	)
+	return err
+}
+
+const updateStaffRole = `-- name: UpdateStaffRole :exec
+UPDATE clinic_staff
+SET 
+    staff_role = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateStaffRoleParams struct {
+	ID        pgtype.UUID `json:"id"`
+	StaffRole string      `json:"staff_role"`
+}
+
+func (q *Queries) UpdateStaffRole(ctx context.Context, arg UpdateStaffRoleParams) error {
+	_, err := q.db.Exec(ctx, updateStaffRole, arg.ID, arg.StaffRole)
 	return err
 }

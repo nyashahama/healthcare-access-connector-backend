@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	AcceptStaffInvitation(ctx context.Context, arg AcceptStaffInvitationParams) error
 	// ============================================
 	// DEPENDENT HEALTH RECORDS REPOSITORY QUERIES
 	// Maps to: Part of PatientRepository interface
@@ -94,9 +95,11 @@ type Querier interface {
 	AddPatientSurgery(ctx context.Context, arg AddPatientSurgeryParams) (PatientSurgery, error)
 	BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error
 	CancelAppointment(ctx context.Context, arg CancelAppointmentParams) (Appointment, error)
+	CancelStaffInvitation(ctx context.Context, invitationToken pgtype.Text) error
 	CheckNationalIDExists(ctx context.Context, arg CheckNationalIDExistsParams) (bool, error)
 	CheckSchedulingConflict(ctx context.Context, arg CheckSchedulingConflictParams) (CheckSchedulingConflictRow, error)
 	CheckServiceNameExists(ctx context.Context, arg CheckServiceNameExistsParams) (bool, error)
+	CheckStaffEmailExists(ctx context.Context, arg CheckStaffEmailExistsParams) (bool, error)
 	CompleteAppointment(ctx context.Context, id pgtype.UUID) (Appointment, error)
 	CompleteUserOnboarding(ctx context.Context, id pgtype.UUID) error
 	ConfirmAppointment(ctx context.Context, arg ConfirmAppointmentParams) (Appointment, error)
@@ -177,6 +180,10 @@ type Querier interface {
 	// Session Management Queries
 	CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error)
 	// ============================================
+	// STAFF INVITATION FLOW
+	// ============================================
+	CreateStaffInvitation(ctx context.Context, arg CreateStaffInvitationParams) (ClinicStaff, error)
+	// ============================================
 	// CLINIC STAFF REPOSITORY QUERIES
 	// Maps to: StaffRepository interface
 	// Domain: Healthcare Staff Management
@@ -204,6 +211,7 @@ type Querier interface {
 	// ============================================
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateClinic(ctx context.Context, id pgtype.UUID) error
+	DeclineStaffInvitation(ctx context.Context, invitationToken pgtype.Text) error
 	DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error
 	DeleteAppointment(ctx context.Context, id pgtype.UUID) error
 	DeleteClinic(ctx context.Context, id pgtype.UUID) error
@@ -234,6 +242,7 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
+	ExpireStaffInvitations(ctx context.Context) error
 	ExportDataAccessLogs(ctx context.Context, arg ExportDataAccessLogsParams) ([]DataAccessLog, error)
 	ExportUserActivities(ctx context.Context, arg ExportUserActivitiesParams) ([]UserActivity, error)
 	GetAccessLogsByAccessedByUser(ctx context.Context, arg GetAccessLogsByAccessedByUserParams) ([]DataAccessLog, error)
@@ -345,6 +354,7 @@ type Querier interface {
 	// ============================================
 	GetPatientsWithMultipleSurgeries(ctx context.Context, dollar_1 interface{}) ([]GetPatientsWithMultipleSurgeriesRow, error)
 	GetPendingAppointments(ctx context.Context, clinicID pgtype.UUID) ([]Appointment, error)
+	GetPendingInvitationsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]GetPendingInvitationsByClinicRow, error)
 	GetPendingVerificationClinics(ctx context.Context, arg GetPendingVerificationClinicsParams) ([]GetPendingVerificationClinicsRow, error)
 	GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (GetPrimaryEmergencyContactRow, error)
 	GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error)
@@ -357,8 +367,12 @@ type Querier interface {
 	GetServiceByID(ctx context.Context, id pgtype.UUID) (ClinicService, error)
 	GetSession(ctx context.Context, sessionToken string) (GetSessionRow, error)
 	GetStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff, error)
+	GetStaffByUserAndClinic(ctx context.Context, arg GetStaffByUserAndClinicParams) (ClinicStaff, error)
 	GetStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error)
 	GetStaffCredentials(ctx context.Context, staffID pgtype.UUID) ([]ProfessionalCredential, error)
+	GetStaffInvitationByToken(ctx context.Context, invitationToken pgtype.Text) (GetStaffInvitationByTokenRow, error)
+	GetStaffInvitationsByEmail(ctx context.Context, workEmail pgtype.Text) ([]GetStaffInvitationsByEmailRow, error)
+	GetStaffWithPermissions(ctx context.Context, id pgtype.UUID) (GetStaffWithPermissionsRow, error)
 	GetSurgeriesByDateRange(ctx context.Context, arg GetSurgeriesByDateRangeParams) ([]GetSurgeriesByDateRangeRow, error)
 	GetSurgeriesByHospital(ctx context.Context, hospitalName pgtype.Text) ([]GetSurgeriesByHospitalRow, error)
 	GetSurgeriesByOutcome(ctx context.Context, outcome pgtype.Text) ([]GetSurgeriesByOutcomeRow, error)
@@ -420,9 +434,11 @@ type Querier interface {
 	LogUserActivity(ctx context.Context, arg LogUserActivityParams) error
 	MarkOTPUsed(ctx context.Context, arg MarkOTPUsedParams) error
 	ReactivateClinic(ctx context.Context, id pgtype.UUID) error
+	ReactivateStaffMember(ctx context.Context, id pgtype.UUID) error
 	RecordComplications(ctx context.Context, arg RecordComplicationsParams) error
 	RejectClinicVerification(ctx context.Context, arg RejectClinicVerificationParams) error
 	RescheduleAppointment(ctx context.Context, arg RescheduleAppointmentParams) (Appointment, error)
+	ResendStaffInvitation(ctx context.Context, arg ResendStaffInvitationParams) error
 	// OTP Verification Queries
 	SaveOTP(ctx context.Context, arg SaveOTPParams) (OtpVerification, error)
 	// ============================================
@@ -445,6 +461,7 @@ type Querier interface {
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
 	SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error
 	StaffExists(ctx context.Context, id pgtype.UUID) (bool, error)
+	TerminateStaffMember(ctx context.Context, id pgtype.UUID) error
 	UpdateAppointmentNotes(ctx context.Context, arg UpdateAppointmentNotesParams) (Appointment, error)
 	UpdateAppointmentReminders(ctx context.Context, arg UpdateAppointmentRemindersParams) error
 	UpdateAppointmentStatus(ctx context.Context, arg UpdateAppointmentStatusParams) (Appointment, error)
@@ -481,6 +498,8 @@ type Querier interface {
 	UpdateSession(ctx context.Context, arg UpdateSessionParams) error
 	UpdateSessionToken(ctx context.Context, arg UpdateSessionTokenParams) error
 	UpdateStaffMember(ctx context.Context, arg UpdateStaffMemberParams) error
+	UpdateStaffPermissions(ctx context.Context, arg UpdateStaffPermissionsParams) error
+	UpdateStaffRole(ctx context.Context, arg UpdateStaffRoleParams) error
 	// ============================================
 	// OUTCOME & COMPLICATIONS
 	// ============================================
