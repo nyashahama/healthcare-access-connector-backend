@@ -111,40 +111,6 @@ func (r *familyHistoryRepository) GetPatientFamilyHistory(ctx context.Context, p
 	return histories, nil
 }
 
-func (r *familyHistoryRepository) GetFamilyHistoryByRelative(ctx context.Context, patientID uuid.UUID, relative string) ([]patients.PatientFamilyHistory, error) {
-	start := time.Now()
-	defer func() {
-		familyHistoryDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	rows, err := r.querier.GetFamilyHistoryByRelative(ctx, sqlc.GetFamilyHistoryByRelativeParams{
-		PatientID: uuidToPgtypeUUID(patientID),
-		Relative:  relative,
-	})
-	if err != nil {
-		familyHistoryDBQueryTotal.WithLabelValues("get_family_history_by_relative", "error").Inc()
-		return nil, r.handleError(err, "get family history by relative")
-	}
-
-	histories := make([]patients.PatientFamilyHistory, len(rows))
-	for i, row := range rows {
-		histories[i] = patients.PatientFamilyHistory{
-			ID:                     pgtypeUUIDToUUID(row.ID),
-			PatientID:              patientID,
-			Relative:               relative,
-			ConditionName:          row.ConditionName,
-			RelativeAgeAtDiagnosis: pgtypeInt4ToIntPtr(row.RelativeAgeAtDiagnosis),
-			IsAlive:                pgtypeBoolToBoolPtr(row.IsAlive),
-			CauseOfDeath:           pgtypeTextToStringPtr(row.CauseOfDeath),
-			AgeAtDeath:             pgtypeInt4ToIntPtr(row.AgeAtDeath),
-			Notes:                  pgtypeTextToStringPtr(row.Notes),
-		}
-	}
-
-	familyHistoryDBQueryTotal.WithLabelValues("get_family_history_by_relative", "success").Inc()
-	return histories, nil
-}
-
 func (r *familyHistoryRepository) UpdateFamilyHistory(ctx context.Context, history patients.PatientFamilyHistory) error {
 	start := time.Now()
 	defer func() {
