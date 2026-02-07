@@ -4,7 +4,11 @@
 
 CREATE TABLE clinics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
+
+    -- NEW: Track who created the clinic
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    owner_user_id UUID REFERENCES users(id) ON DELETE SET NULL,   
+
     -- Basic Information
     clinic_name VARCHAR(255) NOT NULL,
     clinic_type VARCHAR(100) NOT NULL, -- 'public_health_clinic', 'private_clinic', 'community_health_center', 'mobile_clinic'

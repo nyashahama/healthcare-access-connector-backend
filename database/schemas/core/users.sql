@@ -26,5 +26,10 @@ CREATE TABLE users (
     consent_date TIMESTAMP,
     
     -- Profile completion tracking
-    profile_completion_percentage INTEGER DEFAULT 0
+    profile_completion_percentage INTEGER DEFAULT 0,
+    
+    -- NEW: Provider onboarding tracking
+    primary_clinic_id UUID REFERENCES clinics(id) ON DELETE SET NULL,
+    onboarding_completed BOOLEAN DEFAULT false,
+    onboarding_step VARCHAR(50)
 );

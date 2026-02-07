@@ -196,7 +196,7 @@ VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
     $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
 )
-RETURNING id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at
+RETURNING id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at
 `
 
 type CreateStaffMemberParams struct {
@@ -286,6 +286,15 @@ func (q *Queries) CreateStaffMember(ctx context.Context, arg CreateStaffMemberPa
 		&i.StaffRole,
 		&i.Department,
 		&i.IsPrimaryContact,
+		&i.InvitationToken,
+		&i.InvitationStatus,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.InvitationExpires,
+		&i.Permissions,
+		&i.CanManageStaff,
+		&i.CanApproveAppointments,
+		&i.CanEditClinicInfo,
 		&i.WorkingHours,
 		&i.AvailableDays,
 		&i.IsAcceptingNewPatients,
@@ -1073,7 +1082,7 @@ func (q *Queries) GetStaffByExperience(ctx context.Context, arg GetStaffByExperi
 
 const getStaffByHPCSNumber = `-- name: GetStaffByHPCSNumber :one
 
-SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
 WHERE hpcs_number = $1
 LIMIT 1
 `
@@ -1104,6 +1113,15 @@ func (q *Queries) GetStaffByHPCSNumber(ctx context.Context, hpcsNumber pgtype.Te
 		&i.StaffRole,
 		&i.Department,
 		&i.IsPrimaryContact,
+		&i.InvitationToken,
+		&i.InvitationStatus,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.InvitationExpires,
+		&i.Permissions,
+		&i.CanManageStaff,
+		&i.CanApproveAppointments,
+		&i.CanEditClinicInfo,
 		&i.WorkingHours,
 		&i.AvailableDays,
 		&i.IsAcceptingNewPatients,
@@ -1119,7 +1137,7 @@ func (q *Queries) GetStaffByHPCSNumber(ctx context.Context, hpcsNumber pgtype.Te
 }
 
 const getStaffByID = `-- name: GetStaffByID :one
-SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
 WHERE id = $1
 `
 
@@ -1146,6 +1164,15 @@ func (q *Queries) GetStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff
 		&i.StaffRole,
 		&i.Department,
 		&i.IsPrimaryContact,
+		&i.InvitationToken,
+		&i.InvitationStatus,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.InvitationExpires,
+		&i.Permissions,
+		&i.CanManageStaff,
+		&i.CanApproveAppointments,
+		&i.CanEditClinicInfo,
 		&i.WorkingHours,
 		&i.AvailableDays,
 		&i.IsAcceptingNewPatients,
@@ -1162,7 +1189,7 @@ func (q *Queries) GetStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff
 
 const getStaffByIDs = `-- name: GetStaffByIDs :many
 
-SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
 WHERE id = ANY($1::uuid[])
 ORDER BY first_name, last_name
 `
@@ -1199,6 +1226,15 @@ func (q *Queries) GetStaffByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]
 			&i.StaffRole,
 			&i.Department,
 			&i.IsPrimaryContact,
+			&i.InvitationToken,
+			&i.InvitationStatus,
+			&i.InvitedBy,
+			&i.InvitedAt,
+			&i.InvitationExpires,
+			&i.Permissions,
+			&i.CanManageStaff,
+			&i.CanApproveAppointments,
+			&i.CanEditClinicInfo,
 			&i.WorkingHours,
 			&i.AvailableDays,
 			&i.IsAcceptingNewPatients,
@@ -1338,7 +1374,7 @@ func (q *Queries) GetStaffBySpecialization(ctx context.Context, arg GetStaffBySp
 }
 
 const getStaffByUserID = `-- name: GetStaffByUserID :one
-SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
+SELECT id, clinic_id, user_id, title, first_name, last_name, professional_title, specialization, work_email, work_phone, personal_phone, hpcs_number, other_license_numbers, qualifications, years_experience, bio, staff_role, department, is_primary_contact, invitation_token, invitation_status, invited_by, invited_at, invitation_expires, permissions, can_manage_staff, can_approve_appointments, can_edit_clinic_info, working_hours, available_days, is_accepting_new_patients, employment_status, start_date, end_date, profile_picture_url, languages_spoken, created_at, updated_at FROM clinic_staff
 WHERE user_id = $1
 `
 
@@ -1365,6 +1401,15 @@ func (q *Queries) GetStaffByUserID(ctx context.Context, userID pgtype.UUID) (Cli
 		&i.StaffRole,
 		&i.Department,
 		&i.IsPrimaryContact,
+		&i.InvitationToken,
+		&i.InvitationStatus,
+		&i.InvitedBy,
+		&i.InvitedAt,
+		&i.InvitationExpires,
+		&i.Permissions,
+		&i.CanManageStaff,
+		&i.CanApproveAppointments,
+		&i.CanEditClinicInfo,
 		&i.WorkingHours,
 		&i.AvailableDays,
 		&i.IsAcceptingNewPatients,

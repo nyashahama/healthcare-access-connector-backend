@@ -37,6 +37,8 @@ type Appointment struct {
 
 type Clinic struct {
 	ID                     pgtype.UUID      `json:"id"`
+	CreatedBy              pgtype.UUID      `json:"created_by"`
+	OwnerUserID            pgtype.UUID      `json:"owner_user_id"`
 	ClinicName             string           `json:"clinic_name"`
 	ClinicType             string           `json:"clinic_type"`
 	RegistrationNumber     pgtype.Text      `json:"registration_number"`
@@ -137,6 +139,15 @@ type ClinicStaff struct {
 	StaffRole              string           `json:"staff_role"`
 	Department             pgtype.Text      `json:"department"`
 	IsPrimaryContact       pgtype.Bool      `json:"is_primary_contact"`
+	InvitationToken        pgtype.Text      `json:"invitation_token"`
+	InvitationStatus       pgtype.Text      `json:"invitation_status"`
+	InvitedBy              pgtype.UUID      `json:"invited_by"`
+	InvitedAt              pgtype.Timestamp `json:"invited_at"`
+	InvitationExpires      pgtype.Timestamp `json:"invitation_expires"`
+	Permissions            []byte           `json:"permissions"`
+	CanManageStaff         pgtype.Bool      `json:"can_manage_staff"`
+	CanApproveAppointments pgtype.Bool      `json:"can_approve_appointments"`
+	CanEditClinicInfo      pgtype.Bool      `json:"can_edit_clinic_info"`
 	WorkingHours           []byte           `json:"working_hours"`
 	AvailableDays          []string         `json:"available_days"`
 	IsAcceptingNewPatients pgtype.Bool      `json:"is_accepting_new_patients"`
@@ -569,6 +580,9 @@ type User struct {
 	PopiaConsentGiven           pgtype.Bool      `json:"popia_consent_given"`
 	ConsentDate                 pgtype.Timestamp `json:"consent_date"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 }
 
 type UserActivity struct {
