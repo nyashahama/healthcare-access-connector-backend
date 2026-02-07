@@ -27,6 +27,20 @@ func (q *Queries) BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserSt
 	return err
 }
 
+const completeUserOnboarding = `-- name: CompleteUserOnboarding :exec
+UPDATE users
+SET 
+    onboarding_completed = TRUE,
+    onboarding_step = 'completed',
+    updated_at = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) CompleteUserOnboarding(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, completeUserOnboarding, id)
+	return err
+}
+
 const countUsersByRole = `-- name: CountUsersByRole :one
 SELECT COUNT(*) FROM users 
 WHERE role = $1 AND status != 'inactive'
@@ -40,13 +54,17 @@ func (q *Queries) CountUsersByRole(ctx context.Context, role string) (int64, err
 }
 
 const createUser = `-- name: CreateUser :one
+
+
 INSERT INTO users (
     email, phone, password_hash, role, status, 
     is_sms_only, sms_consent_given, popia_consent_given, consent_date
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING id, email, phone, role, status, is_verified, last_login, 
-    login_count, is_sms_only, profile_completion_percentage, created_at, updated_at
+    login_count, is_sms_only, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
+    created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -72,11 +90,21 @@ type CreateUserRow struct {
 	LoginCount                  pgtype.Int4      `json:"login_count"`
 	IsSmsOnly                   pgtype.Bool      `json:"is_sms_only"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
 }
 
-// User Management Queries
+// ============================================
+// USER REPOSITORY QUERIES
+// Maps to: UserRepository interface
+// Domain: User Management & Authentication
+// ============================================
+// ============================================
+// CORE CRUD OPERATIONS
+// ============================================
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
 	row := q.db.QueryRow(ctx, createUser,
 		arg.Email,
@@ -101,6 +129,9 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 		&i.LoginCount,
 		&i.IsSmsOnly,
 		&i.ProfileCompletionPercentage,
+		&i.PrimaryClinicID,
+		&i.OnboardingCompleted,
+		&i.OnboardingStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -116,11 +147,69 @@ func (q *Queries) DeleteUser(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const getProviderWithClinic = `-- name: GetProviderWithClinic :one
+SELECT 
+    u.id,
+    u.email,
+    u.phone,
+    u.role,
+    u.status,
+    u.is_verified,
+    u.primary_clinic_id,
+    u.onboarding_completed,
+    u.onboarding_step,
+    c.id as clinic_id,
+    c.clinic_name,
+    c.verification_status as clinic_verification_status,
+    c.is_verified as clinic_is_verified
+FROM users u
+LEFT JOIN clinics c ON u.primary_clinic_id = c.id
+WHERE u.id = $1 AND u.status != 'inactive'
+`
+
+type GetProviderWithClinicRow struct {
+	ID                       pgtype.UUID `json:"id"`
+	Email                    string      `json:"email"`
+	Phone                    pgtype.Text `json:"phone"`
+	Role                     string      `json:"role"`
+	Status                   pgtype.Text `json:"status"`
+	IsVerified               pgtype.Bool `json:"is_verified"`
+	PrimaryClinicID          pgtype.UUID `json:"primary_clinic_id"`
+	OnboardingCompleted      pgtype.Bool `json:"onboarding_completed"`
+	OnboardingStep           pgtype.Text `json:"onboarding_step"`
+	ClinicID                 pgtype.UUID `json:"clinic_id"`
+	ClinicName               pgtype.Text `json:"clinic_name"`
+	ClinicVerificationStatus pgtype.Text `json:"clinic_verification_status"`
+	ClinicIsVerified         pgtype.Bool `json:"clinic_is_verified"`
+}
+
+func (q *Queries) GetProviderWithClinic(ctx context.Context, id pgtype.UUID) (GetProviderWithClinicRow, error) {
+	row := q.db.QueryRow(ctx, getProviderWithClinic, id)
+	var i GetProviderWithClinicRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Phone,
+		&i.Role,
+		&i.Status,
+		&i.IsVerified,
+		&i.PrimaryClinicID,
+		&i.OnboardingCompleted,
+		&i.OnboardingStep,
+		&i.ClinicID,
+		&i.ClinicName,
+		&i.ClinicVerificationStatus,
+		&i.ClinicIsVerified,
+	)
+	return i, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     verification_token, verification_expires, last_login, login_count, 
     is_sms_only, sms_consent_given, popia_consent_given, 
-    profile_completion_percentage, created_at, updated_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at, updated_at
 FROM users
 WHERE email = $1 AND status != 'inactive'
 `
@@ -141,6 +230,9 @@ type GetUserByEmailRow struct {
 	SmsConsentGiven             pgtype.Bool      `json:"sms_consent_given"`
 	PopiaConsentGiven           pgtype.Bool      `json:"popia_consent_given"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
 }
@@ -164,6 +256,9 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 		&i.SmsConsentGiven,
 		&i.PopiaConsentGiven,
 		&i.ProfileCompletionPercentage,
+		&i.PrimaryClinicID,
+		&i.OnboardingCompleted,
+		&i.OnboardingStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -173,6 +268,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (GetUserByEm
 const getUserByID = `-- name: GetUserByID :one
 SELECT id, email, phone, role, status, is_verified, last_login, 
     login_count, is_sms_only, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
     created_at, updated_at
 FROM users
 WHERE id = $1 AND status != 'inactive'
@@ -189,6 +285,9 @@ type GetUserByIDRow struct {
 	LoginCount                  pgtype.Int4      `json:"login_count"`
 	IsSmsOnly                   pgtype.Bool      `json:"is_sms_only"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
 }
@@ -207,6 +306,9 @@ func (q *Queries) GetUserByID(ctx context.Context, id pgtype.UUID) (GetUserByIDR
 		&i.LoginCount,
 		&i.IsSmsOnly,
 		&i.ProfileCompletionPercentage,
+		&i.PrimaryClinicID,
+		&i.OnboardingCompleted,
+		&i.OnboardingStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -217,7 +319,8 @@ const getUserByPasswordResetToken = `-- name: GetUserByPasswordResetToken :one
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     reset_password_token, reset_password_expires, last_login, login_count, 
     is_sms_only, sms_consent_given, popia_consent_given, 
-    profile_completion_percentage, created_at, updated_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at, updated_at
 FROM users
 WHERE reset_password_token = $1 
     AND reset_password_expires > NOW() 
@@ -240,6 +343,9 @@ type GetUserByPasswordResetTokenRow struct {
 	SmsConsentGiven             pgtype.Bool      `json:"sms_consent_given"`
 	PopiaConsentGiven           pgtype.Bool      `json:"popia_consent_given"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
 }
@@ -263,6 +369,9 @@ func (q *Queries) GetUserByPasswordResetToken(ctx context.Context, resetPassword
 		&i.SmsConsentGiven,
 		&i.PopiaConsentGiven,
 		&i.ProfileCompletionPercentage,
+		&i.PrimaryClinicID,
+		&i.OnboardingCompleted,
+		&i.OnboardingStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -272,7 +381,9 @@ func (q *Queries) GetUserByPasswordResetToken(ctx context.Context, resetPassword
 const getUserByPhone = `-- name: GetUserByPhone :one
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     last_login, login_count, is_sms_only, sms_consent_given, 
-    popia_consent_given, profile_completion_percentage, created_at, updated_at
+    popia_consent_given, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
+    created_at, updated_at
 FROM users
 WHERE phone = $1 AND status != 'inactive'
 `
@@ -291,6 +402,9 @@ type GetUserByPhoneRow struct {
 	SmsConsentGiven             pgtype.Bool      `json:"sms_consent_given"`
 	PopiaConsentGiven           pgtype.Bool      `json:"popia_consent_given"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
 }
@@ -312,6 +426,9 @@ func (q *Queries) GetUserByPhone(ctx context.Context, phone pgtype.Text) (GetUse
 		&i.SmsConsentGiven,
 		&i.PopiaConsentGiven,
 		&i.ProfileCompletionPercentage,
+		&i.PrimaryClinicID,
+		&i.OnboardingCompleted,
+		&i.OnboardingStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -322,6 +439,7 @@ const getUserByPhoneWithHash = `-- name: GetUserByPhoneWithHash :one
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     last_login, login_count, is_sms_only, sms_consent_given, 
     popia_consent_given, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
     created_at, updated_at
 FROM users
 WHERE phone = $1 AND status != 'inactive'
@@ -341,6 +459,9 @@ type GetUserByPhoneWithHashRow struct {
 	SmsConsentGiven             pgtype.Bool      `json:"sms_consent_given"`
 	PopiaConsentGiven           pgtype.Bool      `json:"popia_consent_given"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
 }
@@ -362,6 +483,9 @@ func (q *Queries) GetUserByPhoneWithHash(ctx context.Context, phone pgtype.Text)
 		&i.SmsConsentGiven,
 		&i.PopiaConsentGiven,
 		&i.ProfileCompletionPercentage,
+		&i.PrimaryClinicID,
+		&i.OnboardingCompleted,
+		&i.OnboardingStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -372,7 +496,8 @@ const getUserByVerificationToken = `-- name: GetUserByVerificationToken :one
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     verification_token, verification_expires, last_login, login_count, 
     is_sms_only, sms_consent_given, popia_consent_given, 
-    profile_completion_percentage, created_at, updated_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at, updated_at
 FROM users
 WHERE verification_token = $1 
     AND verification_expires > NOW() 
@@ -395,6 +520,9 @@ type GetUserByVerificationTokenRow struct {
 	SmsConsentGiven             pgtype.Bool      `json:"sms_consent_given"`
 	PopiaConsentGiven           pgtype.Bool      `json:"popia_consent_given"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
 }
@@ -418,15 +546,81 @@ func (q *Queries) GetUserByVerificationToken(ctx context.Context, verificationTo
 		&i.SmsConsentGiven,
 		&i.PopiaConsentGiven,
 		&i.ProfileCompletionPercentage,
+		&i.PrimaryClinicID,
+		&i.OnboardingCompleted,
+		&i.OnboardingStep,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
+const getUserClinics = `-- name: GetUserClinics :many
+SELECT 
+    c.id as clinic_id,
+    c.clinic_name,
+    c.clinic_type,
+    c.verification_status,
+    c.is_verified,
+    cs.staff_role,
+    cs.can_manage_staff,
+    cs.can_edit_clinic_info,
+    cs.can_approve_appointments,
+    cs.is_primary_contact
+FROM clinic_staff cs
+INNER JOIN clinics c ON cs.clinic_id = c.id
+WHERE cs.user_id = $1 AND cs.employment_status = 'active'
+ORDER BY cs.is_primary_contact DESC, c.created_at DESC
+`
+
+type GetUserClinicsRow struct {
+	ClinicID               pgtype.UUID `json:"clinic_id"`
+	ClinicName             string      `json:"clinic_name"`
+	ClinicType             string      `json:"clinic_type"`
+	VerificationStatus     pgtype.Text `json:"verification_status"`
+	IsVerified             pgtype.Bool `json:"is_verified"`
+	StaffRole              string      `json:"staff_role"`
+	CanManageStaff         pgtype.Bool `json:"can_manage_staff"`
+	CanEditClinicInfo      pgtype.Bool `json:"can_edit_clinic_info"`
+	CanApproveAppointments pgtype.Bool `json:"can_approve_appointments"`
+	IsPrimaryContact       pgtype.Bool `json:"is_primary_contact"`
+}
+
+func (q *Queries) GetUserClinics(ctx context.Context, userID pgtype.UUID) ([]GetUserClinicsRow, error) {
+	rows, err := q.db.Query(ctx, getUserClinics, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetUserClinicsRow{}
+	for rows.Next() {
+		var i GetUserClinicsRow
+		if err := rows.Scan(
+			&i.ClinicID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.VerificationStatus,
+			&i.IsVerified,
+			&i.StaffRole,
+			&i.CanManageStaff,
+			&i.CanEditClinicInfo,
+			&i.CanApproveAppointments,
+			&i.IsPrimaryContact,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUsersByIDs = `-- name: GetUsersByIDs :many
 SELECT id, email, phone, role, status, is_verified, last_login, 
     login_count, is_sms_only, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
     created_at, updated_at
 FROM users
 WHERE id = ANY($1::uuid[]) AND status != 'inactive'
@@ -444,6 +638,9 @@ type GetUsersByIDsRow struct {
 	LoginCount                  pgtype.Int4      `json:"login_count"`
 	IsSmsOnly                   pgtype.Bool      `json:"is_sms_only"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 	UpdatedAt                   pgtype.Timestamp `json:"updated_at"`
 }
@@ -468,6 +665,9 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]
 			&i.LoginCount,
 			&i.IsSmsOnly,
 			&i.ProfileCompletionPercentage,
+			&i.PrimaryClinicID,
+			&i.OnboardingCompleted,
+			&i.OnboardingStep,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -483,7 +683,8 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]
 
 const listUsersByRole = `-- name: ListUsersByRole :many
 SELECT id, email, phone, role, status, is_verified, last_login, 
-    profile_completion_percentage, created_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at
 FROM users
 WHERE role = $1 AND status != 'inactive'
 ORDER BY created_at DESC
@@ -505,6 +706,9 @@ type ListUsersByRoleRow struct {
 	IsVerified                  pgtype.Bool      `json:"is_verified"`
 	LastLogin                   pgtype.Timestamp `json:"last_login"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 }
 
@@ -526,6 +730,9 @@ func (q *Queries) ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams
 			&i.IsVerified,
 			&i.LastLogin,
 			&i.ProfileCompletionPercentage,
+			&i.PrimaryClinicID,
+			&i.OnboardingCompleted,
+			&i.OnboardingStep,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -540,7 +747,8 @@ func (q *Queries) ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams
 
 const searchUsers = `-- name: SearchUsers :many
 SELECT id, email, phone, role, status, is_verified, last_login, 
-    profile_completion_percentage, created_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at
 FROM users
 WHERE status != 'inactive'
     AND (
@@ -568,6 +776,9 @@ type SearchUsersRow struct {
 	IsVerified                  pgtype.Bool      `json:"is_verified"`
 	LastLogin                   pgtype.Timestamp `json:"last_login"`
 	ProfileCompletionPercentage pgtype.Int4      `json:"profile_completion_percentage"`
+	PrimaryClinicID             pgtype.UUID      `json:"primary_clinic_id"`
+	OnboardingCompleted         pgtype.Bool      `json:"onboarding_completed"`
+	OnboardingStep              pgtype.Text      `json:"onboarding_step"`
 	CreatedAt                   pgtype.Timestamp `json:"created_at"`
 }
 
@@ -589,6 +800,9 @@ func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]Sea
 			&i.IsVerified,
 			&i.LastLogin,
 			&i.ProfileCompletionPercentage,
+			&i.PrimaryClinicID,
+			&i.OnboardingCompleted,
+			&i.OnboardingStep,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -734,6 +948,28 @@ func (q *Queries) UpdateUserLastLogin(ctx context.Context, id pgtype.UUID) error
 	return err
 }
 
+const updateUserOnboardingStep = `-- name: UpdateUserOnboardingStep :exec
+
+UPDATE users
+SET 
+    onboarding_step = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserOnboardingStepParams struct {
+	ID             pgtype.UUID `json:"id"`
+	OnboardingStep pgtype.Text `json:"onboarding_step"`
+}
+
+// ============================================
+// PROVIDER ONBOARDING QUERIES
+// ============================================
+func (q *Queries) UpdateUserOnboardingStep(ctx context.Context, arg UpdateUserOnboardingStepParams) error {
+	_, err := q.db.Exec(ctx, updateUserOnboardingStep, arg.ID, arg.OnboardingStep)
+	return err
+}
+
 const updateUserPassword = `-- name: UpdateUserPassword :exec
 UPDATE users
 SET password_hash = $2, reset_password_token = NULL, reset_password_expires = NULL, updated_at = NOW()
@@ -763,6 +999,24 @@ type UpdateUserPhoneParams struct {
 
 func (q *Queries) UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) error {
 	_, err := q.db.Exec(ctx, updateUserPhone, arg.ID, arg.Phone)
+	return err
+}
+
+const updateUserPrimaryClinic = `-- name: UpdateUserPrimaryClinic :exec
+UPDATE users
+SET 
+    primary_clinic_id = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateUserPrimaryClinicParams struct {
+	ID              pgtype.UUID `json:"id"`
+	PrimaryClinicID pgtype.UUID `json:"primary_clinic_id"`
+}
+
+func (q *Queries) UpdateUserPrimaryClinic(ctx context.Context, arg UpdateUserPrimaryClinicParams) error {
+	_, err := q.db.Exec(ctx, updateUserPrimaryClinic, arg.ID, arg.PrimaryClinicID)
 	return err
 }
 

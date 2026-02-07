@@ -1,4 +1,13 @@
--- User Management Queries
+-- ============================================
+-- USER REPOSITORY QUERIES
+-- Maps to: UserRepository interface
+-- Domain: User Management & Authentication
+-- ============================================
+
+-- ============================================
+-- CORE CRUD OPERATIONS
+-- ============================================
+
 -- name: CreateUser :one
 INSERT INTO users (
     email, phone, password_hash, role, status, 
@@ -6,13 +15,16 @@ INSERT INTO users (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING id, email, phone, role, status, is_verified, last_login, 
-    login_count, is_sms_only, profile_completion_percentage, created_at, updated_at;
+    login_count, is_sms_only, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
+    created_at, updated_at;
 
 -- name: GetUserByVerificationToken :one
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     verification_token, verification_expires, last_login, login_count, 
     is_sms_only, sms_consent_given, popia_consent_given, 
-    profile_completion_percentage, created_at, updated_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at, updated_at
 FROM users
 WHERE verification_token = $1 
     AND verification_expires > NOW() 
@@ -22,7 +34,8 @@ WHERE verification_token = $1
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     reset_password_token, reset_password_expires, last_login, login_count, 
     is_sms_only, sms_consent_given, popia_consent_given, 
-    profile_completion_percentage, created_at, updated_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at, updated_at
 FROM users
 WHERE reset_password_token = $1 
     AND reset_password_expires > NOW() 
@@ -32,14 +45,17 @@ WHERE reset_password_token = $1
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     verification_token, verification_expires, last_login, login_count, 
     is_sms_only, sms_consent_given, popia_consent_given, 
-    profile_completion_percentage, created_at, updated_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at, updated_at
 FROM users
 WHERE email = $1 AND status != 'inactive';
 
 -- name: GetUserByPhone :one
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     last_login, login_count, is_sms_only, sms_consent_given, 
-    popia_consent_given, profile_completion_percentage, created_at, updated_at
+    popia_consent_given, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
+    created_at, updated_at
 FROM users
 WHERE phone = $1 AND status != 'inactive';
 
@@ -47,6 +63,7 @@ WHERE phone = $1 AND status != 'inactive';
 SELECT id, email, phone, password_hash, role, status, is_verified, 
     last_login, login_count, is_sms_only, sms_consent_given, 
     popia_consent_given, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
     created_at, updated_at
 FROM users
 WHERE phone = $1 AND status != 'inactive';
@@ -54,6 +71,7 @@ WHERE phone = $1 AND status != 'inactive';
 -- name: GetUserByID :one
 SELECT id, email, phone, role, status, is_verified, last_login, 
     login_count, is_sms_only, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
     created_at, updated_at
 FROM users
 WHERE id = $1 AND status != 'inactive';
@@ -90,7 +108,8 @@ WHERE id = $1;
 
 -- name: ListUsersByRole :many
 SELECT id, email, phone, role, status, is_verified, last_login, 
-    profile_completion_percentage, created_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at
 FROM users
 WHERE role = $1 AND status != 'inactive'
 ORDER BY created_at DESC
@@ -146,7 +165,8 @@ WHERE id = $1;
 
 -- name: SearchUsers :many
 SELECT id, email, phone, role, status, is_verified, last_login, 
-    profile_completion_percentage, created_at
+    profile_completion_percentage, primary_clinic_id, 
+    onboarding_completed, onboarding_step, created_at
 FROM users
 WHERE status != 'inactive'
     AND (
@@ -169,7 +189,70 @@ WHERE id = ANY($1::uuid[]);
 -- name: GetUsersByIDs :many
 SELECT id, email, phone, role, status, is_verified, last_login, 
     login_count, is_sms_only, profile_completion_percentage, 
+    primary_clinic_id, onboarding_completed, onboarding_step,
     created_at, updated_at
 FROM users
 WHERE id = ANY($1::uuid[]) AND status != 'inactive'
 ORDER BY created_at DESC;
+
+-- ============================================
+-- PROVIDER ONBOARDING QUERIES 
+-- ============================================
+
+-- name: UpdateUserOnboardingStep :exec
+UPDATE users
+SET 
+    onboarding_step = $2,
+    updated_at = NOW()
+WHERE id = $1;
+
+-- name: UpdateUserPrimaryClinic :exec
+UPDATE users
+SET 
+    primary_clinic_id = $2,
+    updated_at = NOW()
+WHERE id = $1;
+
+-- name: CompleteUserOnboarding :exec
+UPDATE users
+SET 
+    onboarding_completed = TRUE,
+    onboarding_step = 'completed',
+    updated_at = NOW()
+WHERE id = $1;
+
+-- name: GetProviderWithClinic :one
+SELECT 
+    u.id,
+    u.email,
+    u.phone,
+    u.role,
+    u.status,
+    u.is_verified,
+    u.primary_clinic_id,
+    u.onboarding_completed,
+    u.onboarding_step,
+    c.id as clinic_id,
+    c.clinic_name,
+    c.verification_status as clinic_verification_status,
+    c.is_verified as clinic_is_verified
+FROM users u
+LEFT JOIN clinics c ON u.primary_clinic_id = c.id
+WHERE u.id = $1 AND u.status != 'inactive';
+
+-- name: GetUserClinics :many
+SELECT 
+    c.id as clinic_id,
+    c.clinic_name,
+    c.clinic_type,
+    c.verification_status,
+    c.is_verified,
+    cs.staff_role,
+    cs.can_manage_staff,
+    cs.can_edit_clinic_info,
+    cs.can_approve_appointments,
+    cs.is_primary_contact
+FROM clinic_staff cs
+INNER JOIN clinics c ON cs.clinic_id = c.id
+WHERE cs.user_id = $1 AND cs.employment_status = 'active'
+ORDER BY cs.is_primary_contact DESC, c.created_at DESC;

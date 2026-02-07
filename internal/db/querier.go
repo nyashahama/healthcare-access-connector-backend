@@ -98,6 +98,7 @@ type Querier interface {
 	CheckSchedulingConflict(ctx context.Context, arg CheckSchedulingConflictParams) (CheckSchedulingConflictRow, error)
 	CheckServiceNameExists(ctx context.Context, arg CheckServiceNameExistsParams) (bool, error)
 	CompleteAppointment(ctx context.Context, id pgtype.UUID) (Appointment, error)
+	CompleteUserOnboarding(ctx context.Context, id pgtype.UUID) error
 	ConfirmAppointment(ctx context.Context, arg ConfirmAppointmentParams) (Appointment, error)
 	CountActiveConsents(ctx context.Context) (int64, error)
 	CountConsentsByType(ctx context.Context) (CountConsentsByTypeRow, error)
@@ -193,7 +194,14 @@ type Querier interface {
 	// CORE CRUD OPERATIONS
 	// ============================================
 	CreateSystemAdmin(ctx context.Context, arg CreateSystemAdminParams) (SystemAdmin, error)
-	// User Management Queries
+	// ============================================
+	// USER REPOSITORY QUERIES
+	// Maps to: UserRepository interface
+	// Domain: User Management & Authentication
+	// ============================================
+	// ============================================
+	// CORE CRUD OPERATIONS
+	// ============================================
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateClinic(ctx context.Context, id pgtype.UUID) error
 	DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error
@@ -333,6 +341,7 @@ type Querier interface {
 	GetPendingVerificationClinics(ctx context.Context, arg GetPendingVerificationClinicsParams) ([]GetPendingVerificationClinicsRow, error)
 	GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (GetPrimaryEmergencyContactRow, error)
 	GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error)
+	GetProviderWithClinic(ctx context.Context, id pgtype.UUID) (GetProviderWithClinicRow, error)
 	GetRecentActivities(ctx context.Context, arg GetRecentActivitiesParams) ([]UserActivity, error)
 	GetRecentOTPs(ctx context.Context, arg GetRecentOTPsParams) ([]OtpVerification, error)
 	GetRecentSurgeries(ctx context.Context, patientID pgtype.UUID) ([]GetRecentSurgeriesRow, error)
@@ -376,6 +385,7 @@ type Querier interface {
 	GetUserByPhone(ctx context.Context, phone pgtype.Text) (GetUserByPhoneRow, error)
 	GetUserByPhoneWithHash(ctx context.Context, phone pgtype.Text) (GetUserByPhoneWithHashRow, error)
 	GetUserByVerificationToken(ctx context.Context, verificationToken pgtype.Text) (GetUserByVerificationTokenRow, error)
+	GetUserClinics(ctx context.Context, userID pgtype.UUID) ([]GetUserClinicsRow, error)
 	GetUserSessions(ctx context.Context, userID pgtype.UUID) ([]UserSession, error)
 	GetUsersByIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetUsersByIDsRow, error)
 	GetUsersForHealthTips(ctx context.Context, healthTipsFrequency pgtype.Text) ([]pgtype.UUID, error)
@@ -471,8 +481,13 @@ type Querier interface {
 	UpdateUserConsents(ctx context.Context, arg UpdateUserConsentsParams) error
 	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error
 	UpdateUserLastLogin(ctx context.Context, id pgtype.UUID) error
+	// ============================================
+	// PROVIDER ONBOARDING QUERIES
+	// ============================================
+	UpdateUserOnboardingStep(ctx context.Context, arg UpdateUserOnboardingStepParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserPhone(ctx context.Context, arg UpdateUserPhoneParams) error
+	UpdateUserPrimaryClinic(ctx context.Context, arg UpdateUserPrimaryClinicParams) error
 	UpdateUserProfileCompletion(ctx context.Context, arg UpdateUserProfileCompletionParams) error
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error
