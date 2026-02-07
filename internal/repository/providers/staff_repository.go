@@ -86,7 +86,7 @@ func (r *staffRepository) CreateStaffMember(ctx context.Context, staff providers
 
 	params := sqlc.CreateStaffMemberParams{
 		ClinicID:               uuidToPgtypeUUID(staff.ClinicID),
-		UserID:                 uuidToPgtypeUUID(staff.UserID),
+		UserID:                 uuidPtrToPgtypeUUID(staff.UserID),
 		Title:                  pgtypeTextFromStringPtr(staff.Title),
 		FirstName:              staff.FirstName,
 		LastName:               staff.LastName,
@@ -235,7 +235,7 @@ func (r *staffRepository) GetClinicStaff(ctx context.Context, clinicID uuid.UUID
 		staffList[i] = providers.ClinicStaff{
 			ID:                     pgtypeUUIDToUUID(row.ID),
 			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-			UserID:                 pgtypeUUIDToUUID(row.UserID),
+			UserID:                 pgtypeUUIDToUUIDPtr(row.UserID),
 			Title:                  pgtypeTextToStringPtr(row.Title),
 			FirstName:              row.FirstName,
 			LastName:               row.LastName,
@@ -270,7 +270,7 @@ func (r *staffRepository) GetActiveClinicStaff(ctx context.Context, clinicID uui
 	for i, row := range rows {
 		staffList[i] = providers.ClinicStaff{
 			ID:                     pgtypeUUIDToUUID(row.ID),
-			UserID:                 pgtypeUUIDToUUID(row.UserID),
+			UserID:                 pgtypeUUIDToUUIDPtr(row.UserID),
 			Title:                  pgtypeTextToStringPtr(row.Title),
 			FirstName:              row.FirstName,
 			LastName:               row.LastName,
@@ -301,6 +301,321 @@ func (r *staffRepository) StaffExists(ctx context.Context, id uuid.UUID) (bool, 
 
 	staffDBQueryTotal.WithLabelValues("staff_exists", "success").Inc()
 	return exists, nil
+}
+
+func (r *staffRepository) CreateStaffInvitation(ctx context.Context, invitation providers.StaffInvitation) (providers.ClinicStaff, error) {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	params := sqlc.CreateStaffInvitationParams{
+		ClinicID:               uuidToPgtypeUUID(invitation.ClinicID),
+		WorkEmail:              pgtype.Text{String: invitation.WorkEmail, Valid: true},
+		FirstName:              invitation.FirstName,
+		LastName:               invitation.LastName,
+		StaffRole:              invitation.StaffRole,
+		ProfessionalTitle:      pgtypeTextFromStringPtr(invitation.ProfessionalTitle),
+		InvitationToken:        pgtype.Text{String: invitation.InvitationToken, Valid: true},
+		InvitedBy:              uuidToPgtypeUUID(invitation.InvitedBy),
+		InvitationExpires:      pgtype.Timestamp{Time: invitation.InvitationExpires, Valid: true},
+		CanManageStaff:         pgtype.Bool{Bool: invitation.CanManageStaff, Valid: true},
+		CanApproveAppointments: pgtype.Bool{Bool: invitation.CanApproveAppointments, Valid: true},
+		CanEditClinicInfo:      pgtype.Bool{Bool: invitation.CanEditClinicInfo, Valid: true},
+	}
+
+	created, err := r.querier.CreateStaffInvitation(ctx, params)
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("create_invitation", "error").Inc()
+		return providers.ClinicStaff{}, r.handleError(err, "create staff invitation")
+	}
+
+	staffDBQueryTotal.WithLabelValues("create_invitation", "success").Inc()
+	return r.mapToClinicStaff(created), nil
+}
+
+func (r *staffRepository) GetStaffInvitationByToken(ctx context.Context, token string) (*providers.StaffInvitationDetails, error) {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	row, err := r.querier.GetStaffInvitationByToken(ctx, pgtype.Text{String: token, Valid: true})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			staffDBQueryTotal.WithLabelValues("get_invitation_by_token", "not_found").Inc()
+			return nil, domain.ErrInvitationNotFound
+		}
+		staffDBQueryTotal.WithLabelValues("get_invitation_by_token", "error").Inc()
+		return nil, fmt.Errorf("get invitation by token: %w", err)
+	}
+
+	details := &providers.StaffInvitationDetails{
+		StaffInvitation: providers.StaffInvitation{
+			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
+			WorkEmail:              pgtypeTextToString(row.WorkEmail),
+			FirstName:              row.FirstName,
+			LastName:               row.LastName,
+			StaffRole:              row.StaffRole,
+			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
+			InvitationToken:        pgtypeTextToString(row.InvitationToken),
+			InvitedBy:              pgtypeUUIDToUUID(row.InvitedBy),
+			InvitationExpires:      *pgtypeTimestampToTimePtr(row.InvitationExpires),
+			CanManageStaff:         pgtypeBoolToBool(row.CanManageStaff),
+			CanApproveAppointments: pgtypeBoolToBool(row.CanApproveAppointments),
+			CanEditClinicInfo:      pgtypeBoolToBool(row.CanEditClinicInfo),
+		},
+		ClinicName:   row.ClinicName,
+		City:         pgtypeTextToStringPtr(row.City),
+		Province:     pgtypeTextToStringPtr(row.Province),
+		InviterEmail: pgtypeTextToStringPtr(row.InviterEmail),
+		InviterPhone: pgtypeTextToStringPtr(row.InviterPhone),
+	}
+
+	staffDBQueryTotal.WithLabelValues("get_invitation_by_token", "success").Inc()
+	return details, nil
+}
+
+func (r *staffRepository) AcceptStaffInvitation(ctx context.Context, token string, userID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	params := sqlc.AcceptStaffInvitationParams{
+		InvitationToken: pgtype.Text{String: token, Valid: true},
+		UserID:          uuidToPgtypeUUID(userID),
+	}
+
+	err := r.querier.AcceptStaffInvitation(ctx, params)
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("accept_invitation", "error").Inc()
+		return fmt.Errorf("accept staff invitation: %w", err)
+	}
+
+	staffDBQueryTotal.WithLabelValues("accept_invitation", "success").Inc()
+	return nil
+}
+
+func (r *staffRepository) DeclineStaffInvitation(ctx context.Context, token string) error {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.DeclineStaffInvitation(ctx, pgtype.Text{String: token, Valid: true})
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("decline_invitation", "error").Inc()
+		return fmt.Errorf("decline staff invitation: %w", err)
+	}
+
+	staffDBQueryTotal.WithLabelValues("decline_invitation", "success").Inc()
+	return nil
+}
+
+func (r *staffRepository) GetPendingInvitationsByClinic(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error) {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	rows, err := r.querier.GetPendingInvitationsByClinic(ctx, uuidToPgtypeUUID(clinicID))
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("get_pending_invitations", "error").Inc()
+		return nil, fmt.Errorf("get pending invitations: %w", err)
+	}
+
+	invitations := make([]providers.ClinicStaff, len(rows))
+	for i, row := range rows {
+		invitations[i] = providers.ClinicStaff{
+			ID:                pgtypeUUIDToUUID(row.ID),
+			WorkEmail:         pgtypeTextToStringPtr(row.WorkEmail),
+			FirstName:         row.FirstName,
+			LastName:          row.LastName,
+			StaffRole:         row.StaffRole,
+			ProfessionalTitle: pgtypeTextToStringPtr(row.ProfessionalTitle),
+			InvitationToken:   pgtypeTextToStringPtr(row.InvitationToken),
+			InvitedAt:         pgtypeTimestampToTimePtr(row.InvitedAt),
+			InvitationExpires: pgtypeTimestampToTimePtr(row.InvitationExpires),
+			InvitedBy:         pgtypeUUIDToUUIDPtr(row.InvitedBy),
+		}
+	}
+
+	staffDBQueryTotal.WithLabelValues("get_pending_invitations", "success").Inc()
+	return invitations, nil
+}
+
+func (r *staffRepository) GetStaffInvitationsByEmail(ctx context.Context, email string) ([]providers.StaffInvitationDetails, error) {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	rows, err := r.querier.GetStaffInvitationsByEmail(ctx, pgtype.Text{String: email, Valid: true})
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("get_invitations_by_email", "error").Inc()
+		return nil, fmt.Errorf("get invitations by email: %w", err)
+	}
+
+	invitations := make([]providers.StaffInvitationDetails, len(rows))
+	for i, row := range rows {
+		invitations[i] = providers.StaffInvitationDetails{
+			StaffInvitation: providers.StaffInvitation{
+				ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
+				WorkEmail:              pgtypeTextToString(row.WorkEmail),
+				FirstName:              row.FirstName,
+				LastName:               row.LastName,
+				StaffRole:              row.StaffRole,
+				ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
+				InvitationToken:        pgtypeTextToString(row.InvitationToken),
+				InvitedBy:              pgtypeUUIDToUUID(row.InvitedBy),
+				InvitationExpires:      *pgtypeTimestampToTimePtr(row.InvitationExpires),
+				CanManageStaff:         pgtypeBoolToBool(row.CanManageStaff),
+				CanApproveAppointments: pgtypeBoolToBool(row.CanApproveAppointments),
+				CanEditClinicInfo:      pgtypeBoolToBool(row.CanEditClinicInfo),
+			},
+			ClinicName: row.ClinicName,
+			City:       pgtypeTextToStringPtr(row.City),
+			Province:   pgtypeTextToStringPtr(row.Province),
+		}
+	}
+
+	staffDBQueryTotal.WithLabelValues("get_invitations_by_email", "success").Inc()
+	return invitations, nil
+}
+
+func (r *staffRepository) CancelStaffInvitation(ctx context.Context, token string) error {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.CancelStaffInvitation(ctx, pgtype.Text{String: token, Valid: true})
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("cancel_invitation", "error").Inc()
+		return fmt.Errorf("cancel staff invitation: %w", err)
+	}
+
+	staffDBQueryTotal.WithLabelValues("cancel_invitation", "success").Inc()
+	return nil
+}
+
+func (r *staffRepository) ResendStaffInvitation(ctx context.Context, invitationID uuid.UUID) (string, error) {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	// Generate new token and expiry
+	newToken := uuid.New().String()
+	newExpiry := time.Now().Add(7 * 24 * time.Hour)
+
+	params := sqlc.ResendStaffInvitationParams{
+		ID:                uuidToPgtypeUUID(invitationID),
+		InvitationToken:   pgtype.Text{String: newToken, Valid: true},
+		InvitationExpires: pgtype.Timestamp{Time: newExpiry, Valid: true},
+	}
+
+	err := r.querier.ResendStaffInvitation(ctx, params)
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("resend_invitation", "error").Inc()
+		return "", fmt.Errorf("resend staff invitation: %w", err)
+	}
+
+	staffDBQueryTotal.WithLabelValues("resend_invitation", "success").Inc()
+	return newToken, nil
+}
+
+func (r *staffRepository) CheckStaffEmailExists(ctx context.Context, clinicID uuid.UUID, email string) (bool, error) {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	params := sqlc.CheckStaffEmailExistsParams{
+		ClinicID:  uuidToPgtypeUUID(clinicID),
+		WorkEmail: pgtype.Text{String: email, Valid: true},
+	}
+
+	exists, err := r.querier.CheckStaffEmailExists(ctx, params)
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("check_email_exists", "error").Inc()
+		return false, fmt.Errorf("check staff email exists: %w", err)
+	}
+
+	staffDBQueryTotal.WithLabelValues("check_email_exists", "success").Inc()
+	return exists, nil
+}
+
+func (r *staffRepository) GetStaffByUserAndClinic(ctx context.Context, userID, clinicID uuid.UUID) (*providers.ClinicStaff, error) {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	params := sqlc.GetStaffByUserAndClinicParams{
+		UserID:   uuidToPgtypeUUID(userID),
+		ClinicID: uuidToPgtypeUUID(clinicID),
+	}
+
+	row, err := r.querier.GetStaffByUserAndClinic(ctx, params)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			staffDBQueryTotal.WithLabelValues("get_staff_by_user_clinic", "not_found").Inc()
+			return nil, domain.ErrStaffNotFound
+		}
+		staffDBQueryTotal.WithLabelValues("get_staff_by_user_clinic", "error").Inc()
+		return nil, fmt.Errorf("get staff by user and clinic: %w", err)
+	}
+
+	staff := r.mapToClinicStaff(row)
+	staffDBQueryTotal.WithLabelValues("get_staff_by_user_clinic", "success").Inc()
+	return &staff, nil
+}
+
+func (r *staffRepository) UpdateStaffPermissions(ctx context.Context, staffID uuid.UUID, permissions providers.StaffPermissions) error {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	permissionsJSON, err := jsonbFromMap(permissions.CustomPermissions)
+	if err != nil {
+		return fmt.Errorf("marshal custom permissions: %w", err)
+	}
+
+	params := sqlc.UpdateStaffPermissionsParams{
+		ID:                     uuidToPgtypeUUID(staffID),
+		CanManageStaff:         pgtype.Bool{Bool: permissions.CanManageStaff, Valid: true},
+		CanApproveAppointments: pgtype.Bool{Bool: permissions.CanApproveAppointments, Valid: true},
+		CanEditClinicInfo:      pgtype.Bool{Bool: permissions.CanEditClinicInfo, Valid: true},
+		Permissions:            permissionsJSON,
+	}
+
+	err = r.querier.UpdateStaffPermissions(ctx, params)
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("update_permissions", "error").Inc()
+		return fmt.Errorf("update staff permissions: %w", err)
+	}
+
+	staffDBQueryTotal.WithLabelValues("update_permissions", "success").Inc()
+	return nil
+}
+
+func (r *staffRepository) ExpireStaffInvitations(ctx context.Context) error {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.ExpireStaffInvitations(ctx)
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("expire_invitations", "error").Inc()
+		return fmt.Errorf("expire staff invitations: %w", err)
+	}
+
+	staffDBQueryTotal.WithLabelValues("expire_invitations", "success").Inc()
+	return nil
 }
 
 // ============================================
@@ -339,7 +654,7 @@ func (r *staffRepository) mapToClinicStaff(row sqlc.ClinicStaff) providers.Clini
 	return providers.ClinicStaff{
 		ID:                     pgtypeUUIDToUUID(row.ID),
 		ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-		UserID:                 pgtypeUUIDToUUID(row.UserID),
+		UserID:                 pgtypeUUIDToUUIDPtr(row.UserID),
 		Title:                  pgtypeTextToStringPtr(row.Title),
 		FirstName:              row.FirstName,
 		LastName:               row.LastName,

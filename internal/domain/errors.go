@@ -48,6 +48,7 @@ var (
 	ErrDuplicateRegistrationNumber = errors.New("registration number already exists")
 
 	// Staff errors
+	ErrInvitationNotFound    = errors.New("staff invitation not send")
 	ErrStaffNotFound         = errors.New("staff member not found")
 	ErrStaffNotActive        = errors.New("staff member is not active")
 	ErrCredentialNotFound    = errors.New("credential not found")
