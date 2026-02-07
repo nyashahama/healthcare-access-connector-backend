@@ -34,6 +34,21 @@ type AuthRepository interface {
 
 	// Session & Status
 	UpdateLastLogin(ctx context.Context, id uuid.UUID) error
+
+	// UpdateUserOnboardingStep updates the user's onboarding progress
+	UpdateUserOnboardingStep(ctx context.Context, userID uuid.UUID, step string) error
+
+	// UpdateUserPrimaryClinic sets the user's primary clinic
+	UpdateUserPrimaryClinic(ctx context.Context, userID uuid.UUID, clinicID uuid.UUID) error
+
+	// CompleteUserOnboarding marks onboarding as complete
+	CompleteUserOnboarding(ctx context.Context, userID uuid.UUID) error
+
+	// GetProviderWithClinic gets user with their clinic info
+	GetProviderWithClinic(ctx context.Context, userID uuid.UUID) (*core.ProviderWithClinic, error)
+
+	// GetUserClinics gets all clinics a user is affiliated with
+	GetUserClinics(ctx context.Context, userID uuid.UUID) ([]core.UserClinic, error)
 }
 
 type SessionRepository interface {

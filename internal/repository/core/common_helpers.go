@@ -159,3 +159,20 @@ func timePtrToPgtypeTime(t *time.Time) pgtype.Time {
 	microseconds := (int64(hour)*3600+int64(min)*60+int64(sec))*1_000_000 + int64(nsec)/1000
 	return pgtype.Time{Microseconds: microseconds, Valid: true}
 }
+
+func pgtypeUUIDToUUIDPtr(id pgtype.UUID) *uuid.UUID {
+	if !id.Valid {
+		return nil
+	}
+
+	var u uuid.UUID
+	u = uuid.UUID(id.Bytes) // direct array copy
+	return &u
+}
+
+func pgtypeBoolToBoolPtr(b pgtype.Bool) *bool {
+	if !b.Valid {
+		return nil
+	}
+	return &b.Bool
+}

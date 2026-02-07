@@ -308,6 +308,132 @@ func (r *authRepository) UpdateLastLogin(ctx context.Context, id uuid.UUID) erro
 	return nil
 }
 
+func (r *authRepository) UpdateUserOnboardingStep(ctx context.Context, userID uuid.UUID, step string) error {
+	start := time.Now()
+	defer func() {
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	params := sqlc.UpdateUserOnboardingStepParams{
+		ID:             uuidToPgtypeUUID(userID),
+		OnboardingStep: pgtype.Text{String: step, Valid: true},
+	}
+
+	err := r.querier.UpdateUserOnboardingStep(ctx, params)
+	if err != nil {
+		authDBQueryTotal.WithLabelValues("update_onboarding_step", "error").Inc()
+		return fmt.Errorf("update onboarding step: %w", err)
+	}
+
+	authDBQueryTotal.WithLabelValues("update_onboarding_step", "success").Inc()
+	return nil
+}
+
+func (r *authRepository) UpdateUserPrimaryClinic(ctx context.Context, userID uuid.UUID, clinicID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	params := sqlc.UpdateUserPrimaryClinicParams{
+		ID:              uuidToPgtypeUUID(userID),
+		PrimaryClinicID: uuidToPgtypeUUID(clinicID),
+	}
+
+	err := r.querier.UpdateUserPrimaryClinic(ctx, params)
+	if err != nil {
+		authDBQueryTotal.WithLabelValues("update_primary_clinic", "error").Inc()
+		return fmt.Errorf("update primary clinic: %w", err)
+	}
+
+	authDBQueryTotal.WithLabelValues("update_primary_clinic", "success").Inc()
+	return nil
+}
+
+func (r *authRepository) CompleteUserOnboarding(ctx context.Context, userID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.CompleteUserOnboarding(ctx, uuidToPgtypeUUID(userID))
+	if err != nil {
+		authDBQueryTotal.WithLabelValues("complete_onboarding", "error").Inc()
+		return fmt.Errorf("complete onboarding: %w", err)
+	}
+
+	authDBQueryTotal.WithLabelValues("complete_onboarding", "success").Inc()
+	return nil
+}
+
+func (r *authRepository) GetProviderWithClinic(ctx context.Context, userID uuid.UUID) (*core.ProviderWithClinic, error) {
+	start := time.Now()
+	defer func() {
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	row, err := r.querier.GetProviderWithClinic(ctx, uuidToPgtypeUUID(userID))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, pgx.ErrNoRows) {
+			authDBQueryTotal.WithLabelValues("get_provider_with_clinic", "not_found").Inc()
+			return nil, domain.ErrUserNotFound
+		}
+		authDBQueryTotal.WithLabelValues("get_provider_with_clinic", "error").Inc()
+		return nil, fmt.Errorf("get provider with clinic: %w", err)
+	}
+
+	provider := &core.ProviderWithClinic{
+		UserID:                   pgtypeUUIDToUUID(row.ID),
+		Email:                    &row.Email,
+		Phone:                    pgtypeTextToStringPtr(row.Phone),
+		Role:                     row.Role,
+		Status:                   pgtypeTextToString(row.Status),
+		IsVerified:               pgtypeBoolToBool(row.IsVerified),
+		PrimaryClinicID:          pgtypeUUIDToUUIDPtr(row.PrimaryClinicID),
+		OnboardingCompleted:      pgtypeBoolToBool(row.OnboardingCompleted),
+		OnboardingStep:           pgtypeTextToStringPtr(row.OnboardingStep),
+		ClinicID:                 pgtypeUUIDToUUIDPtr(row.ClinicID),
+		ClinicName:               pgtypeTextToStringPtr(row.ClinicName),
+		ClinicVerificationStatus: pgtypeTextToStringPtr(row.ClinicVerificationStatus),
+		ClinicIsVerified:         pgtypeBoolToBoolPtr(row.ClinicIsVerified),
+	}
+
+	authDBQueryTotal.WithLabelValues("get_provider_with_clinic", "success").Inc()
+	return provider, nil
+}
+
+func (r *authRepository) GetUserClinics(ctx context.Context, userID uuid.UUID) ([]core.UserClinic, error) {
+	start := time.Now()
+	defer func() {
+		authDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	rows, err := r.querier.GetUserClinics(ctx, uuidToPgtypeUUID(userID))
+	if err != nil {
+		authDBQueryTotal.WithLabelValues("get_user_clinics", "error").Inc()
+		return nil, fmt.Errorf("get user clinics: %w", err)
+	}
+
+	clinics := make([]core.UserClinic, len(rows))
+	for i, row := range rows {
+		clinics[i] = core.UserClinic{
+			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
+			ClinicName:             row.ClinicName,
+			ClinicType:             row.ClinicType,
+			VerificationStatus:     pgtypeTextToString(row.VerificationStatus),
+			IsVerified:             pgtypeBoolToBool(row.IsVerified),
+			StaffRole:              row.StaffRole,
+			CanManageStaff:         pgtypeBoolToBool(row.CanManageStaff),
+			CanEditClinicInfo:      pgtypeBoolToBool(row.CanEditClinicInfo),
+			CanApproveAppointments: pgtypeBoolToBool(row.CanApproveAppointments),
+			IsPrimaryContact:       pgtypeBoolToBool(row.IsPrimaryContact),
+		}
+	}
+
+	authDBQueryTotal.WithLabelValues("get_user_clinics", "success").Inc()
+	return clinics, nil
+}
+
 // handleError converts database errors to domain errors
 func (r *authRepository) handleError(err error, operation string) error {
 	var pgErr *pgconn.PgError
