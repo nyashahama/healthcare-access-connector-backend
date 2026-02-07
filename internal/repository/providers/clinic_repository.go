@@ -149,20 +149,20 @@ func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Cl
 		BedCount:            intPtrToPgtypeInt4(clinic.BedCount),
 
 		// JSONB fields - mapped to ColumnXX by sqlc
-		Column22:          operatingHoursJSON,                           // operating_hours
-		Column23:          servicesJSON,                                 // services
-		Column24:          specialtiesJSON,                              // specialties
+		Column24:          operatingHoursJSON,                           // operating_hours
+		Column25:          servicesJSON,                                 // services
+		Column26:          specialtiesJSON,                              // specialties
 		LanguagesSpoken:   clinic.LanguagesSpoken,                       // languages_spoken
-		Column26:          facilitiesJSON,                               // facilities
+		Column28:          facilitiesJSON,                               // facilities
 		AcceptsMedicalAid: pgtype.Bool{Bool: clinic.AcceptsMedicalAid},  // accepts_medical_aid (workaround)
-		Column28:          medicalAidProvidersJSON,                      // medical_aid_providers
-		Column29:          paymentMethodsJSON,                           // payment_methods
+		Column30:          medicalAidProvidersJSON,                      // medical_aid_providers
+		Column31:          paymentMethodsJSON,                           // payment_methods
 		FeeStructure:      pgtypeTextFromStringPtr(clinic.FeeStructure), // fee_structure
 
 		AccreditationBody: pgtypeTextFromStringPtr(clinic.AccreditationBody),
 
 		AccreditationExpiry: pgtype.Date{Time: *clinic.AccreditationExpiry}, // accreditation_expiry (workaround)
-		Column33:            certificationsJSON,                             // certifications
+		Column35:            certificationsJSON,                             // certifications
 
 		PatientCapacity:        intPtrToPgtypeInt4(clinic.PatientCapacity),
 		AverageWaitTimeMinutes: intPtrToPgtypeInt4(clinic.AverageWaitTimeMinutes),

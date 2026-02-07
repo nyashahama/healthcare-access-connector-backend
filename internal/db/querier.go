@@ -256,6 +256,10 @@ type Querier interface {
 	GetAppointmentsByPatient(ctx context.Context, patientID pgtype.UUID) ([]Appointment, error)
 	GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, error)
 	// ============================================
+	// PROVIDER REGISTRATION QUERIES
+	// ============================================
+	GetClinicByOwner(ctx context.Context, ownerUserID pgtype.UUID) (Clinic, error)
+	// ============================================
 	// QUERYING BY CLINIC
 	// ============================================
 	GetClinicServices(ctx context.Context, clinicID pgtype.UUID) ([]GetClinicServicesRow, error)
@@ -263,6 +267,9 @@ type Querier interface {
 	// CLINIC STAFF MANAGEMENT
 	// ============================================
 	GetClinicStaff(ctx context.Context, arg GetClinicStaffParams) ([]GetClinicStaffRow, error)
+	GetClinicVerificationStatus(ctx context.Context, id pgtype.UUID) (GetClinicVerificationStatusRow, error)
+	GetClinicWithOwnerInfo(ctx context.Context, id pgtype.UUID) (GetClinicWithOwnerInfoRow, error)
+	GetClinicsByCreator(ctx context.Context, createdBy pgtype.UUID) ([]Clinic, error)
 	GetConsentByID(ctx context.Context, id pgtype.UUID) (PrivacyConsent, error)
 	GetConsentHistory(ctx context.Context, userID pgtype.UUID) ([]PrivacyConsent, error)
 	GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error)
@@ -443,6 +450,7 @@ type Querier interface {
 	UpdateAppointmentStatus(ctx context.Context, arg UpdateAppointmentStatusParams) (Appointment, error)
 	UpdateChannelSettings(ctx context.Context, arg UpdateChannelSettingsParams) error
 	UpdateClinic(ctx context.Context, arg UpdateClinicParams) error
+	UpdateClinicOwner(ctx context.Context, arg UpdateClinicOwnerParams) error
 	UpdateClinicService(ctx context.Context, arg UpdateClinicServiceParams) error
 	UpdateClinicVerificationStatus(ctx context.Context, arg UpdateClinicVerificationStatusParams) error
 	UpdateCommunicationConsents(ctx context.Context, arg UpdateCommunicationConsentsParams) error

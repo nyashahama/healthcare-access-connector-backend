@@ -16,6 +16,7 @@ const createClinic = `-- name: CreateClinic :one
 
 
 INSERT INTO clinics (
+    created_by, owner_user_id,
     clinic_name, clinic_type, registration_number, accreditation_number,
     primary_phone, secondary_phone, emergency_phone, email, website,
     physical_address, city, province, postal_code, country,
@@ -28,15 +29,17 @@ INSERT INTO clinics (
     contact_person_name, contact_person_role, contact_person_phone, contact_person_email
 )
 VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-    $15, $16, $17, $18, $19, $20, $21, $22::jsonb, $23::jsonb, $24::jsonb, $25,
-    $26::jsonb, $27, $28::jsonb, $29::jsonb, $30, $31, $32,
-    $33::jsonb, $34, $35, $36, $37, $38, $39
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+    $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25::jsonb, $26::jsonb, $27,
+    $28::jsonb, $29, $30::jsonb, $31::jsonb, $32, $33, $34,
+    $35::jsonb, $36, $37, $38, $39, $40, $41
 )
 RETURNING id, created_by, owner_user_id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at
 `
 
 type CreateClinicParams struct {
+	CreatedBy              pgtype.UUID     `json:"created_by"`
+	OwnerUserID            pgtype.UUID     `json:"owner_user_id"`
 	ClinicName             string          `json:"clinic_name"`
 	ClinicType             string          `json:"clinic_type"`
 	RegistrationNumber     pgtype.Text     `json:"registration_number"`
@@ -58,18 +61,18 @@ type CreateClinicParams struct {
 	YearEstablished        pgtype.Int4     `json:"year_established"`
 	OwnershipType          pgtype.Text     `json:"ownership_type"`
 	BedCount               pgtype.Int4     `json:"bed_count"`
-	Column22               json.RawMessage `json:"column_22"`
-	Column23               json.RawMessage `json:"column_23"`
 	Column24               json.RawMessage `json:"column_24"`
-	LanguagesSpoken        []string        `json:"languages_spoken"`
+	Column25               json.RawMessage `json:"column_25"`
 	Column26               json.RawMessage `json:"column_26"`
-	AcceptsMedicalAid      pgtype.Bool     `json:"accepts_medical_aid"`
+	LanguagesSpoken        []string        `json:"languages_spoken"`
 	Column28               json.RawMessage `json:"column_28"`
-	Column29               json.RawMessage `json:"column_29"`
+	AcceptsMedicalAid      pgtype.Bool     `json:"accepts_medical_aid"`
+	Column30               json.RawMessage `json:"column_30"`
+	Column31               json.RawMessage `json:"column_31"`
 	FeeStructure           pgtype.Text     `json:"fee_structure"`
 	AccreditationBody      pgtype.Text     `json:"accreditation_body"`
 	AccreditationExpiry    pgtype.Date     `json:"accreditation_expiry"`
-	Column33               json.RawMessage `json:"column_33"`
+	Column35               json.RawMessage `json:"column_35"`
 	PatientCapacity        pgtype.Int4     `json:"patient_capacity"`
 	AverageWaitTimeMinutes pgtype.Int4     `json:"average_wait_time_minutes"`
 	ContactPersonName      pgtype.Text     `json:"contact_person_name"`
@@ -88,6 +91,8 @@ type CreateClinicParams struct {
 // ============================================
 func (q *Queries) CreateClinic(ctx context.Context, arg CreateClinicParams) (Clinic, error) {
 	row := q.db.QueryRow(ctx, createClinic,
+		arg.CreatedBy,
+		arg.OwnerUserID,
 		arg.ClinicName,
 		arg.ClinicType,
 		arg.RegistrationNumber,
@@ -109,18 +114,18 @@ func (q *Queries) CreateClinic(ctx context.Context, arg CreateClinicParams) (Cli
 		arg.YearEstablished,
 		arg.OwnershipType,
 		arg.BedCount,
-		arg.Column22,
-		arg.Column23,
 		arg.Column24,
-		arg.LanguagesSpoken,
+		arg.Column25,
 		arg.Column26,
-		arg.AcceptsMedicalAid,
+		arg.LanguagesSpoken,
 		arg.Column28,
-		arg.Column29,
+		arg.AcceptsMedicalAid,
+		arg.Column30,
+		arg.Column31,
 		arg.FeeStructure,
 		arg.AccreditationBody,
 		arg.AccreditationExpiry,
-		arg.Column33,
+		arg.Column35,
 		arg.PatientCapacity,
 		arg.AverageWaitTimeMinutes,
 		arg.ContactPersonName,
@@ -346,6 +351,326 @@ func (q *Queries) GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, er
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getClinicByOwner = `-- name: GetClinicByOwner :one
+
+SELECT id, created_by, owner_user_id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at FROM clinics
+WHERE owner_user_id = $1
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+// ============================================
+// PROVIDER REGISTRATION QUERIES
+// ============================================
+func (q *Queries) GetClinicByOwner(ctx context.Context, ownerUserID pgtype.UUID) (Clinic, error) {
+	row := q.db.QueryRow(ctx, getClinicByOwner, ownerUserID)
+	var i Clinic
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedBy,
+		&i.OwnerUserID,
+		&i.ClinicName,
+		&i.ClinicType,
+		&i.RegistrationNumber,
+		&i.AccreditationNumber,
+		&i.PrimaryPhone,
+		&i.SecondaryPhone,
+		&i.EmergencyPhone,
+		&i.Email,
+		&i.Website,
+		&i.PhysicalAddress,
+		&i.City,
+		&i.Province,
+		&i.PostalCode,
+		&i.Country,
+		&i.Latitude,
+		&i.Longitude,
+		&i.GooglePlaceID,
+		&i.Description,
+		&i.YearEstablished,
+		&i.OwnershipType,
+		&i.BedCount,
+		&i.OperatingHours,
+		&i.Services,
+		&i.Specialties,
+		&i.LanguagesSpoken,
+		&i.Facilities,
+		&i.AcceptsMedicalAid,
+		&i.MedicalAidProviders,
+		&i.PaymentMethods,
+		&i.FeeStructure,
+		&i.AccreditationBody,
+		&i.AccreditationExpiry,
+		&i.Certifications,
+		&i.IsVerified,
+		&i.VerificationStatus,
+		&i.VerificationNotes,
+		&i.VerifiedBy,
+		&i.VerificationDate,
+		&i.PatientCapacity,
+		&i.AverageWaitTimeMinutes,
+		&i.Rating,
+		&i.ReviewCount,
+		&i.ContactPersonName,
+		&i.ContactPersonRole,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getClinicVerificationStatus = `-- name: GetClinicVerificationStatus :one
+SELECT 
+    id,
+    clinic_name,
+    verification_status,
+    is_verified,
+    verification_notes,
+    verification_date,
+    created_at
+FROM clinics
+WHERE id = $1
+`
+
+type GetClinicVerificationStatusRow struct {
+	ID                 pgtype.UUID      `json:"id"`
+	ClinicName         string           `json:"clinic_name"`
+	VerificationStatus pgtype.Text      `json:"verification_status"`
+	IsVerified         pgtype.Bool      `json:"is_verified"`
+	VerificationNotes  pgtype.Text      `json:"verification_notes"`
+	VerificationDate   pgtype.Timestamp `json:"verification_date"`
+	CreatedAt          pgtype.Timestamp `json:"created_at"`
+}
+
+func (q *Queries) GetClinicVerificationStatus(ctx context.Context, id pgtype.UUID) (GetClinicVerificationStatusRow, error) {
+	row := q.db.QueryRow(ctx, getClinicVerificationStatus, id)
+	var i GetClinicVerificationStatusRow
+	err := row.Scan(
+		&i.ID,
+		&i.ClinicName,
+		&i.VerificationStatus,
+		&i.IsVerified,
+		&i.VerificationNotes,
+		&i.VerificationDate,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getClinicWithOwnerInfo = `-- name: GetClinicWithOwnerInfo :one
+SELECT 
+    c.id, c.created_by, c.owner_user_id, c.clinic_name, c.clinic_type, c.registration_number, c.accreditation_number, c.primary_phone, c.secondary_phone, c.emergency_phone, c.email, c.website, c.physical_address, c.city, c.province, c.postal_code, c.country, c.latitude, c.longitude, c.google_place_id, c.description, c.year_established, c.ownership_type, c.bed_count, c.operating_hours, c.services, c.specialties, c.languages_spoken, c.facilities, c.accepts_medical_aid, c.medical_aid_providers, c.payment_methods, c.fee_structure, c.accreditation_body, c.accreditation_expiry, c.certifications, c.is_verified, c.verification_status, c.verification_notes, c.verified_by, c.verification_date, c.patient_capacity, c.average_wait_time_minutes, c.rating, c.review_count, c.contact_person_name, c.contact_person_role, c.contact_person_phone, c.contact_person_email, c.created_at, c.updated_at,
+    u.email as owner_email,
+    u.phone as owner_phone,
+    cs.first_name as owner_first_name,
+    cs.last_name as owner_last_name
+FROM clinics c
+LEFT JOIN users u ON c.owner_user_id = u.id
+LEFT JOIN clinic_staff cs ON c.owner_user_id = cs.user_id AND cs.clinic_id = c.id
+WHERE c.id = $1
+`
+
+type GetClinicWithOwnerInfoRow struct {
+	ID                     pgtype.UUID      `json:"id"`
+	CreatedBy              pgtype.UUID      `json:"created_by"`
+	OwnerUserID            pgtype.UUID      `json:"owner_user_id"`
+	ClinicName             string           `json:"clinic_name"`
+	ClinicType             string           `json:"clinic_type"`
+	RegistrationNumber     pgtype.Text      `json:"registration_number"`
+	AccreditationNumber    pgtype.Text      `json:"accreditation_number"`
+	PrimaryPhone           pgtype.Text      `json:"primary_phone"`
+	SecondaryPhone         pgtype.Text      `json:"secondary_phone"`
+	EmergencyPhone         pgtype.Text      `json:"emergency_phone"`
+	Email                  pgtype.Text      `json:"email"`
+	Website                pgtype.Text      `json:"website"`
+	PhysicalAddress        string           `json:"physical_address"`
+	City                   pgtype.Text      `json:"city"`
+	Province               pgtype.Text      `json:"province"`
+	PostalCode             pgtype.Text      `json:"postal_code"`
+	Country                pgtype.Text      `json:"country"`
+	Latitude               pgtype.Numeric   `json:"latitude"`
+	Longitude              pgtype.Numeric   `json:"longitude"`
+	GooglePlaceID          pgtype.Text      `json:"google_place_id"`
+	Description            pgtype.Text      `json:"description"`
+	YearEstablished        pgtype.Int4      `json:"year_established"`
+	OwnershipType          pgtype.Text      `json:"ownership_type"`
+	BedCount               pgtype.Int4      `json:"bed_count"`
+	OperatingHours         []byte           `json:"operating_hours"`
+	Services               []byte           `json:"services"`
+	Specialties            []byte           `json:"specialties"`
+	LanguagesSpoken        []string         `json:"languages_spoken"`
+	Facilities             []byte           `json:"facilities"`
+	AcceptsMedicalAid      pgtype.Bool      `json:"accepts_medical_aid"`
+	MedicalAidProviders    []byte           `json:"medical_aid_providers"`
+	PaymentMethods         []byte           `json:"payment_methods"`
+	FeeStructure           pgtype.Text      `json:"fee_structure"`
+	AccreditationBody      pgtype.Text      `json:"accreditation_body"`
+	AccreditationExpiry    pgtype.Date      `json:"accreditation_expiry"`
+	Certifications         []byte           `json:"certifications"`
+	IsVerified             pgtype.Bool      `json:"is_verified"`
+	VerificationStatus     pgtype.Text      `json:"verification_status"`
+	VerificationNotes      pgtype.Text      `json:"verification_notes"`
+	VerifiedBy             pgtype.UUID      `json:"verified_by"`
+	VerificationDate       pgtype.Timestamp `json:"verification_date"`
+	PatientCapacity        pgtype.Int4      `json:"patient_capacity"`
+	AverageWaitTimeMinutes pgtype.Int4      `json:"average_wait_time_minutes"`
+	Rating                 pgtype.Numeric   `json:"rating"`
+	ReviewCount            pgtype.Int4      `json:"review_count"`
+	ContactPersonName      pgtype.Text      `json:"contact_person_name"`
+	ContactPersonRole      pgtype.Text      `json:"contact_person_role"`
+	ContactPersonPhone     pgtype.Text      `json:"contact_person_phone"`
+	ContactPersonEmail     pgtype.Text      `json:"contact_person_email"`
+	CreatedAt              pgtype.Timestamp `json:"created_at"`
+	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
+	OwnerEmail             pgtype.Text      `json:"owner_email"`
+	OwnerPhone             pgtype.Text      `json:"owner_phone"`
+	OwnerFirstName         pgtype.Text      `json:"owner_first_name"`
+	OwnerLastName          pgtype.Text      `json:"owner_last_name"`
+}
+
+func (q *Queries) GetClinicWithOwnerInfo(ctx context.Context, id pgtype.UUID) (GetClinicWithOwnerInfoRow, error) {
+	row := q.db.QueryRow(ctx, getClinicWithOwnerInfo, id)
+	var i GetClinicWithOwnerInfoRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedBy,
+		&i.OwnerUserID,
+		&i.ClinicName,
+		&i.ClinicType,
+		&i.RegistrationNumber,
+		&i.AccreditationNumber,
+		&i.PrimaryPhone,
+		&i.SecondaryPhone,
+		&i.EmergencyPhone,
+		&i.Email,
+		&i.Website,
+		&i.PhysicalAddress,
+		&i.City,
+		&i.Province,
+		&i.PostalCode,
+		&i.Country,
+		&i.Latitude,
+		&i.Longitude,
+		&i.GooglePlaceID,
+		&i.Description,
+		&i.YearEstablished,
+		&i.OwnershipType,
+		&i.BedCount,
+		&i.OperatingHours,
+		&i.Services,
+		&i.Specialties,
+		&i.LanguagesSpoken,
+		&i.Facilities,
+		&i.AcceptsMedicalAid,
+		&i.MedicalAidProviders,
+		&i.PaymentMethods,
+		&i.FeeStructure,
+		&i.AccreditationBody,
+		&i.AccreditationExpiry,
+		&i.Certifications,
+		&i.IsVerified,
+		&i.VerificationStatus,
+		&i.VerificationNotes,
+		&i.VerifiedBy,
+		&i.VerificationDate,
+		&i.PatientCapacity,
+		&i.AverageWaitTimeMinutes,
+		&i.Rating,
+		&i.ReviewCount,
+		&i.ContactPersonName,
+		&i.ContactPersonRole,
+		&i.ContactPersonPhone,
+		&i.ContactPersonEmail,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwnerEmail,
+		&i.OwnerPhone,
+		&i.OwnerFirstName,
+		&i.OwnerLastName,
+	)
+	return i, err
+}
+
+const getClinicsByCreator = `-- name: GetClinicsByCreator :many
+SELECT id, created_by, owner_user_id, clinic_name, clinic_type, registration_number, accreditation_number, primary_phone, secondary_phone, emergency_phone, email, website, physical_address, city, province, postal_code, country, latitude, longitude, google_place_id, description, year_established, ownership_type, bed_count, operating_hours, services, specialties, languages_spoken, facilities, accepts_medical_aid, medical_aid_providers, payment_methods, fee_structure, accreditation_body, accreditation_expiry, certifications, is_verified, verification_status, verification_notes, verified_by, verification_date, patient_capacity, average_wait_time_minutes, rating, review_count, contact_person_name, contact_person_role, contact_person_phone, contact_person_email, created_at, updated_at FROM clinics
+WHERE created_by = $1
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetClinicsByCreator(ctx context.Context, createdBy pgtype.UUID) ([]Clinic, error) {
+	rows, err := q.db.Query(ctx, getClinicsByCreator, createdBy)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Clinic{}
+	for rows.Next() {
+		var i Clinic
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedBy,
+			&i.OwnerUserID,
+			&i.ClinicName,
+			&i.ClinicType,
+			&i.RegistrationNumber,
+			&i.AccreditationNumber,
+			&i.PrimaryPhone,
+			&i.SecondaryPhone,
+			&i.EmergencyPhone,
+			&i.Email,
+			&i.Website,
+			&i.PhysicalAddress,
+			&i.City,
+			&i.Province,
+			&i.PostalCode,
+			&i.Country,
+			&i.Latitude,
+			&i.Longitude,
+			&i.GooglePlaceID,
+			&i.Description,
+			&i.YearEstablished,
+			&i.OwnershipType,
+			&i.BedCount,
+			&i.OperatingHours,
+			&i.Services,
+			&i.Specialties,
+			&i.LanguagesSpoken,
+			&i.Facilities,
+			&i.AcceptsMedicalAid,
+			&i.MedicalAidProviders,
+			&i.PaymentMethods,
+			&i.FeeStructure,
+			&i.AccreditationBody,
+			&i.AccreditationExpiry,
+			&i.Certifications,
+			&i.IsVerified,
+			&i.VerificationStatus,
+			&i.VerificationNotes,
+			&i.VerifiedBy,
+			&i.VerificationDate,
+			&i.PatientCapacity,
+			&i.AverageWaitTimeMinutes,
+			&i.Rating,
+			&i.ReviewCount,
+			&i.ContactPersonName,
+			&i.ContactPersonRole,
+			&i.ContactPersonPhone,
+			&i.ContactPersonEmail,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getPendingVerificationClinics = `-- name: GetPendingVerificationClinics :many
@@ -726,6 +1051,24 @@ func (q *Queries) UpdateClinic(ctx context.Context, arg UpdateClinicParams) erro
 		arg.Description,
 		arg.OperatingHours,
 	)
+	return err
+}
+
+const updateClinicOwner = `-- name: UpdateClinicOwner :exec
+UPDATE clinics
+SET 
+    owner_user_id = $2,
+    updated_at = NOW()
+WHERE id = $1
+`
+
+type UpdateClinicOwnerParams struct {
+	ID          pgtype.UUID `json:"id"`
+	OwnerUserID pgtype.UUID `json:"owner_user_id"`
+}
+
+func (q *Queries) UpdateClinicOwner(ctx context.Context, arg UpdateClinicOwnerParams) error {
+	_, err := q.db.Exec(ctx, updateClinicOwner, arg.ID, arg.OwnerUserID)
 	return err
 }
 

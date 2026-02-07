@@ -10,6 +10,7 @@
 
 -- name: CreateClinic :one
 INSERT INTO clinics (
+    created_by, owner_user_id,
     clinic_name, clinic_type, registration_number, accreditation_number,
     primary_phone, secondary_phone, emergency_phone, email, website,
     physical_address, city, province, postal_code, country,
@@ -22,10 +23,10 @@ INSERT INTO clinics (
     contact_person_name, contact_person_role, contact_person_phone, contact_person_email
 )
 VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-    $15, $16, $17, $18, $19, $20, $21, $22::jsonb, $23::jsonb, $24::jsonb, $25,
-    $26::jsonb, $27, $28::jsonb, $29::jsonb, $30, $31, $32,
-    $33::jsonb, $34, $35, $36, $37, $38, $39
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+    $17, $18, $19, $20, $21, $22, $23, $24::jsonb, $25::jsonb, $26::jsonb, $27,
+    $28::jsonb, $29, $30::jsonb, $31::jsonb, $32, $33, $34,
+    $35::jsonb, $36, $37, $38, $39, $40, $41
 )
 RETURNING *;
 
@@ -167,4 +168,48 @@ WHERE verification_status = 'pending'
 ORDER BY created_at ASC
 LIMIT $1 OFFSET $2;
 
+-- ============================================
+-- PROVIDER REGISTRATION QUERIES 
+-- ============================================
 
+-- name: GetClinicByOwner :one
+SELECT * FROM clinics
+WHERE owner_user_id = $1
+ORDER BY created_at DESC
+LIMIT 1;
+
+-- name: GetClinicsByCreator :many
+SELECT * FROM clinics
+WHERE created_by = $1
+ORDER BY created_at DESC;
+
+-- name: GetClinicWithOwnerInfo :one
+SELECT 
+    c.*,
+    u.email as owner_email,
+    u.phone as owner_phone,
+    cs.first_name as owner_first_name,
+    cs.last_name as owner_last_name
+FROM clinics c
+LEFT JOIN users u ON c.owner_user_id = u.id
+LEFT JOIN clinic_staff cs ON c.owner_user_id = cs.user_id AND cs.clinic_id = c.id
+WHERE c.id = $1;
+
+-- name: UpdateClinicOwner :exec
+UPDATE clinics
+SET 
+    owner_user_id = $2,
+    updated_at = NOW()
+WHERE id = $1;
+
+-- name: GetClinicVerificationStatus :one
+SELECT 
+    id,
+    clinic_name,
+    verification_status,
+    is_verified,
+    verification_notes,
+    verification_date,
+    created_at
+FROM clinics
+WHERE id = $1;
