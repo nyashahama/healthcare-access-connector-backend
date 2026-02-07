@@ -96,27 +96,17 @@ type Querier interface {
 	BulkUpdateCommunicationMethod(ctx context.Context, arg BulkUpdateCommunicationMethodParams) error
 	BulkUpdateMarketingConsent(ctx context.Context, arg BulkUpdateMarketingConsentParams) error
 	BulkUpdateMedicalAidStatus(ctx context.Context, arg BulkUpdateMedicalAidStatusParams) error
-	BulkUpdateMedicationStatus(ctx context.Context, arg BulkUpdateMedicationStatusParams) error
 	BulkUpdatePatientProvince(ctx context.Context, arg BulkUpdatePatientProvinceParams) error
 	BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error
 	CancelAppointment(ctx context.Context, arg CancelAppointmentParams) (Appointment, error)
 	CheckMedicalAidNumberExists(ctx context.Context, arg CheckMedicalAidNumberExistsParams) (bool, error)
-	// ============================================
-	// VALIDATION & UTILITIES
-	// ============================================
-	CheckMedicationConflict(ctx context.Context, arg CheckMedicationConflictParams) (bool, error)
 	CheckNationalIDExists(ctx context.Context, arg CheckNationalIDExistsParams) (bool, error)
 	CheckSchedulingConflict(ctx context.Context, arg CheckSchedulingConflictParams) (CheckSchedulingConflictRow, error)
 	CheckServiceNameExists(ctx context.Context, arg CheckServiceNameExistsParams) (bool, error)
 	CompleteAppointment(ctx context.Context, id pgtype.UUID) (Appointment, error)
-	CompleteMedication(ctx context.Context, id pgtype.UUID) error
 	ConfirmAppointment(ctx context.Context, arg ConfirmAppointmentParams) (Appointment, error)
 	CountActiveConsents(ctx context.Context) (int64, error)
 	CountConsentsByType(ctx context.Context) (CountConsentsByTypeRow, error)
-	// ============================================
-	// STATISTICS & ANALYTICS
-	// ============================================
-	CountPatientMedications(ctx context.Context, patientID pgtype.UUID) (CountPatientMedicationsRow, error)
 	// ============================================
 	// STATISTICS & ANALYTICS
 	// ============================================
@@ -240,7 +230,6 @@ type Querier interface {
 	DeletePatientImmunization(ctx context.Context, id pgtype.UUID) error
 	DeletePatientMedicalInfo(ctx context.Context, patientID pgtype.UUID) error
 	DeletePatientMedication(ctx context.Context, id pgtype.UUID) error
-	DeletePatientMedications(ctx context.Context, patientID pgtype.UUID) error
 	DeletePatientProfile(ctx context.Context, id pgtype.UUID) error
 	DeletePatientProfileByUserID(ctx context.Context, userID pgtype.UUID) error
 	DeletePatientSurgeries(ctx context.Context, patientID pgtype.UUID) error
@@ -252,7 +241,6 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
-	DiscontinueMedication(ctx context.Context, arg DiscontinueMedicationParams) error
 	ExportDataAccessLogs(ctx context.Context, arg ExportDataAccessLogsParams) ([]DataAccessLog, error)
 	ExportPatientBasicInfo(ctx context.Context, userID pgtype.UUID) (ExportPatientBasicInfoRow, error)
 	// ============================================
@@ -266,7 +254,6 @@ type Querier interface {
 	GetActiveConditions(ctx context.Context, patientID pgtype.UUID) ([]GetActiveConditionsRow, error)
 	GetActiveEmergencyAccessConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetActiveHealthDataConsents(ctx context.Context) ([]PrivacyConsent, error)
-	GetActiveMedicationCount(ctx context.Context, patientID pgtype.UUID) (int64, error)
 	GetActiveMedications(ctx context.Context, patientID pgtype.UUID) ([]GetActiveMedicationsRow, error)
 	GetActivePatientAllergies(ctx context.Context, patientID pgtype.UUID) ([]GetActivePatientAllergiesRow, error)
 	GetActiveResearchConsents(ctx context.Context) ([]PrivacyConsent, error)
@@ -294,7 +281,6 @@ type Querier interface {
 	GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error)
 	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error)
 	GetCredentialByID(ctx context.Context, id pgtype.UUID) (ProfessionalCredential, error)
-	GetCurrentMedications(ctx context.Context, patientID pgtype.UUID) ([]GetCurrentMedicationsRow, error)
 	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]DataAccessLog, error)
 	GetDependentChildren(ctx context.Context, patientID pgtype.UUID) ([]GetDependentChildrenRow, error)
 	GetDependentHealthRecord(ctx context.Context, id pgtype.UUID) (DependentHealthRecord, error)
@@ -304,14 +290,8 @@ type Querier interface {
 	GetDependentHealthRecords(ctx context.Context, dependentID pgtype.UUID) ([]GetDependentHealthRecordsRow, error)
 	GetEmergencyAccessLogs(ctx context.Context, arg GetEmergencyAccessLogsParams) ([]DataAccessLog, error)
 	GetEmergencyContact(ctx context.Context, id pgtype.UUID) (EmergencyContact, error)
-	GetEmergencyMedicationInfo(ctx context.Context, patientID pgtype.UUID) ([]GetEmergencyMedicationInfoRow, error)
 	GetEmergencySurgeryInfo(ctx context.Context, patientID pgtype.UUID) ([]GetEmergencySurgeryInfoRow, error)
 	GetExpiredConsents(ctx context.Context) ([]PrivacyConsent, error)
-	GetExpiredMedications(ctx context.Context) ([]GetExpiredMedicationsRow, error)
-	// ============================================
-	// EXPIRATION & REFILL MANAGEMENT
-	// ============================================
-	GetExpiringMedications(ctx context.Context, endDate pgtype.Date) ([]GetExpiringMedicationsRow, error)
 	GetFamilyHistoryEntry(ctx context.Context, id pgtype.UUID) (PatientFamilyHistory, error)
 	GetGrowthRecords(ctx context.Context, dependentID pgtype.UUID) ([]GetGrowthRecordsRow, error)
 	// ============================================
@@ -326,22 +306,7 @@ type Querier interface {
 	GetLanguageDistribution(ctx context.Context) ([]GetLanguageDistributionRow, error)
 	GetLastSurgeryDate(ctx context.Context, patientID pgtype.UUID) (interface{}, error)
 	GetLatestActiveOTP(ctx context.Context, arg GetLatestActiveOTPParams) (OtpVerification, error)
-	GetLongTermMedications(ctx context.Context) ([]GetLongTermMedicationsRow, error)
-	GetMedicationHistory(ctx context.Context, patientID pgtype.UUID) ([]GetMedicationHistoryRow, error)
-	GetMedicationStatistics(ctx context.Context) (GetMedicationStatisticsRow, error)
-	// ============================================
-	// BULK OPERATIONS
-	// ============================================
-	GetMedicationsByPatientIDs(ctx context.Context, dollar_1 []pgtype.UUID) ([]GetMedicationsByPatientIDsRow, error)
-	GetMedicationsByPharmacy(ctx context.Context, pharmacyName pgtype.Text) ([]GetMedicationsByPharmacyRow, error)
-	// ============================================
-	// PRESCRIBER & PHARMACY QUERIES
-	// ============================================
-	GetMedicationsByPrescriber(ctx context.Context, prescribingDoctor pgtype.Text) ([]GetMedicationsByPrescriberRow, error)
-	GetMedicationsByRoute(ctx context.Context, arg GetMedicationsByRouteParams) ([]GetMedicationsByRouteRow, error)
-	GetMedicationsWithSideEffects(ctx context.Context) ([]GetMedicationsWithSideEffectsRow, error)
 	GetMostCommonProcedures(ctx context.Context, limit int32) ([]GetMostCommonProceduresRow, error)
-	GetMostPrescribedMedications(ctx context.Context, limit int32) ([]GetMostPrescribedMedicationsRow, error)
 	GetNGOPartner(ctx context.Context, id pgtype.UUID) (NgoPartner, error)
 	GetNGOPartnerByUserID(ctx context.Context, userID pgtype.UUID) (NgoPartner, error)
 	// ============================================
@@ -419,7 +384,6 @@ type Querier interface {
 	// ============================================
 	GetPatientsByLanguage(ctx context.Context, arg GetPatientsByLanguageParams) ([]GetPatientsByLanguageRow, error)
 	GetPatientsByMedicalAidProvider(ctx context.Context, arg GetPatientsByMedicalAidProviderParams) ([]GetPatientsByMedicalAidProviderRow, error)
-	GetPatientsByMedication(ctx context.Context, dollar_1 pgtype.Text) ([]GetPatientsByMedicationRow, error)
 	GetPatientsByProcedure(ctx context.Context, dollar_1 pgtype.Text) ([]GetPatientsByProcedureRow, error)
 	// ============================================
 	// GEOGRAPHIC FILTERING
@@ -433,10 +397,6 @@ type Querier interface {
 	GetPatientsByReferrer(ctx context.Context, arg GetPatientsByReferrerParams) ([]GetPatientsByReferrerRow, error)
 	GetPatientsForDataExport(ctx context.Context, arg GetPatientsForDataExportParams) ([]GetPatientsForDataExportRow, error)
 	GetPatientsNeedingOutreach(ctx context.Context, arg GetPatientsNeedingOutreachParams) ([]GetPatientsNeedingOutreachRow, error)
-	// ============================================
-	// REPORTING QUERIES
-	// ============================================
-	GetPatientsOnMultipleMedications(ctx context.Context, dollar_1 interface{}) ([]GetPatientsOnMultipleMedicationsRow, error)
 	GetPatientsOptedInMarketing(ctx context.Context, arg GetPatientsOptedInMarketingParams) ([]GetPatientsOptedInMarketingRow, error)
 	GetPatientsRequiringInterpreter(ctx context.Context, arg GetPatientsRequiringInterpreterParams) ([]GetPatientsRequiringInterpreterRow, error)
 	GetPatientsWithLanguagePreference(ctx context.Context, arg GetPatientsWithLanguagePreferenceParams) ([]GetPatientsWithLanguagePreferenceRow, error)
@@ -451,7 +411,6 @@ type Querier interface {
 	GetPatientsWithoutMedicalAid(ctx context.Context, arg GetPatientsWithoutMedicalAidParams) ([]GetPatientsWithoutMedicalAidRow, error)
 	GetPendingAppointments(ctx context.Context, clinicID pgtype.UUID) ([]Appointment, error)
 	GetPendingVerificationClinics(ctx context.Context, arg GetPendingVerificationClinicsParams) ([]GetPendingVerificationClinicsRow, error)
-	GetPrescriptionTrends(ctx context.Context, prescriptionDate pgtype.Date) ([]GetPrescriptionTrendsRow, error)
 	GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (GetPrimaryEmergencyContactRow, error)
 	GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error)
 	GetProfilesMissingCriticalInfo(ctx context.Context, arg GetProfilesMissingCriticalInfoParams) ([]GetProfilesMissingCriticalInfoRow, error)
@@ -531,12 +490,7 @@ type Querier interface {
 	LogUserActivity(ctx context.Context, arg LogUserActivityParams) error
 	MarkOTPUsed(ctx context.Context, arg MarkOTPUsedParams) error
 	ReactivateClinic(ctx context.Context, id pgtype.UUID) error
-	ReactivateMedication(ctx context.Context, id pgtype.UUID) error
 	RecordComplications(ctx context.Context, arg RecordComplicationsParams) error
-	// ============================================
-	// SIDE EFFECTS & MONITORING
-	// ============================================
-	RecordSideEffects(ctx context.Context, arg RecordSideEffectsParams) error
 	RejectClinicVerification(ctx context.Context, arg RejectClinicVerificationParams) error
 	RescheduleAppointment(ctx context.Context, arg RescheduleAppointmentParams) (Appointment, error)
 	// OTP Verification Queries
@@ -546,10 +500,6 @@ type Querier interface {
 	// ============================================
 	SearchClinics(ctx context.Context, arg SearchClinicsParams) ([]SearchClinicsRow, error)
 	SearchDataAccessLogs(ctx context.Context, arg SearchDataAccessLogsParams) ([]DataAccessLog, error)
-	// ============================================
-	// SEARCH & FILTERING
-	// ============================================
-	SearchMedicationsByName(ctx context.Context, arg SearchMedicationsByNameParams) ([]SearchMedicationsByNameRow, error)
 	// ============================================
 	// SEARCH & DISCOVERY
 	// ============================================
@@ -582,12 +532,7 @@ type Querier interface {
 	UpdateFamilyHistory(ctx context.Context, arg UpdateFamilyHistoryParams) error
 	UpdateHealthDataConsent(ctx context.Context, arg UpdateHealthDataConsentParams) error
 	UpdateHealthTips(ctx context.Context, arg UpdateHealthTipsParams) error
-	UpdateMedicationEndDate(ctx context.Context, arg UpdateMedicationEndDateParams) error
 	UpdateMedicationReminders(ctx context.Context, arg UpdateMedicationRemindersParams) error
-	// ============================================
-	// STATUS MANAGEMENT
-	// ============================================
-	UpdateMedicationStatus(ctx context.Context, arg UpdateMedicationStatusParams) error
 	UpdateNotificationLanguage(ctx context.Context, arg UpdateNotificationLanguageParams) error
 	UpdateNotificationPreferences(ctx context.Context, arg UpdateNotificationPreferencesParams) error
 	UpdatePatientAllergy(ctx context.Context, arg UpdatePatientAllergyParams) error
@@ -611,7 +556,6 @@ type Querier interface {
 	UpdatePatientReferralInfo(ctx context.Context, arg UpdatePatientReferralInfoParams) error
 	UpdatePatientSurgery(ctx context.Context, arg UpdatePatientSurgeryParams) error
 	UpdatePatientTimezone(ctx context.Context, arg UpdatePatientTimezoneParams) error
-	UpdatePharmacy(ctx context.Context, arg UpdatePharmacyParams) error
 	UpdatePrivacyConsent(ctx context.Context, arg UpdatePrivacyConsentParams) error
 	UpdateQuietHours(ctx context.Context, arg UpdateQuietHoursParams) error
 	UpdateResearchConsent(ctx context.Context, arg UpdateResearchConsentParams) error
