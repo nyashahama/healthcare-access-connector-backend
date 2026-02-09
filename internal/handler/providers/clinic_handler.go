@@ -36,7 +36,6 @@ func NewClinicHandler(
 	}
 }
 
-// CreateClinic handles clinic creation
 func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -76,11 +75,26 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get user ID from context (assuming auth middleware sets this)
+	userID, ok := ctx.Value("user_id").(uuid.UUID)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	// Determine owner user ID (default to current user if not specified in request)
+	ownerUserID := userID
+	if req.OwnerUserID != nil {
+		ownerUserID = *req.OwnerUserID
+	}
+
 	// Convert DTO to domain model
 	clinic := dto.ToDomainClinic(req)
 
-	// Create clinic
-	createdClinic, err := h.clinicService.RegisterClinic(ctx, clinic)
+	// Create clinic with owner tracking
+	createdClinic, err := h.clinicService.RegisterClinic(ctx, clinic, userID, ownerUserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -441,6 +455,146 @@ func (h *ClinicHandler) ListClinics(w http.ResponseWriter, r *http.Request) {
 		"limit":   limit,
 		"offset":  offset,
 	})
+}
+
+// Add UpdateClinicOwner handler
+func (h *ClinicHandler) UpdateClinicOwner(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "id")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid clinic ID format",
+		})
+		return
+	}
+
+	// Get the user making the request from context
+	updatedBy, ok := ctx.Value("user_id").(uuid.UUID)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		NewOwnerUserID uuid.UUID `json:"new_owner_user_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("new_owner_user_id", req.NewOwnerUserID.String())
+
+	if !v.Valid() {
+		handler.RespondValidationError(w, v.Errors())
+		return
+	}
+
+	// Update clinic owner
+	if err := h.clinicService.UpdateClinicOwner(ctx, clinicID, req.NewOwnerUserID, updatedBy); err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, map[string]string{
+		"message": "Clinic owner updated successfully",
+	})
+}
+
+// Add GetClinicByOwner handler
+func (h *ClinicHandler) GetClinicByOwner(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	// Get owner user ID from query parameter
+	ownerUserIDStr := r.URL.Query().Get("owner_user_id")
+	if ownerUserIDStr == "" {
+		// If not specified, get from authenticated user context
+		userID, ok := ctx.Value("user_id").(uuid.UUID)
+		if !ok {
+			handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+				Error: "Owner user ID is required",
+			})
+			return
+		}
+		ownerUserIDStr = userID.String()
+	}
+
+	ownerUserID, err := uuid.Parse(ownerUserIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid owner user ID format",
+		})
+		return
+	}
+
+	// Get clinic by owner
+	clinic, err := h.clinicService.GetClinicByOwner(ctx, ownerUserID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, dto.ToClinicResponse(*clinic))
+}
+
+// Add GetClinicWithOwnerInfo handler
+func (h *ClinicHandler) GetClinicWithOwnerInfo(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "id")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid clinic ID format",
+		})
+		return
+	}
+
+	// Get clinic with owner information
+	clinicWithOwner, err := h.clinicService.GetClinicWithOwnerInfo(ctx, clinicID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, dto.ToClinicWithOwnerResponse(*clinicWithOwner))
+}
+
+// Add GetClinicVerificationStatus handler
+func (h *ClinicHandler) GetClinicVerificationStatus(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "id")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid clinic ID format",
+		})
+		return
+	}
+
+	// Get verification status
+	verification, err := h.clinicService.GetClinicVerificationStatus(ctx, clinicID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, verification)
 }
 
 func stringToPtr(s string) *string {

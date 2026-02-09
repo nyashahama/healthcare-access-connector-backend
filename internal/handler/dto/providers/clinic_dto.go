@@ -11,6 +11,7 @@ import (
 type CreateClinicRequest struct {
 	ClinicName             string         `json:"clinic_name"`
 	ClinicType             string         `json:"clinic_type"`
+	OwnerUserID            *uuid.UUID     `json:"owner_user_id,omitempty"`
 	RegistrationNumber     *string        `json:"registration_number,omitempty"`
 	AccreditationNumber    *string        `json:"accreditation_number,omitempty"`
 	PrimaryPhone           *string        `json:"primary_phone,omitempty"`
@@ -254,6 +255,7 @@ func ToDomainClinic(req CreateClinicRequest) providers.Clinic {
 	return providers.Clinic{
 		ClinicName:             req.ClinicName,
 		ClinicType:             req.ClinicType,
+		OwnerUserID:            req.OwnerUserID,
 		RegistrationNumber:     req.RegistrationNumber,
 		AccreditationNumber:    req.AccreditationNumber,
 		PrimaryPhone:           req.PrimaryPhone,
