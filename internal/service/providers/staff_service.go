@@ -168,22 +168,30 @@ func (s *staffService) CreateStaffInvitation(ctx context.Context, invitation pro
 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "InvitedBy user ID is required", 400)
 	}
 
-	// Verify clinic exists
-	if _, err := s.clinicRepo.GetClinicByID(ctx, invitation.ClinicID); err != nil {
-		if errors.Is(err, domain.ErrClinicNotFound) {
-			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found", 404)
-		}
+	// Verify clinic is verified before allowing staff invitations
+	clinic, err := s.clinicRepo.GetClinicByID(ctx, invitation.ClinicID)
+	if err != nil {
 		s.logger.Error().Err(err).Str("clinic_id", invitation.ClinicID.String()).Msg("Failed to get clinic")
 		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to verify clinic", 500)
 	}
 
-	// Verify inviter exists
-	if _, err := s.userRepo.GetUserByID(ctx, invitation.InvitedBy); err != nil {
-		if errors.Is(err, domain.ErrUserNotFound) {
-			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrUserNotFound, "Inviter not found", 404)
-		}
-		s.logger.Error().Err(err).Str("invited_by", invitation.InvitedBy.String()).Msg("Failed to get inviter")
-		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to verify inviter", 500)
+	// Check if clinic is verified
+	if !clinic.IsVerified {
+		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Clinic must be verified to invite staff", 403)
+	}
+
+	// Check if inviter has permission to manage staff
+	inviterStaff, err := s.staffRepo.GetStaffByUserAndClinic(ctx, invitation.InvitedBy, invitation.ClinicID)
+	if err != nil {
+		s.logger.Error().Err(err).
+			Str("user_id", invitation.InvitedBy.String()).
+			Str("clinic_id", invitation.ClinicID.String()).
+			Msg("Inviter not found in clinic staff")
+		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrUnauthorized, "You are not authorized to invite staff", 403)
+	}
+
+	if !inviterStaff.CanManageStaff {
+		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrUnauthorized, "You do not have permission to manage staff", 403)
 	}
 
 	// Check if email already exists for this clinic
