@@ -357,6 +357,68 @@ func (h *AuthHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetProviderWithClinic retrieves provider user with their clinic information
+func (h *AuthHandler) GetProviderWithClinic(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	userIDStr := chi.URLParam(r, "id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
+			Error: "Invalid user ID format",
+		})
+		return
+	}
+
+	provider, err := h.authService.GetProviderWithClinic(ctx, userID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	if provider == nil {
+		handler.RespondJSON(w, http.StatusNotFound, core.ErrorResponse{
+			Error: "Provider not found",
+		})
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, core.ToProviderWithClinicResponse(*provider))
+}
+
+// GetUserClinics retrieves all clinics associated with a user
+func (h *AuthHandler) GetUserClinics(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	userIDStr := chi.URLParam(r, "id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
+			Error: "Invalid user ID format",
+		})
+		return
+	}
+
+	clinics, err := h.authService.GetUserClinics(ctx, userID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	// Convert to response DTOs
+	clinicResponses := make([]core.UserClinicResponse, len(clinics))
+	for i, clinic := range clinics {
+		clinicResponses[i] = core.ToUserClinicResponse(clinic)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"clinics": clinicResponses,
+		"total":   len(clinicResponses),
+	})
+}
+
 // extractToken extracts JWT token from Authorization header
 func extractToken(r *http.Request) string {
 	bearerToken := r.Header.Get("Authorization")

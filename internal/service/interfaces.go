@@ -23,6 +23,11 @@ type AuthService interface {
 	RequestPasswordReset(ctx context.Context, identifier string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
 	ResendVerificationEmail(ctx context.Context, email string) error
+	UpdateUserOnboardingStep(ctx context.Context, userID uuid.UUID, step string) error
+	UpdateUserPrimaryClinic(ctx context.Context, userID, clinicID uuid.UUID) error
+	CompleteUserOnboarding(ctx context.Context, userID uuid.UUID) error
+	GetProviderWithClinic(ctx context.Context, userID uuid.UUID) (*core.ProviderWithClinic, error)
+	GetUserClinics(ctx context.Context, userID uuid.UUID) ([]core.UserClinic, error)
 }
 
 // UserService handles user operations
