@@ -296,7 +296,7 @@ func (s *Server) setupRoutes() http.Handler {
 					r.Put("/{id}", s.clinicHandler.UpdateClinic)
 					r.Delete("/{id}", s.clinicHandler.DeleteClinic)
 					r.Put("/{id}/verify", s.clinicHandler.VerifyClinic)
-					r.Put("/{id}/verification-status", s.clinicHandler.UpdateVerificationStatus)
+					// r.Put("/{id}/verification-status", s.clinicHandler.UpdateVerificationStatus)
 				})
 
 				// Staff routes

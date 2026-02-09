@@ -45,97 +45,97 @@ func NewStaffService(
 	}
 }
 
-// func (s *staffService) CreateStaffMember(ctx context.Context, staff providers.ClinicStaff) (providers.ClinicStaff, error) {
-// 	start := time.Now()
-// 	defer func() {
-// 		s.logger.Debug().
-// 			Dur("duration_ms", time.Since(start)).
-// 			Str("first_name", staff.FirstName).
-// 			Str("last_name", staff.LastName).
-// 			Msg("CreateStaffMember completed")
-// 	}()
-//
-// 	// Validate required fields
-// 	if staff.ClinicID == uuid.Nil {
-// 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Clinic ID is required", 400)
-// 	}
-// 	if staff.UserID == uuid.Nil {
-// 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
-// 	}
-// 	if staff.FirstName == "" {
-// 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "First name is required", 400)
-// 	}
-// 	if staff.LastName == "" {
-// 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Last name is required", 400)
-// 	}
-// 	if staff.StaffRole == "" {
-// 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Staff role is required", 400)
-// 	}
-//
-// 	// Verify clinic exists
-// 	if _, err := s.clinicRepo.GetClinicByID(ctx, staff.ClinicID); err != nil {
-// 		if errors.Is(err, domain.ErrClinicNotFound) {
-// 			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found", 404)
-// 		}
-// 		s.logger.Error().Err(err).Str("clinic_id", staff.ClinicID.String()).Msg("Failed to get clinic")
-// 		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to verify clinic", 500)
-// 	}
-//
-// 	// Verify user exists
-// 	if _, err := s.userRepo.GetUserByID(ctx, staff.UserID); err != nil {
-// 		if errors.Is(err, domain.ErrUserNotFound) {
-// 			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrUserNotFound, "User not found", 404)
-// 		}
-// 		s.logger.Error().Err(err).Str("user_id", staff.UserID.String()).Msg("Failed to get user")
-// 		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to verify user", 500)
-// 	}
-//
-// 	// Set timestamps and status
-// 	now := time.Now()
-// 	staff.ID = uuid.New()
-// 	staff.EmploymentStatus = "active"
-// 	staff.CreatedAt = now
-// 	staff.UpdatedAt = now
-//
-// 	// Create staff member
-// 	createdStaff, err := s.staffRepo.CreateStaffMember(ctx, staff)
-// 	if err != nil {
-// 		if errors.Is(err, domain.ErrDuplicateUserStaff) {
-// 			return providers.ClinicStaff{}, domain.NewAppError(err, "User is already a staff member", 409)
-// 		}
-// 		if errors.Is(err, domain.ErrDuplicateStaffEmail) {
-// 			return providers.ClinicStaff{}, domain.NewAppError(err, "Work email already exists", 409)
-// 		}
-// 		if errors.Is(err, domain.ErrDuplicateHPCSNumber) {
-// 			return providers.ClinicStaff{}, domain.NewAppError(err, "HPCS number already exists", 409)
-// 		}
-// 		s.logger.Error().Err(err).
-// 			Str("user_id", staff.UserID.String()).
-// 			Str("clinic_id", staff.ClinicID.String()).
-// 			Msg("Failed to create staff member")
-// 		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to create staff member", 500)
-// 	}
-//
-// 	// Invalidate cache
-// 	s.invalidateStaffCache(ctx, createdStaff.ID, createdStaff.ClinicID)
-//
-// 	// Log audit activity
-// 	s.logStaffActivity(ctx, "staff_created", createdStaff.ID, createdStaff.UserID, map[string]interface{}{
-// 		"clinic_id":  createdStaff.ClinicID,
-// 		"staff_role": createdStaff.StaffRole,
-// 		"first_name": createdStaff.FirstName,
-// 		"last_name":  createdStaff.LastName,
-// 	})
-//
-// 	s.logger.Info().
-// 		Str("staff_id", createdStaff.ID.String()).
-// 		Str("user_id", createdStaff.UserID.String()).
-// 		Str("clinic_id", createdStaff.ClinicID.String()).
-// 		Str("role", createdStaff.StaffRole).
-// 		Msg("Staff member created successfully")
-//
-// 	return createdStaff, nil
-// }
+func (s *staffService) CreateStaffMember(ctx context.Context, staff providers.ClinicStaff) (providers.ClinicStaff, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("first_name", staff.FirstName).
+			Str("last_name", staff.LastName).
+			Msg("CreateStaffMember completed")
+	}()
+
+	// Validate required fields
+	if staff.ClinicID == uuid.Nil {
+		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Clinic ID is required", 400)
+	}
+	if *staff.UserID == uuid.Nil {
+		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
+	}
+	if staff.FirstName == "" {
+		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "First name is required", 400)
+	}
+	if staff.LastName == "" {
+		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Last name is required", 400)
+	}
+	if staff.StaffRole == "" {
+		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Staff role is required", 400)
+	}
+
+	// Verify clinic exists
+	if _, err := s.clinicRepo.GetClinicByID(ctx, staff.ClinicID); err != nil {
+		if errors.Is(err, domain.ErrClinicNotFound) {
+			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found", 404)
+		}
+		s.logger.Error().Err(err).Str("clinic_id", staff.ClinicID.String()).Msg("Failed to get clinic")
+		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to verify clinic", 500)
+	}
+
+	// Verify user exists
+	if _, err := s.userRepo.GetUserByID(ctx, *staff.UserID); err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrUserNotFound, "User not found", 404)
+		}
+		s.logger.Error().Err(err).Str("user_id", staff.UserID.String()).Msg("Failed to get user")
+		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to verify user", 500)
+	}
+
+	// Set timestamps and status
+	now := time.Now()
+	staff.ID = uuid.New()
+	staff.EmploymentStatus = "active"
+	staff.CreatedAt = now
+	staff.UpdatedAt = now
+
+	// Create staff member
+	createdStaff, err := s.staffRepo.CreateStaffMember(ctx, staff)
+	if err != nil {
+		if errors.Is(err, domain.ErrDuplicateUserStaff) {
+			return providers.ClinicStaff{}, domain.NewAppError(err, "User is already a staff member", 409)
+		}
+		if errors.Is(err, domain.ErrDuplicateStaffEmail) {
+			return providers.ClinicStaff{}, domain.NewAppError(err, "Work email already exists", 409)
+		}
+		if errors.Is(err, domain.ErrDuplicateHPCSNumber) {
+			return providers.ClinicStaff{}, domain.NewAppError(err, "HPCS number already exists", 409)
+		}
+		s.logger.Error().Err(err).
+			Str("user_id", staff.UserID.String()).
+			Str("clinic_id", staff.ClinicID.String()).
+			Msg("Failed to create staff member")
+		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to create staff member", 500)
+	}
+
+	// Invalidate cache
+	s.invalidateStaffCache(ctx, createdStaff.ID, createdStaff.ClinicID)
+
+	// Log audit activity
+	s.logStaffActivity(ctx, "staff_created", createdStaff.ID, createdStaff.ClinicID, map[string]interface{}{
+		"clinic_id":  createdStaff.ClinicID,
+		"staff_role": createdStaff.StaffRole,
+		"first_name": createdStaff.FirstName,
+		"last_name":  createdStaff.LastName,
+	})
+
+	s.logger.Info().
+		Str("staff_id", createdStaff.ID.String()).
+		Str("user_id", createdStaff.UserID.String()).
+		Str("clinic_id", createdStaff.ClinicID.String()).
+		Str("role", createdStaff.StaffRole).
+		Msg("Staff member created successfully")
+
+	return createdStaff, nil
+}
 
 // CreateStaffInvitation creates a pending staff invitation
 func (s *staffService) CreateStaffInvitation(ctx context.Context, invitation providers.StaffInvitation) (providers.ClinicStaff, error) {

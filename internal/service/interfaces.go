@@ -269,7 +269,7 @@ type ClinicService interface {
 }
 
 type StaffService interface {
-	CreateStaffInvitation(ctx context.Context, invitation providers.StaffInvitation) (providers.ClinicStaff, error)
+	CreateStaffMember(ctx context.Context, staff providers.ClinicStaff) (providers.ClinicStaff, error)
 	GetStaffByID(ctx context.Context, id uuid.UUID) (providers.ClinicStaff, error)
 	UpdateStaffMember(ctx context.Context, staff providers.ClinicStaff) error
 	DeleteStaffMember(ctx context.Context, id uuid.UUID) error
@@ -277,6 +277,17 @@ type StaffService interface {
 	GetClinicStaff(ctx context.Context, clinicID uuid.UUID, role *string) ([]providers.ClinicStaff, error)
 	GetActiveClinicStaff(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
 	StaffExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CreateStaffInvitation(ctx context.Context, invitation providers.StaffInvitation) (providers.ClinicStaff, error)
+	GetStaffInvitationByToken(ctx context.Context, token string) (*providers.StaffInvitationDetails, error)
+	AcceptStaffInvitation(ctx context.Context, token string, userID uuid.UUID) (providers.ClinicStaff, error)
+	DeclineStaffInvitation(ctx context.Context, token string) error
+	GetPendingInvitationsByClinic(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
+	GetStaffInvitationsByEmail(ctx context.Context, email string) ([]providers.StaffInvitationDetails, error)
+	CancelStaffInvitation(ctx context.Context, token string, cancelledBy uuid.UUID) error
+	ResendStaffInvitation(ctx context.Context, invitationID uuid.UUID, resentBy uuid.UUID) (string, error)
+	GetStaffByUserAndClinic(ctx context.Context, userID, clinicID uuid.UUID) (*providers.ClinicStaff, error)
+	UpdateStaffPermissions(ctx context.Context, staffID uuid.UUID, permissions providers.StaffPermissions, updatedBy uuid.UUID) error
+	ExpireStaffInvitations(ctx context.Context) error
 }
 
 // ServiceCatalogService handles clinic service operations
