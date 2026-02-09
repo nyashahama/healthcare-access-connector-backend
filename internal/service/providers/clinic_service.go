@@ -40,13 +40,77 @@ func NewClinicService(
 	}
 }
 
-func (c *clinicService) CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error) {
+// func (c *clinicService) CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error) {
+// 	start := time.Now()
+// 	defer func() {
+// 		c.logger.Debug().
+// 			Dur("duration_ms", time.Since(start)).
+// 			Str("clinic_name", clinic.ClinicName).
+// 			Msg("CreateClinic completed")
+// 	}()
+//
+// 	// Validate required fields
+// 	if clinic.ClinicName == "" {
+// 		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "Clinic name is required", 400)
+// 	}
+// 	if clinic.ClinicType == "" {
+// 		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "Clinic type is required", 400)
+// 	}
+// 	if clinic.PhysicalAddress == "" {
+// 		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "Physical address is required", 400)
+// 	}
+//
+// 	// Set timestamps and status
+// 	now := time.Now()
+// 	clinic.ID = uuid.New()
+// 	clinic.IsVerified = false
+// 	clinic.VerificationStatus = "pending"
+// 	clinic.CreatedAt = now
+// 	clinic.UpdatedAt = now
+//
+// 	// Create clinic
+// 	createdClinic, err := c.clinicRepo.CreateClinic(ctx, clinic)
+// 	if err != nil {
+// 		if errors.Is(err, domain.ErrDuplicateRegistrationNumber) {
+// 			return providers.Clinic{}, domain.NewAppError(err, "Registration number already exists", 409)
+// 		}
+// 		if errors.Is(err, domain.ErrDuplicateEmail) {
+// 			return providers.Clinic{}, domain.NewAppError(err, "Email already exists", 409)
+// 		}
+// 		if errors.Is(err, domain.ErrDuplicatePhone) {
+// 			return providers.Clinic{}, domain.NewAppError(err, "Phone number already exists", 409)
+// 		}
+// 		c.logger.Error().Err(err).Str("clinic_name", clinic.ClinicName).Msg("Failed to create clinic")
+// 		return providers.Clinic{}, domain.NewAppError(err, "Failed to create clinic", 500)
+// 	}
+//
+// 	// Invalidate cache for clinic listings
+// 	c.invalidateClinicListCache(ctx)
+//
+// 	// Log audit activity
+// 	c.logClinicActivity(ctx, "clinic_created", createdClinic.ID, nil, map[string]interface{}{
+// 		"clinic_name": createdClinic.ClinicName,
+// 		"clinic_type": createdClinic.ClinicType,
+// 	})
+//
+// 	c.logger.Info().
+// 		Str("clinic_id", createdClinic.ID.String()).
+// 		Str("clinic_name", createdClinic.ClinicName).
+// 		Str("clinic_type", createdClinic.ClinicType).
+// 		Msg("Clinic created successfully")
+//
+// 	return createdClinic, nil
+// }
+
+// RegisterClinic creates a new clinic with owner tracking
+func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error) {
 	start := time.Now()
 	defer func() {
 		c.logger.Debug().
 			Dur("duration_ms", time.Since(start)).
 			Str("clinic_name", clinic.ClinicName).
-			Msg("CreateClinic completed")
+			Str("owner_user_id", ownerUserID.String()).
+			Msg("RegisterClinic completed")
 	}()
 
 	// Validate required fields
@@ -59,17 +123,40 @@ func (c *clinicService) CreateClinic(ctx context.Context, clinic providers.Clini
 	if clinic.PhysicalAddress == "" {
 		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "Physical address is required", 400)
 	}
+	if createdBy == uuid.Nil {
+		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "CreatedBy user ID is required", 400)
+	}
+	if ownerUserID == uuid.Nil {
+		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "Owner user ID is required", 400)
+	}
 
-	// Set timestamps and status
+	// Verify that the owner user exists
+	owner, err := c.userRepo.GetUserByID(ctx, ownerUserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return providers.Clinic{}, domain.NewAppError(domain.ErrUserNotFound, "Owner user not found", 404)
+		}
+		c.logger.Error().Err(err).Str("owner_user_id", ownerUserID.String()).Msg("Failed to get owner user")
+		return providers.Clinic{}, domain.NewAppError(err, "Failed to verify owner user", 500)
+	}
+
+	// Validate owner is a provider role
+	if owner.Role != "provider" && owner.Role != "provider_staff" && owner.Role != "clinic_admin" {
+		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "User must have provider role to own a clinic", 403)
+	}
+
+	// Set timestamps, status, and owner tracking
 	now := time.Now()
 	clinic.ID = uuid.New()
+	clinic.CreatedBy = &createdBy
+	clinic.OwnerUserID = &ownerUserID
 	clinic.IsVerified = false
 	clinic.VerificationStatus = "pending"
 	clinic.CreatedAt = now
 	clinic.UpdatedAt = now
 
-	// Create clinic
-	createdClinic, err := c.clinicRepo.CreateClinic(ctx, clinic)
+	// Create clinic in repository
+	createdClinic, err := c.clinicRepo.CreateClinic(ctx, clinic, createdBy, ownerUserID)
 	if err != nil {
 		if errors.Is(err, domain.ErrDuplicateRegistrationNumber) {
 			return providers.Clinic{}, domain.NewAppError(err, "Registration number already exists", 409)
@@ -84,20 +171,22 @@ func (c *clinicService) CreateClinic(ctx context.Context, clinic providers.Clini
 		return providers.Clinic{}, domain.NewAppError(err, "Failed to create clinic", 500)
 	}
 
-	// Invalidate cache for clinic listings
+	// Invalidate cache
 	c.invalidateClinicListCache(ctx)
 
 	// Log audit activity
-	c.logClinicActivity(ctx, "clinic_created", createdClinic.ID, nil, map[string]interface{}{
+	c.logClinicActivity(ctx, "clinic_registered", createdClinic.ID, &ownerUserID, map[string]interface{}{
 		"clinic_name": createdClinic.ClinicName,
 		"clinic_type": createdClinic.ClinicType,
+		"owner_id":    ownerUserID.String(),
+		"created_by":  createdBy.String(),
 	})
 
 	c.logger.Info().
 		Str("clinic_id", createdClinic.ID.String()).
 		Str("clinic_name", createdClinic.ClinicName).
-		Str("clinic_type", createdClinic.ClinicType).
-		Msg("Clinic created successfully")
+		Str("owner_user_id", ownerUserID.String()).
+		Msg("Clinic registered successfully")
 
 	return createdClinic, nil
 }
@@ -593,6 +682,256 @@ func (c *clinicService) GetClinics(ctx context.Context) ([]providers.Clinic, err
 		Msg("Clinics list retrieved")
 
 	return clinics, nil
+}
+
+// GetClinicByOwner retrieves the clinic owned by a specific user
+func (c *clinicService) GetClinicByOwner(ctx context.Context, ownerUserID uuid.UUID) (*providers.Clinic, error) {
+	start := time.Now()
+	defer func() {
+		c.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("owner_user_id", ownerUserID.String()).
+			Msg("GetClinicByOwner completed")
+	}()
+
+	// Validate owner user ID
+	if ownerUserID == uuid.Nil {
+		return nil, domain.NewAppError(domain.ErrValidation, "Owner user ID is required", 400)
+	}
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("clinic:owner:%s", ownerUserID.String())
+	var clinic providers.Clinic
+	if err := c.cache.Get(ctx, cacheKey, &clinic); err == nil {
+		c.logger.Debug().Str("owner_user_id", ownerUserID.String()).Msg("Clinic retrieved from cache")
+		return &clinic, nil
+	}
+
+	// Fetch from repository (returns *providers.Clinic)
+	clinicPtr, err := c.clinicRepo.GetClinicByOwner(ctx, ownerUserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrClinicNotFound) {
+			return nil, domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found for owner", 404)
+		}
+		c.logger.Error().Err(err).Str("owner_user_id", ownerUserID.String()).Msg("Failed to get clinic by owner")
+		return nil, domain.NewAppError(err, "Failed to get clinic by owner", 500)
+	}
+
+	// Cache the result
+	if err := c.cache.Set(ctx, cacheKey, *clinicPtr, 10*time.Minute); err != nil {
+		c.logger.Warn().Err(err).Msg("Failed to cache clinic")
+	}
+
+	c.logger.Debug().
+		Str("clinic_id", clinicPtr.ID.String()).
+		Str("owner_user_id", ownerUserID.String()).
+		Msg("Clinic retrieved by owner")
+
+	return clinicPtr, nil
+}
+
+// GetClinicWithOwnerInfo retrieves clinic with detailed owner information
+func (c *clinicService) GetClinicWithOwnerInfo(ctx context.Context, clinicID uuid.UUID) (*providers.ClinicWithOwner, error) {
+	start := time.Now()
+	defer func() {
+		c.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("clinic_id", clinicID.String()).
+			Msg("GetClinicWithOwnerInfo completed")
+	}()
+
+	// Validate clinic ID
+	if clinicID == uuid.Nil {
+		return nil, domain.NewAppError(domain.ErrValidation, "Clinic ID is required", 400)
+	}
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("clinic:with_owner:%s", clinicID.String())
+	var clinicWithOwner providers.ClinicWithOwner
+	if err := c.cache.Get(ctx, cacheKey, &clinicWithOwner); err == nil {
+		c.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic with owner retrieved from cache")
+		return &clinicWithOwner, nil
+	}
+
+	// Fetch from repository (returns *providers.ClinicWithOwner)
+	clinicWithOwnerPtr, err := c.clinicRepo.GetClinicWithOwnerInfo(ctx, clinicID)
+	if err != nil {
+		if errors.Is(err, domain.ErrClinicNotFound) {
+			return nil, domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found", 404)
+		}
+		c.logger.Error().Err(err).Str("clinic_id", clinicID.String()).Msg("Failed to get clinic with owner info")
+		return nil, domain.NewAppError(err, "Failed to get clinic with owner", 500)
+	}
+
+	// Cache the result
+	if err := c.cache.Set(ctx, cacheKey, *clinicWithOwnerPtr, 10*time.Minute); err != nil {
+		c.logger.Warn().Err(err).Msg("Failed to cache clinic with owner")
+	}
+
+	c.logger.Debug().
+		Str("clinic_id", clinicID.String()).
+		Str("owner_email", stringPtrToString(clinicWithOwnerPtr.OwnerEmail)).
+		Msg("Clinic with owner info retrieved")
+
+	return clinicWithOwnerPtr, nil
+}
+
+// UpdateClinicOwner changes the owner of a clinic
+func (c *clinicService) UpdateClinicOwner(ctx context.Context, clinicID, newOwnerUserID uuid.UUID, updatedBy uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		c.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("clinic_id", clinicID.String()).
+			Str("new_owner_user_id", newOwnerUserID.String()).
+			Msg("UpdateClinicOwner completed")
+	}()
+
+	// Validate IDs
+	if clinicID == uuid.Nil {
+		return domain.NewAppError(domain.ErrValidation, "Clinic ID is required", 400)
+	}
+	if newOwnerUserID == uuid.Nil {
+		return domain.NewAppError(domain.ErrValidation, "New owner user ID is required", 400)
+	}
+	if updatedBy == uuid.Nil {
+		return domain.NewAppError(domain.ErrValidation, "Updated by user ID is required", 400)
+	}
+
+	// Verify clinic exists
+	clinic, err := c.clinicRepo.GetClinicByID(ctx, clinicID)
+	if err != nil {
+		if errors.Is(err, domain.ErrClinicNotFound) {
+			return domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found", 404)
+		}
+		return domain.NewAppError(err, "Failed to get clinic", 500)
+	}
+
+	// Verify new owner exists and has appropriate role
+	newOwner, err := c.userRepo.GetUserByID(ctx, newOwnerUserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return domain.NewAppError(domain.ErrUserNotFound, "New owner user not found", 404)
+		}
+		c.logger.Error().Err(err).Str("new_owner_user_id", newOwnerUserID.String()).Msg("Failed to get new owner user")
+		return domain.NewAppError(err, "Failed to verify new owner user", 500)
+	}
+
+	// Validate new owner is a provider role
+	if newOwner.Role != "provider" && newOwner.Role != "provider_staff" && newOwner.Role != "clinic_admin" {
+		return domain.NewAppError(domain.ErrValidation, "New owner must have provider role", 403)
+	}
+
+	// Get old owner ID for logging
+	var oldOwnerID uuid.UUID
+	if clinic.OwnerUserID != nil {
+		oldOwnerID = *clinic.OwnerUserID
+	}
+
+	// Update clinic owner in repository
+	if err := c.clinicRepo.UpdateClinicOwner(ctx, clinicID, newOwnerUserID); err != nil {
+		c.logger.Error().Err(err).
+			Str("clinic_id", clinicID.String()).
+			Str("new_owner_user_id", newOwnerUserID.String()).
+			Msg("Failed to update clinic owner")
+		return domain.NewAppError(err, "Failed to update clinic owner", 500)
+	}
+
+	// Invalidate cache
+	c.invalidateClinicCache(ctx, clinicID)
+	if oldOwnerID != uuid.Nil {
+		cacheKey := fmt.Sprintf("clinic:owner:%s", oldOwnerID.String())
+		c.cache.Delete(ctx, cacheKey)
+	}
+	cacheKey := fmt.Sprintf("clinic:owner:%s", newOwnerUserID.String())
+	c.cache.Delete(ctx, cacheKey)
+	c.invalidateClinicListCache(ctx)
+
+	// Log audit activity
+	c.logClinicActivity(ctx, "clinic_owner_updated", clinicID, &updatedBy, map[string]interface{}{
+		"clinic_name":       clinic.ClinicName,
+		"old_owner_user_id": oldOwnerID.String(),
+		"new_owner_user_id": newOwnerUserID.String(),
+		"updated_by":        updatedBy.String(),
+	})
+
+	c.logger.Info().
+		Str("clinic_id", clinicID.String()).
+		Str("old_owner_user_id", oldOwnerID.String()).
+		Str("new_owner_user_id", newOwnerUserID.String()).
+		Msg("Clinic owner updated successfully")
+
+	return nil
+}
+
+// GetClinicVerificationStatus retrieves the verification status of a clinic
+func (c *clinicService) GetClinicVerificationStatus(ctx context.Context, clinicID uuid.UUID) (*providers.ClinicVerification, error) {
+	start := time.Now()
+	defer func() {
+		c.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("clinic_id", clinicID.String()).
+			Msg("GetClinicVerificationStatus completed")
+	}()
+
+	// Validate clinic ID
+	if clinicID == uuid.Nil {
+		return nil, domain.NewAppError(domain.ErrValidation, "Clinic ID is required", 400)
+	}
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("clinic:verification:%s", clinicID.String())
+	var verification providers.ClinicVerification
+	if err := c.cache.Get(ctx, cacheKey, &verification); err == nil {
+		c.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic verification status retrieved from cache")
+		return &verification, nil
+	}
+
+	// Fetch from repository (returns *providers.ClinicVerification)
+	verificationPtr, err := c.clinicRepo.GetClinicVerificationStatus(ctx, clinicID)
+	if err != nil {
+		if errors.Is(err, domain.ErrClinicNotFound) {
+			return nil, domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found", 404)
+		}
+		c.logger.Error().Err(err).Str("clinic_id", clinicID.String()).Msg("Failed to get clinic verification status")
+		return nil, domain.NewAppError(err, "Failed to get verification status", 500)
+	}
+
+	// Cache the result
+	if err := c.cache.Set(ctx, cacheKey, *verificationPtr, 5*time.Minute); err != nil {
+		c.logger.Warn().Err(err).Msg("Failed to cache clinic verification status")
+	}
+
+	c.logger.Debug().
+		Str("clinic_id", clinicID.String()).
+		Str("verification_status", verificationPtr.VerificationStatus).
+		Bool("is_verified", verificationPtr.IsVerified).
+		Msg("Clinic verification status retrieved")
+
+	return verificationPtr, nil
+}
+
+// Helper method to log clinic activities (extending existing service)
+func (c *clinicService) logClinicActivityWithUser(ctx context.Context, activityType string, clinicID, userID uuid.UUID, details map[string]interface{}) {
+	// Create activity log
+	activity := core.UserActivity{
+		UserID:          &userID,
+		ActivityType:    activityType,
+		ActivityDetails: details,
+		ResourceType:    stringPtr("clinic"),
+		ResourceID:      &clinicID,
+		PerformedAt:     time.Now(),
+	}
+
+	// Log activity asynchronously
+	go func() {
+		activityCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := c.auditRepo.LogUserActivity(activityCtx, activity); err != nil {
+			c.logger.Warn().Err(err).Msg("Failed to log clinic activity")
+		}
+	}()
 }
 
 // Helper methods

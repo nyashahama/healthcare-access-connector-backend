@@ -118,7 +118,7 @@ func (c *credentialService) CreateCredential(ctx context.Context, credential pro
 	c.invalidateCredentialCache(ctx, createdCredential.ID, createdCredential.StaffID)
 
 	// Log audit activity
-	c.logCredentialActivity(ctx, "credential_created", createdCredential.ID, &staff.UserID, map[string]interface{}{
+	c.logCredentialActivity(ctx, "credential_created", createdCredential.ID, &staff.ID, map[string]interface{}{
 		"staff_id":          createdCredential.StaffID,
 		"credential_type":   createdCredential.CredentialType,
 		"credential_number": stringPtrToString(createdCredential.CredentialNumber),
@@ -221,7 +221,7 @@ func (c *credentialService) DeleteCredential(ctx context.Context, id uuid.UUID) 
 
 		var userID *uuid.UUID
 		if staff.ID != uuid.Nil {
-			userID = &staff.UserID
+			userID = &staff.ID
 		}
 
 		c.logCredentialActivity(ctx, "credential_deleted", id, userID, map[string]interface{}{

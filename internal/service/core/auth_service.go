@@ -689,6 +689,252 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, email string)
 	return nil
 }
 
+// UpdateUserOnboardingStep updates the user's onboarding progress
+func (s *authService) UpdateUserOnboardingStep(ctx context.Context, userID uuid.UUID, step string) error {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Str("step", step).
+			Msg("UpdateUserOnboardingStep completed")
+	}()
+
+	// Validate step
+	validSteps := map[string]bool{
+		core.OnboardingStepAccountCreated:   true,
+		core.OnboardingStepClinicRegistered: true,
+		core.OnboardingStepClinicApproved:   true,
+		core.OnboardingStepCompleted:        true,
+	}
+
+	if !validSteps[step] {
+		return domain.NewAppError(domain.ErrValidation, "Invalid onboarding step", 400)
+	}
+
+	// Update onboarding step in repository
+	if err := s.authRepo.UpdateUserOnboardingStep(ctx, userID, step); err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return domain.NewAppError(domain.ErrUserNotFound, "User not found", 404)
+		}
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to update onboarding step")
+		return domain.NewAppError(err, "Failed to update onboarding step", 500)
+	}
+
+	// Invalidate user cache
+	if s.cache != nil && s.cache.IsAvailable() {
+		user, err := s.userRepo.GetUserByID(ctx, userID)
+		if err == nil {
+			if user.Email != nil {
+				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+			}
+			if user.Phone != nil {
+				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone))
+			}
+		}
+	}
+
+	s.logger.Info().
+		Str("user_id", userID.String()).
+		Str("onboarding_step", step).
+		Msg("User onboarding step updated successfully")
+
+	return nil
+}
+
+// UpdateUserPrimaryClinic links a user to their primary clinic
+func (s *authService) UpdateUserPrimaryClinic(ctx context.Context, userID, clinicID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Str("clinic_id", clinicID.String()).
+			Msg("UpdateUserPrimaryClinic completed")
+	}()
+
+	// Validate IDs
+	if userID == uuid.Nil {
+		return domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
+	}
+	if clinicID == uuid.Nil {
+		return domain.NewAppError(domain.ErrValidation, "Clinic ID is required", 400)
+	}
+
+	// Update primary clinic in repository
+	if err := s.authRepo.UpdateUserPrimaryClinic(ctx, userID, clinicID); err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return domain.NewAppError(domain.ErrUserNotFound, "User not found", 404)
+		}
+		s.logger.Error().Err(err).
+			Str("user_id", userID.String()).
+			Str("clinic_id", clinicID.String()).
+			Msg("Failed to update user primary clinic")
+		return domain.NewAppError(err, "Failed to update primary clinic", 500)
+	}
+
+	// Invalidate user cache
+	if s.cache != nil && s.cache.IsAvailable() {
+		user, err := s.userRepo.GetUserByID(ctx, userID)
+		if err == nil {
+			if user.Email != nil {
+				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+			}
+			if user.Phone != nil {
+				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone))
+			}
+		}
+	}
+
+	s.logger.Info().
+		Str("user_id", userID.String()).
+		Str("clinic_id", clinicID.String()).
+		Msg("User primary clinic updated successfully")
+
+	return nil
+}
+
+// CompleteUserOnboarding marks the user's onboarding as complete
+func (s *authService) CompleteUserOnboarding(ctx context.Context, userID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Msg("CompleteUserOnboarding completed")
+	}()
+
+	// Validate user ID
+	if userID == uuid.Nil {
+		return domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
+	}
+
+	// Complete onboarding in repository
+	if err := s.authRepo.CompleteUserOnboarding(ctx, userID); err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return domain.NewAppError(domain.ErrUserNotFound, "User not found", 404)
+		}
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to complete user onboarding")
+		return domain.NewAppError(err, "Failed to complete onboarding", 500)
+	}
+
+	// Invalidate user cache
+	if s.cache != nil && s.cache.IsAvailable() {
+		user, err := s.userRepo.GetUserByID(ctx, userID)
+		if err == nil {
+			if user.Email != nil {
+				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+			}
+			if user.Phone != nil {
+				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone))
+			}
+		}
+	}
+
+	s.logger.Info().
+		Str("user_id", userID.String()).
+		Msg("User onboarding completed successfully")
+
+	return nil
+}
+
+// GetProviderWithClinic retrieves provider user with clinic information
+func (s *authService) GetProviderWithClinic(ctx context.Context, userID uuid.UUID) (*core.ProviderWithClinic, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Msg("GetProviderWithClinic completed")
+	}()
+
+	// Validate user ID
+	if userID == uuid.Nil {
+		return nil, domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
+	}
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("provider:with_clinic:%s", userID.String())
+	if s.cache != nil && s.cache.IsAvailable() {
+		var cached core.ProviderWithClinic
+		if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("Provider retrieved from cache")
+			return &cached, nil
+		}
+	}
+
+	// Fetch from repository
+	provider, err := s.authRepo.GetProviderWithClinic(ctx, userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, domain.NewAppError(domain.ErrUserNotFound, "Provider not found", 404)
+		}
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get provider with clinic")
+		return nil, domain.NewAppError(err, "Failed to get provider information", 500)
+	}
+
+	// Cache the result
+	if s.cache != nil && s.cache.IsAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, *provider, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache provider information")
+		}
+	}
+
+	s.logger.Debug().
+		Str("user_id", userID.String()).
+		Str("clinic_id", uuidPtrToString(provider.ClinicID)).
+		Msg("Provider with clinic retrieved")
+
+	return provider, nil
+}
+
+// GetUserClinics retrieves all clinics associated with a user
+func (s *authService) GetUserClinics(ctx context.Context, userID uuid.UUID) ([]core.UserClinic, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Msg("GetUserClinics completed")
+	}()
+
+	// Validate user ID
+	if userID == uuid.Nil {
+		return nil, domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
+	}
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("user:clinics:%s", userID.String())
+	if s.cache != nil && s.cache.IsAvailable() {
+		var cached []core.UserClinic
+		if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("User clinics retrieved from cache")
+			return cached, nil
+		}
+	}
+
+	// Fetch from repository
+	clinics, err := s.authRepo.GetUserClinics(ctx, userID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user clinics")
+		return nil, domain.NewAppError(err, "Failed to get user clinics", 500)
+	}
+
+	// Cache the result
+	if s.cache != nil && s.cache.IsAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, clinics, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache user clinics")
+		}
+	}
+
+	s.logger.Debug().
+		Str("user_id", userID.String()).
+		Int("clinic_count", len(clinics)).
+		Msg("User clinics retrieved")
+
+	return clinics, nil
+}
+
 // Helper methods for auth service
 func (s *authService) handlePostRegistration(user core.User, email, phone, role string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -857,6 +1103,14 @@ func stringPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// Helper function to convert UUID pointer to string
+func uuidPtrToString(id *uuid.UUID) string {
+	if id == nil {
+		return "nil"
+	}
+	return id.String()
 }
 
 func maskIdentifier(identifier string) string {

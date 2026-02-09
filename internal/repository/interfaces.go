@@ -327,6 +327,10 @@ type ClinicRepository interface {
 	SearchClinics(ctx context.Context, params providers.ClinicSearchParams) ([]providers.ClinicSearchResult, error)
 
 	GetClinics(ctx context.Context) ([]providers.Clinic, error)
+	GetClinicByOwner(ctx context.Context, ownerUserID uuid.UUID) (*providers.Clinic, error)
+	GetClinicWithOwnerInfo(ctx context.Context, clinicID uuid.UUID) (*providers.ClinicWithOwner, error)
+	UpdateClinicOwner(ctx context.Context, clinicID, newOwnerID uuid.UUID) error
+	GetClinicVerificationStatus(ctx context.Context, clinicID uuid.UUID) (*providers.ClinicVerification, error)
 }
 
 type ServiceRepository interface {
@@ -352,6 +356,18 @@ type StaffRepository interface {
 	GetActiveClinicStaff(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
 
 	StaffExists(ctx context.Context, id uuid.UUID) (bool, error)
+	CreateStaffInvitation(ctx context.Context, invitation providers.StaffInvitation) (providers.ClinicStaff, error)
+	GetStaffInvitationByToken(ctx context.Context, token string) (*providers.StaffInvitationDetails, error)
+	AcceptStaffInvitation(ctx context.Context, token string, userID uuid.UUID) error
+	DeclineStaffInvitation(ctx context.Context, token string) error
+	GetPendingInvitationsByClinic(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
+	GetStaffInvitationsByEmail(ctx context.Context, email string) ([]providers.StaffInvitationDetails, error)
+	CancelStaffInvitation(ctx context.Context, token string) error
+	ResendStaffInvitation(ctx context.Context, invitationID uuid.UUID) (string, error)
+	CheckStaffEmailExists(ctx context.Context, clinicID uuid.UUID, email string) (bool, error)
+	GetStaffByUserAndClinic(ctx context.Context, userID, clinicID uuid.UUID) (*providers.ClinicStaff, error)
+	UpdateStaffPermissions(ctx context.Context, staffID uuid.UUID, permissions providers.StaffPermissions) error
+	ExpireStaffInvitations(ctx context.Context) error
 }
 
 type CredentialRepository interface {

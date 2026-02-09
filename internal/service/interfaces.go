@@ -244,7 +244,7 @@ type EmergencyContactService interface {
 
 // ClinicService handles clinic operations
 type ClinicService interface {
-	CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error)
+	RegisterClinic(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error)
 	GetClinicByID(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
 	UpdateClinic(ctx context.Context, clinic providers.Clinic) error
 	DeleteClinic(ctx context.Context, id uuid.UUID) error
@@ -257,10 +257,14 @@ type ClinicService interface {
 
 	SearchClinics(ctx context.Context, params providers.ClinicSearchParams) ([]providers.ClinicSearchResult, error)
 	GetClinics(ctx context.Context) ([]providers.Clinic, error)
+	GetClinicByOwner(ctx context.Context, ownerUserID uuid.UUID) (*providers.Clinic, error)
+	GetClinicWithOwnerInfo(ctx context.Context, clinicID uuid.UUID) (*providers.ClinicWithOwner, error)
+	UpdateClinicOwner(ctx context.Context, clinicID, newOwnerUserID uuid.UUID, updatedBy uuid.UUID) error
+	GetClinicVerificationStatus(ctx context.Context, clinicID uuid.UUID) (*providers.ClinicVerification, error)
 }
 
 type StaffService interface {
-	CreateStaffMember(ctx context.Context, staff providers.ClinicStaff) (providers.ClinicStaff, error)
+	CreateStaffInvitation(ctx context.Context, invitation providers.StaffInvitation) (providers.ClinicStaff, error)
 	GetStaffByID(ctx context.Context, id uuid.UUID) (providers.ClinicStaff, error)
 	UpdateStaffMember(ctx context.Context, staff providers.ClinicStaff) error
 	DeleteStaffMember(ctx context.Context, id uuid.UUID) error

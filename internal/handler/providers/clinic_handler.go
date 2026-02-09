@@ -80,7 +80,7 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 	clinic := dto.ToDomainClinic(req)
 
 	// Create clinic
-	createdClinic, err := h.clinicService.CreateClinic(ctx, clinic)
+	createdClinic, err := h.clinicService.RegisterClinic(ctx, clinic)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
