@@ -339,7 +339,7 @@ func (s *Server) setupRoutes() http.Handler {
 					r.Get("/", s.credentialHandler.GetStaffCredentials)
 				})
 			})
-
+			r.Get("/auth/provider-dashboard", s.authHandler.GetProviderDashboard)
 			// Session management routes
 			r.Route("/sessions", func(r chi.Router) {
 				r.Get("/{token}", s.sessionHandler.GetSession)

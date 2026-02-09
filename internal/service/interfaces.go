@@ -15,6 +15,7 @@ import (
 // AuthService handles auth operations
 type AuthService interface {
 	Register(ctx context.Context, email, phone, password, role string) (core.User, error)
+	RegisterInvitedStaff(ctx context.Context, token, email, password, phone string) (core.User, error)
 	Login(ctx context.Context, identifier, password, ipAddress, userAgent string) (string, time.Time, core.User, error)
 	Logout(ctx context.Context, tokenString string, userID uuid.UUID) error
 	ValidateToken(ctx context.Context, token string) (*TokenClaims, error)

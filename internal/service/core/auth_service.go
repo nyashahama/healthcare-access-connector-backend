@@ -182,6 +182,8 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 		UpdatedAt:            now,
 	}
 
+	// TODO:     // Restrict self-selection of admin roles
+
 	// Create user in repository
 	created, err := s.authRepo.CreateUser(ctx, user, string(hash))
 	if err != nil {

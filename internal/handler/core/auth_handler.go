@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/core"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
@@ -424,14 +425,17 @@ func (h *AuthHandler) GetProviderDashboard(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	// Get user ID from context
-	userID, ok := ctx.Value("user_id").(uuid.UUID)
+	// Get claims from context
+	claims, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		handler.RespondJSON(w, http.StatusUnauthorized, core.ErrorResponse{
 			Error: "User not authenticated",
 		})
 		return
 	}
+
+	// Extract user ID from claims
+	userID := claims.UserID
 
 	// Get provider with clinic info
 	provider, err := h.authService.GetProviderWithClinic(ctx, userID)

@@ -12,6 +12,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/providers"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
@@ -62,7 +63,6 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 	v.ValidateRequired("physical_address", req.PhysicalAddress)
 	v.ValidateMinLength("physical_address", req.PhysicalAddress, 1)
 	v.ValidateRequired("country", req.Country)
-
 	if req.Email != nil && *req.Email != "" {
 		v.ValidateEmail("email", *req.Email)
 	}
@@ -75,14 +75,17 @@ func (h *ClinicHandler) CreateClinic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user ID from context (assuming auth middleware sets this)
-	userID, ok := ctx.Value("user_id").(uuid.UUID)
+	// Get claims from context using the middleware helper
+	claims, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		handler.RespondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
 			Error: "User not authenticated",
 		})
 		return
 	}
+
+	// Extract user ID from claims
+	userID := claims.UserID
 
 	// Determine owner user ID (default to current user if not specified in request)
 	ownerUserID := userID
