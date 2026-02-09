@@ -20,6 +20,8 @@ type clinicService struct {
 	clinicRepo repository.ClinicRepository
 	auditRepo  repository.AuditRepository
 	userRepo   repository.UserRepository
+	authRepo   repository.AuthRepository
+	staffRepo  repository.StaffRepository
 	cache      cache.Service
 	logger     *zerolog.Logger
 }
@@ -28,6 +30,8 @@ func NewClinicService(
 	clinicRepo repository.ClinicRepository,
 	auditRepo repository.AuditRepository,
 	userRepo repository.UserRepository,
+	authRepo repository.AuthRepository,
+	staffRepo repository.StaffRepository,
 	cache cache.Service,
 	logger *zerolog.Logger,
 ) service.ClinicService {
@@ -35,6 +39,8 @@ func NewClinicService(
 		clinicRepo: clinicRepo,
 		auditRepo:  auditRepo,
 		userRepo:   userRepo,
+		authRepo:   authRepo,
+		staffRepo:  staffRepo,
 		cache:      cache,
 		logger:     logger,
 	}
@@ -141,7 +147,13 @@ func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Cli
 	}
 
 	// Validate owner is a provider role
-	if owner.Role != "provider" && owner.Role != "provider_staff" && owner.Role != "clinic_admin" {
+	validOwnerRoles := map[string]bool{
+		"provider":       true,
+		"provider_staff": true,
+		"clinic_admin":   true,
+		"system_admin":   true, // System admins can own clinics too
+	}
+	if !validOwnerRoles[owner.Role] {
 		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "User must have provider role to own a clinic", 403)
 	}
 
@@ -171,8 +183,86 @@ func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Cli
 		return providers.Clinic{}, domain.NewAppError(err, "Failed to create clinic", 500)
 	}
 
-	// Invalidate cache
+	// Create owner staff record
+	ownerStaff := providers.ClinicStaff{
+		ID:                     uuid.New(),
+		ClinicID:               createdClinic.ID,
+		UserID:                 &ownerUserID,
+		FirstName:              "Clinic", // Placeholder, will be updated when user sets profile
+		LastName:               "Owner",
+		StaffRole:              providers.StaffRoleOwner,
+		Department:             stringPtr("Management"),
+		IsPrimaryContact:       true,
+		InvitationStatus:       stringPtr(providers.InvitationStatusAccepted),
+		InvitedAt:              &now,
+		InvitedBy:              &ownerUserID,
+		Permissions:            make(map[string]any),
+		CanManageStaff:         true,
+		CanApproveAppointments: true,
+		CanEditClinicInfo:      true,
+		WorkingHours:           make(map[string]any),
+		AvailableDays:          []string{"monday", "tuesday", "wednesday", "thursday", "friday"},
+		IsAcceptingNewPatients: true,
+		EmploymentStatus:       providers.EmploymentStatusActive,
+		StartDate:              &now,
+		ProfilePictureURL:      nil,
+		LanguagesSpoken:        []string{"en"},
+		CreatedAt:              now,
+		UpdatedAt:              now,
+	}
+
+	// Try to create owner staff record
+	if c.staffRepo != nil {
+		if _, err := c.staffRepo.CreateStaffMember(ctx, ownerStaff); err != nil {
+			c.logger.Warn().Err(err).
+				Str("clinic_id", createdClinic.ID.String()).
+				Str("user_id", ownerUserID.String()).
+				Msg("Failed to create owner staff record")
+			// Continue even if staff record fails
+		}
+	} else {
+		c.logger.Warn().
+			Str("clinic_id", createdClinic.ID.String()).
+			Str("user_id", ownerUserID.String()).
+			Msg("Staff repository not available, skipping owner staff creation")
+	}
+
+	// Update user's primary clinic
+	if err := c.authRepo.UpdateUserPrimaryClinic(ctx, ownerUserID, createdClinic.ID); err != nil {
+		c.logger.Warn().Err(err).
+			Str("user_id", ownerUserID.String()).
+			Str("clinic_id", createdClinic.ID.String()).
+			Msg("Failed to update user primary clinic")
+		// Continue even if this fails
+	}
+
+	// Update user's onboarding step
+	if err := c.authRepo.UpdateUserOnboardingStep(ctx, ownerUserID, core.OnboardingStepClinicRegistered); err != nil {
+		c.logger.Warn().Err(err).
+			Str("user_id", ownerUserID.String()).
+			Msg("Failed to update user onboarding step")
+		// Continue even if this fails
+	}
+
+	// Invalidate user cache
+	if c.cache != nil {
+		userCacheKey := fmt.Sprintf("user:%s", ownerUserID.String())
+		c.cache.Delete(ctx, userCacheKey)
+
+		// Also invalidate any login caches
+		if owner.Email != nil {
+			loginCacheKey := fmt.Sprintf("user:login:%s", *owner.Email)
+			c.cache.Delete(ctx, loginCacheKey)
+		}
+		if owner.Phone != nil {
+			loginCacheKey := fmt.Sprintf("user:login:%s", *owner.Phone)
+			c.cache.Delete(ctx, loginCacheKey)
+		}
+	}
+
+	// Invalidate clinic cache
 	c.invalidateClinicListCache(ctx)
+	c.invalidateClinicCache(ctx, createdClinic.ID)
 
 	// Log audit activity
 	c.logClinicActivity(ctx, "clinic_registered", createdClinic.ID, &ownerUserID, map[string]interface{}{
@@ -180,13 +270,15 @@ func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Cli
 		"clinic_type": createdClinic.ClinicType,
 		"owner_id":    ownerUserID.String(),
 		"created_by":  createdBy.String(),
+		"staff_role":  ownerStaff.StaffRole,
 	})
 
 	c.logger.Info().
 		Str("clinic_id", createdClinic.ID.String()).
 		Str("clinic_name", createdClinic.ClinicName).
 		Str("owner_user_id", ownerUserID.String()).
-		Msg("Clinic registered successfully")
+		Str("onboarding_step", core.OnboardingStepClinicRegistered).
+		Msg("Clinic registered successfully with owner staff")
 
 	return createdClinic, nil
 }

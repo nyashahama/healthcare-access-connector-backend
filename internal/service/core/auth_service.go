@@ -172,6 +172,9 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 		POPIAConsentGiven:    true,
 		ConsentDate:          &now,
 		ProfileCompletionPct: 10,
+		PrimaryClinicID:      nil,
+		OnboardingCompleted:  false,
+		OnboardingStep:       stringPtr(core.OnboardingStepAccountCreated),
 		CreatedAt:            now,
 		UpdatedAt:            now,
 	}

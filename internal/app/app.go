@@ -277,6 +277,8 @@ func New(cfg *config.Config) (*App, error) {
 		clinicRepo,
 		auditRepo,
 		userRepo,
+		authRepo,
+		staffRepo,
 		cacheService,
 		logger,
 	)
