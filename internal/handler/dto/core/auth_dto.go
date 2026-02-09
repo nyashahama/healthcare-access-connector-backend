@@ -39,7 +39,46 @@ type UserResponse struct {
 	IsVerified           bool       `json:"is_verified"`
 	LastLogin            *time.Time `json:"last_login,omitempty"`
 	ProfileCompletionPct int        `json:"profile_completion_percentage"`
-	CreatedAt            time.Time  `json:"created_at"`
+
+	// Provider onboarding fields
+	PrimaryClinicID     *uuid.UUID `json:"primary_clinic_id,omitempty"`
+	OnboardingCompleted bool       `json:"onboarding_completed"`
+	OnboardingStep      *string    `json:"onboarding_step,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// ProviderWithClinicResponse represents a provider user with their clinic information
+type ProviderWithClinicResponse struct {
+	UserID              uuid.UUID  `json:"user_id"`
+	Email               *string    `json:"email,omitempty"`
+	Phone               *string    `json:"phone,omitempty"`
+	Role                string     `json:"role"`
+	Status              string     `json:"status"`
+	IsVerified          bool       `json:"is_verified"`
+	PrimaryClinicID     *uuid.UUID `json:"primary_clinic_id,omitempty"`
+	OnboardingCompleted bool       `json:"onboarding_completed"`
+	OnboardingStep      *string    `json:"onboarding_step,omitempty"`
+
+	// Clinic information
+	ClinicID                 *uuid.UUID `json:"clinic_id,omitempty"`
+	ClinicName               *string    `json:"clinic_name,omitempty"`
+	ClinicVerificationStatus *string    `json:"clinic_verification_status,omitempty"`
+	ClinicIsVerified         *bool      `json:"clinic_is_verified,omitempty"`
+}
+
+// UserClinicResponse represents a clinic that a user is affiliated with
+type UserClinicResponse struct {
+	ClinicID               uuid.UUID `json:"clinic_id"`
+	ClinicName             string    `json:"clinic_name"`
+	ClinicType             string    `json:"clinic_type"`
+	VerificationStatus     string    `json:"verification_status"`
+	IsVerified             bool      `json:"is_verified"`
+	StaffRole              string    `json:"staff_role"`
+	CanManageStaff         bool      `json:"can_manage_staff"`
+	CanEditClinicInfo      bool      `json:"can_edit_clinic_info"`
+	CanApproveAppointments bool      `json:"can_approve_appointments"`
+	IsPrimaryContact       bool      `json:"is_primary_contact"`
 }
 
 // PatientProfileResponse represents patient profile data
@@ -83,7 +122,45 @@ func ToUserResponse(user core.User) UserResponse {
 		IsVerified:           user.IsVerified,
 		LastLogin:            user.LastLogin,
 		ProfileCompletionPct: user.ProfileCompletionPct,
+		PrimaryClinicID:      user.PrimaryClinicID,
+		OnboardingCompleted:  user.OnboardingCompleted,
+		OnboardingStep:       user.OnboardingStep,
 		CreatedAt:            user.CreatedAt,
+	}
+}
+
+// ToProviderWithClinicResponse converts domain.ProviderWithClinic to response DTO
+func ToProviderWithClinicResponse(provider core.ProviderWithClinic) ProviderWithClinicResponse {
+	return ProviderWithClinicResponse{
+		UserID:                   provider.UserID,
+		Email:                    provider.Email,
+		Phone:                    provider.Phone,
+		Role:                     provider.Role,
+		Status:                   provider.Status,
+		IsVerified:               provider.IsVerified,
+		PrimaryClinicID:          provider.PrimaryClinicID,
+		OnboardingCompleted:      provider.OnboardingCompleted,
+		OnboardingStep:           provider.OnboardingStep,
+		ClinicID:                 provider.ClinicID,
+		ClinicName:               provider.ClinicName,
+		ClinicVerificationStatus: provider.ClinicVerificationStatus,
+		ClinicIsVerified:         provider.ClinicIsVerified,
+	}
+}
+
+// ToUserClinicResponse converts domain.UserClinic to response DTO
+func ToUserClinicResponse(clinic core.UserClinic) UserClinicResponse {
+	return UserClinicResponse{
+		ClinicID:               clinic.ClinicID,
+		ClinicName:             clinic.ClinicName,
+		ClinicType:             clinic.ClinicType,
+		VerificationStatus:     clinic.VerificationStatus,
+		IsVerified:             clinic.IsVerified,
+		StaffRole:              clinic.StaffRole,
+		CanManageStaff:         clinic.CanManageStaff,
+		CanEditClinicInfo:      clinic.CanEditClinicInfo,
+		CanApproveAppointments: clinic.CanApproveAppointments,
+		IsPrimaryContact:       clinic.IsPrimaryContact,
 	}
 }
 

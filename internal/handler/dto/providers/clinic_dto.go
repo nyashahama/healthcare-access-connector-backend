@@ -95,7 +95,12 @@ type UpdateClinicRequest struct {
 
 // ClinicResponse represents a clinic in responses
 type ClinicResponse struct {
-	ID                     uuid.UUID      `json:"id"`
+	ID uuid.UUID `json:"id"`
+
+	// Owner tracking
+	CreatedBy   *uuid.UUID `json:"created_by,omitempty"`
+	OwnerUserID *uuid.UUID `json:"owner_user_id,omitempty"`
+
 	ClinicName             string         `json:"clinic_name"`
 	ClinicType             string         `json:"clinic_type"`
 	RegistrationNumber     *string        `json:"registration_number,omitempty"`
@@ -146,15 +151,19 @@ type ClinicResponse struct {
 	UpdatedAt              time.Time      `json:"updated_at"`
 }
 
+// ClinicWithOwnerResponse represents a clinic with owner information
+type ClinicWithOwnerResponse struct {
+	ClinicResponse
+	OwnerEmail     *string `json:"owner_email,omitempty"`
+	OwnerPhone     *string `json:"owner_phone,omitempty"`
+	OwnerFirstName *string `json:"owner_first_name,omitempty"`
+	OwnerLastName  *string `json:"owner_last_name,omitempty"`
+}
+
 // VerifyClinicRequest represents a request to verify a clinic
 type VerifyClinicRequest struct {
 	VerifiedBy uuid.UUID `json:"verified_by"`
 	Notes      string    `json:"notes"`
-}
-
-// UpdateVerificationStatusRequest represents a request to update verification status
-type UpdateVerificationStatusRequest struct {
-	Status string `json:"status"`
 }
 
 // ClinicListResponse represents a list of clinics
@@ -165,10 +174,19 @@ type ClinicListResponse struct {
 	Offset  int              `json:"offset,omitempty"`
 }
 
+// ErrorResponse represents an error response
+// type ErrorResponse struct {
+// 	Error  string            `json:"error"`
+// 	Fields map[string]string `json:"fields,omitempty"`
+// 	Code   string            `json:"code,omitempty"`
+// }
+
 // ToClinicResponse converts domain Clinic to response DTO
 func ToClinicResponse(clinic providers.Clinic) ClinicResponse {
 	return ClinicResponse{
 		ID:                     clinic.ID,
+		CreatedBy:              clinic.CreatedBy,
+		OwnerUserID:            clinic.OwnerUserID,
 		ClinicName:             clinic.ClinicName,
 		ClinicType:             clinic.ClinicType,
 		RegistrationNumber:     clinic.RegistrationNumber,
@@ -217,6 +235,17 @@ func ToClinicResponse(clinic providers.Clinic) ClinicResponse {
 		ContactPersonEmail:     clinic.ContactPersonEmail,
 		CreatedAt:              clinic.CreatedAt,
 		UpdatedAt:              clinic.UpdatedAt,
+	}
+}
+
+// ToClinicWithOwnerResponse converts domain ClinicWithOwner to response DTO
+func ToClinicWithOwnerResponse(clinicWithOwner providers.ClinicWithOwner) ClinicWithOwnerResponse {
+	return ClinicWithOwnerResponse{
+		ClinicResponse: ToClinicResponse(clinicWithOwner.Clinic),
+		OwnerEmail:     clinicWithOwner.OwnerEmail,
+		OwnerPhone:     clinicWithOwner.OwnerPhone,
+		OwnerFirstName: clinicWithOwner.OwnerFirstName,
+		OwnerLastName:  clinicWithOwner.OwnerLastName,
 	}
 }
 
