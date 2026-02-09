@@ -48,16 +48,18 @@ var (
 	ErrDuplicateRegistrationNumber = errors.New("registration number already exists")
 
 	// Staff errors
-	ErrInvitationNotFound    = errors.New("staff invitation not send")
-	ErrStaffNotFound         = errors.New("staff member not found")
-	ErrStaffNotActive        = errors.New("staff member is not active")
-	ErrCredentialNotFound    = errors.New("credential not found")
-	ErrCredentialExpired     = errors.New("credential has expired")
-	ErrCredentialNotVerified = errors.New("credential not verified")
-	ErrInvalidHPCSNumber     = errors.New("invalid HPCS number")
-	ErrDuplicateStaffEmail   = errors.New("staff email already exists")
-	ErrDuplicateHPCSNumber   = errors.New("HPCS number already exists")
-	ErrDuplicateUserStaff    = errors.New("user already has staff profile")
+	ErrInvitationNotFound        = errors.New("staff invitation not send")
+	ErrInvitationExpired         = errors.New("invitation has expired")
+	ErrInvitationAlreadyAccepted = errors.New("invitation has already been accepted")
+	ErrStaffNotFound             = errors.New("staff member not found")
+	ErrStaffNotActive            = errors.New("staff member is not active")
+	ErrCredentialNotFound        = errors.New("credential not found")
+	ErrCredentialExpired         = errors.New("credential has expired")
+	ErrCredentialNotVerified     = errors.New("credential not verified")
+	ErrInvalidHPCSNumber         = errors.New("invalid HPCS number")
+	ErrDuplicateStaffEmail       = errors.New("staff email already exists")
+	ErrDuplicateHPCSNumber       = errors.New("HPCS number already exists")
+	ErrDuplicateUserStaff        = errors.New("user already has staff profile")
 
 	// Session errors
 	ErrSessionNotFound = errors.New("session not found")

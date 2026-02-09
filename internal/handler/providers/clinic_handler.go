@@ -268,52 +268,52 @@ func (h *ClinicHandler) VerifyClinic(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateVerificationStatus handles updating clinic verification status
-func (h *ClinicHandler) UpdateVerificationStatus(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
-	defer cancel()
-
-	clinicIDStr := chi.URLParam(r, "id")
-	clinicID, err := uuid.Parse(clinicIDStr)
-	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
-			Error: "Invalid clinic ID format",
-		})
-		return
-	}
-
-	var req dto.UpdateVerificationStatusRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
-			Error: "Invalid request body",
-		})
-		return
-	}
-
-	// Validate input
-	v := validator.New()
-	v.ValidateRequired("status", req.Status)
-	v.ValidateEnum("status", req.Status, []string{
-		"pending",
-		"verified",
-		"rejected",
-		"in_review",
-		"unverified",
-	})
-
-	if !v.Valid() {
-		handler.RespondValidationError(w, v.Errors())
-		return
-	}
-
-	if err := h.clinicService.UpdateClinicVerificationStatus(ctx, clinicID, req.Status); err != nil {
-		handler.RespondError(w, h.logger, err)
-		return
-	}
-
-	handler.RespondJSON(w, http.StatusOK, map[string]string{
-		"message": "Verification status updated successfully",
-	})
-}
+// func (h *ClinicHandler) UpdateVerificationStatus(w http.ResponseWriter, r *http.Request) {
+// 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+// 	defer cancel()
+//
+// 	clinicIDStr := chi.URLParam(r, "id")
+// 	clinicID, err := uuid.Parse(clinicIDStr)
+// 	if err != nil {
+// 		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+// 			Error: "Invalid clinic ID format",
+// 		})
+// 		return
+// 	}
+//
+// 	var req dto.UpdateVerificationStatusRequest
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		handler.RespondJSON(w, http.StatusBadRequest, dto.ErrorResponse{
+// 			Error: "Invalid request body",
+// 		})
+// 		return
+// 	}
+//
+// 	// Validate input
+// 	v := validator.New()
+// 	v.ValidateRequired("status", req.Status)
+// 	v.ValidateEnum("status", req.Status, []string{
+// 		"pending",
+// 		"verified",
+// 		"rejected",
+// 		"in_review",
+// 		"unverified",
+// 	})
+//
+// 	if !v.Valid() {
+// 		handler.RespondValidationError(w, v.Errors())
+// 		return
+// 	}
+//
+// 	if err := h.clinicService.UpdateClinicVerificationStatus(ctx, clinicID, req.Status); err != nil {
+// 		handler.RespondError(w, h.logger, err)
+// 		return
+// 	}
+//
+// 	handler.RespondJSON(w, http.StatusOK, map[string]string{
+// 		"message": "Verification status updated successfully",
+// 	})
+// }
 
 // DeactivateClinic handles clinic deactivation
 func (h *ClinicHandler) DeactivateClinic(w http.ResponseWriter, r *http.Request) {
