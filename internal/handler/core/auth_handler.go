@@ -419,6 +419,64 @@ func (h *AuthHandler) GetUserClinics(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// GetProviderDashboard returns provider dashboard information
+func (h *AuthHandler) GetProviderDashboard(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	// Get user ID from context
+	userID, ok := ctx.Value("user_id").(uuid.UUID)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, core.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	// Get provider with clinic info
+	provider, err := h.authService.GetProviderWithClinic(ctx, userID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	response := map[string]interface{}{
+		"user_id":              provider.UserID,
+		"role":                 provider.Role,
+		"onboarding_completed": provider.OnboardingCompleted,
+		"onboarding_step":      provider.OnboardingStep,
+	}
+
+	// If user has a clinic, add clinic info
+	if provider.ClinicID != nil {
+		response["has_clinic"] = true
+		response["clinic_id"] = provider.ClinicID
+		response["clinic_name"] = provider.ClinicName
+		response["clinic_is_verified"] = provider.ClinicIsVerified
+		response["clinic_verification_status"] = provider.ClinicVerificationStatus
+
+		// Determine dashboard status based on clinic verification
+		if provider.ClinicIsVerified != nil && *provider.ClinicIsVerified {
+			response["clinic_status"] = "verified"
+			response["message"] = "Your clinic is verified and ready"
+			response["can_invite_staff"] = true
+			response["can_manage_services"] = true
+		} else {
+			response["clinic_status"] = "pending_approval"
+			response["message"] = "Your clinic is under review"
+			response["estimated_time"] = "2-3 business days"
+			response["can_invite_staff"] = false
+			response["can_manage_services"] = false
+		}
+	} else {
+		response["has_clinic"] = false
+		response["message"] = "No clinic registered yet"
+		response["can_register_clinic"] = true
+	}
+
+	handler.RespondJSON(w, http.StatusOK, response)
+}
+
 // extractToken extracts JWT token from Authorization header
 func extractToken(r *http.Request) string {
 	bearerToken := r.Header.Get("Authorization")

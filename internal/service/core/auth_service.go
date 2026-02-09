@@ -32,6 +32,7 @@ type authService struct {
 	patientRepo  repository.PatientProfileRepository
 	sessionSvc   service.SessionService
 	consentRepo  repository.ConsentRepository
+	staffService service.StaffService
 	cache        cache.Service
 	broker       messaging.Broker
 	emailService email.Service
@@ -63,6 +64,7 @@ func NewAuthService(
 	patientRepo repository.PatientProfileRepository,
 	sessionSvc service.SessionService,
 	consentRepo repository.ConsentRepository,
+	staffService service.StaffService,
 	cache cache.Service,
 	broker messaging.Broker,
 	emailService email.Service,
@@ -95,6 +97,7 @@ func NewAuthService(
 		patientRepo:   patientRepo,
 		sessionSvc:    sessionSvc,
 		consentRepo:   consentRepo,
+		staffService:  staffService,
 		cache:         cache,
 		broker:        broker,
 		emailService:  emailService,
@@ -202,6 +205,52 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 		Msg("User registered successfully")
 
 	return created, nil
+}
+
+// RegisterInvitedStaff handles staff registration via invitation
+func (s *authService) RegisterInvitedStaff(ctx context.Context, token, email, password, phone string) (core.User, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("email", email).
+			Msg("Registration completed")
+	}()
+	// Get invitation
+	invitation, err := s.staffService.GetStaffInvitationByToken(ctx, token)
+	if err != nil {
+		return core.User{}, domain.NewAppError(domain.ErrInvalidToken, "Invalid or expired invitation", 400)
+	}
+
+	// Verify email matches
+	if strings.ToLower(invitation.WorkEmail) != strings.ToLower(email) {
+		return core.User{}, domain.NewAppError(domain.ErrValidation, "Email does not match invitation", 400)
+	}
+
+	// Register user (using existing Register method)
+	user, err := s.Register(ctx, email, phone, password, "provider_staff")
+	if err != nil {
+		return core.User{}, err
+	}
+
+	// Accept invitation
+	_, err = s.staffService.AcceptStaffInvitation(ctx, token, user.ID)
+	if err != nil {
+		// Rollback user creation if needed
+		s.logger.Error().Err(err).Msg("Failed to accept invitation after user creation")
+		return core.User{}, domain.NewAppError(err, "Failed to accept invitation", 500)
+	}
+
+	// Update user's primary clinic and mark onboarding as complete
+	if err := s.authRepo.UpdateUserPrimaryClinic(ctx, user.ID, invitation.ClinicID); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to update user primary clinic")
+	}
+
+	if err := s.authRepo.CompleteUserOnboarding(ctx, user.ID); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to complete user onboarding")
+	}
+
+	return user, nil
 }
 
 // Login handles user login

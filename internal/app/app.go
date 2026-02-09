@@ -127,6 +127,14 @@ func New(cfg *config.Config) (*App, error) {
 		cacheService,
 		logger,
 	)
+	staffService := serviceproviders.NewStaffService(
+		staffRepo,
+		clinicRepo,
+		userRepo,
+		auditRepo,
+		cacheService,
+		logger,
+	)
 	// Initialize services
 	authService := servicecore.NewAuthService(
 		authRepo,
@@ -135,6 +143,7 @@ func New(cfg *config.Config) (*App, error) {
 		patientRepo,
 		sessionService,
 		consentRepo,
+		staffService,
 		cacheService,
 		broker,
 		emailService,
@@ -279,15 +288,6 @@ func New(cfg *config.Config) (*App, error) {
 		userRepo,
 		authRepo,
 		staffRepo,
-		cacheService,
-		logger,
-	)
-
-	staffService := serviceproviders.NewStaffService(
-		staffRepo,
-		clinicRepo,
-		userRepo,
-		auditRepo,
 		cacheService,
 		logger,
 	)
