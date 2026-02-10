@@ -415,6 +415,26 @@ func (s *appointmentService) ConfirmAppointment(ctx context.Context, id uuid.UUI
 		return appointments.Appointment{}, domain.NewAppError(domain.ErrValidation, "User does not have permission to confirm appointments", 403)
 	}
 
+	// Get the appointment first to check its status
+	existing, err := s.appointmentRepo.GetAppointmentByID(ctx, id)
+	if err != nil {
+		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Appointment not found")
+		return appointments.Appointment{}, domain.NewAppError(err, "Appointment not found", 404)
+	}
+
+	// Check if the appointment is in a confirmable state
+	if existing.Status != appointments.StatusPending {
+		s.logger.Warn().
+			Str("appointment_id", id.String()).
+			Str("current_status", string(existing.Status)).
+			Msg("Appointment cannot be confirmed - not in pending status")
+		return appointments.Appointment{}, domain.NewAppError(
+			domain.ErrValidation,
+			fmt.Sprintf("Appointment cannot be confirmed. Current status: %s", existing.Status),
+			400,
+		)
+	}
+
 	confirmed, err := s.appointmentRepo.ConfirmAppointment(ctx, id, confirmedBy)
 	if err != nil {
 		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Failed to confirm appointment")
