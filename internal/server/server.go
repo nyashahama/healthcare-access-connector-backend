@@ -225,11 +225,17 @@ func (s *Server) setupRoutes() http.Handler {
 		r.Post("/auth/password/reset-request", s.authHandler.RequestPasswordReset)
 		r.Post("/auth/password/reset", s.authHandler.ResetPassword)
 		r.Post("/auth/resend-verification", s.authHandler.ResendVerificationEmail)
+		// Staff registration via invitation
+		r.Post("/auth/register/staff", s.authHandler.RegisterInvitedStaff)
 
 		// Public OTP routes
 		r.Post("/auth/otp/generate", s.otpHandler.GenerateOTP)
 		r.Post("/auth/otp/verify", s.otpHandler.VerifyOTP)
 		r.Post("/auth/password/reset-with-otp", s.otpHandler.ResetPasswordWithOTP)
+
+		// Public staff invitation routes (no authentication required)
+		r.Get("/staff/invitations/{token}", s.staffHandler.GetInvitationDetails)
+		r.Post("/staff/invitations/{token}/decline", s.staffHandler.DeclineInvitation)
 
 		// Protected routes - require authentication
 		r.Group(func(r chi.Router) {
@@ -313,6 +319,11 @@ func (s *Server) setupRoutes() http.Handler {
 				r.Route("/clinics/{clinic_id}/staff", func(r chi.Router) {
 					r.Get("/", s.staffHandler.ListClinicStaff)
 					r.Get("/active", s.staffHandler.ListActiveClinicStaff)
+					// Staff invitation endpoints
+					r.Post("/invite", s.staffHandler.InviteStaff)
+					r.Get("/invitations/pending", s.staffHandler.GetPendingInvitations)
+					r.Delete("/invitations/{token}", s.staffHandler.CancelInvitation)
+					r.Post("/invitations/{invitation_id}/resend", s.staffHandler.ResendInvitation)
 				})
 
 				// Service routes
@@ -341,6 +352,13 @@ func (s *Server) setupRoutes() http.Handler {
 				})
 			})
 			r.Get("/auth/provider-dashboard", s.authHandler.GetProviderDashboard)
+
+			// Protected staff invitation routes (require authentication)
+			r.Route("/staff", func(r chi.Router) {
+				r.Post("/invitations/{token}/accept", s.staffHandler.AcceptInvitation)
+				r.Get("/invitations/my", s.staffHandler.GetMyInvitations)
+			})
+
 			// Session management routes
 			r.Route("/sessions", func(r chi.Router) {
 				r.Get("/{token}", s.sessionHandler.GetSession)

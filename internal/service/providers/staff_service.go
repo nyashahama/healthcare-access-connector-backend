@@ -721,7 +721,7 @@ func (s *staffService) GetStaffByID(ctx context.Context, id uuid.UUID) (provider
 	staff, err := s.staffRepo.GetStaffByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrStaffNotFound) {
-			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrStaffNotFound, "Staff member not found", 404)
+			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrStaffNotFound, "Staff member not found at all", 404)
 		}
 		s.logger.Error().Err(err).Str("staff_id", id.String()).Msg("Failed to get staff member")
 		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to get staff member", 500)

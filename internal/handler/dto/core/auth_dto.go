@@ -22,6 +22,14 @@ type LoginRequest struct {
 	Password   string `json:"password"`
 }
 
+// StaffRegistrationRequest represents staff member registration via invitation
+type StaffRegistrationRequest struct {
+	InvitationToken string `json:"invitation_token"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	Phone           string `json:"phone,omitempty"`
+}
+
 // LoginResponse represents a successful login response
 type LoginResponse struct {
 	Token     string       `json:"token"`

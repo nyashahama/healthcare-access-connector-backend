@@ -83,6 +83,68 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	handler.RespondJSON(w, http.StatusCreated, core.ToUserResponse(user))
 }
 
+// RegisterInvitedStaff handles staff member registration via invitation
+// POST /api/v1/auth/register/staff
+func (h *AuthHandler) RegisterInvitedStaff(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	var req core.StaffRegistrationRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
+			Error: "Invalid request body",
+		})
+		return
+	}
+
+	// Validate input
+	v := validator.New()
+	v.ValidateRequired("invitation_token", req.InvitationToken)
+	v.ValidateRequired("email", req.Email)
+	v.ValidateEmail("email", req.Email)
+	v.ValidateRequired("password", req.Password)
+	v.ValidatePassword("password", req.Password)
+
+	if req.Phone != "" {
+		v.ValidatePhone("phone", req.Phone)
+	}
+
+	if !v.Valid() {
+		handler.RespondValidationError(w, v.Errors())
+		return
+	}
+
+	// Register user with invitation token
+	user, err := h.authService.RegisterInvitedStaff(ctx, req.InvitationToken, req.Email, req.Password, req.Phone)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	// Auto-login the user after successful registration
+	ipAddress := getIPAddress(r)
+	userAgent := r.UserAgent()
+
+	token, expiresAt, _, err := h.authService.Login(ctx, req.Email, req.Password, ipAddress, userAgent)
+	if err != nil {
+		// Registration succeeded but login failed - still return success
+		h.logger.Warn().Err(err).Msg("Staff registered but auto-login failed")
+		handler.RespondJSON(w, http.StatusCreated, map[string]interface{}{
+			"message": "Registration successful. Please login.",
+			"user":    core.ToUserResponse(user),
+		})
+		return
+	}
+
+	response := core.LoginResponse{
+		Token:     token,
+		ExpiresAt: expiresAt,
+		User:      core.ToUserResponse(user),
+	}
+
+	handler.RespondJSON(w, http.StatusCreated, response)
+}
+
 // Login handles user login
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)

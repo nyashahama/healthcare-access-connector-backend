@@ -405,6 +405,7 @@ func New(cfg *config.Config) (*App, error) {
 	// Initialize provider handlers
 	staffHandler := handlerproviders.NewStaffHandler(
 		staffService,
+		userService,
 		logger,
 		cfg.Timeout,
 	)
