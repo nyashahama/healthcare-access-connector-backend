@@ -3,12 +3,14 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/providers"
@@ -598,6 +600,43 @@ func (h *ClinicHandler) GetClinicVerificationStatus(w http.ResponseWriter, r *ht
 	}
 
 	handler.RespondJSON(w, http.StatusOK, verification)
+}
+
+// GetMyClinic handles getting the current user's clinic
+func (h *ClinicHandler) GetMyClinic(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	// Get user from context using middleware helper
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	// Get user ID from claims
+	userID := claims.UserID
+
+	// Get clinic by owner
+	clinic, err := h.clinicService.GetClinicByOwner(ctx, userID)
+	if err != nil {
+		// Check if it's a "not found" error
+		if errors.Is(err, domain.ErrClinicNotFound) {
+			handler.RespondJSON(w, http.StatusNotFound, dto.ErrorResponse{
+				Error: "No clinic found for this user",
+			})
+			return
+		}
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	// Return clinic in the expected format for frontend
+	handler.RespondJSON(w, http.StatusOK, map[string]interface{}{
+		"clinic": dto.ToClinicResponse(*clinic),
+	})
 }
 
 func stringToPtr(s string) *string {
