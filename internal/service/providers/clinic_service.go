@@ -183,24 +183,35 @@ func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Cli
 		return providers.Clinic{}, domain.NewAppError(err, "Failed to create clinic", 500)
 	}
 
-	// Create owner staff record
+	// Try to get more user details for better staff record
+	firstName := "Clinic" // Default placeholder
+	lastName := "Owner"   // Default placeholder
+
+	// If the user has a patient profile (unlikely for providers, but check anyway)
+	// or any other profile source, we could populate actual names here
+	// For now, we'll use email/phone as identifiers until they complete their provider profile
+
+	// Create owner staff record with user information
 	ownerStaff := providers.ClinicStaff{
 		ID:                     uuid.New(),
 		ClinicID:               createdClinic.ID,
 		UserID:                 &ownerUserID,
-		FirstName:              "Clinic", // Placeholder, will be updated when user sets profile
-		LastName:               "Owner",
+		FirstName:              firstName,   // Will be updated when user completes provider profile
+		LastName:               lastName,    // Will be updated when user completes provider profile
+		WorkEmail:              owner.Email, // Use the owner's email from user account
+		WorkPhone:              owner.Phone, // Use the owner's phone from user account
 		StaffRole:              providers.StaffRoleOwner,
 		Department:             stringPtr("Management"),
 		IsPrimaryContact:       true,
 		InvitationStatus:       stringPtr(providers.InvitationStatusAccepted),
 		InvitedAt:              &now,
 		InvitedBy:              &ownerUserID,
-		Permissions:            make(map[string]any),
+		Permissions:            nil, // Set to nil to avoid JSON marshal error (will be NULL in DB)
+		OtherLicenseNumbers:    nil, // Set to nil to avoid JSON marshal error (will be NULL in DB)
 		CanManageStaff:         true,
 		CanApproveAppointments: true,
 		CanEditClinicInfo:      true,
-		WorkingHours:           make(map[string]any),
+		WorkingHours:           nil, // Set to nil to avoid JSON marshal error (will be NULL in DB)
 		AvailableDays:          []string{"monday", "tuesday", "wednesday", "thursday", "friday"},
 		IsAcceptingNewPatients: true,
 		EmploymentStatus:       providers.EmploymentStatusActive,
@@ -210,6 +221,8 @@ func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Cli
 		CreatedAt:              now,
 		UpdatedAt:              now,
 	}
+
+	fmt.Println(ownerStaff)
 
 	// Try to create owner staff record
 	if c.staffRepo != nil {

@@ -111,6 +111,10 @@ func (r *staffRepository) CreateStaffMember(ctx context.Context, staff providers
 		EndDate:                datePtrToPgtypeDate(staff.EndDate),
 		ProfilePictureUrl:      pgtypeTextFromStringPtr(staff.ProfilePictureURL),
 		LanguagesSpoken:        staff.LanguagesSpoken,
+		InvitationStatus:       pgtypeTextFromStringPtr(staff.InvitationStatus),
+		CanManageStaff:         pgtype.Bool{Bool: staff.CanManageStaff, Valid: true},
+		CanApproveAppointments: pgtype.Bool{Bool: staff.CanApproveAppointments, Valid: true},
+		CanEditClinicInfo:      pgtype.Bool{Bool: staff.CanEditClinicInfo, Valid: true},
 	}
 
 	created, err := r.querier.CreateStaffMember(ctx, params)
@@ -247,6 +251,10 @@ func (r *staffRepository) GetClinicStaff(ctx context.Context, clinicID uuid.UUID
 			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
 			EmploymentStatus:       pgtypeTextToString(row.EmploymentStatus),
 			CreatedAt:              row.CreatedAt.Time,
+			InvitationStatus:       pgtypeTextToStringPtr(row.InvitationStatus),
+			CanManageStaff:         pgtypeBoolToBool(row.CanManageStaff),
+			CanApproveAppointments: pgtypeBoolToBool(row.CanApproveAppointments),
+			CanEditClinicInfo:      pgtypeBoolToBool(row.CanEditClinicInfo),
 		}
 	}
 
@@ -652,25 +660,37 @@ func (r *staffRepository) handleError(err error, operation string) error {
 
 func (r *staffRepository) mapToClinicStaff(row sqlc.ClinicStaff) providers.ClinicStaff {
 	return providers.ClinicStaff{
-		ID:                     pgtypeUUIDToUUID(row.ID),
-		ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
-		UserID:                 pgtypeUUIDToUUIDPtr(row.UserID),
-		Title:                  pgtypeTextToStringPtr(row.Title),
-		FirstName:              row.FirstName,
-		LastName:               row.LastName,
-		ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
-		Specialization:         pgtypeTextToStringPtr(row.Specialization),
-		WorkEmail:              pgtypeTextToStringPtr(row.WorkEmail),
-		WorkPhone:              pgtypeTextToStringPtr(row.WorkPhone),
-		PersonalPhone:          pgtypeTextToStringPtr(row.PersonalPhone),
-		HPCSNumber:             pgtypeTextToStringPtr(row.HpcsNumber),
-		OtherLicenseNumbers:    mapFromJSONB(row.OtherLicenseNumbers),
-		Qualifications:         row.Qualifications,
-		YearsExperience:        pgtypeInt4ToIntPtr(row.YearsExperience),
-		Bio:                    pgtypeTextToStringPtr(row.Bio),
-		StaffRole:              row.StaffRole,
-		Department:             pgtypeTextToStringPtr(row.Department),
-		IsPrimaryContact:       pgtypeBoolToBool(row.IsPrimaryContact),
+		ID:                  pgtypeUUIDToUUID(row.ID),
+		ClinicID:            pgtypeUUIDToUUID(row.ClinicID),
+		UserID:              pgtypeUUIDToUUIDPtr(row.UserID),
+		Title:               pgtypeTextToStringPtr(row.Title),
+		FirstName:           row.FirstName,
+		LastName:            row.LastName,
+		ProfessionalTitle:   pgtypeTextToStringPtr(row.ProfessionalTitle),
+		Specialization:      pgtypeTextToStringPtr(row.Specialization),
+		WorkEmail:           pgtypeTextToStringPtr(row.WorkEmail),
+		WorkPhone:           pgtypeTextToStringPtr(row.WorkPhone),
+		PersonalPhone:       pgtypeTextToStringPtr(row.PersonalPhone),
+		HPCSNumber:          pgtypeTextToStringPtr(row.HpcsNumber),
+		OtherLicenseNumbers: mapFromJSONB(row.OtherLicenseNumbers),
+		Qualifications:      row.Qualifications,
+		YearsExperience:     pgtypeInt4ToIntPtr(row.YearsExperience),
+		Bio:                 pgtypeTextToStringPtr(row.Bio),
+		StaffRole:           row.StaffRole,
+		Department:          pgtypeTextToStringPtr(row.Department),
+		IsPrimaryContact:    pgtypeBoolToBool(row.IsPrimaryContact),
+		// Invitation fields
+		InvitationToken:   pgtypeTextToStringPtr(row.InvitationToken),
+		InvitationStatus:  pgtypeTextToStringPtr(row.InvitationStatus),
+		InvitedBy:         pgtypeUUIDToUUIDPtr(row.InvitedBy),
+		InvitedAt:         pgtypeTimestampToTimePtr(row.InvitedAt),
+		InvitationExpires: pgtypeTimestampToTimePtr(row.InvitationExpires),
+		// Permission fields - CRITICAL FIX
+		Permissions:            mapFromJSONB(row.Permissions),
+		CanManageStaff:         pgtypeBoolToBool(row.CanManageStaff),
+		CanApproveAppointments: pgtypeBoolToBool(row.CanApproveAppointments),
+		CanEditClinicInfo:      pgtypeBoolToBool(row.CanEditClinicInfo),
+		// Working hours and availability
 		WorkingHours:           mapFromJSONB(row.WorkingHours),
 		AvailableDays:          row.AvailableDays,
 		IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),

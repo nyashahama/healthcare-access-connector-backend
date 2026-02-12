@@ -179,9 +179,10 @@ func (s *staffService) CreateStaffInvitation(ctx context.Context, invitation pro
 	if !clinic.IsVerified {
 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Clinic must be verified to invite staff", 403)
 	}
-
+	fmt.Println("Here 1")
 	// Check if inviter has permission to manage staff
 	inviterStaff, err := s.staffRepo.GetStaffByUserAndClinic(ctx, invitation.InvitedBy, invitation.ClinicID)
+	fmt.Println("Here 2", inviterStaff)
 	if err != nil {
 		s.logger.Error().Err(err).
 			Str("user_id", invitation.InvitedBy.String()).
@@ -721,7 +722,7 @@ func (s *staffService) GetStaffByID(ctx context.Context, id uuid.UUID) (provider
 	staff, err := s.staffRepo.GetStaffByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrStaffNotFound) {
-			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrStaffNotFound, "Staff member not found at all", 404)
+			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrStaffNotFound, "Staff member not found", 404)
 		}
 		s.logger.Error().Err(err).Str("staff_id", id.String()).Msg("Failed to get staff member")
 		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to get staff member", 500)
