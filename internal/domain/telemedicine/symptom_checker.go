@@ -38,9 +38,9 @@ const (
 // SymptomCheckerSession is the core domain model for a symptom checker interaction.
 // It captures what the patient reported, the AI triage output, and the session lifecycle.
 type SymptomCheckerSession struct {
-	ID        uuid.UUID  `json:"id"`
-	PatientID uuid.UUID  `json:"patient_id"`
-	UserID    uuid.UUID  `json:"user_id"`
+	ID        uuid.UUID `json:"id"`
+	PatientID uuid.UUID `json:"patient_id"`
+	UserID    uuid.UUID `json:"user_id"`
 	// DependentID is set when the session was filed on behalf of a dependent
 	DependentID *uuid.UUID `json:"dependent_id,omitempty"`
 
@@ -123,14 +123,14 @@ type SessionWithPatientContext struct {
 	DependentID         *uuid.UUID        `json:"dependent_id,omitempty"`
 
 	// Patient demographics (from patient_profiles)
-	PatientID                    uuid.UUID `json:"patient_id"`
-	FirstName                    string    `json:"first_name"`
-	LastName                     string    `json:"last_name"`
+	PatientID                    uuid.UUID  `json:"patient_id"`
+	FirstName                    string     `json:"first_name"`
+	LastName                     string     `json:"last_name"`
 	DateOfBirth                  *time.Time `json:"date_of_birth,omitempty"`
-	Gender                       *string   `json:"gender,omitempty"`
-	PreferredCommunicationMethod *string   `json:"preferred_communication_method,omitempty"`
-	LanguagePreferences          *string   `json:"language_preferences,omitempty"`
-	RequiresInterpreter          bool      `json:"requires_interpreter"`
+	Gender                       *string    `json:"gender,omitempty"`
+	PreferredCommunicationMethod *string    `json:"preferred_communication_method,omitempty"`
+	LanguagePreferences          []string   `json:"language_preferences,omitempty"`
+	RequiresInterpreter          bool       `json:"requires_interpreter"`
 
 	// Medical summary (from patient_medical_info — left-joined, may be nil)
 	BloodType           *string `json:"blood_type,omitempty"`
