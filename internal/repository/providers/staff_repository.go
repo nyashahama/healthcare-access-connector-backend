@@ -167,6 +167,43 @@ func (r *staffRepository) GetStaffByUserID(ctx context.Context, userID uuid.UUID
 	return r.mapToClinicStaff(s), nil
 }
 
+func (r *staffRepository) GetAllClinicStaff(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error) {
+	start := time.Now()
+	defer func() {
+		staffDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	rows, err := r.querier.GetAllClinicStaff(ctx, uuidToPgtypeUUID(clinicID))
+	if err != nil {
+		staffDBQueryTotal.WithLabelValues("get_all_clinic_staff", "error").Inc()
+		return nil, r.handleError(err, "get all clinic staff")
+	}
+
+	staffList := make([]providers.ClinicStaff, len(rows))
+	for i, row := range rows {
+		staffList[i] = providers.ClinicStaff{
+			ID:                     pgtypeUUIDToUUID(row.ID),
+			ClinicID:               pgtypeUUIDToUUID(row.ClinicID),
+			UserID:                 pgtypeUUIDToUUIDPtr(row.UserID),
+			Title:                  pgtypeTextToStringPtr(row.Title),
+			FirstName:              row.FirstName,
+			LastName:               row.LastName,
+			ProfessionalTitle:      pgtypeTextToStringPtr(row.ProfessionalTitle),
+			Specialization:         pgtypeTextToStringPtr(row.Specialization),
+			StaffRole:              row.StaffRole,
+			EmploymentStatus:       pgtypeTextToString(row.EmploymentStatus),
+			IsAcceptingNewPatients: pgtypeBoolToBool(row.IsAcceptingNewPatients),
+			StartDate:              pgtypeDateToTimePtr(row.StartDate),
+			EndDate:                pgtypeDateToTimePtr(row.EndDate),
+			InvitationStatus:       pgtypeTextToStringPtr(row.InvitationStatus),
+			CreatedAt:              row.CreatedAt.Time,
+		}
+	}
+
+	staffDBQueryTotal.WithLabelValues("get_all_clinic_staff", "success").Inc()
+	return staffList, nil
+}
+
 func (r *staffRepository) UpdateStaffMember(ctx context.Context, staff providers.ClinicStaff) error {
 	start := time.Now()
 	defer func() {
