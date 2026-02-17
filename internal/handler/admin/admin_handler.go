@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/admin"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -77,4 +79,28 @@ func (h *AdminHandler) CreateSystemAdmin(w http.ResponseWriter, r *http.Request)
 	}
 
 	handler.RespondJSON(w, http.StatusCreated, admin.ToSystemAdminResponse(created))
+}
+
+// GetSystemAdminByUserID retrieves a system admin profile by user ID
+// GET /api/v1/admin/system-admins/user/{user_id}
+func (h *AdminHandler) GetSystemAdminByUserID(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	userIDStr := chi.URLParam(r, "user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, admin.ErrorResponse{
+			Error: "Invalid user ID format",
+		})
+		return
+	}
+
+	sysAdmin, err := h.adminService.GetSystemAdminByUserID(ctx, userID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, admin.ToSystemAdminResponse(sysAdmin))
 }
