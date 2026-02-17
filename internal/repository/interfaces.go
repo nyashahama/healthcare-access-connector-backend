@@ -11,6 +11,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/sms"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/telemedicine"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -418,6 +419,54 @@ type AppointmentRepository interface {
 
 	// Utility
 	CheckSchedulingConflict(ctx context.Context, clinicID uuid.UUID, date time.Time, appointmentTime time.Time) (bool, error)
+}
+
+type SymptomCheckerRepository interface {
+	// ─── Core CRUD ───────────────────────────────────────────────────────────
+
+	// CreateSession persists a new completed or abandoned symptom session.
+	CreateSession(ctx context.Context, session telemedicine.SymptomCheckerSession) (telemedicine.SymptomCheckerSession, error)
+
+	// GetSessionByID fetches the full session record by its primary key.
+	GetSessionByID(ctx context.Context, id uuid.UUID) (telemedicine.SymptomCheckerSession, error)
+
+	// UpdateSessionStatus updates the lifecycle status of a session (e.g. abandoned → completed).
+	UpdateSessionStatus(ctx context.Context, id uuid.UUID, status telemedicine.SessionStatus) error
+
+	// MarkSessionConverted transitions a completed session to converted_to_consult.
+	// Only succeeds when the session is currently in the 'completed' state.
+	MarkSessionConverted(ctx context.Context, id uuid.UUID) error
+
+	// ─── Patient-Facing ───────────────────────────────────────────────────────
+
+	// GetLatestEligibleSession returns the most recent telemedicine-eligible session
+	// created within the past 24 hours. Used as a preflight check before showing
+	// the provider list. Returns domain.ErrNotFound when none exists.
+	GetLatestEligibleSession(ctx context.Context, patientID uuid.UUID) (telemedicine.EligibleSession, error)
+
+	// GetPatientSessions returns a paginated list of session summaries for a patient,
+	// ordered newest first.
+	GetPatientSessions(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]telemedicine.SymptomSessionSummary, error)
+
+	// GetDependentSessions returns all sessions filed on behalf of a specific dependent,
+	// ordered newest first.
+	GetDependentSessions(ctx context.Context, patientID uuid.UUID, dependentID uuid.UUID) ([]telemedicine.DependentSessionSummary, error)
+
+	// ─── Provider-Facing ─────────────────────────────────────────────────────
+
+	// GetSessionWithPatientContext returns the full session joined with the patient's
+	// profile and medical summary. Called when a provider accepts a consultation.
+	GetSessionWithPatientContext(ctx context.Context, sessionID uuid.UUID) (telemedicine.SessionWithPatientContext, error)
+
+	// ─── Admin / Analytics ───────────────────────────────────────────────────
+
+	// GetSessionsByTriageLevel returns a paginated list of sessions matching a triage
+	// level within a time window, ordered newest first.
+	GetSessionsByTriageLevel(ctx context.Context, triageLevel telemedicine.TriageLevel, from, to time.Time, limit, offset int) ([]telemedicine.AdminSessionSummary, error)
+
+	// CountSessionsByOutcome returns per-action counts for sessions created within a
+	// given time window. Used for dashboard analytics.
+	CountSessionsByOutcome(ctx context.Context, from, to time.Time) ([]telemedicine.SessionOutcomeCount, error)
 }
 
 type SMSRepository interface {
