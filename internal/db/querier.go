@@ -11,6 +11,11 @@ import (
 )
 
 type Querier interface {
+	// ============================================
+	// STATUS TRANSITIONS
+	// ============================================
+	// Provider accepts from waiting room.
+	AcceptConsultation(ctx context.Context, arg AcceptConsultationParams) (Consultation, error)
 	AcceptStaffInvitation(ctx context.Context, arg AcceptStaffInvitationParams) error
 	// ============================================
 	// DEPENDENT HEALTH RECORDS REPOSITORY QUERIES
@@ -95,12 +100,14 @@ type Querier interface {
 	AddPatientSurgery(ctx context.Context, arg AddPatientSurgeryParams) (PatientSurgery, error)
 	BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error
 	CancelAppointment(ctx context.Context, arg CancelAppointmentParams) (Appointment, error)
+	CancelConsultation(ctx context.Context, arg CancelConsultationParams) (Consultation, error)
 	CancelStaffInvitation(ctx context.Context, invitationToken pgtype.Text) error
 	CheckNationalIDExists(ctx context.Context, arg CheckNationalIDExistsParams) (bool, error)
 	CheckSchedulingConflict(ctx context.Context, arg CheckSchedulingConflictParams) (CheckSchedulingConflictRow, error)
 	CheckServiceNameExists(ctx context.Context, arg CheckServiceNameExistsParams) (bool, error)
 	CheckStaffEmailExists(ctx context.Context, arg CheckStaffEmailExistsParams) (bool, error)
 	CompleteAppointment(ctx context.Context, id pgtype.UUID) (Appointment, error)
+	CompleteConsultation(ctx context.Context, arg CompleteConsultationParams) (Consultation, error)
 	CompleteUserOnboarding(ctx context.Context, id pgtype.UUID) error
 	ConfirmAppointment(ctx context.Context, arg ConfirmAppointmentParams) (Appointment, error)
 	CountActiveConsents(ctx context.Context) (int64, error)
@@ -109,6 +116,10 @@ type Querier interface {
 	// STATISTICS & ANALYTICS
 	// ============================================
 	CountPatientSurgeries(ctx context.Context, patientID pgtype.UUID) (CountPatientSurgeriesRow, error)
+	// Quick analytics: how many sessions per recommended_action in a window.
+	CountSessionsByOutcome(ctx context.Context, arg CountSessionsByOutcomeParams) ([]CountSessionsByOutcomeRow, error)
+	// Badge counter for a given party (pass sender_role of the OTHER party).
+	CountUnreadMessages(ctx context.Context, arg CountUnreadMessagesParams) (int64, error)
 	CountUsersByRole(ctx context.Context, role string) (int64, error)
 	CreateAppointment(ctx context.Context, arg CreateAppointmentParams) (Appointment, error)
 	// ============================================
@@ -129,6 +140,15 @@ type Querier interface {
 	// CORE CRUD OPERATIONS
 	// ============================================
 	CreateClinicService(ctx context.Context, arg CreateClinicServiceParams) (ClinicService, error)
+	// ============================================
+	// CORE CRUD OPERATIONS
+	// ============================================
+	CreateConsultation(ctx context.Context, arg CreateConsultationParams) (Consultation, error)
+	// ============================================
+	// CORE WRITE OPERATIONS
+	// ============================================
+	// Provider opens the notes panel → create draft immediately.
+	CreateConsultationNote(ctx context.Context, arg CreateConsultationNoteParams) (ConsultationNote, error)
 	// ============================================
 	// PROFESSIONAL CREDENTIALS REPOSITORY QUERIES
 	// Maps to: Part of StaffRepository interface (credential methods)
@@ -193,6 +213,10 @@ type Querier interface {
 	// ============================================
 	CreateStaffMember(ctx context.Context, arg CreateStaffMemberParams) (ClinicStaff, error)
 	// ============================================
+	// CORE CRUD OPERATIONS
+	// ============================================
+	CreateSymptomSession(ctx context.Context, arg CreateSymptomSessionParams) (SymptomCheckerSession, error)
+	// ============================================
 	// SYSTEM ADMINS REPOSITORY QUERIES
 	// Maps to: AdminRepository interface
 	// Domain: System Administration & Access Management
@@ -211,7 +235,11 @@ type Querier interface {
 	// ============================================
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeactivateClinic(ctx context.Context, id pgtype.UUID) error
+	// Provider declines — patient will see a new provider list.
+	DeclineConsultation(ctx context.Context, id pgtype.UUID) error
 	DeclineStaffInvitation(ctx context.Context, invitationToken pgtype.Text) error
+	// Called when a consultation closes (completed / cancelled / no_show).
+	DecrementActiveConsultations(ctx context.Context, staffID pgtype.UUID) error
 	DeleteAllSessionsExcept(ctx context.Context, arg DeleteAllSessionsExceptParams) error
 	DeleteAppointment(ctx context.Context, id pgtype.UUID) error
 	DeleteClinic(ctx context.Context, id pgtype.UUID) error
@@ -242,9 +270,14 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
+	EscalateConsultation(ctx context.Context, arg EscalateConsultationParams) (Consultation, error)
 	ExpireStaffInvitations(ctx context.Context) error
 	ExportDataAccessLogs(ctx context.Context, arg ExportDataAccessLogsParams) ([]DataAccessLog, error)
 	ExportUserActivities(ctx context.Context, arg ExportUserActivitiesParams) ([]UserActivity, error)
+	// Locks the note. Called when provider clicks "End Consultation".
+	FinaliseConsultationNote(ctx context.Context, id pgtype.UUID) (ConsultationNote, error)
+	// Alternative: lock by consultation_id (more natural from the service layer).
+	FinaliseNoteByConsultation(ctx context.Context, consultationID pgtype.UUID) (ConsultationNote, error)
 	GetAccessLogsByAccessedByUser(ctx context.Context, arg GetAccessLogsByAccessedByUserParams) ([]DataAccessLog, error)
 	GetActiveClinicServices(ctx context.Context, clinicID pgtype.UUID) ([]GetActiveClinicServicesRow, error)
 	GetActiveClinicStaff(ctx context.Context, clinicID pgtype.UUID) ([]GetActiveClinicStaffRow, error)
@@ -263,6 +296,17 @@ type Querier interface {
 	GetAppointmentsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]Appointment, error)
 	GetAppointmentsByClinicAndDate(ctx context.Context, arg GetAppointmentsByClinicAndDateParams) ([]Appointment, error)
 	GetAppointmentsByPatient(ctx context.Context, patientID pgtype.UUID) ([]Appointment, error)
+	// ============================================
+	// PROVIDER-FACING SELF-READS
+	// ============================================
+	GetAvailabilityByStaffID(ctx context.Context, staffID pgtype.UUID) (ProviderAvailability, error)
+	// ============================================
+	// PROVIDER LIST (Patient-facing)
+	// ============================================
+	// Powers ProvidersList.jsx — only providers who are accepting AND have capacity.
+	GetAvailableProviders(ctx context.Context, dollar_1 pgtype.UUID) ([]GetAvailableProvidersRow, error)
+	// Filtered version: patient requests a specific specialty.
+	GetAvailableProvidersBySpecialization(ctx context.Context, dollar_1 pgtype.Text) ([]GetAvailableProvidersBySpecializationRow, error)
 	GetClinicByID(ctx context.Context, id pgtype.UUID) (Clinic, error)
 	// ============================================
 	// PROVIDER REGISTRATION QUERIES
@@ -282,6 +326,17 @@ type Querier interface {
 	GetConsentByID(ctx context.Context, id pgtype.UUID) (PrivacyConsent, error)
 	GetConsentHistory(ctx context.Context, userID pgtype.UUID) ([]PrivacyConsent, error)
 	GetConsentsExpiringBefore(ctx context.Context, healthDataConsentDate pgtype.Timestamp) ([]pgtype.UUID, error)
+	// ============================================
+	// ATTACHMENTS
+	// ============================================
+	// All files shared in a consultation — shown in the attachment list panel.
+	GetConsultationAttachments(ctx context.Context, consultationID pgtype.UUID) ([]GetConsultationAttachmentsRow, error)
+	GetConsultationByID(ctx context.Context, id pgtype.UUID) (Consultation, error)
+	// Full message thread for a consultation — used on initial chat load.
+	GetConsultationMessages(ctx context.Context, arg GetConsultationMessagesParams) ([]GetConsultationMessagesRow, error)
+	// Full consultation row joined with session summary and patient name.
+	// Used by both patient and provider to hydrate a chat screen.
+	GetConsultationWithDetails(ctx context.Context, id pgtype.UUID) (GetConsultationWithDetailsRow, error)
 	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error)
 	GetCredentialByID(ctx context.Context, id pgtype.UUID) (ProfessionalCredential, error)
 	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]DataAccessLog, error)
@@ -291,20 +346,46 @@ type Querier interface {
 	// QUERYING BY DEPENDENT
 	// ============================================
 	GetDependentHealthRecords(ctx context.Context, dependentID pgtype.UUID) ([]GetDependentHealthRecordsRow, error)
+	// All sessions filed on behalf of a specific dependent.
+	GetDependentSessions(ctx context.Context, arg GetDependentSessionsParams) ([]GetDependentSessionsRow, error)
 	GetEmergencyAccessLogs(ctx context.Context, arg GetEmergencyAccessLogsParams) ([]DataAccessLog, error)
 	GetEmergencyContact(ctx context.Context, id pgtype.UUID) (EmergencyContact, error)
 	GetEmergencySurgeryInfo(ctx context.Context, patientID pgtype.UUID) ([]GetEmergencySurgeryInfoRow, error)
 	GetExpiredConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetFamilyHistoryEntry(ctx context.Context, id pgtype.UUID) (PatientFamilyHistory, error)
 	GetGrowthRecords(ctx context.Context, dependentID pgtype.UUID) ([]GetGrowthRecordsRow, error)
+	// Used in consultation list previews.
+	GetLastMessage(ctx context.Context, consultationID pgtype.UUID) (GetLastMessageRow, error)
 	GetLastSurgeryDate(ctx context.Context, patientID pgtype.UUID) (interface{}, error)
 	GetLatestActiveOTP(ctx context.Context, arg GetLatestActiveOTPParams) (OtpVerification, error)
+	// ============================================
+	// PATIENT-FACING QUERIES
+	// ============================================
+	// Preflight check: patient has a recent telemedicine-eligible session.
+	// Called before showing the provider list.
+	GetLatestEligibleSession(ctx context.Context, patientID pgtype.UUID) (GetLatestEligibleSessionRow, error)
+	// ============================================
+	// READ OPERATIONS
+	// ============================================
+	GetMessageByID(ctx context.Context, id pgtype.UUID) (ConsultationMessage, error)
+	// Polling / WebSocket catch-up: messages newer than a timestamp cursor.
+	GetMessagesAfterCursor(ctx context.Context, arg GetMessagesAfterCursorParams) ([]GetMessagesAfterCursorRow, error)
 	GetMostCommonProcedures(ctx context.Context, limit int32) ([]GetMostCommonProceduresRow, error)
 	GetNGOPartner(ctx context.Context, id pgtype.UUID) (NgoPartner, error)
 	GetNGOPartnerByUserID(ctx context.Context, userID pgtype.UUID) (NgoPartner, error)
+	// Primary read path — get the note for a given consultation.
+	GetNoteByConsultationID(ctx context.Context, consultationID pgtype.UUID) (ConsultationNote, error)
+	// ============================================
+	// READ OPERATIONS
+	// ============================================
+	GetNoteByID(ctx context.Context, id pgtype.UUID) (ConsultationNote, error)
+	// Hydrated view for patient record / admin audit.
+	GetNoteWithProviderInfo(ctx context.Context, consultationID pgtype.UUID) (GetNoteWithProviderInfoRow, error)
 	GetNotificationPreferences(ctx context.Context, userID pgtype.UUID) (NotificationPreference, error)
 	GetOTP(ctx context.Context, arg GetOTPParams) (OtpVerification, error)
 	GetOTPAttemptCount(ctx context.Context, arg GetOTPAttemptCountParams) (int64, error)
+	// Check if the patient already has an open consultation (prevent duplicates).
+	GetPatientActiveConsultation(ctx context.Context, patientID pgtype.UUID) (GetPatientActiveConsultationRow, error)
 	// ============================================
 	// QUERYING BY PATIENT
 	// ============================================
@@ -315,6 +396,11 @@ type Querier interface {
 	// QUERYING BY PATIENT
 	// ============================================
 	GetPatientConditions(ctx context.Context, arg GetPatientConditionsParams) ([]PatientCondition, error)
+	// ============================================
+	// PATIENT-FACING QUERIES
+	// ============================================
+	// Full consultation history for a patient.
+	GetPatientConsultations(ctx context.Context, arg GetPatientConsultationsParams) ([]GetPatientConsultationsRow, error)
 	GetPatientDependent(ctx context.Context, id pgtype.UUID) (PatientDependent, error)
 	// ============================================
 	// QUERYING BY PATIENT
@@ -340,9 +426,16 @@ type Querier interface {
 	// QUERYING BY PATIENT
 	// ============================================
 	GetPatientMedications(ctx context.Context, arg GetPatientMedicationsParams) ([]GetPatientMedicationsRow, error)
+	// ============================================
+	// PATIENT RECORD ACCESS
+	// ============================================
+	// All finalised notes for a patient (their full telemedicine record).
+	GetPatientNoteHistory(ctx context.Context, patientID pgtype.UUID) ([]GetPatientNoteHistoryRow, error)
 	GetPatientProfileByID(ctx context.Context, id pgtype.UUID) (PatientProfile, error)
 	GetPatientProfileByNationalID(ctx context.Context, nationalIDNumber pgtype.Text) (PatientProfile, error)
 	GetPatientProfileByUserID(ctx context.Context, userID pgtype.UUID) (PatientProfile, error)
+	// Patient session history, newest first.
+	GetPatientSessions(ctx context.Context, arg GetPatientSessionsParams) ([]GetPatientSessionsRow, error)
 	// ============================================
 	// QUERYING BY PATIENT
 	// ============================================
@@ -358,6 +451,17 @@ type Querier interface {
 	GetPendingVerificationClinics(ctx context.Context, arg GetPendingVerificationClinicsParams) ([]GetPendingVerificationClinicsRow, error)
 	GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (GetPrimaryEmergencyContactRow, error)
 	GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error)
+	// ============================================
+	// PROVIDER-FACING QUERIES
+	// ============================================
+	// Provider dashboard: all open consultations with unread counts and triage priority.
+	GetProviderActiveConsultations(ctx context.Context, providerStaffID pgtype.UUID) ([]GetProviderActiveConsultationsRow, error)
+	GetProviderConsultationHistory(ctx context.Context, arg GetProviderConsultationHistoryParams) ([]GetProviderConsultationHistoryRow, error)
+	// ============================================
+	// PROVIDER HISTORY
+	// ============================================
+	// All finalised notes written by a provider, newest first.
+	GetProviderNoteHistory(ctx context.Context, arg GetProviderNoteHistoryParams) ([]GetProviderNoteHistoryRow, error)
 	GetProviderWithClinic(ctx context.Context, id pgtype.UUID) (GetProviderWithClinicRow, error)
 	GetRecentActivities(ctx context.Context, arg GetRecentActivitiesParams) ([]UserActivity, error)
 	GetRecentOTPs(ctx context.Context, arg GetRecentOTPsParams) ([]OtpVerification, error)
@@ -366,6 +470,16 @@ type Querier interface {
 	GetSMSConversationByPhone(ctx context.Context, phoneNumber string) (SmsConversation, error)
 	GetServiceByID(ctx context.Context, id pgtype.UUID) (ClinicService, error)
 	GetSession(ctx context.Context, sessionToken string) (GetSessionRow, error)
+	// ============================================
+	// PROVIDER-FACING QUERIES
+	// ============================================
+	// Joins symptom session with patient profile + medical info.
+	// Used to populate the provider's context panel on consultation accept.
+	GetSessionWithPatientContext(ctx context.Context, id pgtype.UUID) (GetSessionWithPatientContextRow, error)
+	// ============================================
+	// ADMIN / ANALYTICS
+	// ============================================
+	GetSessionsByTriageLevel(ctx context.Context, arg GetSessionsByTriageLevelParams) ([]GetSessionsByTriageLevelRow, error)
 	GetStaffByID(ctx context.Context, id pgtype.UUID) (ClinicStaff, error)
 	GetStaffByUserAndClinic(ctx context.Context, arg GetStaffByUserAndClinicParams) (ClinicStaff, error)
 	GetStaffByUserID(ctx context.Context, userID pgtype.UUID) (ClinicStaff, error)
@@ -373,6 +487,12 @@ type Querier interface {
 	GetStaffInvitationByToken(ctx context.Context, invitationToken pgtype.Text) (GetStaffInvitationByTokenRow, error)
 	GetStaffInvitationsByEmail(ctx context.Context, workEmail pgtype.Text) ([]GetStaffInvitationsByEmailRow, error)
 	GetStaffWithPermissions(ctx context.Context, id pgtype.UUID) (GetStaffWithPermissionsRow, error)
+	// ============================================
+	// BACKGROUND JOB QUERIES
+	// ============================================
+	// Background job: find providers whose heartbeat hasn't been seen in 2 minutes.
+	// Used to auto-set them offline so patients don't wait for a ghost provider.
+	GetStaleProviders(ctx context.Context) ([]pgtype.UUID, error)
 	GetSurgeriesByDateRange(ctx context.Context, arg GetSurgeriesByDateRangeParams) ([]GetSurgeriesByDateRangeRow, error)
 	GetSurgeriesByHospital(ctx context.Context, hospitalName pgtype.Text) ([]GetSurgeriesByHospitalRow, error)
 	GetSurgeriesByOutcome(ctx context.Context, outcome pgtype.Text) ([]GetSurgeriesByOutcomeRow, error)
@@ -384,8 +504,11 @@ type Querier interface {
 	GetSurgeriesWithComplications(ctx context.Context, patientID pgtype.UUID) ([]GetSurgeriesWithComplicationsRow, error)
 	GetSurgeryStatistics(ctx context.Context) (GetSurgeryStatisticsRow, error)
 	GetSurgeryTrends(ctx context.Context, procedureDate pgtype.Date) ([]GetSurgeryTrendsRow, error)
+	GetSymptomSessionByID(ctx context.Context, id pgtype.UUID) (SymptomCheckerSession, error)
 	GetSystemAdmin(ctx context.Context, id pgtype.UUID) (SystemAdmin, error)
 	GetSystemAdminByUserID(ctx context.Context, userID pgtype.UUID) (SystemAdmin, error)
+	// Retrieve only system events for a consultation (call log, file shares).
+	GetSystemEvents(ctx context.Context, consultationID pgtype.UUID) ([]GetSystemEventsRow, error)
 	// -- name: GetUpcomingAppointments :many
 	// SELECT *
 	// FROM appointments
@@ -412,12 +535,38 @@ type Querier interface {
 	GetUsersForHealthTips(ctx context.Context, healthTipsFrequency pgtype.Text) ([]pgtype.UUID, error)
 	GetUsersWithDisabledType(ctx context.Context, dollar_1 interface{}) ([]pgtype.UUID, error)
 	GetVerifiedClinics(ctx context.Context, arg GetVerifiedClinicsParams) ([]GetVerifiedClinicsRow, error)
+	// All pending_acceptance consultations — shown to providers scanning for new patients.
+	GetWaitingRoom(ctx context.Context) ([]GetWaitingRoomRow, error)
 	GetWithdrawnConsents(ctx context.Context, arg GetWithdrawnConsentsParams) ([]PrivacyConsent, error)
+	// Provider closes dashboard or session expires.
+	GoOffline(ctx context.Context, staffID pgtype.UUID) error
+	// ============================================
+	// STATUS TRANSITIONS
+	// ============================================
+	// Provider opens their dashboard.
+	GoOnline(ctx context.Context, staffID pgtype.UUID) (ProviderAvailability, error)
 	// ============================================
 	// VALIDATION & UTILITIES
 	// ============================================
 	HasSurgicalHistory(ctx context.Context, patientID pgtype.UUID) (bool, error)
+	// ============================================
+	// CONCURRENCY COUNTERS
+	// ============================================
+	// Called atomically when a provider accepts a consultation.
+	// Returns the updated row so the service layer can enforce the cap.
+	IncrementActiveConsultations(ctx context.Context, staffID pgtype.UUID) (ProviderAvailability, error)
+	// ============================================
+	// CORE WRITE OPERATIONS
+	// ============================================
+	InsertMessage(ctx context.Context, arg InsertMessageParams) (ConsultationMessage, error)
+	// ============================================
+	// SYSTEM / SPECIAL MESSAGE HELPERS
+	// ============================================
+	// Convenience for system-generated events (call start, file shared, chat ended).
+	InsertSystemEvent(ctx context.Context, arg InsertSystemEventParams) (ConsultationMessage, error)
 	InvalidateUserOTPs(ctx context.Context, arg InvalidateUserOTPsParams) error
+	IsNoteFinalisedForConsultation(ctx context.Context, consultationID pgtype.UUID) (bool, error)
+	LinkFollowUpAppointment(ctx context.Context, arg LinkFollowUpAppointmentParams) error
 	// ============================================
 	// FILTERING & LISTING
 	// ============================================
@@ -432,7 +581,22 @@ type Querier interface {
 	// User Activity Queries
 	// ============================================
 	LogUserActivity(ctx context.Context, arg LogUserActivityParams) error
+	// Provider opens chat → mark all patient messages as read.
+	MarkAllPatientMessagesRead(ctx context.Context, consultationID pgtype.UUID) error
+	// Patient opens chat → mark all provider messages as read.
+	MarkAllProviderMessagesRead(ctx context.Context, consultationID pgtype.UUID) error
+	// ============================================
+	// READ RECEIPTS
+	// ============================================
+	MarkMessageRead(ctx context.Context, id pgtype.UUID) error
+	MarkNoShow(ctx context.Context, id pgtype.UUID) error
 	MarkOTPUsed(ctx context.Context, arg MarkOTPUsedParams) error
+	// Called when a consultation is created from this session
+	MarkSessionConverted(ctx context.Context, id pgtype.UUID) error
+	// ============================================
+	// QUICK CHECKS
+	// ============================================
+	NoteExistsForConsultation(ctx context.Context, consultationID pgtype.UUID) (bool, error)
 	ReactivateClinic(ctx context.Context, id pgtype.UUID) error
 	ReactivateStaffMember(ctx context.Context, id pgtype.UUID) error
 	RecordComplications(ctx context.Context, arg RecordComplicationsParams) error
@@ -458,9 +622,24 @@ type Querier interface {
 	SearchUserActivities(ctx context.Context, arg SearchUserActivitiesParams) ([]UserActivity, error)
 	SearchUsers(ctx context.Context, arg SearchUsersParams) ([]SearchUsersRow, error)
 	ServiceExists(ctx context.Context, id pgtype.UUID) (bool, error)
+	// Provider toggles "Start Accepting" in their UI.
+	SetAccepting(ctx context.Context, arg SetAcceptingParams) (ProviderAvailability, error)
+	SetConsultationFee(ctx context.Context, arg SetConsultationFeeParams) error
+	SetMaxConcurrent(ctx context.Context, arg SetMaxConcurrentParams) error
 	SetPasswordResetToken(ctx context.Context, arg SetPasswordResetTokenParams) error
+	// Companion to GetStaleProviders — runs in same background job.
+	SetStaleProvidersOffline(ctx context.Context) error
 	SetVerificationToken(ctx context.Context, arg SetVerificationTokenParams) error
+	// Hides content from both parties while preserving the audit record.
+	SoftDeleteMessage(ctx context.Context, id pgtype.UUID) error
 	StaffExists(ctx context.Context, id pgtype.UUID) (bool, error)
+	// First message sent — move from accepted → in_progress.
+	StartConsultation(ctx context.Context, id pgtype.UUID) (Consultation, error)
+	// ============================================
+	// RATING
+	// ============================================
+	// Called from RatingModal after chat ends.
+	SubmitPatientRating(ctx context.Context, arg SubmitPatientRatingParams) error
 	TerminateStaffMember(ctx context.Context, id pgtype.UUID) error
 	UpdateAppointmentNotes(ctx context.Context, arg UpdateAppointmentNotesParams) (Appointment, error)
 	UpdateAppointmentReminders(ctx context.Context, arg UpdateAppointmentRemindersParams) error
@@ -471,6 +650,10 @@ type Querier interface {
 	UpdateClinicService(ctx context.Context, arg UpdateClinicServiceParams) error
 	UpdateClinicVerificationStatus(ctx context.Context, arg UpdateClinicVerificationStatusParams) error
 	UpdateCommunicationConsents(ctx context.Context, arg UpdateCommunicationConsentsParams) error
+	// Used when upgrading chat → video.
+	UpdateConsultationChannel(ctx context.Context, arg UpdateConsultationChannelParams) error
+	// Auto-save as provider types. Blocked once is_finalised = true (enforced at service layer).
+	UpdateConsultationNote(ctx context.Context, arg UpdateConsultationNoteParams) (ConsultationNote, error)
 	UpdateCredential(ctx context.Context, arg UpdateCredentialParams) error
 	UpdateDataSharingConsent(ctx context.Context, arg UpdateDataSharingConsentParams) error
 	UpdateDependentHealthRecord(ctx context.Context, arg UpdateDependentHealthRecordParams) error
@@ -480,6 +663,9 @@ type Querier interface {
 	UpdateFamilyHistory(ctx context.Context, arg UpdateFamilyHistoryParams) error
 	UpdateHealthDataConsent(ctx context.Context, arg UpdateHealthDataConsentParams) error
 	UpdateHealthTips(ctx context.Context, arg UpdateHealthTipsParams) error
+	// Provider dashboard pings every 30 s. If last_seen_at is stale (> 2 min),
+	// a background job sets the provider offline.
+	UpdateHeartbeat(ctx context.Context, staffID pgtype.UUID) error
 	UpdateMedicationReminders(ctx context.Context, arg UpdateMedicationRemindersParams) error
 	UpdateNotificationLanguage(ctx context.Context, arg UpdateNotificationLanguageParams) error
 	UpdateNotificationPreferences(ctx context.Context, arg UpdateNotificationPreferencesParams) error
@@ -491,15 +677,21 @@ type Querier interface {
 	UpdatePatientMedication(ctx context.Context, arg UpdatePatientMedicationParams) error
 	UpdatePatientProfile(ctx context.Context, arg UpdatePatientProfileParams) error
 	UpdatePatientSurgery(ctx context.Context, arg UpdatePatientSurgeryParams) error
+	// ============================================
+	// BILLING
+	// ============================================
+	UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) error
 	UpdatePrivacyConsent(ctx context.Context, arg UpdatePrivacyConsentParams) error
 	UpdateQuietHours(ctx context.Context, arg UpdateQuietHoursParams) error
 	UpdateResearchConsent(ctx context.Context, arg UpdateResearchConsentParams) error
 	UpdateSMSConversation(ctx context.Context, arg UpdateSMSConversationParams) error
 	UpdateSession(ctx context.Context, arg UpdateSessionParams) error
+	UpdateSessionStatus(ctx context.Context, arg UpdateSessionStatusParams) error
 	UpdateSessionToken(ctx context.Context, arg UpdateSessionTokenParams) error
 	UpdateStaffMember(ctx context.Context, arg UpdateStaffMemberParams) error
 	UpdateStaffPermissions(ctx context.Context, arg UpdateStaffPermissionsParams) error
 	UpdateStaffRole(ctx context.Context, arg UpdateStaffRoleParams) error
+	UpdateStatus(ctx context.Context, arg UpdateStatusParams) error
 	// ============================================
 	// OUTCOME & COMPLICATIONS
 	// ============================================
@@ -518,6 +710,13 @@ type Querier interface {
 	UpdateUserProfileCompletion(ctx context.Context, arg UpdateUserProfileCompletionParams) error
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) error
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) error
+	// Provider manually adjusts their estimated wait time shown to patients.
+	UpdateWaitTime(ctx context.Context, arg UpdateWaitTimeParams) error
+	// ============================================
+	// UPSERT / INITIALISE
+	// ============================================
+	// Creates a row on first login, updates on subsequent calls.
+	UpsertProviderAvailability(ctx context.Context, staffID pgtype.UUID) (ProviderAvailability, error)
 	ValidatePatientExists(ctx context.Context, userID pgtype.UUID) (bool, error)
 	// ============================================
 	// VERIFICATION & STATUS

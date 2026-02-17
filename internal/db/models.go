@@ -160,6 +160,73 @@ type ClinicStaff struct {
 	UpdatedAt              pgtype.Timestamp `json:"updated_at"`
 }
 
+type Consultation struct {
+	ID                    pgtype.UUID      `json:"id"`
+	SymptomSessionID      pgtype.UUID      `json:"symptom_session_id"`
+	PatientID             pgtype.UUID      `json:"patient_id"`
+	ProviderStaffID       pgtype.UUID      `json:"provider_staff_id"`
+	ClinicID              pgtype.UUID      `json:"clinic_id"`
+	Channel               string           `json:"channel"`
+	RequestedAt           pgtype.Timestamp `json:"requested_at"`
+	AcceptedAt            pgtype.Timestamp `json:"accepted_at"`
+	StartedAt             pgtype.Timestamp `json:"started_at"`
+	EndedAt               pgtype.Timestamp `json:"ended_at"`
+	DurationSeconds       pgtype.Int4      `json:"duration_seconds"`
+	Status                string           `json:"status"`
+	TriageLevelAtStart    pgtype.Text      `json:"triage_level_at_start"`
+	EndedBy               pgtype.UUID      `json:"ended_by"`
+	EndReason             pgtype.Text      `json:"end_reason"`
+	ConsultationFee       pgtype.Numeric   `json:"consultation_fee"`
+	FeeCurrency           string           `json:"fee_currency"`
+	PaymentStatus         string           `json:"payment_status"`
+	PaymentReference      pgtype.Text      `json:"payment_reference"`
+	PatientRating         pgtype.Int4      `json:"patient_rating"`
+	PatientFeedback       pgtype.Text      `json:"patient_feedback"`
+	RatedAt               pgtype.Timestamp `json:"rated_at"`
+	FollowUpAppointmentID pgtype.UUID      `json:"follow_up_appointment_id"`
+	CreatedAt             pgtype.Timestamp `json:"created_at"`
+	UpdatedAt             pgtype.Timestamp `json:"updated_at"`
+}
+
+type ConsultationMessage struct {
+	ID                 pgtype.UUID      `json:"id"`
+	ConsultationID     pgtype.UUID      `json:"consultation_id"`
+	SenderUserID       pgtype.UUID      `json:"sender_user_id"`
+	SenderRole         string           `json:"sender_role"`
+	MessageType        string           `json:"message_type"`
+	Content            pgtype.Text      `json:"content"`
+	AttachmentUrl      pgtype.Text      `json:"attachment_url"`
+	AttachmentType     pgtype.Text      `json:"attachment_type"`
+	AttachmentFilename pgtype.Text      `json:"attachment_filename"`
+	IsRead             bool             `json:"is_read"`
+	ReadAt             pgtype.Timestamp `json:"read_at"`
+	IsDeleted          bool             `json:"is_deleted"`
+	Metadata           []byte           `json:"metadata"`
+	SentAt             pgtype.Timestamp `json:"sent_at"`
+}
+
+type ConsultationNote struct {
+	ID                  pgtype.UUID      `json:"id"`
+	ConsultationID      pgtype.UUID      `json:"consultation_id"`
+	AuthoredByStaffID   pgtype.UUID      `json:"authored_by_staff_id"`
+	Subjective          pgtype.Text      `json:"subjective"`
+	Objective           pgtype.Text      `json:"objective"`
+	Assessment          pgtype.Text      `json:"assessment"`
+	Plan                pgtype.Text      `json:"plan"`
+	DiagnosisCodes      []string         `json:"diagnosis_codes"`
+	PrescriptionIssued  bool             `json:"prescription_issued"`
+	PrescriptionDetails []byte           `json:"prescription_details"`
+	ReferralRequired    bool             `json:"referral_required"`
+	ReferralType        pgtype.Text      `json:"referral_type"`
+	ReferralNotes       pgtype.Text      `json:"referral_notes"`
+	FollowUpRecommended bool             `json:"follow_up_recommended"`
+	FollowUpTimeframe   pgtype.Text      `json:"follow_up_timeframe"`
+	IsFinalised         bool             `json:"is_finalised"`
+	FinalisedAt         pgtype.Timestamp `json:"finalised_at"`
+	CreatedAt           pgtype.Timestamp `json:"created_at"`
+	UpdatedAt           pgtype.Timestamp `json:"updated_at"`
+}
+
 type DataAccessLog struct {
 	ID                   pgtype.UUID      `json:"id"`
 	AccessedByUserID     pgtype.UUID      `json:"accessed_by_user_id"`
@@ -510,6 +577,22 @@ type ProfessionalCredential struct {
 	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
 }
 
+type ProviderAvailability struct {
+	ID                         pgtype.UUID      `json:"id"`
+	StaffID                    pgtype.UUID      `json:"staff_id"`
+	IsOnline                   bool             `json:"is_online"`
+	IsAccepting                bool             `json:"is_accepting"`
+	Status                     string           `json:"status"`
+	ActiveConsultationCount    int32            `json:"active_consultation_count"`
+	MaxConcurrentConsultations int32            `json:"max_concurrent_consultations"`
+	EstimatedWaitMinutes       pgtype.Int4      `json:"estimated_wait_minutes"`
+	StatusMessage              pgtype.Text      `json:"status_message"`
+	ConsultationFeeOverride    pgtype.Numeric   `json:"consultation_fee_override"`
+	LastSeenAt                 pgtype.Timestamp `json:"last_seen_at"`
+	ShiftStart                 pgtype.Timestamp `json:"shift_start"`
+	UpdatedAt                  pgtype.Timestamp `json:"updated_at"`
+}
+
 type SmsConversation struct {
 	ID                  pgtype.UUID      `json:"id"`
 	UserID              pgtype.UUID      `json:"user_id"`
@@ -539,6 +622,26 @@ type SmsMessage struct {
 	Cost            pgtype.Numeric   `json:"cost"`
 	CostCurrency    pgtype.Text      `json:"cost_currency"`
 	CreatedAt       pgtype.Timestamp `json:"created_at"`
+}
+
+type SymptomCheckerSession struct {
+	ID                  pgtype.UUID      `json:"id"`
+	PatientID           pgtype.UUID      `json:"patient_id"`
+	UserID              pgtype.UUID      `json:"user_id"`
+	DependentID         pgtype.UUID      `json:"dependent_id"`
+	ChiefComplaint      string           `json:"chief_complaint"`
+	SymptomDuration     pgtype.Text      `json:"symptom_duration"`
+	SymptomsReported    json.RawMessage  `json:"symptoms_reported"`
+	BodySystemsAffected []string         `json:"body_systems_affected"`
+	SeverityScore       pgtype.Int4      `json:"severity_score"`
+	TriageLevel         string           `json:"triage_level"`
+	IsForDependent      bool             `json:"is_for_dependent"`
+	AiSummary           pgtype.Text      `json:"ai_summary"`
+	RecommendedAction   pgtype.Text      `json:"recommended_action"`
+	Status              string           `json:"status"`
+	RawAnswers          []byte           `json:"raw_answers"`
+	CreatedAt           pgtype.Timestamp `json:"created_at"`
+	UpdatedAt           pgtype.Timestamp `json:"updated_at"`
 }
 
 type SystemAdmin struct {

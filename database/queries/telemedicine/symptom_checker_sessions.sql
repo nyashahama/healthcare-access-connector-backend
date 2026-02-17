@@ -135,7 +135,7 @@ ORDER BY created_at DESC
 LIMIT  $4
 OFFSET $5;
 
--- name: CountSessionsByOutcome :one
+-- name: CountSessionsByOutcome :many
 -- Quick analytics: how many sessions per recommended_action in a window.
 SELECT
     recommended_action,
