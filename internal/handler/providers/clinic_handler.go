@@ -603,6 +603,7 @@ func (h *ClinicHandler) GetClinicVerificationStatus(w http.ResponseWriter, r *ht
 }
 
 // GetMyClinic handles getting the current user's clinic
+// This uses the user's primary_clinic_id field
 func (h *ClinicHandler) GetMyClinic(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -619,8 +620,8 @@ func (h *ClinicHandler) GetMyClinic(w http.ResponseWriter, r *http.Request) {
 	// Get user ID from claims
 	userID := claims.UserID
 
-	// Get clinic by owner
-	clinic, err := h.clinicService.GetClinicByOwner(ctx, userID)
+	// Get clinic using the new method that looks up via primary_clinic_id
+	clinic, err := h.clinicService.GetClinicByUserID(ctx, userID)
 	if err != nil {
 		// Check if it's a "not found" error
 		if errors.Is(err, domain.ErrClinicNotFound) {

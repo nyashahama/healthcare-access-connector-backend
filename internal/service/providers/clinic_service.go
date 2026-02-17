@@ -46,68 +46,6 @@ func NewClinicService(
 	}
 }
 
-// func (c *clinicService) CreateClinic(ctx context.Context, clinic providers.Clinic) (providers.Clinic, error) {
-// 	start := time.Now()
-// 	defer func() {
-// 		c.logger.Debug().
-// 			Dur("duration_ms", time.Since(start)).
-// 			Str("clinic_name", clinic.ClinicName).
-// 			Msg("CreateClinic completed")
-// 	}()
-//
-// 	// Validate required fields
-// 	if clinic.ClinicName == "" {
-// 		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "Clinic name is required", 400)
-// 	}
-// 	if clinic.ClinicType == "" {
-// 		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "Clinic type is required", 400)
-// 	}
-// 	if clinic.PhysicalAddress == "" {
-// 		return providers.Clinic{}, domain.NewAppError(domain.ErrValidation, "Physical address is required", 400)
-// 	}
-//
-// 	// Set timestamps and status
-// 	now := time.Now()
-// 	clinic.ID = uuid.New()
-// 	clinic.IsVerified = false
-// 	clinic.VerificationStatus = "pending"
-// 	clinic.CreatedAt = now
-// 	clinic.UpdatedAt = now
-//
-// 	// Create clinic
-// 	createdClinic, err := c.clinicRepo.CreateClinic(ctx, clinic)
-// 	if err != nil {
-// 		if errors.Is(err, domain.ErrDuplicateRegistrationNumber) {
-// 			return providers.Clinic{}, domain.NewAppError(err, "Registration number already exists", 409)
-// 		}
-// 		if errors.Is(err, domain.ErrDuplicateEmail) {
-// 			return providers.Clinic{}, domain.NewAppError(err, "Email already exists", 409)
-// 		}
-// 		if errors.Is(err, domain.ErrDuplicatePhone) {
-// 			return providers.Clinic{}, domain.NewAppError(err, "Phone number already exists", 409)
-// 		}
-// 		c.logger.Error().Err(err).Str("clinic_name", clinic.ClinicName).Msg("Failed to create clinic")
-// 		return providers.Clinic{}, domain.NewAppError(err, "Failed to create clinic", 500)
-// 	}
-//
-// 	// Invalidate cache for clinic listings
-// 	c.invalidateClinicListCache(ctx)
-//
-// 	// Log audit activity
-// 	c.logClinicActivity(ctx, "clinic_created", createdClinic.ID, nil, map[string]interface{}{
-// 		"clinic_name": createdClinic.ClinicName,
-// 		"clinic_type": createdClinic.ClinicType,
-// 	})
-//
-// 	c.logger.Info().
-// 		Str("clinic_id", createdClinic.ID.String()).
-// 		Str("clinic_name", createdClinic.ClinicName).
-// 		Str("clinic_type", createdClinic.ClinicType).
-// 		Msg("Clinic created successfully")
-//
-// 	return createdClinic, nil
-// }
-
 // RegisterClinic creates a new clinic with owner tracking
 func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error) {
 	start := time.Now()
@@ -329,6 +267,68 @@ func (c *clinicService) GetClinicByID(ctx context.Context, id uuid.UUID) (provid
 	}
 
 	return clinic, nil
+}
+
+// GetClinicByUserID retrieves the clinic from a user's primary_clinic_id
+func (c *clinicService) GetClinicByUserID(ctx context.Context, userID uuid.UUID) (*providers.Clinic, error) {
+	start := time.Now()
+	defer func() {
+		c.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Msg("GetClinicByUserID completed")
+	}()
+
+	// Validate user ID
+	if userID == uuid.Nil {
+		return nil, domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
+	}
+
+	// Get the user to access their primary_clinic_id
+	user, err := c.userRepo.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			return nil, domain.NewAppError(domain.ErrUserNotFound, "User not found", 404)
+		}
+		c.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get user")
+		return nil, domain.NewAppError(err, "Failed to get user", 500)
+	}
+
+	// Check if user has a primary_clinic_id
+	if user.PrimaryClinicID == nil || *user.PrimaryClinicID == uuid.Nil {
+		return nil, domain.NewAppError(domain.ErrClinicNotFound, "No clinic assigned to this user", 404)
+	}
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("clinic:user:%s", userID.String())
+	var clinic providers.Clinic
+	if err := c.cache.Get(ctx, cacheKey, &clinic); err == nil {
+		c.logger.Debug().Str("user_id", userID.String()).Msg("Clinic retrieved from cache")
+		return &clinic, nil
+	}
+
+	// Get the clinic using the primary_clinic_id
+	// Note: GetClinicByID returns providers.Clinic (not a pointer)
+	clinic, err = c.clinicRepo.GetClinicByID(ctx, *user.PrimaryClinicID)
+	if err != nil {
+		if errors.Is(err, domain.ErrClinicNotFound) {
+			return nil, domain.NewAppError(domain.ErrClinicNotFound, "Clinic not found", 404)
+		}
+		c.logger.Error().Err(err).Str("clinic_id", user.PrimaryClinicID.String()).Msg("Failed to get clinic")
+		return nil, domain.NewAppError(err, "Failed to get clinic", 500)
+	}
+
+	// Cache the result
+	if err := c.cache.Set(ctx, cacheKey, clinic, 10*time.Minute); err != nil {
+		c.logger.Warn().Err(err).Msg("Failed to cache clinic")
+	}
+
+	c.logger.Debug().
+		Str("clinic_id", clinic.ID.String()).
+		Str("user_id", userID.String()).
+		Msg("Clinic retrieved by user ID")
+
+	return &clinic, nil
 }
 
 func (c *clinicService) UpdateClinic(ctx context.Context, clinic providers.Clinic) error {

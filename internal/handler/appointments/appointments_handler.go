@@ -3,6 +3,7 @@ package appointments
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/appointments"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	app_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/appointments"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
@@ -358,17 +360,28 @@ func (h *AppointmentHandler) ConfirmAppointment(w http.ResponseWriter, r *http.R
 		})
 		return
 	}
+	// Get user from context using middleware helper
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
 
+	// Get user ID from claims
+	userID := claims.UserID
 	// Validate input
 	v := validator.New()
-	v.ValidateRequired("confirmed_by", req.ConfirmedBy.String())
+	// v.ValidateRequired("confirmed_by", string(userID))
+	fmt.Println("WHO TF IZ U", userID)
 
 	if !v.Valid() {
 		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
-	confirmed, err := h.appointmentService.ConfirmAppointment(ctx, id, req.ConfirmedBy)
+	confirmed, err := h.appointmentService.ConfirmAppointment(ctx, id, userID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
