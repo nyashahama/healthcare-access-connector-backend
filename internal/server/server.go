@@ -309,6 +309,7 @@ func (s *Server) setupRoutes() http.Handler {
 				// Staff routes
 				r.Route("/staff", func(r chi.Router) {
 					r.Post("/", s.staffHandler.CreateStaff)
+					r.Get("/user/{user_id}", s.staffHandler.GetStaffByUserID)
 					r.Get("/{id}", s.staffHandler.GetStaff)
 					r.Put("/{id}", s.staffHandler.UpdateStaff)
 					r.Delete("/{id}", s.staffHandler.DeleteStaff)
@@ -318,6 +319,7 @@ func (s *Server) setupRoutes() http.Handler {
 				// Clinic-specific staff routes
 				r.Route("/clinics/{clinic_id}/staff", func(r chi.Router) {
 					r.Get("/", s.staffHandler.ListClinicStaff)
+					r.Get("/all", s.staffHandler.ListAllClinicStaff)
 					r.Get("/active", s.staffHandler.ListActiveClinicStaff)
 					// Staff invitation endpoints
 					r.Post("/invite", s.staffHandler.InviteStaff)
