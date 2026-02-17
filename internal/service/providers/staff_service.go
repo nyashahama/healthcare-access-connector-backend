@@ -736,6 +736,78 @@ func (s *staffService) GetStaffByID(ctx context.Context, id uuid.UUID) (provider
 	return staff, nil
 }
 
+func (s *staffService) GetStaffByUserID(ctx context.Context, userID uuid.UUID) (providers.ClinicStaff, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Msg("GetStaffByUserID completed")
+	}()
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("staff:user:%s", userID.String())
+	var staff providers.ClinicStaff
+	if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
+		s.logger.Debug().Str("user_id", userID.String()).Msg("Staff retrieved from cache")
+		return staff, nil
+	}
+
+	// Fetch from database
+	staff, err := s.staffRepo.GetStaffByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrStaffNotFound) {
+			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrStaffNotFound, "Staff member not found", 404)
+		}
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get staff member by user ID")
+		return providers.ClinicStaff{}, domain.NewAppError(err, "Failed to get staff member", 500)
+	}
+
+	// Cache the result
+	if err := s.cache.Set(ctx, cacheKey, staff, 10*time.Minute); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to cache staff")
+	}
+
+	return staff, nil
+}
+
+func (s *staffService) GetAllClinicStaff(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("clinic_id", clinicID.String()).
+			Msg("GetAllClinicStaff completed")
+	}()
+
+	// Try cache first
+	cacheKey := fmt.Sprintf("staff:clinic:%s:all", clinicID.String())
+	var staff []providers.ClinicStaff
+	if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
+		s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("All clinic staff retrieved from cache")
+		return staff, nil
+	}
+
+	// Fetch from database
+	staff, err := s.staffRepo.GetAllClinicStaff(ctx, clinicID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("clinic_id", clinicID.String()).Msg("Failed to get all clinic staff")
+		return nil, domain.NewAppError(err, "Failed to get all clinic staff", 500)
+	}
+
+	// Cache the result
+	if err := s.cache.Set(ctx, cacheKey, staff, 5*time.Minute); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to cache all clinic staff")
+	}
+
+	s.logger.Debug().
+		Str("clinic_id", clinicID.String()).
+		Int("staff_count", len(staff)).
+		Msg("All clinic staff retrieved")
+
+	return staff, nil
+}
+
 func (s *staffService) UpdateStaffMember(ctx context.Context, staff providers.ClinicStaff) error {
 	start := time.Now()
 	defer func() {
