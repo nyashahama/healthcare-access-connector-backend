@@ -350,6 +350,8 @@ type ServiceRepository interface {
 type StaffRepository interface {
 	CreateStaffMember(ctx context.Context, staff providers.ClinicStaff) (providers.ClinicStaff, error)
 	GetStaffByID(ctx context.Context, id uuid.UUID) (providers.ClinicStaff, error)
+	GetStaffByUserID(ctx context.Context, userID uuid.UUID) (providers.ClinicStaff, error)
+	GetAllClinicStaff(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
 	UpdateStaffMember(ctx context.Context, staff providers.ClinicStaff) error
 	DeleteStaffMember(ctx context.Context, id uuid.UUID) error
 
