@@ -451,6 +451,63 @@ func (h *StaffHandler) CreateStaff(w http.ResponseWriter, r *http.Request) {
 	handler.RespondJSON(w, http.StatusCreated, providers.ToStaffResponse(createdStaff))
 }
 
+// GetStaffByUserID handles getting a staff member by their user ID
+// GET /api/v1/providers/staff/user/{user_id}
+func (h *StaffHandler) GetStaffByUserID(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	userIDStr := chi.URLParam(r, "user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+			Error: "Invalid user ID format",
+		})
+		return
+	}
+
+	staff, err := h.staffService.GetStaffByUserID(ctx, userID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	handler.RespondJSON(w, http.StatusOK, providers.ToStaffResponse(staff))
+}
+
+// ListAllClinicStaff handles listing ALL staff for a clinic regardless of status
+// GET /api/v1/providers/clinics/{clinic_id}/staff/all
+func (h *StaffHandler) ListAllClinicStaff(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
+	clinicIDStr := chi.URLParam(r, "clinic_id")
+	clinicID, err := uuid.Parse(clinicIDStr)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusBadRequest, providers.ErrorResponse{
+			Error: "Invalid clinic ID format",
+		})
+		return
+	}
+
+	staff, err := h.staffService.GetAllClinicStaff(ctx, clinicID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	response := providers.StaffListResponse{
+		Staff: make([]providers.StaffResponse, len(staff)),
+		Total: len(staff),
+	}
+
+	for i, s := range staff {
+		response.Staff[i] = providers.ToStaffResponse(s)
+	}
+
+	handler.RespondJSON(w, http.StatusOK, response)
+}
+
 // GetStaff handles getting a staff member by ID
 func (h *StaffHandler) GetStaff(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
