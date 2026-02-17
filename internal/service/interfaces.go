@@ -316,6 +316,7 @@ type CredentialService interface {
 
 type SystemAdminService interface {
 	CreateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error)
+	GetSystemAdminByUserID(ctx context.Context, userID uuid.UUID) (admin.SystemAdmin, error)
 }
 
 type AppointmentService interface {
