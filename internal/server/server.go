@@ -436,6 +436,8 @@ func (s *Server) setupRoutes() http.Handler {
 				// System Admin management routes
 				r.Route("/admin", func(r chi.Router) {
 					r.Post("/system-admins", s.adminHandler.CreateSystemAdmin)
+
+					r.Get("/system-admins/user/{user_id}", s.adminHandler.GetSystemAdminByUserID)
 				})
 
 				// Admin user management
