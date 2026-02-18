@@ -17,6 +17,7 @@ import (
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
+	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -75,7 +76,8 @@ type Server struct {
 	serviceHandler          *providers.ServiceHandler
 	credentialHandler       *providers.CredentialHandler
 	adminHandler            *handleradmin.AdminHandler
-	appointmentHandler      *handlerappointments.AppointmentHandler // Add appointment handler
+	appointmentHandler      *handlerappointments.AppointmentHandler
+	symptomCheckerHandler   *handlertele.SymptomCheckerHandler
 	healthHandler           *handler.HealthHandler
 	authService             service.AuthService
 }
@@ -108,6 +110,7 @@ func NewServer(
 	credentialHandler *providers.CredentialHandler,
 	adminHandler *handleradmin.AdminHandler,
 	appointmentHandler *handlerappointments.AppointmentHandler, // Add appointment handler parameter
+	symptomCheckerHandler *handlertele.SymptomCheckerHandler,
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
 	txManager repository.TxManager,
@@ -139,6 +142,7 @@ func NewServer(
 		credentialHandler:       credentialHandler,
 		adminHandler:            adminHandler,
 		appointmentHandler:      appointmentHandler, // Initialize appointment handler
+		symptomCheckerHandler:   symptomCheckerHandler,
 		healthHandler:           healthHandler,
 		authService:             authService,
 	}
@@ -290,6 +294,11 @@ func (s *Server) setupRoutes() http.Handler {
 			// Appointment management routes
 			r.Route("/appointments", func(r chi.Router) {
 				s.appointmentHandler.RegisterRoutes(r)
+			})
+
+			// Telemedicine / symptom checker routes
+			r.Route("/telemedicine", func(r chi.Router) {
+				s.symptomCheckerHandler.RegisterRoutes(r)
 			})
 
 			// Provider routes
