@@ -189,8 +189,6 @@ func (s *emailService) startWorkers() {
 func (s *emailService) worker(id int) {
 	defer s.wg.Done()
 
-	s.logger.Debug().Int("worker_id", id).Msg("Email worker started")
-
 	for {
 		select {
 		case <-s.ctx.Done():
