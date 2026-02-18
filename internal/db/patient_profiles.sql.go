@@ -176,6 +176,36 @@ func (q *Queries) DeletePatientProfileByUserID(ctx context.Context, userID pgtyp
 	return err
 }
 
+const dependentBelongsToPatient = `-- name: DependentBelongsToPatient :one
+
+SELECT EXISTS(
+    SELECT 1
+    FROM patient_dependents
+    WHERE id         = $2
+      AND patient_id = $1
+) AS exists
+`
+
+type DependentBelongsToPatientParams struct {
+	PatientID pgtype.UUID `json:"patient_id"`
+	ID        pgtype.UUID `json:"id"`
+}
+
+// ============================================
+// DEPENDENT OWNERSHIP
+// ============================================
+// Verifies that a dependent record belongs to a given patient.
+// Called by the symptom checker service before accepting a session submission
+// on behalf of a dependent, preventing cross-patient data access.
+// $1 = patient_id (UUID of the patient_profile)
+// $2 = dependent_id (UUID of the patient_dependents row)
+func (q *Queries) DependentBelongsToPatient(ctx context.Context, arg DependentBelongsToPatientParams) (bool, error) {
+	row := q.db.QueryRow(ctx, dependentBelongsToPatient, arg.PatientID, arg.ID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getPatientProfileByID = `-- name: GetPatientProfileByID :one
 SELECT id, user_id, first_name, last_name, preferred_name, date_of_birth, gender, preferred_gender_pronouns, primary_address, city, province, postal_code, country, language_preferences, home_language, requires_interpreter, preferred_communication_method, medical_aid_number, medical_aid_provider, has_medical_aid, national_id_number, employment_status, education_level, household_income_range, profile_picture_url, timezone, last_profile_update, referred_by, referral_code, accepts_marketing_emails, created_at, updated_at FROM patient_profiles
 WHERE id = $1

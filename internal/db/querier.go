@@ -270,6 +270,15 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id pgtype.UUID) error
 	DeleteUserOTPs(ctx context.Context, arg DeleteUserOTPsParams) error
 	DeleteUserSessions(ctx context.Context, userID pgtype.UUID) error
+	// ============================================
+	// DEPENDENT OWNERSHIP
+	// ============================================
+	// Verifies that a dependent record belongs to a given patient.
+	// Called by the symptom checker service before accepting a session submission
+	// on behalf of a dependent, preventing cross-patient data access.
+	// $1 = patient_id (UUID of the patient_profile)
+	// $2 = dependent_id (UUID of the patient_dependents row)
+	DependentBelongsToPatient(ctx context.Context, arg DependentBelongsToPatientParams) (bool, error)
 	EscalateConsultation(ctx context.Context, arg EscalateConsultationParams) (Consultation, error)
 	ExpireStaffInvitations(ctx context.Context) error
 	ExportDataAccessLogs(ctx context.Context, arg ExportDataAccessLogsParams) ([]DataAccessLog, error)
