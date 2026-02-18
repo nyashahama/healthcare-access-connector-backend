@@ -494,6 +494,7 @@ func New(cfg *config.Config) (*App, error) {
 	// Initialize symptom checker handler
 	symptomCheckerHandler := handlertele.NewSymptomCheckerHandler(
 		symptomCheckerService,
+		patientService,
 		logger,
 		cfg.Timeout,
 	)
