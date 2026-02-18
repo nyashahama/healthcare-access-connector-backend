@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/ai"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
@@ -30,6 +31,7 @@ import (
 	servicecore "github.com/nyashahama/healthcare-access-connector-backend/internal/service/core"
 	servicepatients "github.com/nyashahama/healthcare-access-connector-backend/internal/service/patients"
 	serviceproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/service/providers"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/ws"
 	"github.com/rs/zerolog"
 )
 
@@ -63,6 +65,46 @@ func New(cfg *config.Config) (*App, error) {
 			broker = nil
 		}
 	}
+	// AI client
+	aiCfg := ai.ConfigFromEnv()
+	if err := aiCfg.Validate(); err != nil {
+		logger.Warn().Err(err).Msg("AI client config invalid, feature disabled")
+		aiCfg.Enabled = false
+	}
+	aiClient := ai.New(aiCfg, logger)
+	fmt.Println(aiClient)
+
+	// WebSocket hub
+	wsCfg := ws.ConfigFromEnv()
+	if err := wsCfg.Validate(); err != nil {
+		return nil, fmt.Errorf("ws config: %w", err)
+	}
+	wsHub := ws.NewHub(wsCfg, logger)
+	go wsHub.Run(context.Background()) // one goroutine for the lifetime of the app
+
+	// wsHub.MessageHandler = func(ctx context.Context, consultationID, senderUserID, senderRole string, payload ws.MessagePayload) error {
+	// 	msg, err := consultationService.SaveMessage(ctx, domain.ConsultationMessage{
+	// 		ConsultationID: consultationID,
+	// 		SenderUserID:   senderUserID,
+	// 		MessageType:    domain.MessageType(payload.MessageType),
+	// 		Content:        payload.Content,
+	// 		Metadata:       payload.Metadata,
+	// 		SentAt:         time.Now().UTC(),
+	// 	})
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	// Broadcast persisted message (with DB-assigned ID) to the room
+	// 	payload.MessageID = msg.ID.String()
+	// 	wsHub.Broadcast(consultationID, ws.OutboundEvent{
+	// 		Type:           ws.EventMessage,
+	// 		ConsultationID: consultationID,
+	// 		SenderUserID:   senderUserID,
+	// 		SentAt:         msg.SentAt,
+	// 		Payload:        payload,
+	// 	})
+	// 	return nil
+	// }
 
 	// Initialize email service
 	var emailService email.Service
@@ -326,7 +368,7 @@ func New(cfg *config.Config) (*App, error) {
 	consentHandler := handlercore.NewConsentHandler(consentService, logger, cfg.Timeout)
 	notificationHandler := handlercore.NewNotificationHandler(notificationService, logger, cfg.Timeout)
 	sessionHandler := handlercore.NewSessionHandler(sessionService, logger, cfg.Timeout)
-	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService)
+	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService, aiClient, wsHub)
 
 	// Initialize patient handler
 	patientHandler := handlerpatients.NewPatientHandler(
