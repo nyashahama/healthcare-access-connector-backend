@@ -363,6 +363,27 @@ func (r *patientRepository) DeletePatientProfileByUserID(ctx context.Context, us
 	return nil
 }
 
+// DependentBelongsToPatient checks whether a dependent is owned by the given patient.
+// Used by the symptom checker service to authorise dependent session submissions.
+func (r *patientRepository) DependentBelongsToPatient(ctx context.Context, patientID uuid.UUID, dependentID uuid.UUID) (bool, error) {
+	start := time.Now()
+	defer func() {
+		patientDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	exists, err := r.querier.DependentBelongsToPatient(ctx, sqlc.DependentBelongsToPatientParams{
+		PatientID: uuidToPgtypeUUID(patientID),
+		ID:        uuidToPgtypeUUID(dependentID),
+	})
+	if err != nil {
+		patientDBQueryTotal.WithLabelValues("dependent_belongs_to_patient", "error").Inc()
+		return false, r.handleError(err, "check dependent ownership")
+	}
+
+	patientDBQueryTotal.WithLabelValues("dependent_belongs_to_patient", "success").Inc()
+	return exists, nil
+}
+
 // handleError converts database errors to domain errors
 func (r *patientRepository) handleError(err error, operation string) error {
 	var pgErr *pgconn.PgError
