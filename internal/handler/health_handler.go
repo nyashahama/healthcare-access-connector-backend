@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/ai"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/ws"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -19,6 +21,8 @@ type HealthHandler struct {
 	cache        cache.Service
 	broker       messaging.Broker
 	emailService email.Service
+	aiClient     ai.Client
+	wsHub        *ws.Hub
 }
 
 type HealthResponse struct {
@@ -29,12 +33,21 @@ type HealthResponse struct {
 }
 
 // NewHealthHandler creates a new health handler
-func NewHealthHandler(pool *pgxpool.Pool, cache cache.Service, broker messaging.Broker, emailService email.Service) *HealthHandler {
+func NewHealthHandler(
+	pool *pgxpool.Pool,
+	cache cache.Service,
+	broker messaging.Broker,
+	emailService email.Service,
+	aiClient ai.Client,
+	wsHub *ws.Hub,
+) *HealthHandler {
 	return &HealthHandler{
 		pool:         pool,
 		cache:        cache,
 		broker:       broker,
 		emailService: emailService,
+		aiClient:     aiClient,
+		wsHub:        wsHub,
 	}
 }
 
@@ -78,11 +91,30 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check email service
 	if h.emailService != nil {
 		if h.emailService.IsAvailable() {
 			services["email"] = "healthy"
 		} else {
 			services["email"] = "degraded"
+		}
+	}
+
+	// Check AI client
+	if h.aiClient != nil {
+		if h.aiClient.IsAvailable() {
+			services["ai"] = "healthy"
+		} else {
+			services["ai"] = "disabled"
+		}
+	}
+
+	// Check WebSocket hub
+	if h.wsHub != nil {
+		if h.wsHub.IsAvailable() {
+			services["websocket"] = "healthy"
+		} else {
+			services["websocket"] = "unavailable"
 		}
 	}
 
@@ -97,7 +129,7 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 		Status:    status,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Services:  services,
-		Version:   "1.0.0", // Update with actual version
+		Version:   "1.0.0",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -116,7 +148,6 @@ func (h *HealthHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
-	// Check only critical dependencies for readiness
 	if err := h.pool.Ping(ctx); err != nil {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		return
