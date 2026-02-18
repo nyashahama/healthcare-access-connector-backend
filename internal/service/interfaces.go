@@ -10,6 +10,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/telemedicine"
 )
 
 // AuthService handles auth operations
@@ -342,6 +343,56 @@ type AppointmentService interface {
 
 	// Delete
 	DeleteAppointment(ctx context.Context, id uuid.UUID) error
+}
+
+// SymptomCheckerService defines all operations for the symptom checker workflow.
+type SymptomCheckerService interface {
+	// ── Patient-facing ──────────────────────────────────────────────────────
+
+	// SubmitSession validates input, calls the AI for triage, persists and
+	// returns the completed session. This is the primary entry point.
+	SubmitSession(ctx context.Context, session telemedicine.SymptomCheckerSession) (telemedicine.SymptomCheckerSession, error)
+
+	// GetSessionByID retrieves a full session by ID.
+	GetSessionByID(ctx context.Context, id uuid.UUID) (telemedicine.SymptomCheckerSession, error)
+
+	// GetPatientSessions returns a paginated summary list of sessions for a patient.
+	GetPatientSessions(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]telemedicine.SymptomSessionSummary, error)
+
+	// GetDependentSessions returns all sessions filed for a specific dependent
+	// of a patient. Validates dependent ownership before returning data.
+	GetDependentSessions(ctx context.Context, patientID, dependentID uuid.UUID) ([]telemedicine.DependentSessionSummary, error)
+
+	// GetLatestEligibleSession returns the most recent telemedicine-eligible
+	// session (completed, within 24 hours, recommended_action=telemedicine).
+	// This is the preflight check the patient must pass before seeing the
+	// provider list. Returns domain.ErrNotFound when none qualifies.
+	GetLatestEligibleSession(ctx context.Context, patientID uuid.UUID) (telemedicine.EligibleSession, error)
+
+	// GetSessionWithPatientContext returns the rich provider-facing view of a
+	// session, joined with patient demographics and medical summary.
+	// Called when a provider accepts a consultation.
+	GetSessionWithPatientContext(ctx context.Context, sessionID uuid.UUID) (telemedicine.SessionWithPatientContext, error)
+
+	// ── Lifecycle mutations ─────────────────────────────────────────────────
+
+	// AbandonSession marks a completed session as abandoned.
+	// Called when a patient exits the flow without proceeding to a consultation.
+	AbandonSession(ctx context.Context, sessionID, patientID uuid.UUID) error
+
+	// MarkSessionConverted transitions a session to converted_to_consult.
+	// Called by the consultation service once a consultation is created.
+	MarkSessionConverted(ctx context.Context, sessionID uuid.UUID) error
+
+	// ── Admin / analytics ──────────────────────────────────────────────────
+
+	// GetSessionsByTriageLevel returns paginated sessions filtered by triage
+	// level and creation date range. Used in the admin dashboard.
+	GetSessionsByTriageLevel(ctx context.Context, triageLevel telemedicine.TriageLevel, from, to time.Time, limit, offset int) ([]telemedicine.AdminSessionSummary, error)
+
+	// CountSessionsByOutcome returns per-action session counts within a time
+	// window. Used for analytics.
+	CountSessionsByOutcome(ctx context.Context, from, to time.Time) ([]telemedicine.SessionOutcomeCount, error)
 }
 
 // TokenClaims represents JWT token claims for health project
