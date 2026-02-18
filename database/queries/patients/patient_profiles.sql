@@ -106,7 +106,6 @@ SELECT EXISTS(
     SELECT 1 FROM patient_profiles WHERE user_id = $1
 ) as exists;
 
-
 -- name: CheckNationalIDExists :one
 SELECT EXISTS(
     SELECT 1 FROM patient_profiles 
@@ -114,3 +113,20 @@ SELECT EXISTS(
         national_id_number = $1
         AND ($2::uuid IS NULL OR user_id != $2)
 ) as exists;
+
+-- ============================================
+-- DEPENDENT OWNERSHIP
+-- ============================================
+
+-- name: DependentBelongsToPatient :one
+-- Verifies that a dependent record belongs to a given patient.
+-- Called by the symptom checker service before accepting a session submission
+-- on behalf of a dependent, preventing cross-patient data access.
+-- $1 = patient_id (UUID of the patient_profile)
+-- $2 = dependent_id (UUID of the patient_dependents row)
+SELECT EXISTS(
+    SELECT 1
+    FROM patient_dependents
+    WHERE id         = $2
+      AND patient_id = $1
+) AS exists;
