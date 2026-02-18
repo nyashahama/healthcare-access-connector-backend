@@ -20,6 +20,9 @@ import (
 
 type SymptomCheckerHandler struct {
 	symptomService service.SymptomCheckerService
+	// patientService is used to resolve the authenticated user's patient profile.
+	// Identity is always derived from the JWT — never from the request body.
+	patientService service.PatientService
 	logger         *zerolog.Logger
 	timeout        time.Duration
 }
@@ -27,11 +30,13 @@ type SymptomCheckerHandler struct {
 // NewSymptomCheckerHandler creates a new symptom checker handler.
 func NewSymptomCheckerHandler(
 	symptomService service.SymptomCheckerService,
+	patientService service.PatientService,
 	logger *zerolog.Logger,
 	timeout time.Duration,
 ) *SymptomCheckerHandler {
 	return &SymptomCheckerHandler{
 		symptomService: symptomService,
+		patientService: patientService,
 		logger:         logger,
 		timeout:        timeout,
 	}
@@ -40,18 +45,18 @@ func NewSymptomCheckerHandler(
 // RegisterRoutes registers all symptom checker routes onto the provided router.
 func (h *SymptomCheckerHandler) RegisterRoutes(router chi.Router) {
 	router.Route("/symptom-checker", func(r chi.Router) {
-		// Patient-facing
+		// Patient-facing — identity always resolved from JWT
 		r.Post("/sessions", h.SubmitSession)
 		r.Get("/sessions/{id}", h.GetSessionByID)
 		r.Put("/sessions/{id}/abandon", h.AbandonSession)
 		r.Put("/sessions/{id}/convert", h.MarkSessionConverted)
 
-		// Patient history
-		r.Get("/patients/{patientId}/sessions", h.GetPatientSessions)
-		r.Get("/patients/{patientId}/eligible-session", h.GetLatestEligibleSession)
+		// Patient history — scoped to the authenticated patient
+		r.Get("/patients/me/sessions", h.GetPatientSessions)
+		r.Get("/patients/me/eligible-session", h.GetLatestEligibleSession)
 
-		// Dependent history
-		r.Get("/patients/{patientId}/dependents/{dependentId}/sessions", h.GetDependentSessions)
+		// Dependent history — scoped to the authenticated patient's dependent
+		r.Get("/patients/me/dependents/{dependentId}/sessions", h.GetDependentSessions)
 
 		// Provider-facing
 		r.Get("/sessions/{id}/patient-context", h.GetSessionWithPatientContext)
@@ -64,17 +69,17 @@ func (h *SymptomCheckerHandler) RegisterRoutes(router chi.Router) {
 
 // ─── Patient-facing handlers ───────────────────────────────────────────────────
 
-// SubmitSession handles POST /symptom-checker/sessions
+// SubmitSession handles POST /symptom-checker/sessions.
+//
+// The patient_id and user_id are never read from the request body — they are
+// derived from the validated JWT so that a patient can only ever submit a
+// session on their own behalf.
 func (h *SymptomCheckerHandler) SubmitSession(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	// Get authenticated user from context
-	claims, ok := middleware.GetUserFromContext(ctx)
+	patientID, userID, ok := h.resolvePatientID(ctx, w)
 	if !ok {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
-			Error: "User not authenticated",
-		})
 		return
 	}
 
@@ -86,12 +91,12 @@ func (h *SymptomCheckerHandler) SubmitSession(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Always stamp the user ID from the JWT — never trust the body
-	req.UserID = claims.UserID
+	// Stamp the verified identity — any values the client may have sent are ignored.
+	req.PatientID = patientID
+	req.UserID = userID
 
-	// Validate input
+	// Validate the symptom payload
 	v := validator.New()
-	v.ValidateRequired("patient_id", req.PatientID.String())
 	v.ValidateRequired("chief_complaint", req.ChiefComplaint)
 	v.ValidateMinLength("chief_complaint", req.ChiefComplaint, 5)
 
@@ -121,12 +126,15 @@ func (h *SymptomCheckerHandler) SubmitSession(w http.ResponseWriter, r *http.Req
 	handler.RespondJSON(w, http.StatusCreated, sc_dto.ToSessionResponse(created))
 }
 
-// GetSessionByID handles GET /symptom-checker/sessions/{id}
+// GetSessionByID handles GET /symptom-checker/sessions/{id}.
+//
+// After fetching the session it verifies the authenticated patient owns it,
+// preventing one patient from reading another patient's session data.
 func (h *SymptomCheckerHandler) GetSessionByID(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	id, err := parseUUIDParam(r, "id")
+	sessionID, err := parseUUIDParam(r, "id")
 	if err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
 			Error: "Invalid session ID",
@@ -134,26 +142,38 @@ func (h *SymptomCheckerHandler) GetSessionByID(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	session, err := h.symptomService.GetSessionByID(ctx, id)
+	patientID, _, ok := h.resolvePatientID(ctx, w)
+	if !ok {
+		return
+	}
+
+	session, err := h.symptomService.GetSessionByID(ctx, sessionID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	// Ownership check — a patient may only read their own sessions.
+	if session.PatientID != patientID {
+		handler.RespondJSON(w, http.StatusForbidden, sc_dto.ErrorResponse{
+			Error: "Access denied",
+		})
 		return
 	}
 
 	handler.RespondJSON(w, http.StatusOK, sc_dto.ToSessionResponse(session))
 }
 
-// GetPatientSessions handles GET /symptom-checker/patients/{patientId}/sessions
-// Supports ?limit=20&offset=0 query params for pagination.
+// GetPatientSessions handles GET /symptom-checker/patients/me/sessions.
+//
+// Route uses /me so the patient ID is never in the URL — it is always resolved
+// from the JWT. Supports ?limit=20&offset=0 for pagination.
 func (h *SymptomCheckerHandler) GetPatientSessions(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	patientID, err := parseUUIDParam(r, "patientId")
-	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
-			Error: "Invalid patient ID",
-		})
+	patientID, _, ok := h.resolvePatientID(ctx, w)
+	if !ok {
 		return
 	}
 
@@ -179,16 +199,16 @@ func (h *SymptomCheckerHandler) GetPatientSessions(w http.ResponseWriter, r *htt
 	})
 }
 
-// GetDependentSessions handles GET /symptom-checker/patients/{patientId}/dependents/{dependentId}/sessions
+// GetDependentSessions handles GET /symptom-checker/patients/me/dependents/{dependentId}/sessions.
+//
+// The patient ID comes from the JWT; the service layer verifies the dependent
+// actually belongs to that patient before returning any data.
 func (h *SymptomCheckerHandler) GetDependentSessions(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	patientID, err := parseUUIDParam(r, "patientId")
-	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
-			Error: "Invalid patient ID",
-		})
+	patientID, _, ok := h.resolvePatientID(ctx, w)
+	if !ok {
 		return
 	}
 
@@ -217,17 +237,16 @@ func (h *SymptomCheckerHandler) GetDependentSessions(w http.ResponseWriter, r *h
 	})
 }
 
-// GetLatestEligibleSession handles GET /symptom-checker/patients/{patientId}/eligible-session
-// This is the preflight check before the patient sees the provider list.
+// GetLatestEligibleSession handles GET /symptom-checker/patients/me/eligible-session.
+//
+// Preflight check before showing the patient the provider list. Patient ID is
+// always derived from the JWT.
 func (h *SymptomCheckerHandler) GetLatestEligibleSession(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	patientID, err := parseUUIDParam(r, "patientId")
-	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
-			Error: "Invalid patient ID",
-		})
+	patientID, _, ok := h.resolvePatientID(ctx, w)
+	if !ok {
 		return
 	}
 
@@ -240,7 +259,10 @@ func (h *SymptomCheckerHandler) GetLatestEligibleSession(w http.ResponseWriter, 
 	handler.RespondJSON(w, http.StatusOK, sc_dto.ToEligibleSessionResponse(session))
 }
 
-// AbandonSession handles PUT /symptom-checker/sessions/{id}/abandon
+// AbandonSession handles PUT /symptom-checker/sessions/{id}/abandon.
+//
+// The patient ID is resolved from the JWT — no body is required. The service
+// layer enforces that the session belongs to the authenticated patient.
 func (h *SymptomCheckerHandler) AbandonSession(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -253,22 +275,13 @@ func (h *SymptomCheckerHandler) AbandonSession(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	var req sc_dto.AbandonSessionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
-			Error: "Invalid request body",
-		})
+	patientID, _, ok := h.resolvePatientID(ctx, w)
+	if !ok {
 		return
 	}
 
-	v := validator.New()
-	v.ValidateRequired("patient_id", req.PatientID.String())
-	if !v.Valid() {
-		handler.RespondValidationError(w, v.Errors())
-		return
-	}
-
-	if err := h.symptomService.AbandonSession(ctx, sessionID, req.PatientID); err != nil {
+	// AbandonSessionRequest body is no longer needed — patientID comes from the JWT.
+	if err := h.symptomService.AbandonSession(ctx, sessionID, patientID); err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
@@ -278,7 +291,7 @@ func (h *SymptomCheckerHandler) AbandonSession(w http.ResponseWriter, r *http.Re
 	})
 }
 
-// MarkSessionConverted handles PUT /symptom-checker/sessions/{id}/convert
+// MarkSessionConverted handles PUT /symptom-checker/sessions/{id}/convert.
 // Called by the consultation service when a consultation is created.
 func (h *SymptomCheckerHandler) MarkSessionConverted(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
@@ -304,7 +317,7 @@ func (h *SymptomCheckerHandler) MarkSessionConverted(w http.ResponseWriter, r *h
 
 // ─── Provider-facing handlers ──────────────────────────────────────────────────
 
-// GetSessionWithPatientContext handles GET /symptom-checker/sessions/{id}/patient-context
+// GetSessionWithPatientContext handles GET /symptom-checker/sessions/{id}/patient-context.
 // Returns the rich provider view joining session with patient demographics and medical info.
 func (h *SymptomCheckerHandler) GetSessionWithPatientContext(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
@@ -329,8 +342,8 @@ func (h *SymptomCheckerHandler) GetSessionWithPatientContext(w http.ResponseWrit
 
 // ─── Admin / analytics handlers ───────────────────────────────────────────────
 
-// GetSessionsByTriageLevel handles GET /symptom-checker/admin/sessions/triage
-// Query params: triage_level, from (YYYY-MM-DD), to (YYYY-MM-DD), limit, offset
+// GetSessionsByTriageLevel handles GET /symptom-checker/admin/sessions/triage.
+// Query params: triage_level, from (YYYY-MM-DD), to (YYYY-MM-DD), limit, offset.
 func (h *SymptomCheckerHandler) GetSessionsByTriageLevel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -375,7 +388,7 @@ func (h *SymptomCheckerHandler) GetSessionsByTriageLevel(w http.ResponseWriter, 
 		return
 	}
 
-	// Set to end of day so the range is inclusive
+	// Set to end of day so the range is inclusive.
 	to = to.Add(24*time.Hour - time.Second)
 
 	limit := parseIntQuery(r, "limit", 20)
@@ -405,8 +418,8 @@ func (h *SymptomCheckerHandler) GetSessionsByTriageLevel(w http.ResponseWriter, 
 	})
 }
 
-// CountSessionsByOutcome handles GET /symptom-checker/admin/sessions/outcome-counts
-// Query params: from (YYYY-MM-DD), to (YYYY-MM-DD)
+// CountSessionsByOutcome handles GET /symptom-checker/admin/sessions/outcome-counts.
+// Query params: from (YYYY-MM-DD), to (YYYY-MM-DD).
 func (h *SymptomCheckerHandler) CountSessionsByOutcome(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
@@ -470,4 +483,28 @@ func parseIntQuery(r *http.Request, key string, defaultVal int) int {
 		}
 	}
 	return defaultVal
+}
+
+// resolvePatientID extracts the authenticated user's ID from the JWT claims,
+// then looks up their patient profile to get the canonical patient UUID.
+// This is the single authoritative way to identify who is making a request —
+// the client never sends patient_id or user_id in the body.
+func (h *SymptomCheckerHandler) resolvePatientID(ctx context.Context, w http.ResponseWriter) (patientID uuid.UUID, userID uuid.UUID, ok bool) {
+	claims, found := middleware.GetUserFromContext(ctx)
+	if !found {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return uuid.Nil, uuid.Nil, false
+	}
+
+	patient, err := h.patientService.GetPatientProfile(ctx, claims.UserID)
+	if err != nil {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "No patient profile found for authenticated user",
+		})
+		return uuid.Nil, uuid.Nil, false
+	}
+
+	return patient.ID, claims.UserID, true
 }
