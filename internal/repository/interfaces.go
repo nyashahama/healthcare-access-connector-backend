@@ -166,6 +166,7 @@ type AuditRepository interface {
 }
 
 type PatientProfileRepository interface {
+	// ── Core CRUD ───────────────────────────────────────────────────────────
 	CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error)
 	GetPatientProfileByID(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error)
 	GetPatientProfileByUserID(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
@@ -174,12 +175,20 @@ type PatientProfileRepository interface {
 	DeletePatientProfile(ctx context.Context, id uuid.UUID) error
 	DeletePatientProfileByUserID(ctx context.Context, userID uuid.UUID) error
 
+	// ── Discovery ───────────────────────────────────────────────────────────
 	ListPatientProfiles(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
 	SearchPatientProfiles(ctx context.Context, query string, limit, offset int) ([]patients.PatientProfile, error)
 
+	// ── Existence checks ────────────────────────────────────────────────────
 	ProfileExists(ctx context.Context, id uuid.UUID) (bool, error)
 	ProfileExistsByUserID(ctx context.Context, userID uuid.UUID) (bool, error)
 	NationalIDExists(ctx context.Context, nationalID string, excludeID *uuid.UUID) (bool, error)
+
+	// ── Dependent ownership ─────────────────────────────────────────────────
+	// DependentBelongsToPatient returns true when the dependent record identified
+	// by dependentID is owned by patientID. Used by the symptom checker service
+	// to authorise sessions filed on behalf of a dependent.
+	DependentBelongsToPatient(ctx context.Context, patientID uuid.UUID, dependentID uuid.UUID) (bool, error)
 }
 
 type PatientMedicalInfoRepository interface {
