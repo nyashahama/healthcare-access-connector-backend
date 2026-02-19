@@ -16,6 +16,7 @@ var (
 	ErrValidation   = errors.New("validation failed")
 	ErrInternal     = errors.New("internal server error")
 	ErrDuplicate    = errors.New("duplicate resource") // Added duplicate error
+	ErrConflict     = errors.New("conflicting")
 
 	// User errors
 	ErrDuplicateEmail     = errors.New("email already exists")
