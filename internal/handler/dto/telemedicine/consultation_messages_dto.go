@@ -240,3 +240,8 @@ func ToDomainMessage(consultationID uuid.UUID, req SendMessageRequest) telemedic
 		Metadata:           req.Metadata,
 	}
 }
+
+// SenderRoleFromString safely converts a query-param string to the domain SenderRole type.
+func SenderRoleFromString(s string) telemedicine.SenderRole {
+	return telemedicine.SenderRole(s)
+}

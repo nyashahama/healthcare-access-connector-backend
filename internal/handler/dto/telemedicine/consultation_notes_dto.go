@@ -265,3 +265,31 @@ func ToDomainNote(consultationID uuid.UUID, req CreateNoteRequest) telemedicine.
 		FollowUpTimeframe:   req.FollowUpTimeframe,
 	}
 }
+
+// ToDomainNoteUpdate converts an UpdateNoteRequest to a partial domain ConsultationNote
+// for field-level merging by the service layer.
+func ToDomainNoteUpdate(req UpdateNoteRequest) telemedicine.ConsultationNote {
+	note := telemedicine.ConsultationNote{
+		Subjective:        req.Subjective,
+		Objective:         req.Objective,
+		Assessment:        req.Assessment,
+		Plan:              req.Plan,
+		DiagnosisCodes:    req.DiagnosisCodes,
+		ReferralType:      req.ReferralType,
+		ReferralNotes:     req.ReferralNotes,
+		FollowUpTimeframe: req.FollowUpTimeframe,
+	}
+	if req.PrescriptionIssued != nil {
+		note.PrescriptionIssued = *req.PrescriptionIssued
+	}
+	if req.PrescriptionDetails != nil {
+		note.PrescriptionDetails = req.PrescriptionDetails
+	}
+	if req.ReferralRequired != nil {
+		note.ReferralRequired = *req.ReferralRequired
+	}
+	if req.FollowUpRecommended != nil {
+		note.FollowUpRecommended = *req.FollowUpRecommended
+	}
+	return note
+}
