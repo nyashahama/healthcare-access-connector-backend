@@ -49,17 +49,22 @@ var (
 	)
 )
 
+// Server holds every handler the application exposes.
 type Server struct {
-	httpServer              *http.Server
-	config                  *config.Config
-	logger                  *zerolog.Logger
-	authHandler             *handlercore.AuthHandler
-	userHandler             *handlercore.UserHandler
-	otpHandler              *handlercore.OTPHandler
-	auditHandler            *handlercore.AuditHandler
-	consentHandler          *handlercore.ConsentHandler
-	notificationHandler     *handlercore.NotificationHandler
-	sessionHandler          *handlercore.SessionHandler
+	httpServer *http.Server
+	config     *config.Config
+	logger     *zerolog.Logger
+
+	// ── Core handlers ──────────────────────────────────────────────────────────
+	authHandler         *handlercore.AuthHandler
+	userHandler         *handlercore.UserHandler
+	otpHandler          *handlercore.OTPHandler
+	auditHandler        *handlercore.AuditHandler
+	consentHandler      *handlercore.ConsentHandler
+	notificationHandler *handlercore.NotificationHandler
+	sessionHandler      *handlercore.SessionHandler
+
+	// ── Patient handlers ───────────────────────────────────────────────────────
 	patientHandler          *patients.PatientHandler
 	allergyHandler          *patients.AllergyHandler
 	conditionHandler        *patients.ConditionHandler
@@ -71,21 +76,38 @@ type Server struct {
 	emergencyContactHandler *patients.EmergencyContactHandler
 	dependentHandler        *patients.DependentHandler
 	dependentHealthHandler  *patients.DependentHealthRecordHandler
-	staffHandler            *providers.StaffHandler
-	clinicHandler           *providers.ClinicHandler
-	serviceHandler          *providers.ServiceHandler
-	credentialHandler       *providers.CredentialHandler
-	adminHandler            *handleradmin.AdminHandler
-	appointmentHandler      *handlerappointments.AppointmentHandler
-	symptomCheckerHandler   *handlertele.SymptomCheckerHandler
-	healthHandler           *handler.HealthHandler
-	authService             service.AuthService
+
+	// ── Provider handlers ──────────────────────────────────────────────────────
+	staffHandler      *providers.StaffHandler
+	clinicHandler     *providers.ClinicHandler
+	serviceHandler    *providers.ServiceHandler
+	credentialHandler *providers.CredentialHandler
+
+	// ── Admin handler ──────────────────────────────────────────────────────────
+	adminHandler *handleradmin.AdminHandler
+
+	// ── Appointment handler ────────────────────────────────────────────────────
+	appointmentHandler *handlerappointments.AppointmentHandler
+
+	// ── Telemedicine handlers ──────────────────────────────────────────────────
+	symptomCheckerHandler       *handlertele.SymptomCheckerHandler
+	consultationHandler         *handlertele.ConsultationHandler
+	consultationMessagesHandler *handlertele.ConsultationMessagesHandler
+	consultationNotesHandler    *handlertele.ConsultationNotesHandler
+	providerAvailabilityHandler *handlertele.ProviderAvailabilityHandler
+	// wsHandler upgrades HTTP connections to WebSocket for real-time chat.
+	wsHandler *handlertele.WSHandler
+
+	// ── Misc ───────────────────────────────────────────────────────────────────
+	healthHandler *handler.HealthHandler
+	authService   service.AuthService
 }
 
-// NewServer creates a new HTTP server
+// NewServer creates a new HTTP server.
 func NewServer(
 	cfg *config.Config,
 	logger *zerolog.Logger,
+	// core
 	authHandler *handlercore.AuthHandler,
 	userHandler *handlercore.UserHandler,
 	otpHandler *handlercore.OTPHandler,
@@ -93,6 +115,7 @@ func NewServer(
 	consentHandler *handlercore.ConsentHandler,
 	notificationHandler *handlercore.NotificationHandler,
 	sessionHandler *handlercore.SessionHandler,
+	// patients
 	patientHandler *patients.PatientHandler,
 	allergyHandler *patients.AllergyHandler,
 	conditionHandler *patients.ConditionHandler,
@@ -104,63 +127,79 @@ func NewServer(
 	emergencyContactHandler *patients.EmergencyContactHandler,
 	dependentHandler *patients.DependentHandler,
 	dependentHealthHandler *patients.DependentHealthRecordHandler,
+	// providers
 	staffHandler *providers.StaffHandler,
 	clinicHandler *providers.ClinicHandler,
 	serviceHandler *providers.ServiceHandler,
 	credentialHandler *providers.CredentialHandler,
+	// admin
 	adminHandler *handleradmin.AdminHandler,
-	appointmentHandler *handlerappointments.AppointmentHandler, // Add appointment handler parameter
+	// appointments
+	appointmentHandler *handlerappointments.AppointmentHandler,
+	// telemedicine
 	symptomCheckerHandler *handlertele.SymptomCheckerHandler,
+	consultationHandler *handlertele.ConsultationHandler,
+	consultationMessagesHandler *handlertele.ConsultationMessagesHandler,
+	consultationNotesHandler *handlertele.ConsultationNotesHandler,
+	providerAvailabilityHandler *handlertele.ProviderAvailabilityHandler,
+	wsHandler *handlertele.WSHandler,
+	// misc
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
 	txManager repository.TxManager,
 ) *Server {
 	return &Server{
-		config:                  cfg,
-		logger:                  logger,
-		authHandler:             authHandler,
-		userHandler:             userHandler,
-		otpHandler:              otpHandler,
-		auditHandler:            auditHandler,
-		consentHandler:          consentHandler,
-		notificationHandler:     notificationHandler,
-		sessionHandler:          sessionHandler,
-		patientHandler:          patientHandler,
-		allergyHandler:          allergyHandler,
-		conditionHandler:        conditionHandler,
-		medicationHandler:       medicationHandler,
-		surgeryHandler:          surgeryHandler,
-		immunizationHandler:     immunizationHandler,
-		familyHistoryHandler:    familyHistoryHandler,
-		medicalInfoHandler:      medicalInfoHandler,
-		emergencyContactHandler: emergencyContactHandler,
-		dependentHandler:        dependentHandler,
-		dependentHealthHandler:  dependentHealthHandler,
-		staffHandler:            staffHandler,
-		clinicHandler:           clinicHandler,
-		serviceHandler:          serviceHandler,
-		credentialHandler:       credentialHandler,
-		adminHandler:            adminHandler,
-		appointmentHandler:      appointmentHandler, // Initialize appointment handler
-		symptomCheckerHandler:   symptomCheckerHandler,
-		healthHandler:           healthHandler,
-		authService:             authService,
+		config:                      cfg,
+		logger:                      logger,
+		authHandler:                 authHandler,
+		userHandler:                 userHandler,
+		otpHandler:                  otpHandler,
+		auditHandler:                auditHandler,
+		consentHandler:              consentHandler,
+		notificationHandler:         notificationHandler,
+		sessionHandler:              sessionHandler,
+		patientHandler:              patientHandler,
+		allergyHandler:              allergyHandler,
+		conditionHandler:            conditionHandler,
+		medicationHandler:           medicationHandler,
+		surgeryHandler:              surgeryHandler,
+		immunizationHandler:         immunizationHandler,
+		familyHistoryHandler:        familyHistoryHandler,
+		medicalInfoHandler:          medicalInfoHandler,
+		emergencyContactHandler:     emergencyContactHandler,
+		dependentHandler:            dependentHandler,
+		dependentHealthHandler:      dependentHealthHandler,
+		staffHandler:                staffHandler,
+		clinicHandler:               clinicHandler,
+		serviceHandler:              serviceHandler,
+		credentialHandler:           credentialHandler,
+		adminHandler:                adminHandler,
+		appointmentHandler:          appointmentHandler,
+		symptomCheckerHandler:       symptomCheckerHandler,
+		consultationHandler:         consultationHandler,
+		consultationMessagesHandler: consultationMessagesHandler,
+		consultationNotesHandler:    consultationNotesHandler,
+		providerAvailabilityHandler: providerAvailabilityHandler,
+		wsHandler:                   wsHandler,
+		healthHandler:               healthHandler,
+		authService:                 authService,
 	}
 }
 
-// Start starts the HTTP server with graceful shutdown
+// Start starts the HTTP server with graceful shutdown.
 func (s *Server) Start() error {
 	router := s.setupRoutes()
 
 	s.httpServer = &http.Server{
-		Addr:         s.config.Port,
-		Handler:      router,
+		Addr:    s.config.Port,
+		Handler: router,
+		// WebSocket connections are long-lived; WriteTimeout must be 0 so the
+		// server does not forcibly close them after the normal HTTP deadline.
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 0,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Start server in goroutine
 	serverErrors := make(chan error, 1)
 	go func() {
 		s.logger.Info().
@@ -171,7 +210,6 @@ func (s *Server) Start() error {
 		serverErrors <- s.httpServer.ListenAndServe()
 	}()
 
-	// Wait for interrupt signal or server error
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
@@ -183,7 +221,6 @@ func (s *Server) Start() error {
 	case sig := <-shutdown:
 		s.logger.Info().Str("signal", sig.String()).Msg("Shutdown signal received")
 
-		// Graceful shutdown with timeout
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
@@ -201,11 +238,27 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// setupRoutes configures all routes and middleware
+// setupRoutes configures all routes and middleware.
 func (s *Server) setupRoutes() http.Handler {
+	// ── WebSocket router ───────────────────────────────────────────────────────
+	// The WS router is intentionally kept separate from the main router so that
+	// it is never wrapped by middleware that replaces http.ResponseWriter (e.g.
+	// Logger, metricsMiddleware). Those wrappers strip the http.Hijacker
+	// interface that gorilla/websocket requires to perform the upgrade, causing
+	// a 500 "response does not implement http.Hijacker" error.
+	//
+	// Only lightweight, non-wrapping middleware is applied here.
+	wsRouter := chi.NewRouter()
+	wsRouter.Use(middleware.Recovery(s.logger))
+	wsRouter.Use(middleware.CORS(s.config.AllowedOrigins))
+	wsRouter.Use(middleware.RateLimiter(s.config.RateLimitRPS, s.config.RateLimitBurst))
+	// URL: /ws/consultations/{consultationId}
+	// JWT passed via Authorization: Bearer <token> header or ?token= query param.
+	wsRouter.Get("/ws/consultations/{consultationId}", s.wsHandler.ServeWS)
+
 	r := chi.NewRouter()
 
-	// Global middleware
+	// ── Global middleware ──────────────────────────────────────────────────────
 	r.Use(middleware.Recovery(s.logger))
 	r.Use(middleware.Logger(s.logger))
 	r.Use(middleware.CORS(s.config.AllowedOrigins))
@@ -214,34 +267,31 @@ func (s *Server) setupRoutes() http.Handler {
 	r.Use(middleware.RateLimiter(s.config.RateLimitRPS, s.config.RateLimitBurst))
 	r.Use(s.metricsMiddleware())
 
-	// Health check routes
+	// ── Infrastructure endpoints ───────────────────────────────────────────────
 	r.Get("/health", s.healthHandler.Health)
 	r.Get("/ready", s.healthHandler.Readiness)
 	r.Get("/live", s.healthHandler.Liveness)
 	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
-	// API routes
+	// ── API v1 ─────────────────────────────────────────────────────────────────
 	r.Route("/api/v1", func(r chi.Router) {
-		// Public authentication routes
+		// ── Public routes (no auth) ────────────────────────────────────────────
 		r.Post("/auth/register", s.authHandler.Register)
 		r.Post("/auth/login", s.authHandler.Login)
 		r.Get("/auth/verify-email", s.authHandler.VerifyEmail)
 		r.Post("/auth/password/reset-request", s.authHandler.RequestPasswordReset)
 		r.Post("/auth/password/reset", s.authHandler.ResetPassword)
 		r.Post("/auth/resend-verification", s.authHandler.ResendVerificationEmail)
-		// Staff registration via invitation
 		r.Post("/auth/register/staff", s.authHandler.RegisterInvitedStaff)
 
-		// Public OTP routes
 		r.Post("/auth/otp/generate", s.otpHandler.GenerateOTP)
 		r.Post("/auth/otp/verify", s.otpHandler.VerifyOTP)
 		r.Post("/auth/password/reset-with-otp", s.otpHandler.ResetPasswordWithOTP)
 
-		// Public staff invitation routes (no authentication required)
 		r.Get("/staff/invitations/{token}", s.staffHandler.GetInvitationDetails)
 		r.Post("/staff/invitations/{token}/decline", s.staffHandler.DeclineInvitation)
 
-		// Protected routes - require authentication
+		// ── Protected routes (JWT required) ────────────────────────────────────
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(s.authService, s.logger))
 
@@ -249,36 +299,26 @@ func (s *Server) setupRoutes() http.Handler {
 			r.Post("/auth/refresh", s.authHandler.RefreshToken)
 			r.Post("/auth/logout", s.authHandler.Logout)
 
-			// User profile routes
+			// User profile
 			r.Route("/users", func(r chi.Router) {
-				// User-specific routes
 				r.Get("/{id}", s.userHandler.GetUser)
 				r.Get("/{id}/profile", s.userHandler.GetProfile)
 				r.Put("/{id}/profile", s.userHandler.UpdateProfile)
 				r.Delete("/{id}/profile", s.userHandler.DeleteProfile)
 				r.Put("/{id}/password", s.authHandler.UpdatePassword)
-
-				// Consent management
 				r.Get("/{id}/consent", s.userHandler.GetConsent)
 				r.Put("/{id}/consent", s.userHandler.UpdateConsent)
-
-				// User field updates
 				r.Put("/{id}/email", s.userHandler.UpdateUserEmail)
 				r.Put("/{id}/phone", s.userHandler.UpdateUserPhone)
-
-				// List and search users (may need role restrictions)
 				r.Get("/", s.userHandler.ListUsers)
 				r.Get("/search", s.userHandler.SearchUsers)
 				r.Get("/batch", s.userHandler.GetUsersByIDs)
 				r.Get("/count", s.userHandler.CountUsers)
 			})
 
-			// Patient profile routes
+			// Patient records
 			r.Route("/patients", func(r chi.Router) {
-				// Register patient routes from patient handler
 				s.patientHandler.RegisterRoutes(r)
-
-				// Register patient health record routes
 				s.allergyHandler.RegisterRoutes(r)
 				s.conditionHandler.RegisterRoutes(r)
 				s.medicationHandler.RegisterRoutes(r)
@@ -291,19 +331,31 @@ func (s *Server) setupRoutes() http.Handler {
 				s.dependentHealthHandler.RegisterRoutes(r)
 			})
 
-			// Appointment management routes
+			// Appointments
 			r.Route("/appointments", func(r chi.Router) {
 				s.appointmentHandler.RegisterRoutes(r)
 			})
 
-			// Telemedicine / symptom checker routes
+			// ── Telemedicine ───────────────────────────────────────────────────
 			r.Route("/telemedicine", func(r chi.Router) {
+				// Symptom checker
 				s.symptomCheckerHandler.RegisterRoutes(r)
+
+				// Consultations (lifecycle, history, waiting room)
+				s.consultationHandler.RegisterRoutes(r)
+
+				// Messages (thread, polling, attachments, read receipts)
+				s.consultationMessagesHandler.RegisterRoutes(r)
+
+				// Clinical notes (SOAP, finalise, history)
+				s.consultationNotesHandler.RegisterRoutes(r)
+
+				// Provider availability (online/offline, heartbeat, patient list)
+				s.providerAvailabilityHandler.RegisterRoutes(r)
 			})
 
-			// Provider routes
+			// Provider management
 			r.Route("/providers", func(r chi.Router) {
-				// Clinic routes
 				r.Route("/clinics", func(r chi.Router) {
 					r.Post("/", s.clinicHandler.CreateClinic)
 					r.Get("/my-clinic", s.clinicHandler.GetMyClinic)
@@ -312,10 +364,8 @@ func (s *Server) setupRoutes() http.Handler {
 					r.Put("/{id}", s.clinicHandler.UpdateClinic)
 					r.Delete("/{id}", s.clinicHandler.DeleteClinic)
 					r.Put("/{id}/verify", s.clinicHandler.VerifyClinic)
-					// r.Put("/{id}/verification-status", s.clinicHandler.UpdateVerificationStatus)
 				})
 
-				// Staff routes
 				r.Route("/staff", func(r chi.Router) {
 					r.Post("/", s.staffHandler.CreateStaff)
 					r.Get("/user/{user_id}", s.staffHandler.GetStaffByUserID)
@@ -325,19 +375,16 @@ func (s *Server) setupRoutes() http.Handler {
 					r.Get("/{id}/exists", s.staffHandler.CheckStaffExists)
 				})
 
-				// Clinic-specific staff routes
 				r.Route("/clinics/{clinic_id}/staff", func(r chi.Router) {
 					r.Get("/", s.staffHandler.ListClinicStaff)
 					r.Get("/all", s.staffHandler.ListAllClinicStaff)
 					r.Get("/active", s.staffHandler.ListActiveClinicStaff)
-					// Staff invitation endpoints
 					r.Post("/invite", s.staffHandler.InviteStaff)
 					r.Get("/invitations/pending", s.staffHandler.GetPendingInvitations)
 					r.Delete("/invitations/{token}", s.staffHandler.CancelInvitation)
 					r.Post("/invitations/{invitation_id}/resend", s.staffHandler.ResendInvitation)
 				})
 
-				// Service routes
 				r.Route("/services", func(r chi.Router) {
 					r.Post("/", s.serviceHandler.CreateService)
 					r.Get("/{id}", s.serviceHandler.GetService)
@@ -346,31 +393,27 @@ func (s *Server) setupRoutes() http.Handler {
 					r.Get("/{id}/exists", s.serviceHandler.CheckServiceExists)
 				})
 
-				// Clinic-specific service routes
 				r.Route("/clinics/{clinic_id}/services", func(r chi.Router) {
 					r.Get("/", s.serviceHandler.ListClinicServices)
 				})
 
-				// Credential routes
 				r.Route("/credentials", func(r chi.Router) {
 					r.Post("/", s.credentialHandler.CreateCredential)
 					r.Delete("/{id}", s.credentialHandler.DeleteCredential)
 				})
 
-				// Staff-specific credential routes
 				r.Route("/staff/{staff_id}/credentials", func(r chi.Router) {
 					r.Get("/", s.credentialHandler.GetStaffCredentials)
 				})
 			})
 			r.Get("/auth/provider-dashboard", s.authHandler.GetProviderDashboard)
 
-			// Protected staff invitation routes (require authentication)
 			r.Route("/staff", func(r chi.Router) {
 				r.Post("/invitations/{token}/accept", s.staffHandler.AcceptInvitation)
 				r.Get("/invitations/my", s.staffHandler.GetMyInvitations)
 			})
 
-			// Session management routes
+			// Sessions
 			r.Route("/sessions", func(r chi.Router) {
 				r.Get("/{token}", s.sessionHandler.GetSession)
 				r.Get("/users/{id}", s.sessionHandler.GetUserSessions)
@@ -383,7 +426,7 @@ func (s *Server) setupRoutes() http.Handler {
 				r.Put("/{id}/token", s.sessionHandler.UpdateSessionToken)
 			})
 
-			// Consent management routes
+			// Consent
 			r.Route("/consent", func(r chi.Router) {
 				r.Route("/users/{id}", func(r chi.Router) {
 					r.Get("/privacy", s.consentHandler.GetPrivacyConsent)
@@ -399,7 +442,7 @@ func (s *Server) setupRoutes() http.Handler {
 				})
 			})
 
-			// Notification preferences routes
+			// Notifications
 			r.Route("/notifications", func(r chi.Router) {
 				r.Route("/users/{id}", func(r chi.Router) {
 					r.Get("/preferences", s.notificationHandler.GetPreferences)
@@ -412,7 +455,7 @@ func (s *Server) setupRoutes() http.Handler {
 				})
 			})
 
-			// OTP management routes (for testing/admin)
+			// OTP (test/admin)
 			r.Route("/otp", func(r chi.Router) {
 				r.Get("/latest", s.otpHandler.GetLatestActiveOTP)
 				r.Delete("/invalidate", s.otpHandler.InvalidateUserOTPs)
@@ -420,17 +463,14 @@ func (s *Server) setupRoutes() http.Handler {
 				r.Get("/recent", s.otpHandler.GetRecentOTPs)
 			})
 
-			// Audit trails routes
+			// Audit trails
 			r.Route("/audit", func(r chi.Router) {
-				// User-specific audit routes
 				r.Route("/users/{id}", func(r chi.Router) {
 					r.Get("/activities", s.auditHandler.GetUserActivities)
 					r.Get("/access-logs", s.auditHandler.GetDataAccessLogs)
 					r.Get("/export", s.auditHandler.ExportUserAuditTrail)
 					r.Post("/access-report", s.auditHandler.GenerateAccessReport)
 				})
-
-				// General audit routes
 				r.Get("/activities/{type}", s.auditHandler.GetActivitiesByType)
 				r.Get("/emergency-access-logs", s.auditHandler.GetEmergencyAccessLogs)
 				r.Get("/suspicious-activities", s.auditHandler.GetSuspiciousActivities)
@@ -442,34 +482,25 @@ func (s *Server) setupRoutes() http.Handler {
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.RequireRole("system_admin"))
 
-				// System Admin management routes
 				r.Route("/admin", func(r chi.Router) {
 					r.Post("/system-admins", s.adminHandler.CreateSystemAdmin)
-
 					r.Get("/system-admins/user/{user_id}", s.adminHandler.GetSystemAdminByUserID)
 				})
 
-				// Admin user management
 				r.Put("/users/{id}/role", s.userHandler.UpdateUserRole)
 				r.Put("/users/{id}/status", s.userHandler.UpdateUserStatus)
 				r.Put("/users/bulk/status", s.userHandler.BulkUpdateStatus)
 
-				// Admin patient management
 				r.Get("/patients/demographics", s.patientHandler.GetDemographicsSummary)
 
-				// Admin OTP management
 				r.Delete("/otp/expired", s.otpHandler.DeleteExpiredOTPs)
-
-				// Admin session management
 				r.Delete("/sessions/expired", s.sessionHandler.CleanupExpiredSessions)
 
-				// Admin consent management
 				r.Post("/consent/notify-expirations", s.consentHandler.NotifyConsentExpirations)
 				r.Get("/consent/active-by-type", s.consentHandler.GetActiveConsentsByType)
 				r.Get("/consent/expired", s.consentHandler.GetExpiredConsents)
 				r.Get("/consent/withdrawn", s.consentHandler.GetWithdrawnConsents)
 
-				// Admin notification management
 				r.Get("/notifications/can-send", s.notificationHandler.CanSendNotification)
 				r.Get("/notifications/disabled-users", s.notificationHandler.GetUsersWithDisabledNotifications)
 			})
@@ -483,10 +514,19 @@ func (s *Server) setupRoutes() http.Handler {
 		w.Write([]byte(`{"error": "Route not found"}`))
 	})
 
-	return r
+	// ── Combine routers ────────────────────────────────────────────────────────
+	// WS requests are routed before the main handler so they never pass through
+	// the response-writer-wrapping middleware on the main router.
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if len(req.URL.Path) >= 4 && req.URL.Path[:4] == "/ws/" {
+			wsRouter.ServeHTTP(w, req)
+			return
+		}
+		r.ServeHTTP(w, req)
+	})
 }
 
-// metricsMiddleware records Prometheus metrics
+// metricsMiddleware records Prometheus metrics for every request.
 func (s *Server) metricsMiddleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
