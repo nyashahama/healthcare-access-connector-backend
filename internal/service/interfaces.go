@@ -395,6 +395,201 @@ type SymptomCheckerService interface {
 	CountSessionsByOutcome(ctx context.Context, from, to time.Time) ([]telemedicine.SessionOutcomeCount, error)
 }
 
+// ConsultationService defines all operations for the consultation lifecycle.
+type ConsultationService interface {
+	// ── Patient-facing ──────────────────────────────────────────────────────
+
+	// RequestConsultation opens a new consultation from a completed eligible symptom session.
+	// Enforces one-active-consultation-per-patient.
+	RequestConsultation(ctx context.Context, c telemedicine.Consultation) (telemedicine.Consultation, error)
+
+	// GetConsultationByID retrieves a full consultation by primary key.
+	GetConsultationByID(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error)
+
+	// GetConsultationWithDetails returns the hydrated view used to render the chat screen.
+	GetConsultationWithDetails(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationWithDetails, error)
+
+	// GetPatientConsultations returns paginated consultation history for a patient.
+	GetPatientConsultations(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]telemedicine.PatientConsultationSummary, error)
+
+	// GetPatientActiveConsultation returns the patient's current open consultation.
+	// Returns domain.ErrNotFound when none exists.
+	GetPatientActiveConsultation(ctx context.Context, patientID uuid.UUID) (telemedicine.ActiveConsultationCheck, error)
+
+	// CancelConsultation cancels a pending or accepted consultation.
+	CancelConsultation(ctx context.Context, id uuid.UUID, cancelledBy uuid.UUID) (telemedicine.Consultation, error)
+
+	// SubmitPatientRating records a star rating and optional feedback on a closed consultation.
+	SubmitPatientRating(ctx context.Context, id uuid.UUID, patientID uuid.UUID, rating int, feedback *string) error
+
+	// ── Provider-facing ─────────────────────────────────────────────────────
+
+	// AcceptConsultation assigns a provider, increments their active count, and applies fee override.
+	AcceptConsultation(ctx context.Context, id uuid.UUID, providerStaffID uuid.UUID, clinicID uuid.UUID) (telemedicine.Consultation, error)
+
+	// StartConsultation transitions an accepted consultation to in_progress.
+	StartConsultation(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error)
+
+	// CompleteConsultation closes an in_progress consultation and decrements provider count.
+	CompleteConsultation(ctx context.Context, id uuid.UUID, endedBy uuid.UUID) (telemedicine.Consultation, error)
+
+	// EscalateConsultation moves an active consultation to escalated.
+	EscalateConsultation(ctx context.Context, id uuid.UUID, endedBy uuid.UUID) (telemedicine.Consultation, error)
+
+	// DeclineConsultation moves a pending consultation to declined so the patient can re-select.
+	DeclineConsultation(ctx context.Context, id uuid.UUID) error
+
+	// MarkNoShow marks an accepted consultation as no_show.
+	MarkNoShow(ctx context.Context, id uuid.UUID) error
+
+	// GetProviderActiveConsultations returns all open consultations for a provider.
+	GetProviderActiveConsultations(ctx context.Context, providerStaffID uuid.UUID) ([]telemedicine.ProviderActiveConsultation, error)
+
+	// GetWaitingRoom returns all pending_acceptance consultations for the provider waiting room.
+	GetWaitingRoom(ctx context.Context) ([]telemedicine.WaitingRoomEntry, error)
+
+	// GetProviderConsultationHistory returns paginated closed consultations for a provider.
+	GetProviderConsultationHistory(ctx context.Context, providerStaffID uuid.UUID, limit, offset int) ([]telemedicine.ProviderConsultationHistoryEntry, error)
+
+	// ── Billing & admin ─────────────────────────────────────────────────────
+
+	// UpdatePaymentStatus updates the payment state and records a payment reference.
+	UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status telemedicine.PaymentStatus, reference *string) error
+
+	// UpdateConsultationChannel changes the channel (e.g. chat → video).
+	UpdateConsultationChannel(ctx context.Context, id uuid.UUID, channel telemedicine.ConsultationChannel) error
+
+	// LinkFollowUpAppointment associates a follow-up booking with a closed consultation.
+	LinkFollowUpAppointment(ctx context.Context, id uuid.UUID, appointmentID uuid.UUID) error
+}
+
+// ConsultationMessagesService defines all operations for the chat message thread.
+type ConsultationMessagesService interface {
+	// ── Write ───────────────────────────────────────────────────────────────
+
+	// SendMessage validates and persists a new message from a patient or provider.
+	SendMessage(ctx context.Context, msg telemedicine.ConsultationMessage) (telemedicine.ConsultationMessage, error)
+
+	// DeleteMessage soft-deletes a message. Only the original sender may delete their own messages.
+	DeleteMessage(ctx context.Context, id uuid.UUID, requestingUserID uuid.UUID) error
+
+	// InsertSystemEvent emits a system-generated event into a consultation's message thread.
+	InsertSystemEvent(ctx context.Context, consultationID uuid.UUID, systemUserID uuid.UUID, label string, metadata map[string]interface{}) (telemedicine.ConsultationMessage, error)
+
+	// ── Read ────────────────────────────────────────────────────────────────
+
+	// GetConsultationMessages returns a paginated message thread for initial chat load.
+	GetConsultationMessages(ctx context.Context, consultationID uuid.UUID, limit, offset int) ([]telemedicine.ConsultationMessage, error)
+
+	// GetMessagesAfterCursor returns all messages newer than a timestamp for polling/WebSocket catch-up.
+	GetMessagesAfterCursor(ctx context.Context, consultationID uuid.UUID, cursor time.Time) ([]telemedicine.MessageAfterCursor, error)
+
+	// GetLastMessage returns the most recent message preview for consultation list cards.
+	GetLastMessage(ctx context.Context, consultationID uuid.UUID) (telemedicine.LastMessagePreview, error)
+
+	// GetSystemEvents returns all system-generated events for the call log panel.
+	GetSystemEvents(ctx context.Context, consultationID uuid.UUID) ([]telemedicine.SystemEvent, error)
+
+	// GetConsultationAttachments returns all shared files for the attachment panel.
+	GetConsultationAttachments(ctx context.Context, consultationID uuid.UUID) ([]telemedicine.AttachmentEntry, error)
+
+	// ── Read receipts ───────────────────────────────────────────────────────
+
+	// MarkMessageRead marks a single message as read.
+	MarkMessageRead(ctx context.Context, id uuid.UUID) error
+
+	// MarkAllProviderMessagesRead marks all unread provider messages as read (called by patient).
+	MarkAllProviderMessagesRead(ctx context.Context, consultationID uuid.UUID) error
+
+	// MarkAllPatientMessagesRead marks all unread patient messages as read (called by provider).
+	MarkAllPatientMessagesRead(ctx context.Context, consultationID uuid.UUID) error
+
+	// CountUnreadMessages returns the unread badge count for a given sender role.
+	CountUnreadMessages(ctx context.Context, consultationID uuid.UUID, senderRole telemedicine.SenderRole) (telemedicine.UnreadCount, error)
+}
+
+// ConsultationNotesService defines all operations for the provider SOAP clinical note.
+type ConsultationNotesService interface {
+	// ── Write ───────────────────────────────────────────────────────────────
+
+	// CreateNote opens a draft note for a consultation. Only one note per consultation is allowed.
+	CreateNote(ctx context.Context, consultationID uuid.UUID, authoredByStaffID uuid.UUID) (telemedicine.ConsultationNote, error)
+
+	// UpdateNote auto-saves SOAP fields as the provider types.
+	// Finalised notes cannot be updated.
+	UpdateNote(ctx context.Context, id uuid.UUID, update telemedicine.ConsultationNote, requestingStaffID uuid.UUID) (telemedicine.ConsultationNote, error)
+
+	// FinaliseNote locks a note by its note ID. Called from the note panel when "End Consultation" is clicked.
+	FinaliseNote(ctx context.Context, id uuid.UUID, requestingStaffID uuid.UUID) (telemedicine.ConsultationNote, error)
+
+	// FinaliseNoteByConsultation locks the note for a consultation by consultation ID.
+	// More natural to call from the consultation service when completing a consultation.
+	FinaliseNoteByConsultation(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNote, error)
+
+	// ─── Read Operations ──────────────────────────────────────────────────────────
+
+	// GetNoteByID retrieves a full note by its primary key.
+	GetNoteByID(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationNote, error)
+
+	// GetNoteByConsultationID retrieves the note for a given consultation.
+	GetNoteByConsultationID(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNote, error)
+
+	// GetNoteWithProviderInfo returns the note joined with the authoring provider's profile.
+	// Used in patient records and admin audits.
+	GetNoteWithProviderInfo(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNoteWithProviderInfo, error)
+
+	// ─── History ─────────────────────────────────────────────────────────────────
+
+	// GetProviderNoteHistory returns paginated finalised notes written by a provider.
+	GetProviderNoteHistory(ctx context.Context, staffID uuid.UUID, limit, offset int) ([]telemedicine.ProviderNoteHistoryEntry, error)
+
+	// GetPatientNoteHistory returns all finalised notes across a patient's consultations.
+	GetPatientNoteHistory(ctx context.Context, patientID uuid.UUID) ([]telemedicine.PatientNoteHistoryEntry, error)
+}
+
+// ProviderAvailabilityService defines all operations for provider presence management.
+type ProviderAvailabilityService interface {
+	// ── Provider self-management ────────────────────────────────────────────
+
+	// GoOnline marks the provider as online and records their shift start.
+	GoOnline(ctx context.Context, staffID uuid.UUID) (telemedicine.ProviderAvailability, error)
+
+	// GoOffline marks the provider as offline, clears accepting state, and nulls shift_start.
+	GoOffline(ctx context.Context, staffID uuid.UUID) error
+
+	// SetAccepting toggles the provider's accepting state and optionally updates fee override
+	// and estimated wait minutes. Provider must be online to accept.
+	SetAccepting(ctx context.Context, staffID uuid.UUID, accepting bool, feeOverride *float64, waitMinutes *int) (telemedicine.ProviderAvailability, error)
+
+	// UpdateStatus sets the provider's status enum and optional status message.
+	UpdateStatus(ctx context.Context, staffID uuid.UUID, status telemedicine.ProviderAvailabilityStatus, message *string) error
+
+	// UpdateHeartbeat records last_seen_at to keep the provider's presence alive.
+	UpdateHeartbeat(ctx context.Context, staffID uuid.UUID) error
+
+	// UpdateWaitTime sets the estimated wait minutes displayed to patients.
+	UpdateWaitTime(ctx context.Context, staffID uuid.UUID, minutes int) error
+
+	// GetAvailabilityByStaffID fetches the full availability record for a provider.
+	GetAvailabilityByStaffID(ctx context.Context, staffID uuid.UUID) (telemedicine.ProviderAvailability, error)
+
+	// ── Patient-facing ──────────────────────────────────────────────────────
+
+	// GetAvailableProviders returns all currently accepting providers for the patient list.
+	GetAvailableProviders(ctx context.Context, clinicID *uuid.UUID) ([]telemedicine.AvailableProvider, error)
+
+	// GetAvailableProvidersBySpecialization filters the available provider list by specialization.
+	GetAvailableProvidersBySpecialization(ctx context.Context, specialization string) ([]telemedicine.AvailableProviderBySpecialization, error)
+
+	// ── Background job ──────────────────────────────────────────────────────
+
+	// GetStaleProviders returns providers whose heartbeat is older than 2 minutes.
+	GetStaleProviders(ctx context.Context) ([]telemedicine.StaleProvider, error)
+
+	// SetStaleProvidersOffline bulk-marks heartbeat-stale providers as offline.
+	SetStaleProvidersOffline(ctx context.Context) error
+}
+
 // TokenClaims represents JWT token claims for health project
 type TokenClaims struct {
 	UserID uuid.UUID `json:"user_id"`
