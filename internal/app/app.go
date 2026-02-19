@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/ai"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
@@ -68,6 +70,7 @@ func New(cfg *config.Config) (*App, error) {
 			broker = nil
 		}
 	}
+
 	// AI client
 	aiCfg := ai.ConfigFromEnv()
 	if err := aiCfg.Validate(); err != nil {
@@ -75,9 +78,8 @@ func New(cfg *config.Config) (*App, error) {
 		aiCfg.Enabled = false
 	}
 	aiClient := ai.New(aiCfg, logger)
-	fmt.Println(aiClient)
 
-	// WebSocket hub
+	// ── WebSocket hub ─────────────────────────────────────────────────────────
 	wsCfg := ws.ConfigFromEnv()
 	if err := wsCfg.Validate(); err != nil {
 		return nil, fmt.Errorf("ws config: %w", err)
@@ -85,35 +87,10 @@ func New(cfg *config.Config) (*App, error) {
 	wsHub := ws.NewHub(wsCfg, logger)
 	go wsHub.Run(context.Background()) // one goroutine for the lifetime of the app
 
-	// wsHub.MessageHandler = func(ctx context.Context, consultationID, senderUserID, senderRole string, payload ws.MessagePayload) error {
-	// 	msg, err := consultationService.SaveMessage(ctx, domain.ConsultationMessage{
-	// 		ConsultationID: consultationID,
-	// 		SenderUserID:   senderUserID,
-	// 		MessageType:    domain.MessageType(payload.MessageType),
-	// 		Content:        payload.Content,
-	// 		Metadata:       payload.Metadata,
-	// 		SentAt:         time.Now().UTC(),
-	// 	})
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	// Broadcast persisted message (with DB-assigned ID) to the room
-	// 	payload.MessageID = msg.ID.String()
-	// 	wsHub.Broadcast(consultationID, ws.OutboundEvent{
-	// 		Type:           ws.EventMessage,
-	// 		ConsultationID: consultationID,
-	// 		SenderUserID:   senderUserID,
-	// 		SentAt:         msg.SentAt,
-	// 		Payload:        payload,
-	// 	})
-	// 	return nil
-	// }
-
 	// Initialize email service
 	var emailService email.Service
 	frontendURL := os.Getenv("FRONTEND_URL")
 
-	// Always try to initialize email service from environment
 	emailService, err = email.NewFromEnv(frontendURL, logger)
 	if err != nil {
 		logger.Error().Err(err).
@@ -128,7 +105,8 @@ func New(cfg *config.Config) (*App, error) {
 			Msg("Email service initialized successfully")
 	}
 
-	// Initialize repositories
+	// ── Repositories ──────────────────────────────────────────────────────────
+
 	/* patients */
 	patientRepo := repopatients.NewPatientRepository(pool)
 	allergyRepo := repopatients.NewAllergyRepository(pool)
@@ -165,9 +143,15 @@ func New(cfg *config.Config) (*App, error) {
 
 	/* telemedicine */
 	symptomCheckerRepo := repotele.NewSymptomCheckerRepository(pool)
+	consultationRepo := repotele.NewConsultationRepository(pool)
+	consultationMessagesRepo := repotele.NewConsultationMessagesRepository(pool)
+	consultationNotesRepo := repotele.NewConsultationNotesRepository(pool)
+	providerAvailabilityRepo := repotele.NewProviderAvailabilityRepository(pool)
 
 	// Initialize transaction manager
 	txManager := repository.NewTxManager(pool)
+
+	// ── Services ──────────────────────────────────────────────────────────────
 
 	sessionService := servicecore.NewSessionService(
 		sessionRepo,
@@ -183,7 +167,6 @@ func New(cfg *config.Config) (*App, error) {
 		cacheService,
 		logger,
 	)
-	// Initialize services
 	authService := servicecore.NewAuthService(
 		authRepo,
 		userRepo,
@@ -252,118 +235,33 @@ func New(cfg *config.Config) (*App, error) {
 		logger,
 	)
 
-	allergyService := servicepatients.NewAllergyService(
-		allergyRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	conditionService := servicepatients.NewConditionService(
-		conditionRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	medicationService := servicepatients.NewMedicationService(
-		medicationRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	surgeryService := servicepatients.NewSurgeryService(
-		surgeryRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	immunizationService := servicepatients.NewImmunizationService(
-		immunizationRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	familyHistoryService := servicepatients.NewFamilyHistoryService(
-		familyHistoryRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	medicalInfoService := servicepatients.NewMedicalInfoService(
-		medicalInfoRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	emergencyContactService := servicepatients.NewEmergencyContactService(
-		emergencyContactRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	dependentService := servicepatients.NewDependentService(
-		dependentRepo,
-		patientRepo,
-		cacheService,
-		logger,
-	)
-
-	dependentHealthService := servicepatients.NewDependentHealthRecordService(
-		dependentHealthRepo,
-		dependentRepo,
-		cacheService,
-		logger,
-	)
+	allergyService := servicepatients.NewAllergyService(allergyRepo, patientRepo, cacheService, logger)
+	conditionService := servicepatients.NewConditionService(conditionRepo, patientRepo, cacheService, logger)
+	medicationService := servicepatients.NewMedicationService(medicationRepo, patientRepo, cacheService, logger)
+	surgeryService := servicepatients.NewSurgeryService(surgeryRepo, patientRepo, cacheService, logger)
+	immunizationService := servicepatients.NewImmunizationService(immunizationRepo, patientRepo, cacheService, logger)
+	familyHistoryService := servicepatients.NewFamilyHistoryService(familyHistoryRepo, patientRepo, cacheService, logger)
+	medicalInfoService := servicepatients.NewMedicalInfoService(medicalInfoRepo, patientRepo, cacheService, logger)
+	emergencyContactService := servicepatients.NewEmergencyContactService(emergencyContactRepo, patientRepo, cacheService, logger)
+	dependentService := servicepatients.NewDependentService(dependentRepo, patientRepo, cacheService, logger)
+	dependentHealthService := servicepatients.NewDependentHealthRecordService(dependentHealthRepo, dependentRepo, cacheService, logger)
 
 	systemAdminService := serviceadmin.NewSystemAdminService(
-		systemAdminRepo,
-		userRepo,
-		auditService,
-		cacheService,
-		logger,
+		systemAdminRepo, userRepo, auditService, cacheService, logger,
 	)
 
 	clinicService := serviceproviders.NewClinicService(
-		clinicRepo,
-		auditRepo,
-		userRepo,
-		authRepo,
-		staffRepo,
-		cacheService,
-		logger,
+		clinicRepo, auditRepo, userRepo, authRepo, staffRepo, cacheService, logger,
 	)
-
 	serviceService := serviceproviders.NewServiceCatalogService(
-		serviceRepo,
-		clinicRepo,
-		staffRepo,
-		auditRepo,
-		cacheService,
-		logger,
+		serviceRepo, clinicRepo, staffRepo, auditRepo, cacheService, logger,
 	)
-
 	credentialService := serviceproviders.NewCredentialService(
-		credentialRepo,
-		staffRepo,
-		userRepo,
-		auditRepo,
-		cacheService,
-		logger,
+		credentialRepo, staffRepo, userRepo, auditRepo, cacheService, logger,
 	)
 
 	appointmentService := serviceappointments.NewAppointmentService(
-		appointmentRepo,
-		clinicRepo,
-		userRepo,
-		cacheService,
-		logger,
+		appointmentRepo, clinicRepo, userRepo, cacheService, logger,
 	)
 
 	symptomCheckerService := servicetele.NewSymptomCheckerService(
@@ -374,7 +272,88 @@ func New(cfg *config.Config) (*App, error) {
 		logger,
 	)
 
-	// Initialize handlers
+	// ── Telemedicine services ──────────────────────────────────────────────────
+	providerAvailabilityService := servicetele.NewProviderAvailabilityService(
+		providerAvailabilityRepo,
+		cacheService,
+		logger,
+	)
+
+	consultationService := servicetele.NewConsultationService(
+		consultationRepo,
+		providerAvailabilityRepo,
+		symptomCheckerRepo,
+		cacheService,
+		logger,
+	)
+
+	consultationMessagesService := servicetele.NewConsultationMessagesService(
+		consultationMessagesRepo,
+		consultationRepo,
+		cacheService,
+		logger,
+	)
+
+	consultationNotesService := servicetele.NewConsultationNotesService(
+		consultationNotesRepo,
+		consultationRepo,
+		cacheService,
+		logger,
+	)
+
+	// ── Wire the WebSocket MessageHandler ─────────────────────────────────────
+	//
+	// When a client sends a "message" event over WebSocket the hub calls this
+	// closure. It:
+	//   1. Persists the message to the DB via consultationMessagesService.
+	//   2. Broadcasts the persisted message (with its DB-assigned ID and
+	//      sent_at timestamp) back to every client in the room.
+	//
+	// This is the only place where the ws package touches domain logic — the
+	// rest of the hub is pure transport.
+	wsHub.MessageHandler = func(
+		ctx context.Context,
+		consultationID, senderUserID, senderRole string,
+		payload ws.MessagePayload,
+	) error {
+		cID, err := uuid.Parse(consultationID)
+		if err != nil {
+			return fmt.Errorf("invalid consultation_id: %w", err)
+		}
+		sUID, err := uuid.Parse(senderUserID)
+		if err != nil {
+			return fmt.Errorf("invalid sender_user_id: %w", err)
+		}
+
+		content := payload.Content
+		msg := telemedicine.ConsultationMessage{
+			ConsultationID: cID,
+			SenderUserID:   sUID,
+			SenderRole:     telemedicine.SenderRole(senderRole),
+			MessageType:    telemedicine.MessageType(payload.MessageType),
+			Content:        &content,
+			Metadata:       toMetadata(payload.Metadata),
+		}
+
+		persisted, err := consultationMessagesService.SendMessage(ctx, msg)
+		if err != nil {
+			return fmt.Errorf("failed to persist ws message: %w", err)
+		}
+
+		// Stamp the DB-assigned ID and broadcast to the room.
+		payload.MessageID = persisted.ID.String()
+		wsHub.Broadcast(consultationID, ws.OutboundEvent{
+			Type:           ws.EventMessage,
+			ConsultationID: consultationID,
+			SenderUserID:   senderUserID,
+			SentAt:         persisted.SentAt,
+			Payload:        payload,
+		})
+		return nil
+	}
+
+	// ── Handlers ──────────────────────────────────────────────────────────────
+
 	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
 	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
 	otpHandler := handlercore.NewOTPHandler(otpService, logger, cfg.Timeout)
@@ -384,120 +363,66 @@ func New(cfg *config.Config) (*App, error) {
 	sessionHandler := handlercore.NewSessionHandler(sessionService, logger, cfg.Timeout)
 	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService, aiClient, wsHub)
 
-	// Initialize patient handler
-	patientHandler := handlerpatients.NewPatientHandler(
-		patientService,
-		logger,
-		cfg.Timeout,
-	)
+	patientHandler := handlerpatients.NewPatientHandler(patientService, logger, cfg.Timeout)
+	allergyHandler := handlerpatients.NewAllergyHandler(allergyService, logger, cfg.Timeout)
+	conditionHandler := handlerpatients.NewConditionHandler(conditionService, logger, cfg.Timeout)
+	medicationHandler := handlerpatients.NewMedicationHandler(medicationService, logger, cfg.Timeout)
+	surgeryHandler := handlerpatients.NewSurgeryHandler(surgeryService, logger, cfg.Timeout)
+	immunizationHandler := handlerpatients.NewImmunizationHandler(immunizationService, logger, cfg.Timeout)
+	familyHistoryHandler := handlerpatients.NewFamilyHistoryHandler(familyHistoryService, logger, cfg.Timeout)
+	medicalInfoHandler := handlerpatients.NewMedicalInfoHandler(medicalInfoService, logger, cfg.Timeout)
+	emergencyContactHandler := handlerpatients.NewEmergencyContactHandler(emergencyContactService, logger, cfg.Timeout)
+	dependentHandler := handlerpatients.NewDependentHandler(dependentService, logger, cfg.Timeout)
+	dependentHealthHandler := handlerpatients.NewDependentHealthRecordHandler(dependentHealthService, logger, cfg.Timeout)
 
-	allergyHandler := handlerpatients.NewAllergyHandler(
-		allergyService,
-		logger,
-		cfg.Timeout,
-	)
+	adminHandler := handleradmin.NewAdminHandler(systemAdminService, logger, cfg.Timeout)
 
-	conditionHandler := handlerpatients.NewConditionHandler(
-		conditionService,
-		logger,
-		cfg.Timeout,
-	)
+	staffHandler := handlerproviders.NewStaffHandler(staffService, userService, logger, cfg.Timeout)
+	clinicHandler := handlerproviders.NewClinicHandler(clinicService, logger, cfg.Timeout)
+	serviceHandler := handlerproviders.NewServiceHandler(serviceService, logger, cfg.Timeout)
+	credentialHandler := handlerproviders.NewCredentialHandler(credentialService, logger, cfg.Timeout)
 
-	medicationHandler := handlerpatients.NewMedicationHandler(
-		medicationService,
-		logger,
-		cfg.Timeout,
-	)
+	appointmentHandler := handlerappointments.NewAppointmentHandler(appointmentService, logger, cfg.Timeout)
 
-	surgeryHandler := handlerpatients.NewSurgeryHandler(
-		surgeryService,
-		logger,
-		cfg.Timeout,
-	)
-
-	immunizationHandler := handlerpatients.NewImmunizationHandler(
-		immunizationService,
-		logger,
-		cfg.Timeout,
-	)
-
-	familyHistoryHandler := handlerpatients.NewFamilyHistoryHandler(
-		familyHistoryService,
-		logger,
-		cfg.Timeout,
-	)
-
-	medicalInfoHandler := handlerpatients.NewMedicalInfoHandler(
-		medicalInfoService,
-		logger,
-		cfg.Timeout,
-	)
-
-	emergencyContactHandler := handlerpatients.NewEmergencyContactHandler(
-		emergencyContactService,
-		logger,
-		cfg.Timeout,
-	)
-
-	dependentHandler := handlerpatients.NewDependentHandler(
-		dependentService,
-		logger,
-		cfg.Timeout,
-	)
-
-	dependentHealthHandler := handlerpatients.NewDependentHealthRecordHandler(
-		dependentHealthService,
-		logger,
-		cfg.Timeout,
-	)
-
-	// Initialize admin handler
-	adminHandler := handleradmin.NewAdminHandler(
-		systemAdminService,
-		logger,
-		cfg.Timeout,
-	)
-
-	// Initialize provider handlers
-	staffHandler := handlerproviders.NewStaffHandler(
-		staffService,
-		userService,
-		logger,
-		cfg.Timeout,
-	)
-
-	clinicHandler := handlerproviders.NewClinicHandler(
-		clinicService,
-		logger,
-		cfg.Timeout,
-	)
-
-	serviceHandler := handlerproviders.NewServiceHandler(
-		serviceService,
-		logger,
-		cfg.Timeout,
-	)
-
-	credentialHandler := handlerproviders.NewCredentialHandler(
-		credentialService,
-		logger,
-		cfg.Timeout,
-	)
-
-	// Initialize appointment handler
-	appointmentHandler := handlerappointments.NewAppointmentHandler(
-		appointmentService,
-		logger,
-		cfg.Timeout,
-	)
-
-	// Initialize symptom checker handler
 	symptomCheckerHandler := handlertele.NewSymptomCheckerHandler(
-		symptomCheckerService,
+		symptomCheckerService, patientService, logger, cfg.Timeout,
+	)
+
+	// ── Telemedicine handlers ──────────────────────────────────────────────────
+	consultationHandler := handlertele.NewConsultationHandler(
+		consultationService,
+		patientService,
+		staffService,
+		logger,
+		cfg.Timeout,
+	)
+
+	consultationMessagesHandler := handlertele.NewConsultationMessagesHandler(
+		consultationMessagesService,
+		logger,
+		cfg.Timeout,
+	)
+
+	consultationNotesHandler := handlertele.NewConsultationNotesHandler(
+		consultationNotesService,
+		patientService,
+		staffService,
+		logger,
+		cfg.Timeout,
+	)
+
+	providerAvailabilityHandler := handlertele.NewProviderAvailabilityHandler(
+		providerAvailabilityService,
+		staffService,
 		patientService,
 		logger,
 		cfg.Timeout,
 	)
+
+	// wsHandler wraps the hub's ServeWS into an HTTP handler that can be
+	// registered on the chi router.  Authentication is enforced before the
+	// upgrade so unauthenticated clients never reach the hub.
+	wsHandler := handlertele.NewWSHandler(wsHub, authService, logger)
 
 	// Initialize server with all handlers
 	srv := server.NewServer(
@@ -526,8 +451,13 @@ func New(cfg *config.Config) (*App, error) {
 		serviceHandler,
 		credentialHandler,
 		adminHandler,
-		appointmentHandler, // Add appointment handler here
+		appointmentHandler,
 		symptomCheckerHandler,
+		consultationHandler,
+		consultationMessagesHandler,
+		consultationNotesHandler,
+		providerAvailabilityHandler,
+		wsHandler,
 		healthHandler,
 		authService,
 		txManager,
@@ -580,4 +510,16 @@ func initDatabase(dbURL string, logger *zerolog.Logger) (*pgxpool.Pool, error) {
 
 	logger.Info().Msg("Database connection established")
 	return pool, nil
+}
+
+// toMetadata safely converts a ws payload Metadata interface{} to the
+// map[string]interface{} that the domain model expects.
+func toMetadata(v interface{}) map[string]interface{} {
+	if v == nil {
+		return nil
+	}
+	if m, ok := v.(map[string]interface{}); ok {
+		return m
+	}
+	return map[string]interface{}{"raw": v}
 }
