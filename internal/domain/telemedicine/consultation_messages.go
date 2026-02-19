@@ -19,9 +19,9 @@ const (
 type MessageType string
 
 const (
-	MessageTypeText        MessageType = "text"
-	MessageTypeAttachment  MessageType = "attachment"
-	MessageTypeSystemEvent MessageType = "system_event"
+	MessageTypeText         MessageType = "text"
+	MessageTypeAttachment   MessageType = "attachment"
+	MessageTypeSystemEvent  MessageType = "system_event"
 	MessageTypePrescription MessageType = "prescription"
 )
 
@@ -39,9 +39,9 @@ const (
 // consultation chat thread. Soft-deleted messages retain their row but have
 // content and attachment_url set to nil.
 type ConsultationMessage struct {
-	ID             uuid.UUID `json:"id"`
-	ConsultationID uuid.UUID `json:"consultation_id"`
-	SenderUserID   uuid.UUID `json:"sender_user_id"`
+	ID             uuid.UUID   `json:"id"`
+	ConsultationID uuid.UUID   `json:"consultation_id"`
+	SenderUserID   uuid.UUID   `json:"sender_user_id"`
 	SenderRole     SenderRole  `json:"sender_role"`
 	MessageType    MessageType `json:"message_type"`
 
@@ -70,17 +70,17 @@ type ConsultationMessage struct {
 // catch-up query. It omits is_deleted (always false by query filter) and
 // read_at fields that aren't needed for catch-up.
 type MessageAfterCursor struct {
-	ID                 uuid.UUID       `json:"id"`
-	SenderUserID       uuid.UUID       `json:"sender_user_id"`
-	SenderRole         SenderRole      `json:"sender_role"`
-	MessageType        MessageType     `json:"message_type"`
-	Content            *string         `json:"content,omitempty"`
-	AttachmentURL      *string         `json:"attachment_url,omitempty"`
-	AttachmentType     *AttachmentType `json:"attachment_type,omitempty"`
-	AttachmentFilename *string         `json:"attachment_filename,omitempty"`
-	IsRead             bool            `json:"is_read"`
+	ID                 uuid.UUID              `json:"id"`
+	SenderUserID       uuid.UUID              `json:"sender_user_id"`
+	SenderRole         SenderRole             `json:"sender_role"`
+	MessageType        MessageType            `json:"message_type"`
+	Content            *string                `json:"content,omitempty"`
+	AttachmentURL      *string                `json:"attachment_url,omitempty"`
+	AttachmentType     *AttachmentType        `json:"attachment_type,omitempty"`
+	AttachmentFilename *string                `json:"attachment_filename,omitempty"`
+	IsRead             bool                   `json:"is_read"`
 	Metadata           map[string]interface{} `json:"metadata,omitempty"`
-	SentAt             time.Time       `json:"sent_at"`
+	SentAt             time.Time              `json:"sent_at"`
 }
 
 // LastMessagePreview is the minimal projection used in consultation list cards
