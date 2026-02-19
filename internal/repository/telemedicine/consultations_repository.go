@@ -429,8 +429,9 @@ func (r *consultationRepository) mapToConsultation(row sqlc.Consultation) teleme
 }
 
 func (r *consultationRepository) mapToConsultationWithDetails(row sqlc.GetConsultationWithDetailsRow) telemedicine.ConsultationWithDetails {
-	// The query uses c.* so all Consultation columns are present in the row.
+	sessionTriageLevel := row.SessionTriageLevel
 	return telemedicine.ConsultationWithDetails{
+		// All core Consultation fields
 		Consultation: telemedicine.Consultation{
 			ID:                    pgtypeUUIDToUUID(row.ID),
 			SymptomSessionID:      pgtypeUUIDToUUID(row.SymptomSessionID),
@@ -460,7 +461,7 @@ func (r *consultationRepository) mapToConsultationWithDetails(row sqlc.GetConsul
 		},
 		ChiefComplaint:               row.ChiefComplaint,
 		AISummary:                    pgtypeTextToStringPtr(row.AiSummary),
-		SessionTriageLevel:           &row.SessionTriageLevel,
+		SessionTriageLevel:           &sessionTriageLevel,
 		SymptomsReported:             stringSliceFromJSONB(row.SymptomsReported),
 		PatientFirstName:             row.PatientFirstName,
 		PatientLastName:              row.PatientLastName,
