@@ -273,11 +273,14 @@ func (s *consultationService) AcceptConsultation(ctx context.Context, id uuid.UU
 			fmt.Sprintf("consultation is not pending acceptance (current: %s)", c.Status), 400)
 	}
 
-	// Increment provider active count — repo enforces the capacity cap
+	// Increment provider active count — repo enforces capacity cap and is_accepting guard
 	avail, err := s.availabilityRepo.IncrementActiveConsultations(ctx, providerStaffID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return telemedicine.Consultation{}, domain.NewAppError(domain.ErrConflict, "provider is at capacity or unavailable", 409)
+			// Either: provider has no availability record (not online), is_accepting=false,
+			// or active_consultation_count >= max_concurrent_consultations.
+			// The provider must call goOnline + setAccepting before accepting consultations.
+			return telemedicine.Consultation{}, domain.NewAppError(domain.ErrConflict, "provider is not available or is at capacity — ensure you are online and accepting patients", 409)
 		}
 		s.logger.Error().Err(err).Str("staff_id", providerStaffID.String()).Msg("Failed to increment active consultations")
 		return telemedicine.Consultation{}, domain.NewAppError(err, "failed to check provider capacity", 500)
