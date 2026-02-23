@@ -374,26 +374,6 @@ func (r *consultationMessagesRepository) mapToAttachmentEntries(rows []sqlc.GetC
 	return result
 }
 
-// ─── Local conversion helpers ─────────────────────────────────────────────────
-
-// attachmentTypePtr converts a *string to a typed *AttachmentType.
-func attachmentTypePtr(s *string) *telemedicine.AttachmentType {
-	if s == nil {
-		return nil
-	}
-	v := telemedicine.AttachmentType(*s)
-	return &v
-}
-
-// attachmentTypeToStringPtr converts a typed *AttachmentType to *string for pgtype helpers.
-func attachmentTypeToStringPtr(at *telemedicine.AttachmentType) *string {
-	if at == nil {
-		return nil
-	}
-	s := string(*at)
-	return &s
-}
-
 // ─── Error handling ───────────────────────────────────────────────────────────
 
 func (r *consultationMessagesRepository) handleError(err error, operation string) error {

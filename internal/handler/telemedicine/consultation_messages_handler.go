@@ -95,6 +95,14 @@ func (h *ConsultationMessagesHandler) SendMessage(w http.ResponseWriter, r *http
 	// Stamp verified sender identity — ignore any client-supplied sender_user_id.
 	req.SenderUserID = claims.UserID
 
+	// Normalize "provider_staff" → "provider" so the value matches the DB
+	// check constraint (valid_sender_role allows: patient, provider, system).
+	// The frontend/WS sends "provider_staff" because that is the JWT role
+	// string, but the messages table only knows "provider".
+	if req.SenderRole == "provider_staff" {
+		req.SenderRole = "provider"
+	}
+
 	v := validator.New()
 	if req.SenderRole == "" {
 		v.AddError("sender_role", "required")

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/telemedicine"
 	"github.com/rs/zerolog/log"
 )
 
@@ -497,3 +498,52 @@ func jsonRawMessageToInterface(data json.RawMessage) interface{} {
 // 	}
 // 	return result
 // }
+
+// attachmentTypePtr converts a *string to a typed *AttachmentType.
+func attachmentTypePtr(s *string) *telemedicine.AttachmentType {
+	if s == nil {
+		return nil
+	}
+	v := telemedicine.AttachmentType(*s)
+	return &v
+}
+
+// attachmentTypeToStringPtr converts a typed *AttachmentType to *string for pgtype helpers.
+func attachmentTypeToStringPtr(at *telemedicine.AttachmentType) *string {
+	if at == nil {
+		return nil
+	}
+	s := string(*at)
+	return &s
+}
+
+// referralTypePtr converts a *string to a typed *ReferralType.
+func referralTypePtr(s *string) *telemedicine.ReferralType {
+	if s == nil {
+		return nil
+	}
+	v := telemedicine.ReferralType(*s)
+	return &v
+}
+
+// referralTypeToStringPtr converts a typed *ReferralType to *string for pgtype helpers.
+func referralTypeToStringPtr(rt *telemedicine.ReferralType) *string {
+	if rt == nil {
+		return nil
+	}
+	s := string(*rt)
+	return &s
+}
+
+// prescriptionItemsFromJSONB unmarshals the JSONB prescription_details array into
+// a typed []PrescriptionItem slice. Returns nil on empty or malformed input.
+func prescriptionItemsFromJSONB(data json.RawMessage) []telemedicine.PrescriptionItem {
+	if len(data) == 0 {
+		return nil
+	}
+	var items []telemedicine.PrescriptionItem
+	if err := json.Unmarshal(data, &items); err != nil {
+		return nil
+	}
+	return items
+}

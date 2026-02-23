@@ -54,6 +54,15 @@ func (s *consultationMessagesService) SendMessage(ctx context.Context, msg telem
 		s.logger.Debug().Dur("duration_ms", time.Since(start)).Str("consultation_id", msg.ConsultationID.String()).Msg("SendMessage completed")
 	}()
 
+	// Normalize "provider_staff" → "provider" so the value always matches the
+	// DB check constraint (valid_sender_role: patient | provider | system).
+	// The JWT role and WS payload use "provider_staff"; the messages table does
+	// not. Both the HTTP handler path and the WebSocket path call SendMessage,
+	// so normalizing here covers both in a single place.
+	if msg.SenderRole == "provider_staff" {
+		msg.SenderRole = "provider"
+	}
+
 	// Validate required fields
 	if msg.ConsultationID == uuid.Nil {
 		return telemedicine.ConsultationMessage{}, domain.NewAppError(domain.ErrValidation, "consultation_id is required", 400)

@@ -3,7 +3,6 @@ package telemedicine
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -347,39 +346,6 @@ func (r *consultationNotesRepository) mapToPatientNoteHistoryEntries(rows []sqlc
 		result[i] = r.mapToPatientNoteHistoryEntry(row)
 	}
 	return result
-}
-
-// ─── Local conversion helpers ─────────────────────────────────────────────────
-
-// referralTypePtr converts a *string to a typed *ReferralType.
-func referralTypePtr(s *string) *telemedicine.ReferralType {
-	if s == nil {
-		return nil
-	}
-	v := telemedicine.ReferralType(*s)
-	return &v
-}
-
-// referralTypeToStringPtr converts a typed *ReferralType to *string for pgtype helpers.
-func referralTypeToStringPtr(rt *telemedicine.ReferralType) *string {
-	if rt == nil {
-		return nil
-	}
-	s := string(*rt)
-	return &s
-}
-
-// prescriptionItemsFromJSONB unmarshals the JSONB prescription_details array into
-// a typed []PrescriptionItem slice. Returns nil on empty or malformed input.
-func prescriptionItemsFromJSONB(data json.RawMessage) []telemedicine.PrescriptionItem {
-	if len(data) == 0 {
-		return nil
-	}
-	var items []telemedicine.PrescriptionItem
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil
-	}
-	return items
 }
 
 // ─── Error handling ───────────────────────────────────────────────────────────
