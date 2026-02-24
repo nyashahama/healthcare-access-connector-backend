@@ -84,7 +84,7 @@ func TestConsentRepository_CreatePrivacyConsent(t *testing.T) {
 	tests := []struct {
 		name           string
 		consent        core.PrivacyConsent
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult core.PrivacyConsent
 		expectedError  error
 	}{
@@ -101,7 +101,7 @@ func TestConsentRepository_CreatePrivacyConsent(t *testing.T) {
 				IPAddress:                 &ipStr,
 				UserAgent:                 stringPtr("Mozilla/5.0"),
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				createdRow := sqlc.CreatePrivacyConsentRow{
 					ID:                uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:            pgtype.UUID{Bytes: userID, Valid: true},
@@ -134,7 +134,7 @@ func TestConsentRepository_CreatePrivacyConsent(t *testing.T) {
 				UserID:            userID,
 				HealthDataConsent: false,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				createdRow := sqlc.CreatePrivacyConsentRow{
 					ID:                uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:            pgtype.UUID{Bytes: userID, Valid: true},
@@ -167,7 +167,7 @@ func TestConsentRepository_CreatePrivacyConsent(t *testing.T) {
 				UserID:            userID,
 				HealthDataConsent: true,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("CreatePrivacyConsent", ctx, mock.Anything).Return(sqlc.CreatePrivacyConsentRow{}, assert.AnError)
 			},
 			expectedResult: core.PrivacyConsent{},
@@ -177,7 +177,7 @@ func TestConsentRepository_CreatePrivacyConsent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -211,14 +211,14 @@ func TestConsentRepository_GetPrivacyConsent(t *testing.T) {
 	tests := []struct {
 		name           string
 		userID         uuid.UUID
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult core.PrivacyConsent
 		expectedError  error
 	}{
 		{
 			name:   "successful get privacy consent",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				consentRow := sqlc.PrivacyConsent{
 					ID:                         pgtype.UUID{Bytes: consentID, Valid: true},
 					UserID:                     pgtype.UUID{Bytes: userID, Valid: true},
@@ -266,7 +266,7 @@ func TestConsentRepository_GetPrivacyConsent(t *testing.T) {
 		{
 			name:   "consent not found",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(sqlc.PrivacyConsent{}, pgx.ErrNoRows)
 			},
 			expectedResult: core.PrivacyConsent{},
@@ -275,7 +275,7 @@ func TestConsentRepository_GetPrivacyConsent(t *testing.T) {
 		{
 			name:   "database error",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(sqlc.PrivacyConsent{}, assert.AnError)
 			},
 			expectedResult: core.PrivacyConsent{},
@@ -285,7 +285,7 @@ func TestConsentRepository_GetPrivacyConsent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -316,7 +316,7 @@ func TestConsentRepository_UpdatePrivacyConsent(t *testing.T) {
 	tests := []struct {
 		name          string
 		consent       core.PrivacyConsent
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -329,7 +329,7 @@ func TestConsentRepository_UpdatePrivacyConsent(t *testing.T) {
 				EmailCommunicationConsent: false,
 				DataSharingConsent:        dataSharingConsent,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdatePrivacyConsent", ctx, mock.MatchedBy(func(p sqlc.UpdatePrivacyConsentParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.HealthDataConsent.Bool == true &&
@@ -347,7 +347,7 @@ func TestConsentRepository_UpdatePrivacyConsent(t *testing.T) {
 				UserID:             userID,
 				DataSharingConsent: map[string]interface{}{"invalid": make(chan int)}, // Unmarshallable
 			},
-			mockSetup:     func(m *mocks.Querier) {},
+			mockSetup:     func(m *mocks.MockQuerier) {},
 			expectedError: errors.New("convert data sharing consent"),
 		},
 		{
@@ -355,7 +355,7 @@ func TestConsentRepository_UpdatePrivacyConsent(t *testing.T) {
 			consent: core.PrivacyConsent{
 				UserID: userID,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdatePrivacyConsent", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update privacy consent failed: %w", assert.AnError),
@@ -364,7 +364,7 @@ func TestConsentRepository_UpdatePrivacyConsent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -390,14 +390,14 @@ func TestConsentRepository_WithdrawConsent(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		reason        string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:   "successful withdraw consent with reason",
 			userID: userID,
 			reason: "Moving to another provider",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("WithdrawConsent", ctx, sqlc.WithdrawConsentParams{
 					UserID:           uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					WithdrawalReason: pgtype.Text{String: "Moving to another provider", Valid: true},
@@ -409,7 +409,7 @@ func TestConsentRepository_WithdrawConsent(t *testing.T) {
 			name:   "successful withdraw consent without reason",
 			userID: userID,
 			reason: "",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("WithdrawConsent", ctx, mock.MatchedBy(func(p sqlc.WithdrawConsentParams) bool {
 					return p.UserID.Bytes == userID && !p.WithdrawalReason.Valid
 				})).Return(nil)
@@ -420,7 +420,7 @@ func TestConsentRepository_WithdrawConsent(t *testing.T) {
 			name:   "database error",
 			userID: userID,
 			reason: "test",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("WithdrawConsent", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("withdraw consent failed: %w", assert.AnError),
@@ -429,7 +429,7 @@ func TestConsentRepository_WithdrawConsent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -456,7 +456,7 @@ func TestConsentRepository_UpdateHealthDataConsent(t *testing.T) {
 		userID        uuid.UUID
 		consent       bool
 		version       string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -464,7 +464,7 @@ func TestConsentRepository_UpdateHealthDataConsent(t *testing.T) {
 			userID:  userID,
 			consent: true,
 			version: "v2.0",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateHealthDataConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateHealthDataConsentParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.HealthDataConsent.Bool == true &&
@@ -478,7 +478,7 @@ func TestConsentRepository_UpdateHealthDataConsent(t *testing.T) {
 			userID:  userID,
 			consent: false,
 			version: "v2.0",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateHealthDataConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateHealthDataConsentParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.HealthDataConsent.Bool == false &&
@@ -492,7 +492,7 @@ func TestConsentRepository_UpdateHealthDataConsent(t *testing.T) {
 			userID:  userID,
 			consent: true,
 			version: "v1.0",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateHealthDataConsent", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update health data consent failed: %w", assert.AnError),
@@ -501,7 +501,7 @@ func TestConsentRepository_UpdateHealthDataConsent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -527,14 +527,14 @@ func TestConsentRepository_UpdateResearchConsent(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		consent       bool
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:    "successful update research consent (grant)",
 			userID:  userID,
 			consent: true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateResearchConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateResearchConsentParams) bool {
 					return p.UserID.Bytes == userID && p.ResearchConsent.Bool == true
 				})).Return(nil)
@@ -545,7 +545,7 @@ func TestConsentRepository_UpdateResearchConsent(t *testing.T) {
 			name:    "successful update research consent (withdraw)",
 			userID:  userID,
 			consent: false,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateResearchConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateResearchConsentParams) bool {
 					return p.UserID.Bytes == userID && p.ResearchConsent.Bool == false
 				})).Return(nil)
@@ -556,7 +556,7 @@ func TestConsentRepository_UpdateResearchConsent(t *testing.T) {
 			name:    "database error",
 			userID:  userID,
 			consent: true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateResearchConsent", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update research consent failed: %w", assert.AnError),
@@ -565,7 +565,7 @@ func TestConsentRepository_UpdateResearchConsent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -591,14 +591,14 @@ func TestConsentRepository_UpdateEmergencyAccessConsent(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		consent       bool
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:    "successful update emergency access consent (grant)",
 			userID:  userID,
 			consent: true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateEmergencyAccessConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateEmergencyAccessConsentParams) bool {
 					return p.UserID.Bytes == userID && p.EmergencyAccessConsent.Bool == true
 				})).Return(nil)
@@ -609,7 +609,7 @@ func TestConsentRepository_UpdateEmergencyAccessConsent(t *testing.T) {
 			name:    "successful update emergency access consent (withdraw)",
 			userID:  userID,
 			consent: false,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateEmergencyAccessConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateEmergencyAccessConsentParams) bool {
 					return p.UserID.Bytes == userID && p.EmergencyAccessConsent.Bool == false
 				})).Return(nil)
@@ -620,7 +620,7 @@ func TestConsentRepository_UpdateEmergencyAccessConsent(t *testing.T) {
 			name:    "database error",
 			userID:  userID,
 			consent: true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateEmergencyAccessConsent", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update emergency access consent failed: %w", assert.AnError),
@@ -629,7 +629,7 @@ func TestConsentRepository_UpdateEmergencyAccessConsent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -656,7 +656,7 @@ func TestConsentRepository_UpdateCommunicationConsents(t *testing.T) {
 		userID        uuid.UUID
 		sms           bool
 		email         bool
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -664,7 +664,7 @@ func TestConsentRepository_UpdateCommunicationConsents(t *testing.T) {
 			userID: userID,
 			sms:    true,
 			email:  true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateCommunicationConsents", ctx, mock.MatchedBy(func(p sqlc.UpdateCommunicationConsentsParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.SmsCommunicationConsent.Bool == true &&
@@ -678,7 +678,7 @@ func TestConsentRepository_UpdateCommunicationConsents(t *testing.T) {
 			userID: userID,
 			sms:    true,
 			email:  false,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateCommunicationConsents", ctx, mock.MatchedBy(func(p sqlc.UpdateCommunicationConsentsParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.SmsCommunicationConsent.Bool == true &&
@@ -692,7 +692,7 @@ func TestConsentRepository_UpdateCommunicationConsents(t *testing.T) {
 			userID: userID,
 			sms:    false,
 			email:  false,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateCommunicationConsents", ctx, mock.MatchedBy(func(p sqlc.UpdateCommunicationConsentsParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.SmsCommunicationConsent.Bool == false &&
@@ -706,7 +706,7 @@ func TestConsentRepository_UpdateCommunicationConsents(t *testing.T) {
 			userID: userID,
 			sms:    true,
 			email:  true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateCommunicationConsents", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update communication consents failed: %w", assert.AnError),
@@ -715,7 +715,7 @@ func TestConsentRepository_UpdateCommunicationConsents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -742,14 +742,14 @@ func TestConsentRepository_UpdateDataSharingConsent(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		sharingPrefs  map[string]interface{}
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:         "successful update data sharing consent",
 			userID:       userID,
 			sharingPrefs: sharingPrefs,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateDataSharingConsent", ctx, mock.MatchedBy(func(p sqlc.UpdateDataSharingConsentParams) bool {
 					return p.UserID.Bytes == userID &&
 						string(p.DataSharingConsent) == `{"anonymized":true,"provider":"research_institute","share":true}`
@@ -761,14 +761,14 @@ func TestConsentRepository_UpdateDataSharingConsent(t *testing.T) {
 			name:          "error converting sharing preferences to JSON",
 			userID:        userID,
 			sharingPrefs:  map[string]interface{}{"invalid": make(chan int)},
-			mockSetup:     func(m *mocks.Querier) {},
+			mockSetup:     func(m *mocks.MockQuerier) {},
 			expectedError: errors.New("convert data sharing preferences"),
 		},
 		{
 			name:         "database error",
 			userID:       userID,
 			sharingPrefs: sharingPrefs,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateDataSharingConsent", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update data sharing consent failed: %w", assert.AnError),
@@ -777,7 +777,7 @@ func TestConsentRepository_UpdateDataSharingConsent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -805,14 +805,14 @@ func TestConsentRepository_GetConsentHistory(t *testing.T) {
 	tests := []struct {
 		name           string
 		userID         uuid.UUID
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult []core.PrivacyConsent
 		expectedError  error
 	}{
 		{
 			name:   "successful get consent history",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				consentRows := []sqlc.PrivacyConsent{
 					{
 						ID:                pgtype.UUID{Bytes: consentID1, Valid: true},
@@ -855,7 +855,7 @@ func TestConsentRepository_GetConsentHistory(t *testing.T) {
 		{
 			name:   "no consent history found",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetConsentHistory", ctx, mock.Anything).Return([]sqlc.PrivacyConsent{}, nil)
 			},
 			expectedResult: []core.PrivacyConsent{},
@@ -864,7 +864,7 @@ func TestConsentRepository_GetConsentHistory(t *testing.T) {
 		{
 			name:   "database error",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetConsentHistory", ctx, mock.Anything).Return([]sqlc.PrivacyConsent{}, assert.AnError)
 			},
 			expectedResult: nil,
@@ -874,7 +874,7 @@ func TestConsentRepository_GetConsentHistory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -908,14 +908,14 @@ func TestConsentRepository_GetActiveConsentsByType(t *testing.T) {
 	tests := []struct {
 		name           string
 		consentType    string
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult []core.PrivacyConsent
 		expectedError  error
 	}{
 		{
 			name:        "successful get active health data consents",
 			consentType: "health_data",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				consentRows := []sqlc.PrivacyConsent{
 					{
 						ID:                pgtype.UUID{Bytes: consentID1, Valid: true},
@@ -951,7 +951,7 @@ func TestConsentRepository_GetActiveConsentsByType(t *testing.T) {
 		{
 			name:        "successful get active research consents",
 			consentType: "research",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				consentRows := []sqlc.PrivacyConsent{
 					{
 						ID:              pgtype.UUID{Bytes: consentID1, Valid: true},
@@ -975,7 +975,7 @@ func TestConsentRepository_GetActiveConsentsByType(t *testing.T) {
 		{
 			name:        "successful get active emergency access consents",
 			consentType: "emergency_access",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				consentRows := []sqlc.PrivacyConsent{
 					{
 						ID:                     pgtype.UUID{Bytes: consentID1, Valid: true},
@@ -999,7 +999,7 @@ func TestConsentRepository_GetActiveConsentsByType(t *testing.T) {
 		{
 			name:        "invalid consent type",
 			consentType: "invalid_type",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				// No mock setup needed since we return early
 			},
 			expectedResult: nil,
@@ -1008,7 +1008,7 @@ func TestConsentRepository_GetActiveConsentsByType(t *testing.T) {
 		{
 			name:        "database error for health data consents",
 			consentType: "health_data",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetActiveHealthDataConsents", ctx).Return([]sqlc.PrivacyConsent{}, assert.AnError)
 			},
 			expectedResult: nil,
@@ -1018,7 +1018,7 @@ func TestConsentRepository_GetActiveConsentsByType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -1051,13 +1051,13 @@ func TestConsentRepository_GetExpiredConsents(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult []core.PrivacyConsent
 		expectedError  error
 	}{
 		{
 			name: "successful get expired consents",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				consentRows := []sqlc.PrivacyConsent{
 					{
 						ID:                     pgtype.UUID{Bytes: consentID1, Valid: true},
@@ -1100,7 +1100,7 @@ func TestConsentRepository_GetExpiredConsents(t *testing.T) {
 		},
 		{
 			name: "no expired consents found",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetExpiredConsents", ctx).Return([]sqlc.PrivacyConsent{}, nil)
 			},
 			expectedResult: []core.PrivacyConsent{},
@@ -1108,7 +1108,7 @@ func TestConsentRepository_GetExpiredConsents(t *testing.T) {
 		},
 		{
 			name: "database error",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetExpiredConsents", ctx).Return([]sqlc.PrivacyConsent{}, assert.AnError)
 			},
 			expectedResult: nil,
@@ -1118,7 +1118,7 @@ func TestConsentRepository_GetExpiredConsents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -1155,7 +1155,7 @@ func TestConsentRepository_GetWithdrawnConsents(t *testing.T) {
 		name           string
 		startDate      time.Time
 		endDate        time.Time
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult []core.PrivacyConsent
 		expectedError  error
 	}{
@@ -1163,7 +1163,7 @@ func TestConsentRepository_GetWithdrawnConsents(t *testing.T) {
 			name:      "successful get withdrawn consents",
 			startDate: startDate,
 			endDate:   endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				consentRows := []sqlc.PrivacyConsent{
 					{
 						ID:                   pgtype.UUID{Bytes: consentID1, Valid: true},
@@ -1215,7 +1215,7 @@ func TestConsentRepository_GetWithdrawnConsents(t *testing.T) {
 			name:      "no withdrawn consents found in date range",
 			startDate: startDate,
 			endDate:   endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetWithdrawnConsents", ctx, mock.Anything).Return([]sqlc.PrivacyConsent{}, nil)
 			},
 			expectedResult: []core.PrivacyConsent{},
@@ -1225,7 +1225,7 @@ func TestConsentRepository_GetWithdrawnConsents(t *testing.T) {
 			name:      "database error",
 			startDate: startDate,
 			endDate:   endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetWithdrawnConsents", ctx, mock.Anything).Return([]sqlc.PrivacyConsent{}, assert.AnError)
 			},
 			expectedResult: nil,
@@ -1235,7 +1235,7 @@ func TestConsentRepository_GetWithdrawnConsents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -1267,13 +1267,13 @@ func TestConsentRepository_ExportConsentData(t *testing.T) {
 	tests := []struct {
 		name          string
 		userID        uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:   "successful export consent data",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				consentRow := sqlc.PrivacyConsent{
 					ID:                pgtype.UUID{Bytes: consentID, Valid: true},
 					UserID:            pgtype.UUID{Bytes: userID, Valid: true},
@@ -1287,7 +1287,7 @@ func TestConsentRepository_ExportConsentData(t *testing.T) {
 		{
 			name:   "consent not found",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(sqlc.PrivacyConsent{}, pgx.ErrNoRows)
 			},
 			expectedError: domain.ErrNotFound,
@@ -1295,7 +1295,7 @@ func TestConsentRepository_ExportConsentData(t *testing.T) {
 		{
 			name:   "database error getting consent",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetPrivacyConsent", ctx, mock.Anything).Return(sqlc.PrivacyConsent{}, assert.AnError)
 			},
 			expectedError: fmt.Errorf("get privacy consent failed: %w", assert.AnError),
@@ -1304,7 +1304,7 @@ func TestConsentRepository_ExportConsentData(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}
@@ -1339,14 +1339,14 @@ func TestConsentRepository_NotifyConsentExpirations(t *testing.T) {
 	tests := []struct {
 		name           string
 		daysBefore     int
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult []uuid.UUID
 		expectedError  error
 	}{
 		{
 			name:       "successful get consents expiring in 30 days",
 			daysBefore: 30,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				userIDs := []pgtype.UUID{
 					{Bytes: userID1, Valid: true},
 					{Bytes: userID2, Valid: true},
@@ -1361,7 +1361,7 @@ func TestConsentRepository_NotifyConsentExpirations(t *testing.T) {
 		{
 			name:       "no consents expiring",
 			daysBefore: 30,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetConsentsExpiringBefore", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return([]pgtype.UUID{}, nil)
 			},
 			expectedResult: []uuid.UUID{},
@@ -1370,7 +1370,7 @@ func TestConsentRepository_NotifyConsentExpirations(t *testing.T) {
 		{
 			name:       "database error",
 			daysBefore: 30,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetConsentsExpiringBefore", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return([]pgtype.UUID{}, assert.AnError)
 			},
 			expectedResult: nil,
@@ -1380,7 +1380,7 @@ func TestConsentRepository_NotifyConsentExpirations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &consentRepository{querier: mockQuerier}

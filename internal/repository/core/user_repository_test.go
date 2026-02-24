@@ -27,14 +27,14 @@ func TestUserRepository_GetUserByID(t *testing.T) {
 	tests := []struct {
 		name          string
 		id            uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedUser  core.User
 		expectedError error
 	}{
 		{
 			name: "successful get user by ID with email",
 			id:   userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.GetUserByIDRow{
 					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "test@example.com",
@@ -70,7 +70,7 @@ func TestUserRepository_GetUserByID(t *testing.T) {
 		{
 			name: "successful get user by ID with phone",
 			id:   userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.GetUserByIDRow{
 					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "",
@@ -106,7 +106,7 @@ func TestUserRepository_GetUserByID(t *testing.T) {
 		{
 			name: "user not found",
 			id:   userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUserByID", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(sqlc.GetUserByIDRow{}, pgx.ErrNoRows)
 			},
 			expectedUser:  core.User{},
@@ -115,7 +115,7 @@ func TestUserRepository_GetUserByID(t *testing.T) {
 		{
 			name: "database error",
 			id:   userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUserByID", ctx, mock.Anything).Return(sqlc.GetUserByIDRow{}, assert.AnError)
 			},
 			expectedUser:  core.User{},
@@ -125,7 +125,7 @@ func TestUserRepository_GetUserByID(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -157,7 +157,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 	tests := []struct {
 		name          string
 		user          core.User
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -174,7 +174,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 				ConsentDate:          &now,
 				ProfileCompletionPct: 90,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUser", ctx, sqlc.UpdateUserParams{
 					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "updated@example.com",
@@ -204,7 +204,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 				ConsentDate:          nil,
 				ProfileCompletionPct: 0,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUser", ctx, sqlc.UpdateUserParams{
 					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email:                       "",
@@ -226,7 +226,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 				ID:   userID,
 				Role: "patient",
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUser", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update user: %w", assert.AnError),
@@ -235,7 +235,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -260,13 +260,13 @@ func TestUserRepository_DeactivateUser(t *testing.T) {
 	tests := []struct {
 		name          string
 		id            uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name: "successful deactivate user",
 			id:   userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserStatus", ctx, sqlc.UpdateUserStatusParams{
 					ID:     uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Status: pgtype.Text{String: "inactive", Valid: true},
@@ -277,7 +277,7 @@ func TestUserRepository_DeactivateUser(t *testing.T) {
 		{
 			name: "database error",
 			id:   userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserStatus", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("deactivate user: %w", assert.AnError),
@@ -286,7 +286,7 @@ func TestUserRepository_DeactivateUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -311,13 +311,13 @@ func TestUserRepository_DeleteUser(t *testing.T) {
 	tests := []struct {
 		name          string
 		id            uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name: "successful delete user",
 			id:   userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteUser", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(nil)
 			},
 			expectedError: nil,
@@ -325,7 +325,7 @@ func TestUserRepository_DeleteUser(t *testing.T) {
 		{
 			name: "database error",
 			id:   userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteUser", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("delete user: %w", assert.AnError),
@@ -334,7 +334,7 @@ func TestUserRepository_DeleteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -361,7 +361,7 @@ func TestUserRepository_ListUsers(t *testing.T) {
 		role          string
 		limit         int
 		offset        int
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedUsers []core.User
 		expectedError error
 	}{
@@ -370,7 +370,7 @@ func TestUserRepository_ListUsers(t *testing.T) {
 			role:   "patient",
 			limit:  10,
 			offset: 0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.ListUsersByRoleRow{
 					{
 						ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174001"),
@@ -436,7 +436,7 @@ func TestUserRepository_ListUsers(t *testing.T) {
 			role:   "doctor",
 			limit:  10,
 			offset: 0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("ListUsersByRole", ctx, sqlc.ListUsersByRoleParams{
 					Role:   "doctor",
 					Limit:  int32(10),
@@ -451,7 +451,7 @@ func TestUserRepository_ListUsers(t *testing.T) {
 			role:   "patient",
 			limit:  10,
 			offset: 0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("ListUsersByRole", ctx, mock.Anything).Return([]sqlc.ListUsersByRoleRow{}, assert.AnError)
 			},
 			expectedUsers: nil,
@@ -461,7 +461,7 @@ func TestUserRepository_ListUsers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -493,7 +493,7 @@ func TestUserRepository_SearchUsers(t *testing.T) {
 		query         string
 		role          string
 		status        string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedUsers []core.User
 		expectedError error
 	}{
@@ -502,7 +502,7 @@ func TestUserRepository_SearchUsers(t *testing.T) {
 			query:  "test@example.com",
 			role:   "",
 			status: "",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.SearchUsersRow{
 					{
 						ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174001"),
@@ -544,7 +544,7 @@ func TestUserRepository_SearchUsers(t *testing.T) {
 			query:  "",
 			role:   "doctor",
 			status: "active",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.SearchUsersRow{
 					{
 						ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174002"),
@@ -586,7 +586,7 @@ func TestUserRepository_SearchUsers(t *testing.T) {
 			query:  "test",
 			role:   "",
 			status: "",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("SearchUsers", ctx, mock.Anything).Return([]sqlc.SearchUsersRow{}, assert.AnError)
 			},
 			expectedUsers: nil,
@@ -596,7 +596,7 @@ func TestUserRepository_SearchUsers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -625,14 +625,14 @@ func TestUserRepository_CountUsers(t *testing.T) {
 	tests := []struct {
 		name          string
 		role          string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedCount int64
 		expectedError error
 	}{
 		{
 			name: "successful count users by role",
 			role: "patient",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("CountUsersByRole", ctx, "patient").Return(int64(42), nil)
 			},
 			expectedCount: 42,
@@ -641,7 +641,7 @@ func TestUserRepository_CountUsers(t *testing.T) {
 		{
 			name: "zero users",
 			role: "doctor",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("CountUsersByRole", ctx, "doctor").Return(int64(0), nil)
 			},
 			expectedCount: 0,
@@ -650,7 +650,7 @@ func TestUserRepository_CountUsers(t *testing.T) {
 		{
 			name: "database error",
 			role: "patient",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("CountUsersByRole", ctx, mock.Anything).Return(int64(0), assert.AnError)
 			},
 			expectedCount: 0,
@@ -660,7 +660,7 @@ func TestUserRepository_CountUsers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -688,7 +688,7 @@ func TestUserRepository_GetUserProfile(t *testing.T) {
 	tests := []struct {
 		name            string
 		userID          uuid.UUID
-		mockSetup       func(*mocks.Querier)
+		mockSetup       func(*mocks.MockQuerier)
 		expectedUser    core.User
 		expectedProfile patients.PatientProfile
 		expectedError   error
@@ -696,7 +696,7 @@ func TestUserRepository_GetUserProfile(t *testing.T) {
 		{
 			name:   "successful get user profile",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				// Mock GetUserByID call
 				userRow := sqlc.GetUserByIDRow{
 					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -734,7 +734,7 @@ func TestUserRepository_GetUserProfile(t *testing.T) {
 		{
 			name:   "user not found",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUserByID", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(sqlc.GetUserByIDRow{}, pgx.ErrNoRows)
 			},
 			expectedUser:    core.User{},
@@ -745,7 +745,7 @@ func TestUserRepository_GetUserProfile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -775,14 +775,14 @@ func TestUserRepository_UpdateUserEmail(t *testing.T) {
 		name          string
 		id            uuid.UUID
 		email         string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:  "successful update user email",
 			id:    userID,
 			email: "newemail@example.com",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserEmail", ctx, sqlc.UpdateUserEmailParams{
 					ID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email: "newemail@example.com",
@@ -794,7 +794,7 @@ func TestUserRepository_UpdateUserEmail(t *testing.T) {
 			name:  "empty email",
 			id:    userID,
 			email: "",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserEmail", ctx, sqlc.UpdateUserEmailParams{
 					ID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Email: "",
@@ -806,7 +806,7 @@ func TestUserRepository_UpdateUserEmail(t *testing.T) {
 			name:  "database error",
 			id:    userID,
 			email: "test@example.com",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserEmail", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update user email: %w", assert.AnError),
@@ -815,7 +815,7 @@ func TestUserRepository_UpdateUserEmail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -841,14 +841,14 @@ func TestUserRepository_UpdateUserPhone(t *testing.T) {
 		name          string
 		id            uuid.UUID
 		phone         string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:  "successful update user phone",
 			id:    userID,
 			phone: "+1234567890",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserPhone", ctx, sqlc.UpdateUserPhoneParams{
 					ID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Phone: pgtype.Text{String: "+1234567890", Valid: true},
@@ -860,7 +860,7 @@ func TestUserRepository_UpdateUserPhone(t *testing.T) {
 			name:  "empty phone",
 			id:    userID,
 			phone: "",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserPhone", ctx, sqlc.UpdateUserPhoneParams{
 					ID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Phone: pgtype.Text{String: "", Valid: true},
@@ -872,7 +872,7 @@ func TestUserRepository_UpdateUserPhone(t *testing.T) {
 			name:  "database error",
 			id:    userID,
 			phone: "+1234567890",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserPhone", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update user phone: %w", assert.AnError),
@@ -881,7 +881,7 @@ func TestUserRepository_UpdateUserPhone(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -907,14 +907,14 @@ func TestUserRepository_UpdateUserRole(t *testing.T) {
 		name          string
 		id            uuid.UUID
 		role          string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name: "successful update user role",
 			id:   userID,
 			role: "doctor",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserRole", ctx, sqlc.UpdateUserRoleParams{
 					ID:   uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Role: "doctor",
@@ -926,7 +926,7 @@ func TestUserRepository_UpdateUserRole(t *testing.T) {
 			name: "database error",
 			id:   userID,
 			role: "doctor",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserRole", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update user role: %w", assert.AnError),
@@ -935,7 +935,7 @@ func TestUserRepository_UpdateUserRole(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -961,14 +961,14 @@ func TestUserRepository_UpdateUserStatus(t *testing.T) {
 		name          string
 		id            uuid.UUID
 		status        string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:   "successful update user status to active",
 			id:     userID,
 			status: "active",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserStatus", ctx, sqlc.UpdateUserStatusParams{
 					ID:     uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Status: pgtype.Text{String: "active", Valid: true},
@@ -980,7 +980,7 @@ func TestUserRepository_UpdateUserStatus(t *testing.T) {
 			name:   "successful update user status to suspended",
 			id:     userID,
 			status: "suspended",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserStatus", ctx, sqlc.UpdateUserStatusParams{
 					ID:     uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Status: pgtype.Text{String: "suspended", Valid: true},
@@ -992,7 +992,7 @@ func TestUserRepository_UpdateUserStatus(t *testing.T) {
 			name:   "database error",
 			id:     userID,
 			status: "active",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserStatus", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update user status: %w", assert.AnError),
@@ -1001,7 +1001,7 @@ func TestUserRepository_UpdateUserStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -1027,14 +1027,14 @@ func TestUserRepository_UpdateUserProfileCompletion(t *testing.T) {
 		name          string
 		id            uuid.UUID
 		percentage    int
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:       "successful update user profile completion",
 			id:         userID,
 			percentage: 75,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserProfileCompletion", ctx, sqlc.UpdateUserProfileCompletionParams{
 					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					ProfileCompletionPercentage: pgtype.Int4{Int32: 75, Valid: true},
@@ -1046,7 +1046,7 @@ func TestUserRepository_UpdateUserProfileCompletion(t *testing.T) {
 			name:       "update to 100% completion",
 			id:         userID,
 			percentage: 100,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserProfileCompletion", ctx, sqlc.UpdateUserProfileCompletionParams{
 					ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					ProfileCompletionPercentage: pgtype.Int4{Int32: 100, Valid: true},
@@ -1058,7 +1058,7 @@ func TestUserRepository_UpdateUserProfileCompletion(t *testing.T) {
 			name:       "database error",
 			id:         userID,
 			percentage: 50,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserProfileCompletion", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update user profile completion: %w", assert.AnError),
@@ -1067,7 +1067,7 @@ func TestUserRepository_UpdateUserProfileCompletion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -1096,7 +1096,7 @@ func TestUserRepository_UpdateUserConsents(t *testing.T) {
 		smsConsent    bool
 		popiaConsent  bool
 		consentDate   time.Time
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -1105,7 +1105,7 @@ func TestUserRepository_UpdateUserConsents(t *testing.T) {
 			smsConsent:   true,
 			popiaConsent: true,
 			consentDate:  now,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserConsents", ctx, sqlc.UpdateUserConsentsParams{
 					ID:                uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					SmsConsentGiven:   pgtype.Bool{Bool: true, Valid: true},
@@ -1121,7 +1121,7 @@ func TestUserRepository_UpdateUserConsents(t *testing.T) {
 			smsConsent:   false,
 			popiaConsent: false,
 			consentDate:  now,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserConsents", ctx, sqlc.UpdateUserConsentsParams{
 					ID:                uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					SmsConsentGiven:   pgtype.Bool{Bool: false, Valid: true},
@@ -1137,7 +1137,7 @@ func TestUserRepository_UpdateUserConsents(t *testing.T) {
 			smsConsent:   true,
 			popiaConsent: true,
 			consentDate:  now,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateUserConsents", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update user consents: %w", assert.AnError),
@@ -1146,7 +1146,7 @@ func TestUserRepository_UpdateUserConsents(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -1176,14 +1176,14 @@ func TestUserRepository_BulkUpdateStatus(t *testing.T) {
 		name          string
 		ids           []uuid.UUID
 		status        string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:   "successful bulk update status",
 			ids:    userIDs,
 			status: "suspended",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				pgIDs := make([]pgtype.UUID, len(userIDs))
 				for i, id := range userIDs {
 					pgIDs[i] = uuidPgtypeFromString(id.String())
@@ -1199,7 +1199,7 @@ func TestUserRepository_BulkUpdateStatus(t *testing.T) {
 			name:   "empty ids list",
 			ids:    []uuid.UUID{},
 			status: "active",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("BulkUpdateUserStatus", ctx, sqlc.BulkUpdateUserStatusParams{
 					Column1: []pgtype.UUID{},
 					Status:  pgtype.Text{String: "active", Valid: true},
@@ -1211,7 +1211,7 @@ func TestUserRepository_BulkUpdateStatus(t *testing.T) {
 			name:   "database error",
 			ids:    userIDs,
 			status: "suspended",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("BulkUpdateUserStatus", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("bulk update status: %w", assert.AnError),
@@ -1220,7 +1220,7 @@ func TestUserRepository_BulkUpdateStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}
@@ -1249,14 +1249,14 @@ func TestUserRepository_GetUsersByIDs(t *testing.T) {
 	tests := []struct {
 		name          string
 		ids           []uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedUsers []core.User
 		expectedError error
 	}{
 		{
 			name: "successful get users by IDs",
 			ids:  userIDs,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.GetUsersByIDsRow{
 					{
 						ID:                          uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174001"),
@@ -1328,7 +1328,7 @@ func TestUserRepository_GetUsersByIDs(t *testing.T) {
 		{
 			name: "empty IDs list",
 			ids:  []uuid.UUID{},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUsersByIDs", ctx, []pgtype.UUID{}).Return([]sqlc.GetUsersByIDsRow{}, nil)
 			},
 			expectedUsers: []core.User{},
@@ -1337,7 +1337,7 @@ func TestUserRepository_GetUsersByIDs(t *testing.T) {
 		{
 			name: "database error",
 			ids:  userIDs,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUsersByIDs", ctx, mock.Anything).Return([]sqlc.GetUsersByIDsRow{}, assert.AnError)
 			},
 			expectedUsers: nil,
@@ -1347,7 +1347,7 @@ func TestUserRepository_GetUsersByIDs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &userRepository{querier: mockQuerier}

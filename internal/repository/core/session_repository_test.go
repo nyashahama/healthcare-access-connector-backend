@@ -47,7 +47,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 	tests := []struct {
 		name          string
 		session       core.UserSession
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedSess  core.UserSession
 		expectedError error
 	}{
@@ -62,7 +62,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 				UserAgent:    stringPtr("Mozilla/5.0"),
 				ExpiresAt:    expires,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.UserSession{
 					ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:       uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -96,7 +96,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 				SessionToken: "token456",
 				ExpiresAt:    expires,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.UserSession{
 					ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:       uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -138,7 +138,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 				SessionToken: "token123",
 				ExpiresAt:    expires,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("CreateSession", ctx, mock.Anything).Return(sqlc.UserSession{}, assert.AnError)
 			},
 			expectedSess:  core.UserSession{},
@@ -151,7 +151,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 				SessionToken: "token123",
 				ExpiresAt:    expires,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				pgErr := &pgconn.PgError{Code: "23503"}
 				m.On("CreateSession", ctx, mock.Anything).Return(sqlc.UserSession{}, pgErr)
 			},
@@ -162,7 +162,7 @@ func TestSessionRepository_CreateSession(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}
@@ -193,14 +193,14 @@ func TestSessionRepository_GetSession(t *testing.T) {
 	tests := []struct {
 		name          string
 		sessionToken  string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedSess  core.UserSession
 		expectedError error
 	}{
 		{
 			name:         "successful get session",
 			sessionToken: "token123",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.GetSessionRow{
 					ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:       uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -229,7 +229,7 @@ func TestSessionRepository_GetSession(t *testing.T) {
 		{
 			name:         "session not found",
 			sessionToken: "invalidtoken",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetSession", ctx, "invalidtoken").Return(sqlc.GetSessionRow{}, pgx.ErrNoRows)
 			},
 			expectedSess:  core.UserSession{},
@@ -238,7 +238,7 @@ func TestSessionRepository_GetSession(t *testing.T) {
 		{
 			name:         "database error",
 			sessionToken: "token123",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetSession", ctx, "token123").Return(sqlc.GetSessionRow{}, assert.AnError)
 			},
 			expectedSess:  core.UserSession{},
@@ -248,7 +248,7 @@ func TestSessionRepository_GetSession(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}
@@ -273,13 +273,13 @@ func TestSessionRepository_DeleteSession(t *testing.T) {
 	tests := []struct {
 		name          string
 		sessionToken  string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:         "successful delete session",
 			sessionToken: "token123",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteSession", ctx, "token123").Return(nil)
 			},
 			expectedError: nil,
@@ -287,7 +287,7 @@ func TestSessionRepository_DeleteSession(t *testing.T) {
 		{
 			name:         "database error",
 			sessionToken: "token123",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteSession", ctx, "token123").Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("delete session failed: %w", assert.AnError),
@@ -296,7 +296,7 @@ func TestSessionRepository_DeleteSession(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}
@@ -321,13 +321,13 @@ func TestSessionRepository_DeleteUserSessions(t *testing.T) {
 	tests := []struct {
 		name          string
 		userID        uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:   "successful delete user sessions",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteUserSessions", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(nil)
 			},
 			expectedError: nil,
@@ -335,7 +335,7 @@ func TestSessionRepository_DeleteUserSessions(t *testing.T) {
 		{
 			name:   "database error",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteUserSessions", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("delete user sessions failed: %w", assert.AnError),
@@ -344,7 +344,7 @@ func TestSessionRepository_DeleteUserSessions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}
@@ -367,19 +367,19 @@ func TestSessionRepository_DeleteExpiredSessions(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name: "successful delete expired sessions",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteExpiredSessions", ctx).Return(nil)
 			},
 			expectedError: nil,
 		},
 		{
 			name: "database error",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteExpiredSessions", ctx).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("delete expired sessions failed: %w", assert.AnError),
@@ -388,7 +388,7 @@ func TestSessionRepository_DeleteExpiredSessions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}
@@ -417,7 +417,7 @@ func TestSessionRepository_UpdateSessionToken(t *testing.T) {
 		id            uuid.UUID
 		sessionToken  string
 		expiresAt     time.Time
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -425,7 +425,7 @@ func TestSessionRepository_UpdateSessionToken(t *testing.T) {
 			id:           sessionID,
 			sessionToken: "newtoken123",
 			expiresAt:    expires,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateSessionToken", ctx, mock.MatchedBy(func(p sqlc.UpdateSessionTokenParams) bool {
 					return p.ID.Bytes == sessionID &&
 						p.SessionToken == "newtoken123" &&
@@ -439,7 +439,7 @@ func TestSessionRepository_UpdateSessionToken(t *testing.T) {
 			id:           sessionID,
 			sessionToken: "newtoken123",
 			expiresAt:    expires,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateSessionToken", ctx, mock.Anything).Return(pgx.ErrNoRows)
 			},
 			expectedError: domain.ErrSessionNotFound,
@@ -449,7 +449,7 @@ func TestSessionRepository_UpdateSessionToken(t *testing.T) {
 			id:           sessionID,
 			sessionToken: "newtoken123",
 			expiresAt:    expires,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateSessionToken", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update session token failed: %w", assert.AnError),
@@ -458,7 +458,7 @@ func TestSessionRepository_UpdateSessionToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}
@@ -491,14 +491,14 @@ func TestSessionRepository_GetUserSessions(t *testing.T) {
 	tests := []struct {
 		name          string
 		userID        uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedSess  []core.UserSession
 		expectedError error
 	}{
 		{
 			name:   "successful get user sessions",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.UserSession{
 					{
 						ID:           uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174001"),
@@ -554,7 +554,7 @@ func TestSessionRepository_GetUserSessions(t *testing.T) {
 		{
 			name:   "no sessions found",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUserSessions", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return([]sqlc.UserSession{}, pgx.ErrNoRows)
 			},
 			expectedSess:  []core.UserSession{},
@@ -563,7 +563,7 @@ func TestSessionRepository_GetUserSessions(t *testing.T) {
 		{
 			name:   "database error",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUserSessions", ctx, mock.Anything).Return([]sqlc.UserSession{}, assert.AnError)
 			},
 			expectedSess:  nil,
@@ -573,7 +573,7 @@ func TestSessionRepository_GetUserSessions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}
@@ -605,14 +605,14 @@ func TestSessionRepository_RevokeAllExceptCurrent(t *testing.T) {
 		name             string
 		userID           uuid.UUID
 		currentSessionID uuid.UUID
-		mockSetup        func(*mocks.Querier)
+		mockSetup        func(*mocks.MockQuerier)
 		expectedError    error
 	}{
 		{
 			name:             "successful revoke all except current",
 			userID:           userID,
 			currentSessionID: currentSessionID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteAllSessionsExcept", ctx, mock.MatchedBy(func(p sqlc.DeleteAllSessionsExceptParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.ID.Bytes == currentSessionID
@@ -624,7 +624,7 @@ func TestSessionRepository_RevokeAllExceptCurrent(t *testing.T) {
 			name:             "database error",
 			userID:           userID,
 			currentSessionID: currentSessionID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteAllSessionsExcept", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("revoke all except current session failed: %w", assert.AnError),
@@ -633,7 +633,7 @@ func TestSessionRepository_RevokeAllExceptCurrent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}
@@ -659,14 +659,14 @@ func TestSessionRepository_InvalidateSessionByDevice(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		deviceID      string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:     "successful invalidate session by device",
 			userID:   userID,
 			deviceID: "device123",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteSessionByDevice", ctx, mock.MatchedBy(func(p sqlc.DeleteSessionByDeviceParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.DeviceID.String == "device123"
@@ -678,7 +678,7 @@ func TestSessionRepository_InvalidateSessionByDevice(t *testing.T) {
 			name:     "database error",
 			userID:   userID,
 			deviceID: "device123",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteSessionByDevice", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("invalidate session by device failed: %w", assert.AnError),
@@ -687,7 +687,7 @@ func TestSessionRepository_InvalidateSessionByDevice(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &sessionRepository{querier: mockQuerier}

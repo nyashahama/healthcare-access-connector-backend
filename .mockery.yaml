@@ -1,0 +1,10 @@
+with-expecter: true
+issue-845-fix: true
+
+packages:
+  github.com/nyashahama/healthcare-access-connector-backend/internal/db:
+    interfaces:
+      Querier:
+        config:
+          dir: "internal/db/mocks"
+          outpkg: "mocks"

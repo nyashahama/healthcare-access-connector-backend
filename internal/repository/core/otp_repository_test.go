@@ -46,7 +46,7 @@ func TestOTPRepository_SaveOTP(t *testing.T) {
 	tests := []struct {
 		name          string
 		otp           core.OTPVerification
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -59,7 +59,7 @@ func TestOTPRepository_SaveOTP(t *testing.T) {
 				Channel:   "sms",
 				ExpiresAt: expires,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.OtpVerification{
 					ID:        uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -91,7 +91,7 @@ func TestOTPRepository_SaveOTP(t *testing.T) {
 				Channel:   "email",
 				ExpiresAt: expires,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.OtpVerification{
 					ID:        uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -123,7 +123,7 @@ func TestOTPRepository_SaveOTP(t *testing.T) {
 				Channel:   "sms",
 				ExpiresAt: expires,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("SaveOTP", ctx, mock.Anything).Return(sqlc.OtpVerification{}, assert.AnError)
 			},
 			expectedError: fmt.Errorf("save OTP: %w", assert.AnError),
@@ -132,7 +132,7 @@ func TestOTPRepository_SaveOTP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &otpRepository{querier: mockQuerier}
@@ -162,7 +162,7 @@ func TestOTPRepository_GetOTP(t *testing.T) {
 		userID        uuid.UUID
 		otp           string
 		otpType       string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedOTP   core.OTPVerification
 		expectedError error
 	}{
@@ -171,7 +171,7 @@ func TestOTPRepository_GetOTP(t *testing.T) {
 			userID:  userID,
 			otp:     "123456",
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.OtpVerification{
 					ID:        uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -205,7 +205,7 @@ func TestOTPRepository_GetOTP(t *testing.T) {
 			userID:  userID,
 			otp:     "999999",
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetOTP", ctx, sqlc.GetOTPParams{
 					UserID: uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Otp:    "999999",
@@ -220,7 +220,7 @@ func TestOTPRepository_GetOTP(t *testing.T) {
 			userID:  userID,
 			otp:     "123456",
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetOTP", ctx, mock.Anything).Return(sqlc.OtpVerification{}, assert.AnError)
 			},
 			expectedOTP:   core.OTPVerification{},
@@ -230,7 +230,7 @@ func TestOTPRepository_GetOTP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &otpRepository{querier: mockQuerier}
@@ -265,7 +265,7 @@ func TestOTPRepository_GetLatestActiveOTP(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		otpType       string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedOTP   core.OTPVerification
 		expectedError error
 	}{
@@ -273,7 +273,7 @@ func TestOTPRepository_GetLatestActiveOTP(t *testing.T) {
 			name:    "successful get latest active OTP",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.OtpVerification{
 					ID:        uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -305,7 +305,7 @@ func TestOTPRepository_GetLatestActiveOTP(t *testing.T) {
 			name:    "no active OTP found",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetLatestActiveOTP", ctx, sqlc.GetLatestActiveOTPParams{
 					UserID: uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Type:   "password_reset",
@@ -318,7 +318,7 @@ func TestOTPRepository_GetLatestActiveOTP(t *testing.T) {
 			name:    "database error",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetLatestActiveOTP", ctx, mock.Anything).Return(sqlc.OtpVerification{}, assert.AnError)
 			},
 			expectedOTP:   core.OTPVerification{},
@@ -328,7 +328,7 @@ func TestOTPRepository_GetLatestActiveOTP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &otpRepository{querier: mockQuerier}
@@ -361,14 +361,14 @@ func TestOTPRepository_MarkOTPUsed(t *testing.T) {
 		name          string
 		otpID         uuid.UUID
 		usedAt        *time.Time
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:   "successful mark OTP used with timestamp",
 			otpID:  otpID,
 			usedAt: &now,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("MarkOTPUsed", ctx, sqlc.MarkOTPUsedParams{
 					ID:     uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UsedAt: pgtype.Timestamp{Time: now, Valid: true},
@@ -380,7 +380,7 @@ func TestOTPRepository_MarkOTPUsed(t *testing.T) {
 			name:   "successful mark OTP used without timestamp",
 			otpID:  otpID,
 			usedAt: nil,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("MarkOTPUsed", ctx, sqlc.MarkOTPUsedParams{
 					ID:     uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UsedAt: pgtype.Timestamp{Valid: false},
@@ -392,7 +392,7 @@ func TestOTPRepository_MarkOTPUsed(t *testing.T) {
 			name:   "database error",
 			otpID:  otpID,
 			usedAt: &now,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("MarkOTPUsed", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("mark OTP used: %w", assert.AnError),
@@ -401,7 +401,7 @@ func TestOTPRepository_MarkOTPUsed(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &otpRepository{querier: mockQuerier}
@@ -427,14 +427,14 @@ func TestOTPRepository_InvalidateUserOTPs(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		otpType       string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:    "successful invalidate user OTPs",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("InvalidateUserOTPs", ctx, sqlc.InvalidateUserOTPsParams{
 					UserID: uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Type:   "password_reset",
@@ -446,7 +446,7 @@ func TestOTPRepository_InvalidateUserOTPs(t *testing.T) {
 			name:    "database error",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("InvalidateUserOTPs", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("invalidate user OTPs: %w", assert.AnError),
@@ -455,7 +455,7 @@ func TestOTPRepository_InvalidateUserOTPs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &otpRepository{querier: mockQuerier}
@@ -478,19 +478,19 @@ func TestOTPRepository_DeleteExpiredOTPs(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name: "successful delete expired OTPs",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteExpiredOTPs", ctx).Return(nil)
 			},
 			expectedError: nil,
 		},
 		{
 			name: "database error",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteExpiredOTPs", ctx).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("delete expired OTPs: %w", assert.AnError),
@@ -499,7 +499,7 @@ func TestOTPRepository_DeleteExpiredOTPs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &otpRepository{querier: mockQuerier}
@@ -525,14 +525,14 @@ func TestOTPRepository_DeleteUserOTPs(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		otpType       string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:    "successful delete user OTPs",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteUserOTPs", ctx, sqlc.DeleteUserOTPsParams{
 					UserID: uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Type:   "password_reset",
@@ -544,7 +544,7 @@ func TestOTPRepository_DeleteUserOTPs(t *testing.T) {
 			name:    "database error",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteUserOTPs", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("delete user OTPs: %w", assert.AnError),
@@ -553,7 +553,7 @@ func TestOTPRepository_DeleteUserOTPs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &otpRepository{querier: mockQuerier}
@@ -579,7 +579,7 @@ func TestOTPRepository_GetOTPAttemptCount(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		otpType       string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedCount int64
 		expectedError error
 	}{
@@ -587,7 +587,7 @@ func TestOTPRepository_GetOTPAttemptCount(t *testing.T) {
 			name:    "successful get OTP attempt count",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetOTPAttemptCount", ctx, sqlc.GetOTPAttemptCountParams{
 					UserID: uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Type:   "password_reset",
@@ -600,7 +600,7 @@ func TestOTPRepository_GetOTPAttemptCount(t *testing.T) {
 			name:    "zero attempts",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetOTPAttemptCount", ctx, sqlc.GetOTPAttemptCountParams{
 					UserID: uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
 					Type:   "password_reset",
@@ -613,7 +613,7 @@ func TestOTPRepository_GetOTPAttemptCount(t *testing.T) {
 			name:    "database error",
 			userID:  userID,
 			otpType: "password_reset",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetOTPAttemptCount", ctx, mock.Anything).Return(int64(0), assert.AnError)
 			},
 			expectedCount: 0,
@@ -623,7 +623,7 @@ func TestOTPRepository_GetOTPAttemptCount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &otpRepository{querier: mockQuerier}
@@ -656,7 +656,7 @@ func TestOTPRepository_GetRecentOTPs(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		within        time.Duration
-		mockSetup     func(*mocks.Querier, time.Time)
+		mockSetup     func(*mocks.MockQuerier, time.Time)
 		expectedOTPs  []core.OTPVerification
 		expectedError error
 	}{
@@ -664,7 +664,7 @@ func TestOTPRepository_GetRecentOTPs(t *testing.T) {
 			name:   "successful get recent OTPs",
 			userID: userID,
 			within: within,
-			mockSetup: func(m *mocks.Querier, threshold time.Time) {
+			mockSetup: func(m *mocks.MockQuerier, threshold time.Time) {
 				// Use mock.MatchedBy to handle time differences flexibly
 				expectedRows := []sqlc.OtpVerification{
 					{
@@ -727,7 +727,7 @@ func TestOTPRepository_GetRecentOTPs(t *testing.T) {
 			name:   "no recent OTPs",
 			userID: userID,
 			within: within,
-			mockSetup: func(m *mocks.Querier, threshold time.Time) {
+			mockSetup: func(m *mocks.MockQuerier, threshold time.Time) {
 				// Use mock.MatchedBy to handle time differences flexibly
 				m.On("GetRecentOTPs", ctx, mock.MatchedBy(func(p sqlc.GetRecentOTPsParams) bool {
 					// Check if UserID matches
@@ -746,7 +746,7 @@ func TestOTPRepository_GetRecentOTPs(t *testing.T) {
 			name:   "database error",
 			userID: userID,
 			within: within,
-			mockSetup: func(m *mocks.Querier, threshold time.Time) {
+			mockSetup: func(m *mocks.MockQuerier, threshold time.Time) {
 				m.On("GetRecentOTPs", ctx, mock.Anything).Return([]sqlc.OtpVerification{}, assert.AnError)
 			},
 			expectedOTPs:  nil,
@@ -756,7 +756,7 @@ func TestOTPRepository_GetRecentOTPs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier, threshold)
 
 			repo := &otpRepository{querier: mockQuerier}

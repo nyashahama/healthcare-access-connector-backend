@@ -101,7 +101,7 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 	tests := []struct {
 		name          string
 		activity      core.UserActivity
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -118,7 +118,7 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 				ResourceType:    stringPtr("patient_record"),
 				ResourceID:      &resourceID,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("LogUserActivity", ctx, mock.MatchedBy(func(p sqlc.LogUserActivityParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.ActivityType == "login" &&
@@ -139,7 +139,7 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 			activity: core.UserActivity{
 				ActivityType: "logout",
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("LogUserActivity", ctx, mock.MatchedBy(func(p sqlc.LogUserActivityParams) bool {
 					return !p.UserID.Valid &&
 						p.ActivityType == "logout" &&
@@ -161,7 +161,7 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 				ActivityType:    "invalid",
 				ActivityDetails: map[string]interface{}{"invalid": make(chan int)}, // Unmarshallable
 			},
-			mockSetup:     func(m *mocks.Querier) {},
+			mockSetup:     func(m *mocks.MockQuerier) {},
 			expectedError: errors.New("marshal activity details"),
 		},
 		{
@@ -170,7 +170,7 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 				ActivityType: "invalid",
 				Location:     map[string]interface{}{"invalid": make(chan int)}, // Unmarshallable
 			},
-			mockSetup:     func(m *mocks.Querier) {},
+			mockSetup:     func(m *mocks.MockQuerier) {},
 			expectedError: errors.New("marshal location"),
 		},
 		{
@@ -178,7 +178,7 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 			activity: core.UserActivity{
 				ActivityType: "login",
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("LogUserActivity", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("log user activity failed: %w", assert.AnError),
@@ -187,7 +187,7 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -222,7 +222,7 @@ func TestAuditRepository_GetUserActivities(t *testing.T) {
 		userID        uuid.UUID
 		limit         int
 		offset        int
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedActs  []core.UserActivity
 		expectedError error
 	}{
@@ -231,7 +231,7 @@ func TestAuditRepository_GetUserActivities(t *testing.T) {
 			userID: userID,
 			limit:  10,
 			offset: 0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.UserActivity{
 					{
 						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -277,7 +277,7 @@ func TestAuditRepository_GetUserActivities(t *testing.T) {
 			userID: userID,
 			limit:  10,
 			offset: 0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, nil)
 			},
 			expectedActs:  []core.UserActivity{},
@@ -288,7 +288,7 @@ func TestAuditRepository_GetUserActivities(t *testing.T) {
 			userID: userID,
 			limit:  10,
 			offset: 0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
 			},
 			expectedActs:  nil,
@@ -298,7 +298,7 @@ func TestAuditRepository_GetUserActivities(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -340,7 +340,7 @@ func TestAuditRepository_GetActivitiesByType(t *testing.T) {
 		activityType  string
 		startDate     time.Time
 		endDate       time.Time
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedActs  []core.UserActivity
 		expectedError error
 	}{
@@ -349,7 +349,7 @@ func TestAuditRepository_GetActivitiesByType(t *testing.T) {
 			activityType: "login",
 			startDate:    startDate,
 			endDate:      endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.UserActivity{
 					{
 						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -395,7 +395,7 @@ func TestAuditRepository_GetActivitiesByType(t *testing.T) {
 			activityType: "login",
 			startDate:    startDate,
 			endDate:      endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetActivitiesByType", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
 			},
 			expectedActs:  nil,
@@ -405,7 +405,7 @@ func TestAuditRepository_GetActivitiesByType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -444,7 +444,7 @@ func TestAuditRepository_GetActivitiesByResource(t *testing.T) {
 		name          string
 		resourceType  string
 		resourceID    uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedActs  []core.UserActivity
 		expectedError error
 	}{
@@ -452,7 +452,7 @@ func TestAuditRepository_GetActivitiesByResource(t *testing.T) {
 			name:         "successful get activities by resource",
 			resourceType: "patient_record",
 			resourceID:   resourceID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.UserActivity{
 					{
 						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -496,7 +496,7 @@ func TestAuditRepository_GetActivitiesByResource(t *testing.T) {
 			name:         "database error",
 			resourceType: "patient_record",
 			resourceID:   resourceID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetActivitiesByResource", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
 			},
 			expectedActs:  nil,
@@ -506,7 +506,7 @@ func TestAuditRepository_GetActivitiesByResource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -543,7 +543,7 @@ func TestAuditRepository_LogDataAccess(t *testing.T) {
 	tests := []struct {
 		name          string
 		log           core.DataAccessLog
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -561,7 +561,7 @@ func TestAuditRepository_LogDataAccess(t *testing.T) {
 				UserAgent:            stringPtr("Mozilla/5.0"),
 				Location:             location,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("LogDataAccess", ctx, mock.MatchedBy(func(p sqlc.LogDataAccessParams) bool {
 					return p.AccessedByUserID.Bytes == accessedByUserID &&
 						p.AccessedByRole.String == "doctor" &&
@@ -585,7 +585,7 @@ func TestAuditRepository_LogDataAccess(t *testing.T) {
 				AccessType:     "read",
 				Location:       map[string]interface{}{"invalid": make(chan int)},
 			},
-			mockSetup:     func(m *mocks.Querier) {},
+			mockSetup:     func(m *mocks.MockQuerier) {},
 			expectedError: errors.New("marshal location"),
 		},
 		{
@@ -594,7 +594,7 @@ func TestAuditRepository_LogDataAccess(t *testing.T) {
 				AccessedUserID: accessedUserID,
 				AccessType:     "read",
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("LogDataAccess", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("log data access failed: %w", assert.AnError),
@@ -603,7 +603,7 @@ func TestAuditRepository_LogDataAccess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -637,7 +637,7 @@ func TestAuditRepository_GetDataAccessLogs(t *testing.T) {
 		accessedUserID uuid.UUID
 		limit          int
 		offset         int
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedLogs   []core.DataAccessLog
 		expectedError  error
 	}{
@@ -646,7 +646,7 @@ func TestAuditRepository_GetDataAccessLogs(t *testing.T) {
 			accessedUserID: accessedUserID,
 			limit:          10,
 			offset:         0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.DataAccessLog{
 					{
 						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
@@ -694,7 +694,7 @@ func TestAuditRepository_GetDataAccessLogs(t *testing.T) {
 			accessedUserID: accessedUserID,
 			limit:          10,
 			offset:         0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, nil)
 			},
 			expectedLogs:  []core.DataAccessLog{},
@@ -705,7 +705,7 @@ func TestAuditRepository_GetDataAccessLogs(t *testing.T) {
 			accessedUserID: accessedUserID,
 			limit:          10,
 			offset:         0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
 			},
 			expectedLogs:  nil,
@@ -715,7 +715,7 @@ func TestAuditRepository_GetDataAccessLogs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -753,7 +753,7 @@ func TestAuditRepository_GetDataAccessLogsByAccessor(t *testing.T) {
 		accessedByUserID uuid.UUID
 		limit            int
 		offset           int
-		mockSetup        func(*mocks.Querier)
+		mockSetup        func(*mocks.MockQuerier)
 		expectedLogs     []core.DataAccessLog
 		expectedError    error
 	}{
@@ -762,7 +762,7 @@ func TestAuditRepository_GetDataAccessLogsByAccessor(t *testing.T) {
 			accessedByUserID: accessedByUserID,
 			limit:            10,
 			offset:           0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.DataAccessLog{
 					{
 						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
@@ -804,7 +804,7 @@ func TestAuditRepository_GetDataAccessLogsByAccessor(t *testing.T) {
 			accessedByUserID: accessedByUserID,
 			limit:            10,
 			offset:           0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetAccessLogsByAccessedByUser", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
 			},
 			expectedLogs:  nil,
@@ -814,7 +814,7 @@ func TestAuditRepository_GetDataAccessLogsByAccessor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -851,7 +851,7 @@ func TestAuditRepository_GetEmergencyAccessLogs(t *testing.T) {
 		name          string
 		limit         int
 		offset        int
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedLogs  []core.DataAccessLog
 		expectedError error
 	}{
@@ -859,7 +859,7 @@ func TestAuditRepository_GetEmergencyAccessLogs(t *testing.T) {
 			name:   "successful get emergency access logs",
 			limit:  10,
 			offset: 0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.DataAccessLog{
 					{
 						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
@@ -903,7 +903,7 @@ func TestAuditRepository_GetEmergencyAccessLogs(t *testing.T) {
 			name:   "database error",
 			limit:  10,
 			offset: 0,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetEmergencyAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
 			},
 			expectedLogs:  nil,
@@ -913,7 +913,7 @@ func TestAuditRepository_GetEmergencyAccessLogs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -953,7 +953,7 @@ func TestAuditRepository_GetAccessLogsByResourceType(t *testing.T) {
 		resourceType  string
 		startDate     time.Time
 		endDate       time.Time
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedLogs  []core.DataAccessLog
 		expectedError error
 	}{
@@ -962,7 +962,7 @@ func TestAuditRepository_GetAccessLogsByResourceType(t *testing.T) {
 			resourceType: "medical_record",
 			startDate:    startDate,
 			endDate:      endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.DataAccessLog{
 					{
 						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
@@ -1006,7 +1006,7 @@ func TestAuditRepository_GetAccessLogsByResourceType(t *testing.T) {
 			resourceType: "medical_record",
 			startDate:    startDate,
 			endDate:      endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("SearchDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
 			},
 			expectedLogs:  nil,
@@ -1016,7 +1016,7 @@ func TestAuditRepository_GetAccessLogsByResourceType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1053,14 +1053,14 @@ func TestAuditRepository_GetSuspiciousActivities(t *testing.T) {
 	tests := []struct {
 		name          string
 		threshold     int
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedActs  []core.UserActivity
 		expectedError error
 	}{
 		{
 			name:      "successful get suspicious activities",
 			threshold: 50,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.UserActivity{
 					{
 						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -1094,7 +1094,7 @@ func TestAuditRepository_GetSuspiciousActivities(t *testing.T) {
 		{
 			name:      "database error",
 			threshold: 50,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetRecentActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
 			},
 			expectedActs:  nil,
@@ -1104,7 +1104,7 @@ func TestAuditRepository_GetSuspiciousActivities(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1142,7 +1142,7 @@ func TestAuditRepository_GetFailedLoginAttempts(t *testing.T) {
 		name          string
 		userID        *uuid.UUID
 		within        time.Duration
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedActs  []core.UserActivity
 		expectedError error
 	}{
@@ -1150,7 +1150,7 @@ func TestAuditRepository_GetFailedLoginAttempts(t *testing.T) {
 			name:   "successful get failed login attempts for specific user",
 			userID: &userID,
 			within: 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.UserActivity{
 					{
 						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -1189,7 +1189,7 @@ func TestAuditRepository_GetFailedLoginAttempts(t *testing.T) {
 			name:   "successful get failed login attempts for all users",
 			userID: nil,
 			within: 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.UserActivity{
 					{
 						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -1225,7 +1225,7 @@ func TestAuditRepository_GetFailedLoginAttempts(t *testing.T) {
 			name:   "database error",
 			userID: &userID,
 			within: 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("SearchUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
 			},
 			expectedActs:  nil,
@@ -1235,7 +1235,7 @@ func TestAuditRepository_GetFailedLoginAttempts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1271,14 +1271,14 @@ func TestAuditRepository_GetUnauthorizedAccessAttempts(t *testing.T) {
 	tests := []struct {
 		name          string
 		within        time.Duration
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedLogs  []core.DataAccessLog
 		expectedError error
 	}{
 		{
 			name:   "successful get unauthorized access attempts",
 			within: 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.DataAccessLog{
 					{
 						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
@@ -1320,7 +1320,7 @@ func TestAuditRepository_GetUnauthorizedAccessAttempts(t *testing.T) {
 		{
 			name:   "database error",
 			within: 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("SearchDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
 			},
 			expectedLogs:  nil,
@@ -1330,7 +1330,7 @@ func TestAuditRepository_GetUnauthorizedAccessAttempts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1358,13 +1358,13 @@ func TestAuditRepository_ArchiveOldLogs(t *testing.T) {
 	tests := []struct {
 		name          string
 		olderThan     time.Duration
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:      "successful archive old logs",
 			olderThan: 90 * 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteOldDataAccessLogs", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return(nil)
 			},
 			expectedError: nil,
@@ -1372,7 +1372,7 @@ func TestAuditRepository_ArchiveOldLogs(t *testing.T) {
 		{
 			name:      "database error",
 			olderThan: 90 * 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteOldDataAccessLogs", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("archive old logs failed: %w", assert.AnError),
@@ -1381,7 +1381,7 @@ func TestAuditRepository_ArchiveOldLogs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1404,13 +1404,13 @@ func TestAuditRepository_DeleteArchivedLogs(t *testing.T) {
 	tests := []struct {
 		name          string
 		olderThan     time.Duration
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:      "successful delete archived logs",
 			olderThan: 365 * 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteOldDataAccessLogs", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return(nil)
 			},
 			expectedError: nil,
@@ -1418,7 +1418,7 @@ func TestAuditRepository_DeleteArchivedLogs(t *testing.T) {
 		{
 			name:      "database error",
 			olderThan: 365 * 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteOldDataAccessLogs", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("delete archived logs failed: %w", assert.AnError),
@@ -1427,7 +1427,7 @@ func TestAuditRepository_DeleteArchivedLogs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1450,13 +1450,13 @@ func TestAuditRepository_ArchiveOldActivities(t *testing.T) {
 	tests := []struct {
 		name          string
 		olderThan     time.Duration
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:      "successful archive old activities",
 			olderThan: 90 * 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteOldUserActivities", ctx, mock.AnythingOfType("pgtype.Timestamp")).Return(nil)
 			},
 			expectedError: nil,
@@ -1464,7 +1464,7 @@ func TestAuditRepository_ArchiveOldActivities(t *testing.T) {
 		{
 			name:      "database error",
 			olderThan: 90 * 24 * time.Hour,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteOldUserActivities", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("archive old activities failed: %w", assert.AnError),
@@ -1473,7 +1473,7 @@ func TestAuditRepository_ArchiveOldActivities(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1509,7 +1509,7 @@ func TestAuditRepository_GenerateAccessReport(t *testing.T) {
 		userID         uuid.UUID
 		startDate      time.Time
 		endDate        time.Time
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedReport interface{}
 		expectedError  error
 	}{
@@ -1518,7 +1518,7 @@ func TestAuditRepository_GenerateAccessReport(t *testing.T) {
 			userID:    userID,
 			startDate: startDate,
 			endDate:   endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.DataAccessLog{
 					{
 						ID:                   uuidPgtypeFromString("423e4567-e89b-12d3-a456-426614174000"),
@@ -1566,7 +1566,7 @@ func TestAuditRepository_GenerateAccessReport(t *testing.T) {
 			userID:    userID,
 			startDate: startDate,
 			endDate:   endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("ExportDataAccessLogs", ctx, mock.Anything).Return([]sqlc.DataAccessLog{}, assert.AnError)
 			},
 			expectedReport: nil,
@@ -1576,7 +1576,7 @@ func TestAuditRepository_GenerateAccessReport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1620,7 +1620,7 @@ func TestAuditRepository_GenerateActivityReport(t *testing.T) {
 		name           string
 		startDate      time.Time
 		endDate        time.Time
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedReport interface{}
 		expectedError  error
 	}{
@@ -1628,7 +1628,7 @@ func TestAuditRepository_GenerateActivityReport(t *testing.T) {
 			name:      "successful generate activity report",
 			startDate: startDate,
 			endDate:   endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRows := []sqlc.UserActivity{
 					{
 						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -1683,7 +1683,7 @@ func TestAuditRepository_GenerateActivityReport(t *testing.T) {
 			name:      "database error",
 			startDate: startDate,
 			endDate:   endDate,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("SearchUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
 			},
 			expectedReport: nil,
@@ -1693,7 +1693,7 @@ func TestAuditRepository_GenerateActivityReport(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}
@@ -1736,14 +1736,14 @@ func TestAuditRepository_ExportUserAuditTrail(t *testing.T) {
 	tests := []struct {
 		name          string
 		userID        uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedJSON  []byte
 		expectedError error
 	}{
 		{
 			name:   "successful export user audit trail",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				// Mock user activities
 				activityRows := []sqlc.UserActivity{
 					{
@@ -1786,7 +1786,7 @@ func TestAuditRepository_ExportUserAuditTrail(t *testing.T) {
 		{
 			name:   "database error on user activities export",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("ExportUserActivities", ctx, mock.Anything).Return([]sqlc.UserActivity{}, assert.AnError)
 			},
 			expectedError: fmt.Errorf("export user activities for audit trail failed: %w", assert.AnError),
@@ -1794,7 +1794,7 @@ func TestAuditRepository_ExportUserAuditTrail(t *testing.T) {
 		{
 			name:   "database error on data access logs export",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				activityRows := []sqlc.UserActivity{
 					{
 						ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -1815,7 +1815,7 @@ func TestAuditRepository_ExportUserAuditTrail(t *testing.T) {
 		{
 			name:   "invalid JSON in activity details is silently ignored",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				// Return an activity with invalid JSON in ActivityDetails
 				invalidActivity := sqlc.UserActivity{
 					ID:              uuidPgtypeFromString("323e4567-e89b-12d3-a456-426614174000"),
@@ -1836,7 +1836,7 @@ func TestAuditRepository_ExportUserAuditTrail(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &auditRepository{querier: mockQuerier}

@@ -53,7 +53,7 @@ func TestNotificationRepository_CreateNotificationPreferences(t *testing.T) {
 	tests := []struct {
 		name           string
 		prefs          core.NotificationPreferences
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult core.NotificationPreferences
 		expectedError  error
 	}{
@@ -68,7 +68,7 @@ func TestNotificationRepository_CreateNotificationPreferences(t *testing.T) {
 				HealthTips:           true,
 				NotificationLanguage: "en",
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				createdRow := sqlc.CreateNotificationPreferencesRow{
 					ID:        uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -115,7 +115,7 @@ func TestNotificationRepository_CreateNotificationPreferences(t *testing.T) {
 				EmailEnabled: false,
 				PushEnabled:  false,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				createdRow := sqlc.CreateNotificationPreferencesRow{
 					ID:        uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:    uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -160,7 +160,7 @@ func TestNotificationRepository_CreateNotificationPreferences(t *testing.T) {
 				UserID:     userID,
 				SMSEnabled: true,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("CreateNotificationPreferences", ctx, mock.Anything).Return(sqlc.CreateNotificationPreferencesRow{}, assert.AnError)
 			},
 			expectedResult: core.NotificationPreferences{},
@@ -170,7 +170,7 @@ func TestNotificationRepository_CreateNotificationPreferences(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -198,14 +198,14 @@ func TestNotificationRepository_GetNotificationPreferences(t *testing.T) {
 	tests := []struct {
 		name           string
 		userID         uuid.UUID
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult core.NotificationPreferences
 		expectedError  error
 	}{
 		{
 			name:   "successful get notification preferences",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				prefsRow := sqlc.NotificationPreference{
 					ID:                             pgtype.UUID{Bytes: prefsID, Valid: true},
 					UserID:                         pgtype.UUID{Bytes: userID, Valid: true},
@@ -259,7 +259,7 @@ func TestNotificationRepository_GetNotificationPreferences(t *testing.T) {
 		{
 			name:   "preferences not found",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetNotificationPreferences", ctx, mock.Anything).Return(sqlc.NotificationPreference{}, pgx.ErrNoRows)
 			},
 			expectedResult: core.NotificationPreferences{},
@@ -268,7 +268,7 @@ func TestNotificationRepository_GetNotificationPreferences(t *testing.T) {
 		{
 			name:   "database error",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetNotificationPreferences", ctx, mock.Anything).Return(sqlc.NotificationPreference{}, assert.AnError)
 			},
 			expectedResult: core.NotificationPreferences{},
@@ -278,7 +278,7 @@ func TestNotificationRepository_GetNotificationPreferences(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -308,7 +308,7 @@ func TestNotificationRepository_UpdateNotificationPreferences(t *testing.T) {
 	tests := []struct {
 		name          string
 		prefs         core.NotificationPreferences
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError string // Change to string to check error message
 	}{
 		{
@@ -323,7 +323,7 @@ func TestNotificationRepository_UpdateNotificationPreferences(t *testing.T) {
 				MedicationReminders:  true,
 				EmergencyAlerts:      true,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				// First call to GetNotificationPreferences (to check existence)
 				existingPrefsRow := sqlc.NotificationPreference{
 					ID:                   uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
@@ -362,7 +362,7 @@ func TestNotificationRepository_UpdateNotificationPreferences(t *testing.T) {
 				AppointmentReminders: true,
 				HealthTips:           true,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				// First call to GetNotificationPreferences returns not found
 				m.On("GetNotificationPreferences", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(sqlc.NotificationPreference{}, pgx.ErrNoRows)
 
@@ -381,7 +381,7 @@ func TestNotificationRepository_UpdateNotificationPreferences(t *testing.T) {
 			prefs: core.NotificationPreferences{
 				UserID: userID,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetNotificationPreferences", ctx, mock.Anything).Return(sqlc.NotificationPreference{}, assert.AnError)
 			},
 			expectedError: "get notification preferences for update failed",
@@ -392,7 +392,7 @@ func TestNotificationRepository_UpdateNotificationPreferences(t *testing.T) {
 				UserID:     userID,
 				SMSEnabled: true,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				existingPrefsRow := sqlc.NotificationPreference{
 					ID:         uuidPgtypeFromString("223e4567-e89b-12d3-a456-426614174000"),
 					UserID:     uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000"),
@@ -413,7 +413,7 @@ func TestNotificationRepository_UpdateNotificationPreferences(t *testing.T) {
 				AppointmentReminders: true,
 				HealthTips:           true,
 			},
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				// First call to GetNotificationPreferences returns not found
 				m.On("GetNotificationPreferences", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(sqlc.NotificationPreference{}, pgx.ErrNoRows)
 
@@ -426,7 +426,7 @@ func TestNotificationRepository_UpdateNotificationPreferences(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -454,13 +454,13 @@ func TestNotificationRepository_DeleteNotificationPreferences(t *testing.T) {
 	tests := []struct {
 		name          string
 		userID        uuid.UUID
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:   "successful delete notification preferences",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteNotificationPreferences", ctx, uuidPgtypeFromString("123e4567-e89b-12d3-a456-426614174000")).Return(nil)
 			},
 			expectedError: nil,
@@ -468,7 +468,7 @@ func TestNotificationRepository_DeleteNotificationPreferences(t *testing.T) {
 		{
 			name:   "database error",
 			userID: userID,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("DeleteNotificationPreferences", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("delete notification preferences failed: %w", assert.AnError),
@@ -477,7 +477,7 @@ func TestNotificationRepository_DeleteNotificationPreferences(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -505,7 +505,7 @@ func TestNotificationRepository_UpdateChannelSettings(t *testing.T) {
 		sms           bool
 		email         bool
 		push          bool
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -514,7 +514,7 @@ func TestNotificationRepository_UpdateChannelSettings(t *testing.T) {
 			sms:    true,
 			email:  true,
 			push:   true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateChannelSettings", ctx, mock.MatchedBy(func(p sqlc.UpdateChannelSettingsParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.SmsEnabled.Bool == true &&
@@ -530,7 +530,7 @@ func TestNotificationRepository_UpdateChannelSettings(t *testing.T) {
 			sms:    true,
 			email:  false,
 			push:   true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateChannelSettings", ctx, mock.MatchedBy(func(p sqlc.UpdateChannelSettingsParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.SmsEnabled.Bool == true &&
@@ -546,7 +546,7 @@ func TestNotificationRepository_UpdateChannelSettings(t *testing.T) {
 			sms:    true,
 			email:  true,
 			push:   true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateChannelSettings", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update channel settings failed: %w", assert.AnError),
@@ -555,7 +555,7 @@ func TestNotificationRepository_UpdateChannelSettings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -582,7 +582,7 @@ func TestNotificationRepository_UpdateAppointmentReminders(t *testing.T) {
 		userID        uuid.UUID
 		enabled       bool
 		hoursBefore   int
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -590,7 +590,7 @@ func TestNotificationRepository_UpdateAppointmentReminders(t *testing.T) {
 			userID:      userID,
 			enabled:     true,
 			hoursBefore: 48,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateAppointmentReminders", ctx, mock.MatchedBy(func(p sqlc.UpdateAppointmentRemindersParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.AppointmentReminders.Bool == true &&
@@ -604,7 +604,7 @@ func TestNotificationRepository_UpdateAppointmentReminders(t *testing.T) {
 			userID:      userID,
 			enabled:     false,
 			hoursBefore: 24,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateAppointmentReminders", ctx, mock.MatchedBy(func(p sqlc.UpdateAppointmentRemindersParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.AppointmentReminders.Bool == false &&
@@ -618,7 +618,7 @@ func TestNotificationRepository_UpdateAppointmentReminders(t *testing.T) {
 			userID:      userID,
 			enabled:     true,
 			hoursBefore: 24,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateAppointmentReminders", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update appointment reminders failed: %w", assert.AnError),
@@ -627,7 +627,7 @@ func TestNotificationRepository_UpdateAppointmentReminders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -654,7 +654,7 @@ func TestNotificationRepository_UpdateHealthTips(t *testing.T) {
 		userID        uuid.UUID
 		enabled       bool
 		frequency     string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -662,7 +662,7 @@ func TestNotificationRepository_UpdateHealthTips(t *testing.T) {
 			userID:    userID,
 			enabled:   true,
 			frequency: "daily",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateHealthTips", ctx, mock.MatchedBy(func(p sqlc.UpdateHealthTipsParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.HealthTips.Bool == true &&
@@ -676,7 +676,7 @@ func TestNotificationRepository_UpdateHealthTips(t *testing.T) {
 			userID:    userID,
 			enabled:   false,
 			frequency: "weekly",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateHealthTips", ctx, mock.MatchedBy(func(p sqlc.UpdateHealthTipsParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.HealthTips.Bool == false &&
@@ -690,7 +690,7 @@ func TestNotificationRepository_UpdateHealthTips(t *testing.T) {
 			userID:    userID,
 			enabled:   true,
 			frequency: "weekly",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateHealthTips", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update health tips failed: %w", assert.AnError),
@@ -699,7 +699,7 @@ func TestNotificationRepository_UpdateHealthTips(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -725,14 +725,14 @@ func TestNotificationRepository_UpdateMedicationReminders(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		enabled       bool
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:    "successful update medication reminders (enabled)",
 			userID:  userID,
 			enabled: true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateMedicationReminders", ctx, mock.MatchedBy(func(p sqlc.UpdateMedicationRemindersParams) bool {
 					return p.UserID.Bytes == userID && p.MedicationReminders.Bool == true
 				})).Return(nil)
@@ -743,7 +743,7 @@ func TestNotificationRepository_UpdateMedicationReminders(t *testing.T) {
 			name:    "successful update medication reminders (disabled)",
 			userID:  userID,
 			enabled: false,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateMedicationReminders", ctx, mock.MatchedBy(func(p sqlc.UpdateMedicationRemindersParams) bool {
 					return p.UserID.Bytes == userID && p.MedicationReminders.Bool == false
 				})).Return(nil)
@@ -754,7 +754,7 @@ func TestNotificationRepository_UpdateMedicationReminders(t *testing.T) {
 			name:    "database error",
 			userID:  userID,
 			enabled: true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateMedicationReminders", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update medication reminders failed: %w", assert.AnError),
@@ -763,7 +763,7 @@ func TestNotificationRepository_UpdateMedicationReminders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -789,14 +789,14 @@ func TestNotificationRepository_UpdateEmergencyAlerts(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		enabled       bool
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:    "successful update emergency alerts (enabled)",
 			userID:  userID,
 			enabled: true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateEmergencyAlerts", ctx, mock.MatchedBy(func(p sqlc.UpdateEmergencyAlertsParams) bool {
 					return p.UserID.Bytes == userID && p.EmergencyAlerts.Bool == true
 				})).Return(nil)
@@ -807,7 +807,7 @@ func TestNotificationRepository_UpdateEmergencyAlerts(t *testing.T) {
 			name:    "successful update emergency alerts (disabled)",
 			userID:  userID,
 			enabled: false,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateEmergencyAlerts", ctx, mock.MatchedBy(func(p sqlc.UpdateEmergencyAlertsParams) bool {
 					return p.UserID.Bytes == userID && p.EmergencyAlerts.Bool == false
 				})).Return(nil)
@@ -818,7 +818,7 @@ func TestNotificationRepository_UpdateEmergencyAlerts(t *testing.T) {
 			name:    "database error",
 			userID:  userID,
 			enabled: true,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateEmergencyAlerts", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update emergency alerts failed: %w", assert.AnError),
@@ -827,7 +827,7 @@ func TestNotificationRepository_UpdateEmergencyAlerts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -856,7 +856,7 @@ func TestNotificationRepository_SetQuietHours(t *testing.T) {
 		userID        uuid.UUID
 		startTime     *time.Time
 		endTime       *time.Time
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
@@ -864,7 +864,7 @@ func TestNotificationRepository_SetQuietHours(t *testing.T) {
 			userID:    userID,
 			startTime: &startTime,
 			endTime:   &endTime,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateQuietHours", ctx, mock.MatchedBy(func(p sqlc.UpdateQuietHoursParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.QuietHoursStart.Valid &&
@@ -878,7 +878,7 @@ func TestNotificationRepository_SetQuietHours(t *testing.T) {
 			userID:    userID,
 			startTime: &startTime,
 			endTime:   nil,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateQuietHours", ctx, mock.MatchedBy(func(p sqlc.UpdateQuietHoursParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.QuietHoursStart.Valid &&
@@ -892,7 +892,7 @@ func TestNotificationRepository_SetQuietHours(t *testing.T) {
 			userID:    userID,
 			startTime: nil,
 			endTime:   &endTime,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateQuietHours", ctx, mock.MatchedBy(func(p sqlc.UpdateQuietHoursParams) bool {
 					return p.UserID.Bytes == userID &&
 						!p.QuietHoursStart.Valid &&
@@ -906,7 +906,7 @@ func TestNotificationRepository_SetQuietHours(t *testing.T) {
 			userID:    userID,
 			startTime: &startTime,
 			endTime:   &endTime,
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateQuietHours", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("set quiet hours failed: %w", assert.AnError),
@@ -915,7 +915,7 @@ func TestNotificationRepository_SetQuietHours(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -941,14 +941,14 @@ func TestNotificationRepository_UpdateNotificationLanguage(t *testing.T) {
 		name          string
 		userID        uuid.UUID
 		language      string
-		mockSetup     func(*mocks.Querier)
+		mockSetup     func(*mocks.MockQuerier)
 		expectedError error
 	}{
 		{
 			name:     "successful update notification language",
 			userID:   userID,
 			language: "fr",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateNotificationLanguage", ctx, mock.MatchedBy(func(p sqlc.UpdateNotificationLanguageParams) bool {
 					return p.UserID.Bytes == userID && p.NotificationLanguage.String == "fr"
 				})).Return(nil)
@@ -959,7 +959,7 @@ func TestNotificationRepository_UpdateNotificationLanguage(t *testing.T) {
 			name:     "database error",
 			userID:   userID,
 			language: "es",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("UpdateNotificationLanguage", ctx, mock.Anything).Return(assert.AnError)
 			},
 			expectedError: fmt.Errorf("update notification language failed: %w", assert.AnError),
@@ -968,7 +968,7 @@ func TestNotificationRepository_UpdateNotificationLanguage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -994,14 +994,14 @@ func TestNotificationRepository_GetUsersWithDisabledNotifications(t *testing.T) 
 	tests := []struct {
 		name             string
 		notificationType string
-		mockSetup        func(*mocks.Querier)
+		mockSetup        func(*mocks.MockQuerier)
 		expectedResult   []uuid.UUID
 		expectedError    error
 	}{
 		{
 			name:             "successful get users with disabled appointment reminders",
 			notificationType: "appointment_reminders",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				userIDs := []pgtype.UUID{
 					{Bytes: userID1, Valid: true},
 					{Bytes: userID2, Valid: true},
@@ -1014,7 +1014,7 @@ func TestNotificationRepository_GetUsersWithDisabledNotifications(t *testing.T) 
 		{
 			name:             "successful get users with disabled health tips",
 			notificationType: "health_tips",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				userIDs := []pgtype.UUID{
 					{Bytes: userID1, Valid: true},
 				}
@@ -1026,7 +1026,7 @@ func TestNotificationRepository_GetUsersWithDisabledNotifications(t *testing.T) 
 		{
 			name:             "no users found with disabled notifications",
 			notificationType: "emergency_alerts",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUsersWithDisabledType", ctx, pgtype.Text{String: "emergency_alerts", Valid: true}).Return([]pgtype.UUID{}, nil)
 			},
 			expectedResult: []uuid.UUID{},
@@ -1035,7 +1035,7 @@ func TestNotificationRepository_GetUsersWithDisabledNotifications(t *testing.T) 
 		{
 			name:             "database error",
 			notificationType: "medication_reminders",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUsersWithDisabledType", ctx, pgtype.Text{String: "medication_reminders", Valid: true}).Return([]pgtype.UUID{}, assert.AnError)
 			},
 			expectedResult: nil,
@@ -1045,7 +1045,7 @@ func TestNotificationRepository_GetUsersWithDisabledNotifications(t *testing.T) 
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}
@@ -1076,14 +1076,14 @@ func TestNotificationRepository_GetUsersForHealthTips(t *testing.T) {
 	tests := []struct {
 		name           string
 		frequency      string
-		mockSetup      func(*mocks.Querier)
+		mockSetup      func(*mocks.MockQuerier)
 		expectedResult []uuid.UUID
 		expectedError  error
 	}{
 		{
 			name:      "successful get users for daily health tips",
 			frequency: "daily",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				userIDs := []pgtype.UUID{
 					{Bytes: userID1, Valid: true},
 					{Bytes: userID2, Valid: true},
@@ -1096,7 +1096,7 @@ func TestNotificationRepository_GetUsersForHealthTips(t *testing.T) {
 		{
 			name:      "successful get users for weekly health tips",
 			frequency: "weekly",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				userIDs := []pgtype.UUID{
 					{Bytes: userID1, Valid: true},
 				}
@@ -1108,7 +1108,7 @@ func TestNotificationRepository_GetUsersForHealthTips(t *testing.T) {
 		{
 			name:      "no users found for health tips frequency",
 			frequency: "monthly",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUsersForHealthTips", ctx, pgtype.Text{String: "monthly", Valid: true}).Return([]pgtype.UUID{}, nil)
 			},
 			expectedResult: []uuid.UUID{},
@@ -1117,7 +1117,7 @@ func TestNotificationRepository_GetUsersForHealthTips(t *testing.T) {
 		{
 			name:      "database error",
 			frequency: "daily",
-			mockSetup: func(m *mocks.Querier) {
+			mockSetup: func(m *mocks.MockQuerier) {
 				m.On("GetUsersForHealthTips", ctx, pgtype.Text{String: "daily", Valid: true}).Return([]pgtype.UUID{}, assert.AnError)
 			},
 			expectedResult: nil,
@@ -1127,7 +1127,7 @@ func TestNotificationRepository_GetUsersForHealthTips(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockQuerier := mocks.NewQuerier(t)
+			mockQuerier := mocks.NewMockQuerier(t)
 			tt.mockSetup(mockQuerier)
 
 			repo := &notificationRepository{querier: mockQuerier}

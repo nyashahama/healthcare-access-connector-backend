@@ -1,4 +1,4 @@
-.PHONY: help dev prod docker-up docker-down docker-logs db-migrate db-seed test clean build run
+.PHONY: help dev prod docker-up docker-down docker-logs db-migrate db-seed test clean build run sqlc mocks generate
 
 # Variables
 APP_NAME=healthcare-access-connector-backend
@@ -74,7 +74,9 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make generate-jwt     - Generate JWT secret"
-	@echo "  make sqlc             - Generate database code"
+	@echo "  make generate         - Generate sqlc code AND mocks (recommended)"
+	@echo "  make sqlc             - Generate sqlc database code only"
+	@echo "  make mocks            - Regenerate mocks from Querier interface only"
 	@echo "  make tidy             - Tidy dependencies"
 	@echo "  make install-tools    - Install development tools"
 	@echo "  make env-status       - Show current environment"
@@ -222,10 +224,21 @@ db-seed:
 	@echo "${GREEN}Seeding database with test data...${RESET}"
 	go run cmd/seed/main.go
 
-# Generate sqlc code
+# Generate sqlc code only
 sqlc:
 	@echo "${GREEN}Generating sqlc code...${RESET}"
 	sqlc generate
+	@echo "${GREEN}✓ sqlc code generated!${RESET}"
+
+# Generate mocks from the sqlc Querier interface
+mocks:
+	@echo "${GREEN}Generating mocks...${RESET}"
+	mockery
+	@echo "${GREEN}✓ Mocks generated!${RESET}"
+
+# Generate sqlc code AND mocks together (recommended - keeps them in sync)
+generate: sqlc mocks
+	@echo "${GREEN}✓ Code generation complete!${RESET}"
 
 # Run tests
 test:
@@ -295,6 +308,7 @@ install-tools:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install mvdan.cc/gofumpt@latest
 	go install github.com/cosmtrek/air@latest
+	go install github.com/vektra/mockery/v2@latest
 	@echo "${GREEN}✓ Tools installed!${RESET}"
 
 # Generate JWT secret
