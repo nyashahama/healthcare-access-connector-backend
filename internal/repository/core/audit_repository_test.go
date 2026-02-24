@@ -122,12 +122,12 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 				m.On("LogUserActivity", ctx, mock.MatchedBy(func(p sqlc.LogUserActivityParams) bool {
 					return p.UserID.Bytes == userID &&
 						p.ActivityType == "login" &&
-						string(p.ActivityDetails) == string(activityDetailsBytes) &&
+						string(p.Column3) == string(activityDetailsBytes) &&
 						p.IpAddress.String() == ipStr &&
 						p.UserAgent.String == "Mozilla/5.0" &&
 						p.DeviceType.String == "mobile" &&
 						p.DeviceID.String == "device123" &&
-						string(p.Location) == string(locationBytes) &&
+						string(p.Column8) == string(locationBytes) &&
 						p.ResourceType.String == "patient_record" &&
 						p.ResourceID.Bytes == resourceID
 				})).Return(nil)
@@ -143,12 +143,12 @@ func TestAuditRepository_LogUserActivity(t *testing.T) {
 				m.On("LogUserActivity", ctx, mock.MatchedBy(func(p sqlc.LogUserActivityParams) bool {
 					return !p.UserID.Valid &&
 						p.ActivityType == "logout" &&
-						string(p.ActivityDetails) == "null" && // Changed from len == 0
+						string(p.Column3) == "null" && // Changed from len == 0
 						p.IpAddress == nil &&
 						!p.UserAgent.Valid &&
 						!p.DeviceType.Valid &&
 						!p.DeviceID.Valid &&
-						string(p.Location) == "null" && // Changed from len == 0
+						string(p.Column8) == "null" && // Changed from len == 0
 						!p.ResourceType.Valid &&
 						!p.ResourceID.Valid
 				})).Return(nil)
