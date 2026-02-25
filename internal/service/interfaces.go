@@ -107,23 +107,7 @@ type NotificationService interface {
 type AuditService interface {
 	LogUserActivity(ctx context.Context, activity core.UserActivity) error
 	GetUserActivities(ctx context.Context, userID uuid.UUID, limit, offset int) ([]core.UserActivity, error)
-	GetActivitiesByType(ctx context.Context, activityType string, startDate, endDate time.Time) ([]core.UserActivity, error)
-	GetActivitiesByResource(ctx context.Context, resourceType string, resourceID uuid.UUID) ([]core.UserActivity, error)
 	LogDataAccess(ctx context.Context, access core.DataAccessLog) error
-	GetDataAccessLogs(ctx context.Context, accessedUserID uuid.UUID, limit, offset int) ([]core.DataAccessLog, error)
-	GetDataAccessLogsByAccessor(ctx context.Context, accessedByUserID uuid.UUID, limit, offset int) ([]core.DataAccessLog, error)
-	GetEmergencyAccessLogs(ctx context.Context, limit, offset int) ([]core.DataAccessLog, error)
-	GetAccessLogsByResourceType(ctx context.Context, resourceType string, startDate, endDate time.Time) ([]core.DataAccessLog, error)
-	GetSuspiciousActivities(ctx context.Context, threshold int) ([]core.UserActivity, error)
-	GetFailedLoginAttempts(ctx context.Context, userID *uuid.UUID, within time.Duration) ([]core.UserActivity, error)
-	GetUnauthorizedAccessAttempts(ctx context.Context, within time.Duration) ([]core.DataAccessLog, error)
-	ArchiveOldLogs(ctx context.Context, olderThan time.Duration) error
-	DeleteArchivedLogs(ctx context.Context, olderThan time.Duration) error
-	ArchiveOldActivities(ctx context.Context, olderThan time.Duration) error
-	GenerateAccessReport(ctx context.Context, userID uuid.UUID, startDate, endDate time.Time) (interface{}, error)
-	GenerateActivityReport(ctx context.Context, startDate, endDate time.Time) (interface{}, error)
-	ExportUserAuditTrail(ctx context.Context, userID uuid.UUID) ([]byte, error)
-	StartCleanupJob(archiveInterval, deleteInterval time.Duration)
 }
 
 // ConsentService defines the interface for consent management operations
