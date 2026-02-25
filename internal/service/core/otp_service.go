@@ -211,59 +211,6 @@ func (s *otpService) ResetPasswordWithOTP(ctx context.Context, identifier, otp, 
 	return s.resetPasswordWithToken(ctx, resetToken, newPassword, user)
 }
 
-// GetLatestActiveOTP gets the latest active OTP for a user
-func (s *otpService) GetLatestActiveOTP(ctx context.Context, userID uuid.UUID, otpType string) (core.OTPVerification, error) {
-	otp, err := s.otpRepo.GetLatestActiveOTP(ctx, userID, otpType)
-	if err != nil {
-		if errors.Is(err, domain.ErrNotFound) {
-			return core.OTPVerification{}, domain.NewAppError(domain.ErrNotFound, "No active OTP found", 404)
-		}
-		s.logger.Error().Err(err).Str("user_id", userID.String()).Str("type", otpType).Msg("Failed to get latest active OTP")
-		return core.OTPVerification{}, domain.NewAppError(err, "Failed to get OTP", 500)
-	}
-	return otp, nil
-}
-
-// InvalidateUserOTPs invalidates all OTPs for a user
-func (s *otpService) InvalidateUserOTPs(ctx context.Context, userID uuid.UUID, otpType string) error {
-	if err := s.otpRepo.InvalidateUserOTPs(ctx, userID, otpType); err != nil {
-		s.logger.Error().Err(err).Str("user_id", userID.String()).Str("type", otpType).Msg("Failed to invalidate user OTPs")
-		return domain.NewAppError(err, "Failed to invalidate OTPs", 500)
-	}
-	s.logger.Info().Str("user_id", userID.String()).Str("type", otpType).Msg("User OTPs invalidated")
-	return nil
-}
-
-// DeleteExpiredOTPs deletes all expired OTPs
-func (s *otpService) DeleteExpiredOTPs(ctx context.Context) error {
-	if err := s.otpRepo.DeleteExpiredOTPs(ctx); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to delete expired OTPs")
-		return domain.NewAppError(err, "Failed to delete expired OTPs", 500)
-	}
-	s.logger.Info().Msg("Expired OTPs deleted")
-	return nil
-}
-
-// GetOTPAttemptCount gets OTP attempt count for a user
-func (s *otpService) GetOTPAttemptCount(ctx context.Context, userID uuid.UUID, otpType string) (int64, error) {
-	count, err := s.otpRepo.GetOTPAttemptCount(ctx, userID, otpType)
-	if err != nil {
-		s.logger.Error().Err(err).Str("user_id", userID.String()).Str("type", otpType).Msg("Failed to get OTP attempt count")
-		return 0, domain.NewAppError(err, "Failed to get OTP attempt count", 500)
-	}
-	return count, nil
-}
-
-// GetRecentOTPs gets recent OTPs for a user within a time period
-func (s *otpService) GetRecentOTPs(ctx context.Context, userID uuid.UUID, within time.Duration) ([]core.OTPVerification, error) {
-	otps, err := s.otpRepo.GetRecentOTPs(ctx, userID, within)
-	if err != nil {
-		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to get recent OTPs")
-		return nil, domain.NewAppError(err, "Failed to get recent OTPs", 500)
-	}
-	return otps, nil
-}
-
 // Helper method to reset password with token
 func (s *otpService) resetPasswordWithToken(ctx context.Context, token, newPassword string, user core.User) error {
 	// Validate the reset token (fetch to check validity and expiry)

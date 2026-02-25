@@ -61,12 +61,6 @@ type OTPService interface {
 	GenerateOTP(ctx context.Context, identifier string) error
 	VerifyOTP(ctx context.Context, identifier, otp string) (string, core.User, error)
 	ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error
-	// Add new methods based on repository updates
-	GetLatestActiveOTP(ctx context.Context, userID uuid.UUID, otpType string) (core.OTPVerification, error)
-	InvalidateUserOTPs(ctx context.Context, userID uuid.UUID, otpType string) error
-	DeleteExpiredOTPs(ctx context.Context) error
-	GetOTPAttemptCount(ctx context.Context, userID uuid.UUID, otpType string) (int64, error)
-	GetRecentOTPs(ctx context.Context, userID uuid.UUID, within time.Duration) ([]core.OTPVerification, error)
 }
 
 // SessionService defines the interface for session management operations
