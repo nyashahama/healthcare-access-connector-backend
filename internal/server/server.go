@@ -432,13 +432,6 @@ func (s *Server) setupRoutes() http.Handler {
 					r.Get("/privacy", s.consentHandler.GetPrivacyConsent)
 					r.Post("/privacy", s.consentHandler.CreatePrivacyConsent)
 					r.Put("/privacy", s.consentHandler.UpdatePrivacyConsent)
-					r.Post("/withdraw", s.consentHandler.WithdrawConsent)
-					r.Put("/health-data", s.consentHandler.UpdateHealthDataConsent)
-					r.Put("/research", s.consentHandler.UpdateResearchConsent)
-					r.Put("/emergency-access", s.consentHandler.UpdateEmergencyAccessConsent)
-					r.Put("/communication", s.consentHandler.UpdateCommunicationConsents)
-					r.Get("/history", s.consentHandler.GetConsentHistory)
-					r.Get("/export", s.consentHandler.ExportConsentData)
 				})
 			})
 
@@ -446,36 +439,15 @@ func (s *Server) setupRoutes() http.Handler {
 			r.Route("/notifications", func(r chi.Router) {
 				r.Route("/users/{id}", func(r chi.Router) {
 					r.Get("/preferences", s.notificationHandler.GetPreferences)
-					r.Post("/preferences", s.notificationHandler.CreatePreferences)
 					r.Put("/preferences", s.notificationHandler.UpdatePreferences)
-					r.Put("/channels", s.notificationHandler.UpdateChannelSettings)
-					r.Put("/appointment-reminders", s.notificationHandler.UpdateAppointmentReminders)
-					r.Put("/health-tips", s.notificationHandler.UpdateHealthTips)
-					r.Put("/quiet-hours", s.notificationHandler.SetQuietHours)
 				})
-			})
-
-			// OTP (test/admin)
-			r.Route("/otp", func(r chi.Router) {
-				r.Get("/latest", s.otpHandler.GetLatestActiveOTP)
-				r.Delete("/invalidate", s.otpHandler.InvalidateUserOTPs)
-				r.Get("/attempts", s.otpHandler.GetOTPAttemptCount)
-				r.Get("/recent", s.otpHandler.GetRecentOTPs)
 			})
 
 			// Audit trails
 			r.Route("/audit", func(r chi.Router) {
 				r.Route("/users/{id}", func(r chi.Router) {
 					r.Get("/activities", s.auditHandler.GetUserActivities)
-					r.Get("/access-logs", s.auditHandler.GetDataAccessLogs)
-					r.Get("/export", s.auditHandler.ExportUserAuditTrail)
-					r.Post("/access-report", s.auditHandler.GenerateAccessReport)
 				})
-				r.Get("/activities/{type}", s.auditHandler.GetActivitiesByType)
-				r.Get("/emergency-access-logs", s.auditHandler.GetEmergencyAccessLogs)
-				r.Get("/suspicious-activities", s.auditHandler.GetSuspiciousActivities)
-				r.Get("/failed-login-attempts", s.auditHandler.GetFailedLoginAttempts)
-				r.Post("/activity-report", s.auditHandler.GenerateActivityReport)
 			})
 
 			// Admin-only routes
@@ -493,16 +465,7 @@ func (s *Server) setupRoutes() http.Handler {
 
 				r.Get("/patients/demographics", s.patientHandler.GetDemographicsSummary)
 
-				r.Delete("/otp/expired", s.otpHandler.DeleteExpiredOTPs)
 				r.Delete("/sessions/expired", s.sessionHandler.CleanupExpiredSessions)
-
-				r.Post("/consent/notify-expirations", s.consentHandler.NotifyConsentExpirations)
-				r.Get("/consent/active-by-type", s.consentHandler.GetActiveConsentsByType)
-				r.Get("/consent/expired", s.consentHandler.GetExpiredConsents)
-				r.Get("/consent/withdrawn", s.consentHandler.GetWithdrawnConsents)
-
-				r.Get("/notifications/can-send", s.notificationHandler.CanSendNotification)
-				r.Get("/notifications/disabled-users", s.notificationHandler.GetUsersWithDisabledNotifications)
 			})
 		})
 	})
