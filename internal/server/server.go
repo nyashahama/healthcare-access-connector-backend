@@ -186,19 +186,21 @@ func NewServer(
 	}
 }
 
+func (s *Server) buildHTTPServer(router http.Handler) *http.Server {
+	return &http.Server{
+		Addr:         s.config.Port,
+		Handler:      router,
+		ReadTimeout:  s.config.ReadTimeout,
+		WriteTimeout: s.config.WriteTimeout,
+		IdleTimeout:  s.config.IdleTimeout,
+	}
+}
+
 // Start starts the HTTP server with graceful shutdown.
 func (s *Server) Start() error {
 	router := s.setupRoutes()
 
-	s.httpServer = &http.Server{
-		Addr:    s.config.Port,
-		Handler: router,
-		// WebSocket connections are long-lived; WriteTimeout must be 0 so the
-		// server does not forcibly close them after the normal HTTP deadline.
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 0,
-		IdleTimeout:  60 * time.Second,
-	}
+	s.httpServer = s.buildHTTPServer(router)
 
 	serverErrors := make(chan error, 1)
 	go func() {

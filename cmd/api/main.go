@@ -27,6 +27,7 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to initialize application:", err)
 	}
+	defer application.Cleanup()
 
 	// Start server with graceful shutdown
 	if err := application.Run(); err != nil {
