@@ -18,8 +18,7 @@ go.work
 .env.local
 .env.*.local
 .env.test
-.env.development
-.env.production
+.worktrees/
 
 # IDEs
 .vscode/
