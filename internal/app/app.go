@@ -43,10 +43,13 @@ import (
 
 // App represents the application with all dependencies
 type App struct {
-	config *config.Config
-	server *server.Server
-	pool   *pgxpool.Pool
-	logger *zerolog.Logger
+	config       *config.Config
+	server       *server.Server
+	pool         *pgxpool.Pool
+	logger       *zerolog.Logger
+	broker       messaging.Broker
+	emailService email.Service
+	wsCancel     context.CancelFunc
 }
 
 // New creates a new application instance
@@ -86,7 +89,8 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, fmt.Errorf("ws config: %w", err)
 	}
 	wsHub := ws.NewHub(wsCfg, logger)
-	go wsHub.Run(context.Background()) // one goroutine for the lifetime of the app
+	wsCtx, wsCancel := context.WithCancel(context.Background())
+	go wsHub.Run(wsCtx) // one goroutine for the lifetime of the app
 
 	// Initialize email service
 	var emailService email.Service
@@ -467,10 +471,13 @@ func New(cfg *config.Config) (*App, error) {
 	)
 
 	return &App{
-		config: cfg,
-		server: srv,
-		pool:   pool,
-		logger: logger,
+		config:       cfg,
+		server:       srv,
+		pool:         pool,
+		logger:       logger,
+		broker:       broker,
+		emailService: emailService,
+		wsCancel:     wsCancel,
 	}, nil
 }
 
@@ -484,8 +491,30 @@ func (a *App) Run() error {
 	return a.server.Start()
 }
 
-// Cleanup performs cleanup operations
+// Cleanup performs cleanup operations in reverse initialization order:
+// email -> websocket -> broker -> database.
 func (a *App) Cleanup() {
+	if a.emailService != nil {
+		if err := a.emailService.Close(); err != nil {
+			a.logger.Warn().Err(err).Msg("Email service close error")
+		} else {
+			a.logger.Info().Msg("Email service closed")
+		}
+	}
+
+	if a.wsCancel != nil {
+		a.wsCancel()
+		a.logger.Info().Msg("WebSocket hub stopped")
+	}
+
+	if a.broker != nil {
+		if err := a.broker.Close(); err != nil {
+			a.logger.Warn().Err(err).Msg("Broker close error")
+		} else {
+			a.logger.Info().Msg("Message broker closed")
+		}
+	}
+
 	if a.pool != nil {
 		a.pool.Close()
 		a.logger.Info().Msg("Database connection closed")

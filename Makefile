@@ -9,6 +9,16 @@ GREEN  := $(shell tput -Txterm setaf 2)
 YELLOW := $(shell tput -Txterm setaf 3)
 RESET  := $(shell tput -Txterm sgr0)
 
+# Build metadata
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+LDFLAGS := -w -s \
+    -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.Version=$(VERSION) \
+    -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.Commit=$(COMMIT) \
+    -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.BuildDate=$(DATE)
+
 # Load environment variables from .env file
 ifneq (,$(wildcard .env))
     include .env
@@ -266,7 +276,10 @@ bench:
 # Build application
 build:
 	@echo "${GREEN}Building application...${RESET}"
-	CGO_ENABLED=0 go build -ldflags="-w -s" -o bin/$(BINARY_NAME) $(MAIN_PATH)/main.go
+	@echo "  Version: $(VERSION)"
+	@echo "  Commit:  $(COMMIT)"
+	@echo "  Date:    $(DATE)"
+	CGO_ENABLED=0 go build -ldflags="$(LDFLAGS)" -o bin/$(BINARY_NAME) $(MAIN_PATH)/main.go
 	@echo "${GREEN}✓ Build complete: bin/$(BINARY_NAME)${RESET}"
 
 # Clean build artifacts

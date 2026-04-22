@@ -15,9 +15,16 @@ RUN go mod verify
 COPY internal/ ./internal/
 COPY cmd/ ./cmd/
 
+ARG BUILD_VERSION=dev
+ARG BUILD_COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags='-w -s -extldflags "-static"' \
+    -ldflags="-w -s -extldflags '-static' \
+    -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.Version=${BUILD_VERSION} \
+    -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.Commit=${BUILD_COMMIT} \
+    -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.BuildDate=${BUILD_DATE}" \
     -a -installsuffix cgo \
     -o /app/api \
     ./cmd/api/main.go
