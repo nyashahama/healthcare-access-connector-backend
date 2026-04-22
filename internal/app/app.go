@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -183,6 +184,8 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.JWTExpiry,
 		cfg.SMSEnabled,
 		cfg.BcryptCost,
+		cfg.LoginMaxAttempts,
+		time.Duration(cfg.LoginLockoutMins)*time.Minute,
 	)
 
 	userService := servicecore.NewUserService(

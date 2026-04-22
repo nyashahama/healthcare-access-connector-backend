@@ -46,8 +46,10 @@ type authService struct {
 	tokenPool sync.Pool
 
 	// Rate limiting for login attempts
-	loginAttempts   map[string]loginAttempt
-	loginAttemptsMu sync.RWMutex
+	loginAttempts    map[string]loginAttempt
+	loginAttemptsMu  sync.RWMutex
+	loginMaxAttempts int
+	loginLockout     time.Duration
 }
 
 type loginAttempt struct {
@@ -73,6 +75,8 @@ func NewAuthService(
 	jwtExpiry time.Duration,
 	smsEnabled bool,
 	bcryptCost int,
+	loginMaxAttempts int,
+	loginLockout time.Duration,
 ) service.AuthService {
 	// Validate bcrypt cost
 	if bcryptCost < bcrypt.MinCost {
@@ -91,22 +95,24 @@ func NewAuthService(
 	}
 
 	service := &authService{
-		authRepo:      authRepo,
-		userRepo:      userRepo,
-		otpRepo:       otpRepo,
-		patientRepo:   patientRepo,
-		sessionSvc:    sessionSvc,
-		consentRepo:   consentRepo,
-		staffService:  staffService,
-		cache:         cache,
-		broker:        broker,
-		emailService:  emailService,
-		logger:        logger,
-		jwtSecret:     jwtSecret,
-		jwtExpiry:     jwtExpiry,
-		smsEnabled:    smsEnabled,
-		bcryptCost:    bcryptCost,
-		loginAttempts: make(map[string]loginAttempt),
+		authRepo:         authRepo,
+		userRepo:         userRepo,
+		otpRepo:          otpRepo,
+		patientRepo:      patientRepo,
+		sessionSvc:       sessionSvc,
+		consentRepo:      consentRepo,
+		staffService:     staffService,
+		cache:            cache,
+		broker:           broker,
+		emailService:     emailService,
+		logger:           logger,
+		jwtSecret:        jwtSecret,
+		jwtExpiry:        jwtExpiry,
+		smsEnabled:       smsEnabled,
+		bcryptCost:       bcryptCost,
+		loginMaxAttempts: loginMaxAttempts,
+		loginLockout:     loginLockout,
+		loginAttempts:    make(map[string]loginAttempt),
 		tokenPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 32)
@@ -148,11 +154,12 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 		"caregiver":      true,
 		"provider_staff": true,
 		"clinic_admin":   true,
-		"system_admin":   true,
-		"ngo_partner":    true,
 	}
 	if !validRoles[role] {
 		return core.User{}, domain.NewAppError(domain.ErrValidation, "Invalid role", 400)
+	}
+	if role == "system_admin" || role == "ngo_partner" {
+		return core.User{}, domain.NewAppError(domain.ErrForbidden, "Privileged roles require invitation or admin action", 403)
 	}
 
 	// Hash password
@@ -1110,9 +1117,8 @@ func (s *authService) recordFailedLogin(identifier string) {
 	attempt.attempts++
 	attempt.lastFailed = time.Now()
 
-	// Lock for 5 minutes after 5 failed attempts
-	if attempt.attempts >= 5 {
-		lockedUntil := time.Now().Add(5 * time.Minute)
+	if attempt.attempts >= s.loginMaxAttempts {
+		lockedUntil := time.Now().Add(s.loginLockout)
 		attempt.lockedUntil = &lockedUntil
 		s.logger.Warn().
 			Str("identifier", maskIdentifier(identifier)).

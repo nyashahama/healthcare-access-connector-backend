@@ -3,7 +3,6 @@ package appointments
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -374,7 +373,6 @@ func (h *AppointmentHandler) ConfirmAppointment(w http.ResponseWriter, r *http.R
 	// Validate input
 	v := validator.New()
 	// v.ValidateRequired("confirmed_by", string(userID))
-	fmt.Println("WHO TF IZ U", userID)
 
 	if !v.Valid() {
 		handler.RespondValidationError(w, v.Errors())

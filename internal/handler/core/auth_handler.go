@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -178,7 +177,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("the ip addresss is", ipAddress)
+	h.logger.Debug().Str("ip_address", ipAddress).Msg("login completed")
 
 	response := core.LoginResponse{
 		Token:     token,

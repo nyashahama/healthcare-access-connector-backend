@@ -406,7 +406,6 @@ func (s *appointmentService) ConfirmAppointment(ctx context.Context, id uuid.UUI
 		s.logger.Error().Err(err).Str("user_id", confirmedBy.String()).Msg("Failed to get confirmer")
 		return appointments.Appointment{}, domain.NewAppError(err, "User not found", 404)
 	}
-	fmt.Println(confirmer.Role)
 	if confirmer.Role != "provider_staff" && confirmer.Role != "doctor" {
 		s.logger.Warn().
 			Str("user_id", confirmedBy.String()).

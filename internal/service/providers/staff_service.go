@@ -179,10 +179,8 @@ func (s *staffService) CreateStaffInvitation(ctx context.Context, invitation pro
 	if !clinic.IsVerified {
 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Clinic must be verified to invite staff", 403)
 	}
-	fmt.Println("Here 1")
 	// Check if inviter has permission to manage staff
 	inviterStaff, err := s.staffRepo.GetStaffByUserAndClinic(ctx, invitation.InvitedBy, invitation.ClinicID)
-	fmt.Println("Here 2", inviterStaff)
 	if err != nil {
 		s.logger.Error().Err(err).
 			Str("user_id", invitation.InvitedBy.String()).
