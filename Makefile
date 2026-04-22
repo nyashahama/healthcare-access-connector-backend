@@ -317,7 +317,7 @@ generate-jwt:
 	@openssl rand -base64 32
 
 # Run all checks
-check: lint vet test
+check: build vet test
 	@echo "${GREEN}✓ All checks passed!${RESET}"
 
 # CI pipeline
