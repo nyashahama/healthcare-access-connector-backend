@@ -39,12 +39,13 @@ type Config struct {
 	NatsURL  string
 	CacheTTL time.Duration
 
-	// Email Configuration
-	EmailFrom     string
-	EmailHost     string
-	EmailPort     int
-	EmailUser     string
-	EmailPassword string
+	// Email Configuration (canonical names match SMTP standard and email package)
+	EmailProvider    string
+	EmailFromAddress string
+	SMTPHost         string
+	SMTPPort         int
+	SMTPUsername     string
+	SMTPPassword     string
 
 	// ===================
 	// NEW PERFORMANCE OPTIMIZATIONS
@@ -117,12 +118,13 @@ func Load() (*Config, error) {
 		NatsURL:        getEnv("NATS_URL", "nats://localhost:4222"),
 		CacheTTL:       getEnvAsDuration("CACHE_TTL_MINUTES", 5*time.Minute),
 
-		// Email Configuration
-		EmailFrom:     getEnv("EMAIL_FROM", ""),
-		EmailHost:     getEnv("EMAIL_HOST", ""),
-		EmailPort:     getEnvAsInt("EMAIL_PORT", 587),
-		EmailUser:     getEnv("EMAIL_USER", ""),
-		EmailPassword: getEnv("EMAIL_PASSWORD", ""),
+		// Email Configuration (canonical names)
+		EmailProvider:    getEnv("EMAIL_PROVIDER", ""),
+		EmailFromAddress: getEnv("EMAIL_FROM_ADDRESS", ""),
+		SMTPHost:         getEnv("SMTP_HOST", ""),
+		SMTPPort:         getEnvAsInt("SMTP_PORT", 587),
+		SMTPUsername:     getEnv("SMTP_USERNAME", ""),
+		SMTPPassword:     getEnv("SMTP_PASSWORD", ""),
 
 		// ===================
 		// PERFORMANCE OPTIMIZATIONS
@@ -282,6 +284,29 @@ func (c *Config) Validate() error {
 	}
 	if c.IdleTimeout < 1*time.Second {
 		errors = append(errors, "IDLE_TIMEOUT must be at least 1 second")
+	}
+
+	// Production hardening
+	if c.IsProduction() {
+		if strings.Contains(c.DBURL, "sslmode=disable") {
+			errors = append(errors, "DB_URL must use sslmode=require in production")
+		}
+		if c.EmailProvider == "smtp" {
+			if c.SMTPHost == "" {
+				errors = append(errors, "SMTP_HOST is required when EMAIL_PROVIDER=smtp in production")
+			}
+			if c.EmailFromAddress == "" {
+				errors = append(errors, "EMAIL_FROM_ADDRESS is required when EMAIL_PROVIDER=smtp in production")
+			}
+		}
+		if c.EmailProvider == "resend" && c.RedisURL == "" {
+			// Resend doesn't require Redis, but this is an example of provider-specific validation
+		}
+		if c.EmailProvider == "ses" {
+			if c.EmailFromAddress == "" {
+				errors = append(errors, "EMAIL_FROM_ADDRESS is required when EMAIL_PROVIDER=ses in production")
+			}
+		}
 	}
 
 	if len(errors) > 0 {
