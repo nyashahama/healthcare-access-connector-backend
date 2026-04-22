@@ -5,7 +5,7 @@ on:
     branches: [develop, main]
 
 jobs:
-  test:
+  fast-checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,6 +13,69 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go mod download
+      - run: go mod verify
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./...
+
+  generated-code-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go mod download
+      - name: Check sqlc drift
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+          sqlc generate
+          git diff --exit-code || (echo "sqlc generated code is out of date. Run 'make sqlc' and commit the changes." && exit 1)
+      - name: Check mock drift (optional)
+        run: |
+          if command -v mockery &> /dev/null; then
+            mockery
+            git diff --exit-code || (echo "Mocks are out of date. Run 'make mocks' and commit the changes." && exit 1)
+          fi
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg BUILD_VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo dev) \
+            --build-arg BUILD_COMMIT=$(git rev-parse --short HEAD) \
+            --build-arg BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            -t healthcare-access-connector:${{ github.sha }} .
+      - name: Verify binary has version metadata
+        run: |
+          docker run --rm healthcare-access-connector:${{ github.sha }} ./api --help || true
+
+  # Environment-backed checks require PostgreSQL
+  migration-validation:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_migrations
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install migrate
+        run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+      - name: Validate migrations
+        run: ./scripts/ci/migration-check.sh "postgres://postgres:test@localhost:5432/test_migrations?sslmode=disable"
