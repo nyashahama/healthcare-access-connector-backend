@@ -273,7 +273,9 @@ func (s *Server) setupRoutes() http.Handler {
 	r.Get("/health", s.healthHandler.Health)
 	r.Get("/ready", s.healthHandler.Readiness)
 	r.Get("/live", s.healthHandler.Liveness)
-	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+	if s.config.MetricsEnabled {
+		r.Get("/metrics", promhttp.Handler().ServeHTTP)
+	}
 
 	// ── API v1 ─────────────────────────────────────────────────────────────────
 	r.Route("/api/v1", func(r chi.Router) {
@@ -492,11 +494,17 @@ func (s *Server) setupRoutes() http.Handler {
 }
 
 // metricsMiddleware records Prometheus metrics for every request.
+// It uses chi route patterns to avoid unbounded cardinality from parameterized paths.
 func (s *Server) metricsMiddleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
-			path := r.URL.Path
+
+			// Use chi route pattern if available; otherwise bounded fallback.
+			routePattern := chi.RouteContext(r.Context()).RoutePattern()
+			if routePattern == "" {
+				routePattern = "unknown"
+			}
 			method := r.Method
 
 			ww := chimiddleware.NewWrapResponseWriter(w, r.ProtoMajor)
@@ -505,8 +513,8 @@ func (s *Server) metricsMiddleware() func(next http.Handler) http.Handler {
 			duration := time.Since(start).Seconds()
 			status := fmt.Sprintf("%d", ww.Status())
 
-			requestDuration.WithLabelValues(path, method).Observe(duration)
-			requestsTotal.WithLabelValues(path, method, status).Inc()
+			requestDuration.WithLabelValues(routePattern, method).Observe(duration)
+			requestsTotal.WithLabelValues(routePattern, method, status).Inc()
 		})
 	}
 }
