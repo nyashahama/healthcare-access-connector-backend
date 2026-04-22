@@ -16,7 +16,7 @@ func TestNewPoolConfigAppliesConfiguredLimits(t *testing.T) {
 		DBMaxConnIdleTime: 5 * time.Minute,
 	}
 
-	poolCfg, err := newPoolConfig("postgresql://postgres:admin@localhost:5432/app_db?sslmode=disable", cfg)
+	poolCfg, err := newPoolConfig("postgresql://postgres:replace_me@localhost:5432/app_db?sslmode=disable", cfg)
 	require.NoError(t, err)
 	require.Equal(t, int32(11), poolCfg.MaxConns)
 	require.Equal(t, int32(3), poolCfg.MinConns)

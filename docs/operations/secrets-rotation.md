@@ -13,10 +13,18 @@ This document describes how to rotate credentials after the repository was previ
 7. Revoke old tokens at each provider.
 8. Remove secrets from git history using the team-approved process (e.g., `git-filter-repo` or BFG Repo-Cleaner).
 
+## Secret Ownership
+
+For a complete registry of secret owners, rotation cadence, and responsibilities, see [Secret Ownership](secret-ownership.md).
+
+## Repository History Cleanup
+
+If live secrets were ever committed to git, follow the [Repository History Cleanup](repository-history-cleanup.md) procedure immediately, then rotate the exposed secrets.
+
 ## Post-Rotation Verification
 
 - Run `go test ./internal/config -run TestTrackedEnvFilesContainNoLiveSecrets -v` to confirm no live secrets remain in tracked env files.
-- Confirm `.env.development` and `.env.production` contain only placeholders.
+- Confirm `.env.example`, `.env.development`, and `.env.production` contain only placeholders.
 - Confirm `.gitignore` blocks `.env` and `.env.*.local` files.
 
 ## Local Development Setup
