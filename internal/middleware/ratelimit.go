@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +12,22 @@ import (
 type rateLimiter struct {
 	limiter  *rate.Limiter
 	lastSeen time.Time
+}
+
+// extractClientIP returns the client IP from trusted proxy headers or RemoteAddr.
+// In production this should be paired with a trusted-proxy allow-list.
+func extractClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP in the chain (closest to the client)
+		if idx := strings.Index(xff, ","); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+	if xri := r.Header.Get("X-Real-Ip"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	return r.RemoteAddr
 }
 
 // RateLimiter creates a simple IP-based rate limiter
@@ -38,7 +55,7 @@ func RateLimiter(rps int, burst int) func(next http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := r.RemoteAddr
+			ip := extractClientIP(r)
 
 			mu.Lock()
 			rl, exists := clients[ip]

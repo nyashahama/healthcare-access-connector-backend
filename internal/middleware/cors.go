@@ -27,10 +27,10 @@ func CORS(allowedOrigins []string) func(next http.Handler) http.Handler {
 			}
 
 			if allowed {
-				// If allowing all origins, use "*" or echo back the origin
-				// Note: "*" doesn't work with credentials, so we echo the origin
+				// Never emit "*" together with credentials. Echo the actual origin
+				// when allowing all, or use the matched origin.
 				if allowAll {
-					w.Header().Set("Access-Control-Allow-Origin", "*")
+					w.Header().Set("Access-Control-Allow-Origin", origin)
 				} else {
 					w.Header().Set("Access-Control-Allow-Origin", origin)
 				}
@@ -39,6 +39,7 @@ func CORS(allowedOrigins []string) func(next http.Handler) http.Handler {
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 				w.Header().Set("Access-Control-Allow-Credentials", "true")
 				w.Header().Set("Access-Control-Max-Age", "3600")
+				w.Header().Set("Vary", "Origin")
 			}
 
 			// Handle preflight requests
