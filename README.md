@@ -89,7 +89,7 @@ open http://localhost:8025
 
 ```bash
 # Run migrations
-make migrate-up DB_URL="postgres://postgres:admin@localhost:5432/healthcare_db?sslmode=disable"
+make migrate-up DB_URL="postgres://postgres:admin@localhost:5432/app_db?sslmode=disable"
 ```
 
 ### 5. Generate Database Code
@@ -386,7 +386,7 @@ JWT_SECRET=<generate-with-make-generate-jwt>
 ENVIRONMENT=production
 
 # Database (use managed PostgreSQL)
-DB_URL=postgres://user:pass@your-db-host:5432/healthcare_db?sslmode=require
+DB_URL=postgres://user:pass@your-db-host:5432/app_db?sslmode=require
 
 # Redis (use managed Redis)
 REDIS_URL=redis://your-redis-host:6379

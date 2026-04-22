@@ -224,28 +224,29 @@ func (r *userRepository) GetUserProfile(ctx context.Context, userID uuid.UUID) (
 		userDBQueryDuration.Observe(time.Since(start).Seconds())
 	}()
 
-	// Get the user
 	user, err := r.GetUserByID(ctx, userID)
 	if err != nil {
 		userDBQueryTotal.WithLabelValues("get_user_profile", "error").Inc()
 		return core.User{}, patients.PatientProfile{}, err
 	}
 
-	// Get patient profile using the injected patient profile repository
-	patientProfile, err := r.patientProfileRepo.GetPatientProfileByUserID(ctx, userID)
+	if r.patientProfileRepo == nil {
+		userDBQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
+		return user, patients.PatientProfile{}, nil
+	}
+
+	profile, err := r.patientProfileRepo.GetPatientProfileByUserID(ctx, userID)
+	if errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrPatientNotFound) {
+		userDBQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
+		return user, patients.PatientProfile{}, nil
+	}
 	if err != nil {
-		// Check if error is "not found" - that's acceptable for users who aren't patients
-		if errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrPatientNotFound) {
-			// Return user with empty patient profile
-			userDBQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
-			return user, patients.PatientProfile{}, nil
-		}
 		userDBQueryTotal.WithLabelValues("get_user_profile", "error").Inc()
 		return core.User{}, patients.PatientProfile{}, fmt.Errorf("get patient profile: %w", err)
 	}
 
 	userDBQueryTotal.WithLabelValues("get_user_profile", "success").Inc()
-	return user, patientProfile, nil
+	return user, profile, nil
 }
 
 func (r *userRepository) UpdateUserEmail(ctx context.Context, id uuid.UUID, email string) error {

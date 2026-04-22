@@ -160,8 +160,6 @@ func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Cli
 		UpdatedAt:              now,
 	}
 
-	fmt.Println(ownerStaff)
-
 	// Try to create owner staff record
 	if c.staffRepo != nil {
 		if _, err := c.staffRepo.CreateStaffMember(ctx, ownerStaff); err != nil {

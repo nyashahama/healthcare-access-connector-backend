@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -182,6 +183,10 @@ func Load() (*Config, error) {
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
 		return nil, err
+	}
+
+	if cfg.IsProduction() && slices.Contains(cfg.AllowedOrigins, "*") {
+		return nil, fmt.Errorf("ALLOWED_ORIGINS must not contain '*' in production")
 	}
 
 	return cfg, nil

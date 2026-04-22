@@ -178,6 +178,9 @@ make switch-dev
 Make sure you haven't accidentally added real secrets to `.env.development` or `.env.production`:
 
 ```bash
+# Run the automated guard test
+go test ./internal/config -run TestTrackedEnvFilesContainNoLiveSecrets -v
+
 # Check what will be committed
 git diff .env.development
 git diff .env.production

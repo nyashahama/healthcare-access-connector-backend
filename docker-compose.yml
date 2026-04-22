@@ -11,7 +11,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin
-      POSTGRES_DB: healthcare_db
+      POSTGRES_DB: app_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -96,8 +96,7 @@ services:
       - .env  # Will be a symlink to .env.development or .env.production
     environment:
       # Override with Docker internal hostnames
-      DB_HOST: postgres
-      DB_PORT: 5432
+      DB_URL: postgresql://postgres:admin@postgres:5432/app_db?sslmode=disable
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
       SMTP_HOST: mailpit

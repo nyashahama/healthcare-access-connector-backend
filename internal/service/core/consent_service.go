@@ -136,10 +136,8 @@ func (s *consentService) UpdatePrivacyConsent(ctx context.Context, consent core.
 		return err
 	}
 
-	// Get existing consent to compare
-	existing, err := s.GetPrivacyConsent(ctx, consent.UserID)
-	fmt.Print(existing)
-	if err != nil {
+	// Verify existing consent exists before updating
+	if _, err := s.GetPrivacyConsent(ctx, consent.UserID); err != nil {
 		return err
 	}
 

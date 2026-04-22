@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -53,7 +54,7 @@ func New(cfg *config.Config) (*App, error) {
 	logger := cfg.Logger()
 
 	// Initialize database connection pool
-	pool, err := initDatabase(cfg.DBURL, logger)
+	pool, err := initDatabase(cfg.DBURL, logger, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
@@ -183,6 +184,8 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.JWTExpiry,
 		cfg.SMSEnabled,
 		cfg.BcryptCost,
+		cfg.LoginMaxAttempts,
+		time.Duration(cfg.LoginLockoutMins)*time.Minute,
 	)
 
 	userService := servicecore.NewUserService(
@@ -489,16 +492,27 @@ func (a *App) Cleanup() {
 	}
 }
 
+func newPoolConfig(dbURL string, cfg *config.Config) (*pgxpool.Config, error) {
+	poolCfg, err := pgxpool.ParseConfig(dbURL)
+	if err != nil {
+		return nil, err
+	}
+	poolCfg.MaxConns = int32(cfg.DBMaxConns)
+	poolCfg.MinConns = int32(cfg.DBMinConns)
+	poolCfg.MaxConnLifetime = cfg.DBMaxConnLifetime
+	poolCfg.MaxConnIdleTime = cfg.DBMaxConnIdleTime
+	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	return poolCfg, nil
+}
+
 // initDatabase initializes the database connection pool
-func initDatabase(dbURL string, logger *zerolog.Logger) (*pgxpool.Pool, error) {
-	config, err := pgxpool.ParseConfig(dbURL)
+func initDatabase(dbURL string, logger *zerolog.Logger, cfg *config.Config) (*pgxpool.Pool, error) {
+	poolCfg, err := newPoolConfig(dbURL, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	config.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
-
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
 	if err != nil {
 		return nil, err
 	}

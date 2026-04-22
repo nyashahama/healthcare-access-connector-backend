@@ -1369,3 +1369,22 @@ func TestUserRepository_GetUsersByIDs(t *testing.T) {
 		})
 	}
 }
+
+func TestUserRepository_GetUserProfile_WhenPatientRepoMissingDoesNotPanic(t *testing.T) {
+	ctx := context.Background()
+	userID := uuid.MustParse("123e4567-e89b-12d3-a456-426614174000")
+	mockQuerier := mocks.NewMockQuerier(t)
+
+	mockQuerier.On("GetUserByID", ctx, uuidPgtypeFromString(userID.String())).Return(sqlc.GetUserByIDRow{
+		ID:        uuidPgtypeFromString(userID.String()),
+		Email:     "test@example.com",
+		Role:      "patient",
+		CreatedAt: pgtype.Timestamp{Time: nowTime(), Valid: true},
+		UpdatedAt: pgtype.Timestamp{Time: nowTime(), Valid: true},
+	}, nil)
+
+	repo := &userRepository{querier: mockQuerier}
+	require.NotPanics(t, func() {
+		_, _, _ = repo.GetUserProfile(ctx, userID)
+	})
+}

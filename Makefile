@@ -160,8 +160,8 @@ docker-rebuild:
 # Database migrations - auto-detects environment
 db-migrate:
 	@if [ -z "$(DB_URL)" ]; then \
-		echo "${YELLOW}Error: DATABASE_URL not set in .env file${RESET}"; \
-		echo "Please ensure DATABASE_URL is set in your .env file"; \
+		echo "${YELLOW}Error: DB_URL not set in .env file${RESET}"; \
+		echo "Please ensure DB_URL is set in your .env file"; \
 		exit 1; \
 	fi
 	@echo "${GREEN}Running database migrations...${RESET}"
@@ -190,7 +190,7 @@ migrate-up: db-migrate
 
 migrate-down:
 	@if [ -z "$(DB_URL)" ]; then \
-		echo "${YELLOW}Error: DATABASE_URL not set in .env file${RESET}"; \
+		echo "${YELLOW}Error: DB_URL not set in .env file${RESET}"; \
 		exit 1; \
 	fi
 	@echo "${YELLOW}Warning: This will rollback the last migration${RESET}"
@@ -211,7 +211,7 @@ migrate-create:
 
 migrate-status:
 	@if [ -z "$(DB_URL)" ]; then \
-		echo "${YELLOW}Error: DATABASE_URL not set in .env file${RESET}"; \
+		echo "${YELLOW}Error: DB_URL not set in .env file${RESET}"; \
 		exit 1; \
 	fi
 	@echo "${GREEN}Migration Status${RESET}"
@@ -317,7 +317,7 @@ generate-jwt:
 	@openssl rand -base64 32
 
 # Run all checks
-check: lint vet test
+check: build vet test
 	@echo "${GREEN}✓ All checks passed!${RESET}"
 
 # CI pipeline
@@ -353,8 +353,8 @@ env-status:
 		echo "${YELLOW}  .env does not exist${RESET}"; \
 	fi
 	@echo ""
-	@if [ -n "$(DATABASE_URL)" ]; then \
-		echo "  DATABASE_URL: Set ✓"; \
+	@if [ -n "$(DB_URL)" ]; then \
+		echo "  DB_URL: Set ✓"; \
 	else \
-		echo "  DATABASE_URL: ${YELLOW}Not set ✗${RESET}"; \
+		echo "  DB_URL: ${YELLOW}Not set ✗${RESET}"; \
 	fi
