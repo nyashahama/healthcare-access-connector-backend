@@ -1,6 +1,6 @@
 # Healthcare Access Connector API
 
-A production-ready healthcare access platform built with Go, connecting patients with healthcare providers, managing appointments, and facilitating seamless healthcare service delivery.
+A healthcare access platform backend under active development toward production readiness, built with Go. It connects patients with healthcare providers, manages appointments, and facilitates healthcare service delivery.
 
 ## 🏥 Features
 
@@ -20,7 +20,7 @@ A production-ready healthcare access platform built with Go, connecting patients
 - 🛡️ **Security** - Rate limiting, CORS, input validation, HIPAA-compliant design
 - 🗃️ **Clean Architecture** - Separation of concerns, dependency injection
 - 🐳 **Docker Ready** - Full Docker Compose setup
-- ✅ **Production Ready** - Health checks, graceful shutdown, comprehensive error handling
+- 🛠️ **Production Readiness Program** - In progress; see `docs/superpowers/plans/` for the active hardening plan
 
 ## 🏗️ Architecture
 
@@ -89,7 +89,7 @@ open http://localhost:8025
 
 ```bash
 # Run migrations
-make migrate-up DB_URL="postgres://postgres:admin@localhost:5432/app_db?sslmode=disable"
+make migrate-up DB_URL="postgres://postgres:replace_me@localhost:5432/app_db?sslmode=disable"
 ```
 
 ### 5. Generate Database Code
@@ -394,12 +394,12 @@ REDIS_URL=redis://your-redis-host:6379
 # Email (AWS SES)
 EMAIL_PROVIDER=ses
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=<your-key>
-AWS_SECRET_ACCESS_KEY=<your-secret>
-EMAIL_FROM_ADDRESS=noreply@yourdomain.com
+AWS_ACCESS_KEY_ID=<EXAMPLE-AWS-KEY-ID-NOT-REAL>
+AWS_SECRET_ACCESS_KEY=<example-aws-secret-key-not-real-do-not-use>
+EMAIL_FROM_ADDRESS=noreply@example.local
 
 # CORS (restrict to your frontend)
-ALLOWED_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
+ALLOWED_ORIGINS=https://example.local,https://www.example.local
 
 # Rate Limiting
 RATE_LIMIT_RPS=50

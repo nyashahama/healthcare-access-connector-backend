@@ -1,0 +1,81 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          COMMIT=$(git rev-parse HEAD)
+          SHORT_COMMIT=$(git rev-parse --short HEAD)
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "commit=${COMMIT}" >> $GITHUB_OUTPUT
+          echo "short_commit=${SHORT_COMMIT}" >> $GITHUB_OUTPUT
+          echo "date=${DATE}" >> $GITHUB_OUTPUT
+
+      - name: Build binary
+        run: |
+          CGO_ENABLED=0 go build \
+            -ldflags="-w -s \
+              -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.Version=${{ steps.meta.outputs.version }} \
+              -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.Commit=${{ steps.meta.outputs.commit }} \
+              -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.BuildDate=${{ steps.meta.outputs.date }}" \
+            -o healthcare-access-connector-${{ steps.meta.outputs.version }}-linux-amd64 \
+            ./cmd/api/main.go
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg BUILD_VERSION=${{ steps.meta.outputs.version }} \
+            --build-arg BUILD_COMMIT=${{ steps.meta.outputs.commit }} \
+            --build-arg BUILD_DATE=${{ steps.meta.outputs.date }} \
+            -t healthcare-access-connector:${{ steps.meta.outputs.version }} .
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          git log --pretty=format:'- %s' $(git describe --tags --abbrev=0 HEAD~1)..HEAD || echo "- Release ${{ steps.meta.outputs.version }}" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Record migration version
+        run: |
+          echo "Migration version at release: $(ls database/migrations/*.up.sql | sort -V | tail -n 1 | sed 's/.*\\//;s/_.*//')" > MIGRATION_VERSION.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ steps.meta.outputs.version }}
+          body: |
+            ## Release ${{ steps.meta.outputs.version }}
+
+            - **Version:** ${{ steps.meta.outputs.version }}
+            - **Commit:** `${{ steps.meta.outputs.commit }}`
+            - **Build Date:** ${{ steps.meta.outputs.date }}
+
+            ### Changelog
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Artifacts
+            - `healthcare-access-connector-${{ steps.meta.outputs.version }}-linux-amd64`
+            - Docker image: `healthcare-access-connector:${{ steps.meta.outputs.version }}`
+          files: |
+            healthcare-access-connector-${{ steps.meta.outputs.version }}-linux-amd64
+            MIGRATION_VERSION.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

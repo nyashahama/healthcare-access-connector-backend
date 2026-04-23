@@ -1,0 +1,12 @@
+# GitGuardian configuration
+# These files contain intentional placeholder values for secrets.
+# They are templates and documentation, not real secrets.
+version: 2
+
+paths-ignore:
+  - '.env.example'
+  - '.env.development'
+  - '.env.production'
+  - '**/*_test.go'
+  - 'README.md'
+  - 'docs/**/*.md'

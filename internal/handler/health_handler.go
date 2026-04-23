@@ -11,6 +11,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/version"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/ws"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -129,7 +130,7 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 		Status:    status,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Services:  services,
-		Version:   "1.0.0",
+		Version:   version.Version + " (" + version.Commit + ")",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
