@@ -12,6 +12,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	pat_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/patients"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
@@ -65,6 +66,21 @@ func (h *PatientHandler) CreatePatientProfile(w http.ResponseWriter, r *http.Req
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, pat_dto.ErrorResponse{
 			Error: "Invalid request body",
+		})
+		return
+	}
+
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, pat_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	if claims.UserID != req.UserID {
+		handler.RespondJSON(w, http.StatusForbidden, pat_dto.ErrorResponse{
+			Error: "Cannot create profile for another user",
 		})
 		return
 	}
