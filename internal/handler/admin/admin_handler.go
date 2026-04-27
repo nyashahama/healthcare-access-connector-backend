@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/admin"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
@@ -38,6 +39,21 @@ func NewAdminHandler(
 func (h *AdminHandler) CreateSystemAdmin(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
+
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, admin.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	if claims.Role != "system_admin" {
+		handler.RespondJSON(w, http.StatusForbidden, admin.ErrorResponse{
+			Error: "Insufficient permissions",
+		})
+		return
+	}
 
 	var req admin.CreateSystemAdminRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -86,6 +102,21 @@ func (h *AdminHandler) CreateSystemAdmin(w http.ResponseWriter, r *http.Request)
 func (h *AdminHandler) GetSystemAdminByUserID(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
+
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, admin.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	if claims.Role != "system_admin" {
+		handler.RespondJSON(w, http.StatusForbidden, admin.ErrorResponse{
+			Error: "Insufficient permissions",
+		})
+		return
+	}
 
 	userIDStr := chi.URLParam(r, "user_id")
 	userID, err := uuid.Parse(userIDStr)

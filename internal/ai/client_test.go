@@ -92,7 +92,8 @@ func TestClient_SummarizeSymptoms(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			err = json.NewEncoder(w).Encode(response)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -231,7 +232,10 @@ func (c *testAIClient) testCall(ctx context.Context, body chatRequest) (string, 
 	}
 
 	var chat chatResponse
-	json.Unmarshal(respBytes, &chat)
+	err = json.Unmarshal(respBytes, &chat)
+	if err != nil {
+		return "", fmt.Errorf("ai: unmarshal response: %w", err)
+	}
 
 	if chat.Error != nil {
 		return "", fmt.Errorf("ai: upstream error: %s", chat.Error.Message)

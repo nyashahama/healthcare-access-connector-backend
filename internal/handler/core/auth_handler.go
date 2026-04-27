@@ -257,7 +257,23 @@ func (h *AuthHandler) VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	token := r.URL.Query().Get("token")
+	var token string
+
+	if r.Method == http.MethodGet {
+		token = r.URL.Query().Get("token")
+	} else {
+		var req struct {
+			Token string `json:"token"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
+				Error: "Invalid request body",
+			})
+			return
+		}
+		token = req.Token
+	}
+
 	if token == "" {
 		handler.RespondJSON(w, http.StatusBadRequest, core.ErrorResponse{
 			Error: "Verification token is required",

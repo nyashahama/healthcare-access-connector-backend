@@ -225,7 +225,7 @@ func (c *Config) Validate() error {
 		errors = append(errors, "RATE_LIMIT_BURST must be >= RATE_LIMIT_RPS")
 	}
 
-	validEnvs := map[string]bool{"development": true, "staging": true, "production": true}
+	validEnvs := map[string]bool{"development": true, "staging": true, "production": true, "test": true}
 	if !validEnvs[c.Environment] {
 		errors = append(errors, "ENVIRONMENT must be one of: development, staging, production")
 	}

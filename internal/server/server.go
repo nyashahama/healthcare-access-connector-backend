@@ -240,6 +240,11 @@ func (s *Server) Start() error {
 	return nil
 }
 
+// Router returns the configured router for testing purposes.
+func (s *Server) Router() http.Handler {
+	return s.setupRoutes()
+}
+
 // setupRoutes configures all routes and middleware.
 func (s *Server) setupRoutes() http.Handler {
 	// ── WebSocket router ───────────────────────────────────────────────────────
@@ -283,6 +288,7 @@ func (s *Server) setupRoutes() http.Handler {
 		r.Post("/auth/register", s.authHandler.Register)
 		r.Post("/auth/login", s.authHandler.Login)
 		r.Get("/auth/verify-email", s.authHandler.VerifyEmail)
+		r.Post("/auth/verify-email", s.authHandler.VerifyEmail)
 		r.Post("/auth/password/reset-request", s.authHandler.RequestPasswordReset)
 		r.Post("/auth/password/reset", s.authHandler.ResetPassword)
 		r.Post("/auth/resend-verification", s.authHandler.ResendVerificationEmail)

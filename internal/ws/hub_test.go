@@ -383,15 +383,15 @@ func TestHub_MessageHandler(t *testing.T) {
 		assert.Nil(t, hub.MessageHandler)
 	})
 
-	t.Run("calls message handler on message event", func(t *testing.T) {
+t.Run("calls message handler on message event", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -412,10 +412,8 @@ func TestHub_MessageHandler(t *testing.T) {
 			Content:     "Hello",
 		}
 
-		if hub.MessageHandler != nil {
-			hub.MessageHandler(context.Background(), "consultation-1", "user-1", "patient", payload)
-		}
-
+		err := hub.MessageHandler(context.Background(), "consultation-1", "user-1", "patient", payload)
+		require.NoError(t, err)
 		assert.True(t, handlerCalled)
 	})
 }

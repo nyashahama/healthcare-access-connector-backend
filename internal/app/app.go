@@ -44,7 +44,7 @@ import (
 // App represents the application with all dependencies
 type App struct {
 	config       *config.Config
-	server       *server.Server
+	Server       *server.Server
 	pool         *pgxpool.Pool
 	logger       *zerolog.Logger
 	broker       messaging.Broker
@@ -472,7 +472,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	return &App{
 		config:       cfg,
-		server:       srv,
+		Server:       srv,
 		pool:         pool,
 		logger:       logger,
 		broker:       broker,
@@ -488,7 +488,7 @@ func (a *App) Run() error {
 		Str("port", a.config.Port).
 		Msg("Starting healthcare access connector")
 
-	return a.server.Start()
+	return a.Server.Start()
 }
 
 // Cleanup performs cleanup operations in reverse initialization order:
