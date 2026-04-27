@@ -1,4 +1,4 @@
-.PHONY: help dev prod docker-up docker-down docker-logs db-migrate db-seed test clean build run sqlc mocks generate
+.PHONY: help dev prod docker-up docker-down docker-logs db-migrate db-seed test test-smoke clean build run sqlc mocks generate
 
 # Variables
 APP_NAME=healthcare-access-connector-backend
@@ -70,6 +70,8 @@ help:
 	@echo "  make test             - Run all tests"
 	@echo "  make test-coverage    - Run tests with coverage"
 	@echo "  make test-unit        - Run unit tests only"
+	@echo "  make test-integration - Run integration tests"
+	@echo "  make test-smoke       - Run smoke tests"
 	@echo "  make bench            - Run benchmarks"
 	@echo ""
 	@echo "Build:"
@@ -268,6 +270,10 @@ test-unit:
 test-integration:
 	@echo "${GREEN}Running integration tests...${RESET}"
 	go test -v -tags=integration ./tests/integration/...
+
+test-smoke:
+	@echo "${GREEN}Running smoke tests...${RESET}"
+	go test -v -short -run "TestSmoke|TestHealth|TestPing" ./...
 
 bench:
 	@echo "${GREEN}Running benchmarks...${RESET}"

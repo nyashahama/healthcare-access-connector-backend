@@ -67,7 +67,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("JWT_SECRET", "test-jwt-secret-key-for-integration-tests")
 	os.Setenv("ENVIRONMENT", "test")
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	absPath := filepath.Join("..", "..", "database/migrations")
 	migration, err := migrate.New(
