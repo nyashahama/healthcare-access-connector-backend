@@ -348,7 +348,9 @@ func (s *authService) Login(ctx context.Context, identifier, password, ipAddress
 
 		// Invalidate cache on failed password
 		if s.cache != nil {
-			s.cache.Delete(ctx, cacheKey)
+			if err := s.cache.Delete(ctx, cacheKey); err != nil {
+				s.logger.Warn().Err(err).Str("identifier", maskIdentifier(identifier)).Msg("Failed to delete login cache entry after failed password")
+			}
 		}
 
 		return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrInvalidCredentials, "Invalid credentials", 401)
@@ -475,7 +477,9 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*s
 
 	// Cache token validation
 	if s.cache != nil && s.cache.IsAvailable() {
-		s.cache.Set(ctx, cacheKey, tokenClaims, 1*time.Minute)
+		if err := s.cache.Set(ctx, cacheKey, tokenClaims, 1*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Str("cache_key", cacheKey).Msg("Failed to cache token validation result")
+		}
 	}
 
 	return tokenClaims, nil
@@ -484,8 +488,11 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*s
 // RefreshToken refreshes JWT token
 func (s *authService) RefreshToken(ctx context.Context, tokenString string, ipAddress, userAgent string) (string, time.Time, core.User, error) {
 	claims, err := s.ValidateToken(ctx, tokenString)
-	if err != nil && !errors.Is(err, domain.ErrExpiredToken) {
+	if err != nil {
 		return "", time.Time{}, core.User{}, err
+	}
+	if claims == nil {
+		return "", time.Time{}, core.User{}, domain.NewAppError(domain.ErrInvalidToken, "Invalid token claims", 401)
 	}
 
 	user, err := s.userRepo.GetUserByID(ctx, claims.UserID)
@@ -512,7 +519,9 @@ func (s *authService) RefreshToken(ctx context.Context, tokenString string, ipAd
 
 	// Invalidate old token cache
 	if s.cache != nil {
-		s.cache.Delete(ctx, fmt.Sprintf("token:valid:%s", tokenString))
+		if err := s.cache.Delete(ctx, fmt.Sprintf("token:valid:%s", tokenString)); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to delete old token cache entry during refresh")
+		}
 	}
 
 	return newToken, expiresAt, user, nil
@@ -527,7 +536,9 @@ func (s *authService) Logout(ctx context.Context, tokenString string, userID uui
 
 	// Invalidate token cache
 	if s.cache != nil {
-		s.cache.Delete(ctx, fmt.Sprintf("token:valid:%s", tokenString))
+		if err := s.cache.Delete(ctx, fmt.Sprintf("token:valid:%s", tokenString)); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to delete token cache entry during logout")
+		}
 	}
 
 	s.logger.Info().Str("user_id", userID.String()).Msg("User logged out successfully")
@@ -569,7 +580,9 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 
 	// Invalidate login cache
 	if s.cache != nil && user.Email != nil {
-		s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+		if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email)); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to delete login cache entry during verification")
+		}
 	}
 
 	// Send welcome email asynchronously
@@ -594,7 +607,12 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 
 	s.logger.Info().
 		Str("user_id", user.ID.String()).
-		Str("email", *user.Email).
+		Str("email", func() string {
+			if user.Email == nil {
+				return ""
+			}
+			return *user.Email
+		}()).
 		Msg("Email verified successfully")
 
 	return nil
@@ -620,6 +638,10 @@ func (s *authService) RequestPasswordReset(ctx context.Context, identifier strin
 
 	// Generate reset token
 	resetToken := s.generateSecureToken()
+	if resetToken == "" {
+		s.logger.Error().Msg("Failed to generate password reset token")
+		return domain.NewAppError(nil, "Failed to generate reset token", 500)
+	}
 	tokenExpires := time.Now().Add(1 * time.Hour)
 
 	// Store reset token
@@ -675,7 +697,11 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 
 	// Send verification email
 	if s.emailService != nil && s.emailService.IsAvailable() {
-		if err := s.emailService.SendPasswordChangedEmail(ctx, *user.Email, *user.Email); err != nil {
+		emailAddress := ""
+		if user.Email != nil {
+			emailAddress = *user.Email
+		}
+		if err := s.emailService.SendPasswordChangedEmail(ctx, emailAddress, emailAddress); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to send password changed email")
 			return domain.NewAppError(err, "Failed to send password changed email", 500)
 		}
@@ -686,10 +712,14 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 	// Invalidate all caches for this user
 	if s.cache != nil {
 		if user.Email != nil {
-			s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+			if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email)); err != nil {
+				s.logger.Warn().Err(err).Msg("Failed to delete email login cache entry during password reset")
+			}
 		}
 		if user.Phone != nil {
-			s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone))
+			if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone)); err != nil {
+				s.logger.Warn().Err(err).Msg("Failed to delete phone login cache entry during password reset")
+			}
 		}
 	}
 
@@ -726,6 +756,10 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, email string)
 
 	// Generate new verification token
 	verificationToken := s.generateSecureToken()
+	if verificationToken == "" {
+		s.logger.Error().Msg("Failed to generate verification token")
+		return domain.NewAppError(nil, "Failed to generate verification token", 500)
+	}
 	tokenExpires := time.Now().Add(24 * time.Hour)
 
 	// Store verification token
@@ -785,10 +819,14 @@ func (s *authService) UpdateUserOnboardingStep(ctx context.Context, userID uuid.
 		user, err := s.userRepo.GetUserByID(ctx, userID)
 		if err == nil {
 			if user.Email != nil {
-				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+				if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email)); err != nil {
+					s.logger.Warn().Err(err).Msg("Failed to delete email login cache entry after onboarding step update")
+				}
 			}
 			if user.Phone != nil {
-				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone))
+				if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone)); err != nil {
+					s.logger.Warn().Err(err).Msg("Failed to delete phone login cache entry after onboarding step update")
+				}
 			}
 		}
 	}
@@ -837,10 +875,14 @@ func (s *authService) UpdateUserPrimaryClinic(ctx context.Context, userID, clini
 		user, err := s.userRepo.GetUserByID(ctx, userID)
 		if err == nil {
 			if user.Email != nil {
-				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+				if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email)); err != nil {
+					s.logger.Warn().Err(err).Msg("Failed to delete email login cache entry after primary clinic update")
+				}
 			}
 			if user.Phone != nil {
-				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone))
+				if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone)); err != nil {
+					s.logger.Warn().Err(err).Msg("Failed to delete phone login cache entry after primary clinic update")
+				}
 			}
 		}
 	}
@@ -882,10 +924,14 @@ func (s *authService) CompleteUserOnboarding(ctx context.Context, userID uuid.UU
 		user, err := s.userRepo.GetUserByID(ctx, userID)
 		if err == nil {
 			if user.Email != nil {
-				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email))
+				if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Email)); err != nil {
+					s.logger.Warn().Err(err).Msg("Failed to delete email login cache entry after onboarding completion")
+				}
 			}
 			if user.Phone != nil {
-				s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone))
+				if err := s.cache.Delete(ctx, fmt.Sprintf("user:login:%s", *user.Phone)); err != nil {
+					s.logger.Warn().Err(err).Msg("Failed to delete phone login cache entry after onboarding completion")
+				}
 			}
 		}
 	}
@@ -1041,6 +1087,10 @@ func (s *authService) handlePostRegistration(user core.User, email, phone, role 
 	// Send verification email if email provided
 	if email != "" && s.emailService != nil && s.emailService.IsAvailable() {
 		verificationToken := s.generateSecureToken()
+		if verificationToken == "" {
+			s.logger.Error().Msg("Failed to generate verification token during registration")
+			return
+		}
 		tokenExpires := time.Now().Add(24 * time.Hour)
 
 		if err := s.authRepo.SetVerificationToken(ctx, user.ID, verificationToken, tokenExpires); err != nil {
@@ -1082,7 +1132,10 @@ func (s *authService) generateSecureToken() string {
 	b := s.tokenPool.Get().([]byte)
 	defer s.tokenPool.Put(b)
 
-	rand.Read(b)
+	n, err := rand.Read(b)
+	if err != nil || n != len(b) {
+		return ""
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
 
@@ -1191,16 +1244,4 @@ func maskIdentifier(identifier string) string {
 		return "***"
 	}
 	return "***" + identifier[len(identifier)-4:]
-}
-
-func maskIP(ip string) string {
-	if ip == "" {
-		return "unknown"
-	}
-	// Simple IP masking: show only first octet for IPv4
-	parts := strings.Split(ip, ".")
-	if len(parts) >= 1 {
-		return parts[0] + ".***.***.***"
-	}
-	return "***"
 }

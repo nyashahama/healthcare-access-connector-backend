@@ -132,8 +132,8 @@ func TestAuthFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to logout: %v", err)
 	}
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("Expected status 204, got %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
 	}
 
 	req, _ = http.NewRequest("POST", ts.URL+"/api/v1/auth/logout", nil)

@@ -737,24 +737,20 @@ func (h *StaffHandler) CheckStaffExists(w http.ResponseWriter, r *http.Request) 
 
 func generateSecureToken() string {
 	b := make([]byte, 32)
-	_, _ = rand.Read(b)
+	n, err := rand.Read(b)
+	if err != nil {
+		return ""
+	}
+	if n != len(b) {
+		return ""
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
 
 func (h *StaffHandler) sendInvitationEmail(staff dproviders.ClinicStaff, email, token string) {
-	// TODO: Implement actual email sending using your email service
-	// This is a placeholder that should be replaced with actual email service call
+	// TODO: Integrate email service here (current implementation logs intent only)
 	h.logger.Info().
 		Str("email", email).
-		Str("token", token).
-		Str("staff_name", staff.FirstName+" "+staff.LastName).
-		Msg("Sending staff invitation email")
-
-	// Example of what the email should contain:
-	// - Clinic name
-	// - Inviter name
-	// - Staff role
-	// - Link to accept invitation (e.g., https://your-app.com/staff/invitations/accept?token=TOKEN)
-	// - Link to decline invitation
-	// - Expiration date
+		Str("staff_id", staff.ID.String()).
+		Msg("Staff invitation queued for delivery")
 }

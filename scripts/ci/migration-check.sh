@@ -56,24 +56,28 @@ echo "  Current version: ${version}"
 # Note: version may be dirty if migrations changed; we just check it applied successfully
 
 echo ""
-echo "4. Validate down migrations work (down 1, then back up)"
-
-# Find the latest down migration file and check if it's empty.
-# Empty down migrations are a known issue in this repo; skip the round-trip test for those.
-latest_down=$(find "${MIGRATIONS_DIR}" -name '*.down.sql' | sort -V | tail -n 1)
-if [ ! -s "${latest_down}" ]; then
-	echo "  [SKIP] Latest down migration (${latest_down}) is empty — skipping down/up round-trip test"
-else
-	if ! migrate -path "${MIGRATIONS_DIR}" -database "${DB_URL}" down 1; then
-		echo "Warning: Down migration failed (this may be expected for complex migrations)"
-	else
-		echo "  [PASS] Down migration succeeded"
-		if ! migrate -path "${MIGRATIONS_DIR}" -database "${DB_URL}" up 1; then
-			echo "Error: Re-up migration failed after down"
-			exit 1
-		fi
-		echo "  [PASS] Re-up migration succeeded"
+echo "4. Ensure every down migration is implemented"
+while IFS= read -r down_file; do
+	if [ ! -s "${down_file}" ]; then
+		echo "Error: Down migration is empty: ${down_file}"
+		echo "Please implement rollback SQL before merging."
+		exit 1
 	fi
+done < <(find "${MIGRATIONS_DIR}" -name '*.down.sql' | sort -V)
+echo "  [PASS] All down migrations contain statements"
+
+echo ""
+echo "5. Validate down and up migrations are reversible"
+if ! migrate -path "${MIGRATIONS_DIR}" -database "${DB_URL}" down 1; then
+	echo "Error: Down migration failed"
+	exit 1
+else
+	echo "  [PASS] Down migration succeeded"
+	if ! migrate -path "${MIGRATIONS_DIR}" -database "${DB_URL}" up 1; then
+		echo "Error: Re-up migration failed after down"
+		exit 1
+	fi
+	echo "  [PASS] Re-up migration succeeded"
 fi
 
 echo ""

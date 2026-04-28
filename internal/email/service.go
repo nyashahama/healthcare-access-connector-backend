@@ -31,7 +31,6 @@ type emailService struct {
 	wg         sync.WaitGroup
 	ctx        context.Context
 	cancel     context.CancelFunc
-	queueMutex sync.RWMutex
 }
 
 // queuedEmail represents an email in the queue

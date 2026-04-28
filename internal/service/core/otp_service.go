@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"fmt"
 	"errors"
 	"strings"
 	"time"
@@ -86,7 +87,11 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 	}
 
 	// Generate 6-digit OTP
-	otp := s.generateNumericOTP(6)
+	otp, err := s.generateNumericOTP(6)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to generate OTP")
+		return domain.NewAppError(err, "Failed to generate OTP", 500)
+	}
 	expiresAt := time.Now().Add(10 * time.Minute)
 
 	// Delete any existing unused OTPs for this user
@@ -184,6 +189,9 @@ func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (str
 
 	// Generate password reset token
 	resetToken := s.generateSecureToken()
+	if resetToken == "" {
+		return "", core.User{}, domain.NewAppError(nil, "Failed to generate reset token", 500)
+	}
 	tokenExpires := time.Now().Add(1 * time.Hour)
 
 	// Store reset token
@@ -247,20 +255,32 @@ func (s *otpService) resetPasswordWithToken(ctx context.Context, token, newPassw
 }
 
 // Helper functions
-func (s *otpService) generateNumericOTP(length int) string {
+func (s *otpService) generateNumericOTP(length int) (string, error) {
 	const digits = "0123456789"
 	b := make([]byte, length)
-	rand.Read(b)
+	n, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to read random bytes: %w", err)
+	}
+	if n != len(b) {
+		return "", fmt.Errorf("unexpected random byte count: got %d, want %d", n, len(b))
+	}
 
 	for i := range b {
 		b[i] = digits[int(b[i])%len(digits)]
 	}
 
-	return string(b)
+	return string(b), nil
 }
 
 func (s *otpService) generateSecureToken() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	n, err := rand.Read(b)
+	if err != nil {
+		return ""
+	}
+	if n != len(b) {
+		return ""
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
