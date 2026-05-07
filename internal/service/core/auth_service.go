@@ -695,18 +695,16 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 		s.logger.Warn().Err(err).Msg("Failed to delete user sessions")
 	}
 
-	// Send verification email
-	if s.emailService != nil && s.emailService.IsAvailable() {
-		emailAddress := ""
-		if user.Email != nil {
-			emailAddress = *user.Email
+	// Send verification email when possible.
+	if user.Email != nil {
+		if s.emailService != nil && s.emailService.IsAvailable() {
+			if err := s.emailService.SendPasswordChangedEmail(ctx, *user.Email, *user.Email); err != nil {
+				s.logger.Error().Err(err).Msg("Failed to send password changed email")
+				return domain.NewAppError(err, "Failed to send password changed email", 500)
+			}
+		} else {
+			s.logger.Warn().Str("user_id", user.ID.String()).Msg("Email service unavailable; skipping password changed notification")
 		}
-		if err := s.emailService.SendPasswordChangedEmail(ctx, emailAddress, emailAddress); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to send password changed email")
-			return domain.NewAppError(err, "Failed to send password changed email", 500)
-		}
-	} else {
-		return domain.NewAppError(nil, "Email service unavailable", 503)
 	}
 
 	// Invalidate all caches for this user
