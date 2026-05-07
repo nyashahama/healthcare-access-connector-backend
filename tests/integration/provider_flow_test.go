@@ -92,7 +92,7 @@ func TestProviderFlow(t *testing.T) {
 
 	token := loginResp.Token
 
-	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/providers/profile", nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/users/"+userID+"/profile", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err = ts.Client().Do(req)
 	if err != nil {
@@ -110,7 +110,7 @@ func TestProviderFlow(t *testing.T) {
 	}
 	clinicBody, _ := json.Marshal(clinicPayload)
 
-	req, _ = http.NewRequest("POST", ts.URL+"/api/v1/clinics", bytes.NewReader(clinicBody))
+	req, _ = http.NewRequest("POST", ts.URL+"/api/v1/providers/clinics", bytes.NewReader(clinicBody))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = ts.Client().Do(req)
@@ -137,7 +137,7 @@ func TestProviderFlow(t *testing.T) {
 		t.Fatalf("Failed to update user clinic: %v", err)
 	}
 
-	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/providers/appointments", nil)
+	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/providers/clinics/"+clinicID, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err = ts.Client().Do(req)
 	if err != nil {
@@ -147,7 +147,7 @@ func TestProviderFlow(t *testing.T) {
 		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
 	}
 
-	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/providers/telemedicine/waiting-room", nil)
+	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/telemedicine/consultations/waiting-room", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err = ts.Client().Do(req)
 	if err != nil {

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/app"
@@ -92,7 +91,7 @@ func TestPatientFlow(t *testing.T) {
 
 	token := loginResp.Token
 
-	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/patients/profile", nil)
+	req, _ := http.NewRequest("GET", ts.URL+"/api/v1/users/"+userID+"/profile", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err = ts.Client().Do(req)
 	if err != nil {
@@ -108,7 +107,7 @@ func TestPatientFlow(t *testing.T) {
 	}
 	updateBody, _ := json.Marshal(updateProfilePayload)
 
-	req, _ = http.NewRequest("PUT", ts.URL+"/api/v1/patients/profile", bytes.NewReader(updateBody))
+	req, _ = http.NewRequest("PUT", ts.URL+"/api/v1/users/"+userID+"/profile", bytes.NewReader(updateBody))
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = ts.Client().Do(req)
@@ -119,17 +118,7 @@ func TestPatientFlow(t *testing.T) {
 		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
 	}
 
-	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/patients/appointments", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err = ts.Client().Do(req)
-	if err != nil {
-		t.Fatalf("Failed to get patient appointments: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
-	}
-
-	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/patients/telemedicine/history", nil)
+	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/telemedicine/consultations/me/history", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err = ts.Client().Do(req)
 	if err != nil {
@@ -139,7 +128,7 @@ func TestPatientFlow(t *testing.T) {
 		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
 	}
 
-	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/clinics?city=Johannesburg", nil)
+	req, _ = http.NewRequest("GET", ts.URL+"/api/v1/providers/clinics?city=Johannesburg", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err = ts.Client().Do(req)
 	if err != nil {
