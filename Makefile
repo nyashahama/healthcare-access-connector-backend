@@ -19,10 +19,9 @@ LDFLAGS := -w -s \
     -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.Commit=$(COMMIT) \
     -X github.com/nyashahama/healthcare-access-connector-backend/internal/version.BuildDate=$(DATE)
 
-# Load environment variables from .env file
+# Load DB_URL from .env file (only what's needed, not all secrets)
 ifneq (,$(wildcard .env))
-    include .env
-    export
+    DB_URL := $(shell grep '^DB_URL=' .env 2>/dev/null | head -1 | sed 's/^DB_URL=//')
 endif
 
 # Detect current environment from .env symlink
@@ -138,7 +137,7 @@ docker-up:
 	@echo "${GREEN}✓ Services started successfully!${RESET}"
 	@echo ""
 	@echo "Service URLs:"
-	@echo "  - PostgreSQL:       localhost:5432 (postgres/admin)"
+	@echo "  - PostgreSQL:       localhost:5432"
 	@echo "  - Redis:            localhost:6379"
 	@echo "  - Mailpit UI:       http://localhost:8025"
 	@echo "  - NATS:             localhost:4222"

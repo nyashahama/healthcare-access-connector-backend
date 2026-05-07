@@ -144,7 +144,7 @@ func (r *clinicRepository) CreateClinic(ctx context.Context, clinic providers.Cl
 		Column31:               paymentMethodsJSON,
 		FeeStructure:           pgtypeTextFromStringPtr(clinic.FeeStructure),
 		AccreditationBody:      pgtypeTextFromStringPtr(clinic.AccreditationBody),
-		AccreditationExpiry:    pgtype.Date{Time: *clinic.AccreditationExpiry},
+		AccreditationExpiry:    datePtrToPgtypeDate(clinic.AccreditationExpiry),
 		Column35:               certificationsJSON,
 		PatientCapacity:        intPtrToPgtypeInt4(clinic.PatientCapacity),
 		AverageWaitTimeMinutes: intPtrToPgtypeInt4(clinic.AverageWaitTimeMinutes),

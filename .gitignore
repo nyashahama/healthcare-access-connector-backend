@@ -31,6 +31,10 @@ go.work
 tmp/
 temp/
 *.log
+# Local documentation (generated or internal notes)
+docs/
+# Local planning and notes
+ISSUES.md
 # Database
 *.db
 *.sqlite
