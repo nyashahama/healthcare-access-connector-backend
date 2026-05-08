@@ -74,40 +74,12 @@ func pgtypeTextFromString(v string) pgtype.Text {
 	}
 }
 
-// Date conversion helpers
-func datePtrToPgtypeDate(t *time.Time) pgtype.Date {
-	if t == nil {
-		return pgtype.Date{Valid: false}
-	}
-	return pgtype.Date{
-		Time:  *t,
-		Valid: true,
-	}
-}
-
-func pgtypeDateToTimePtr(d pgtype.Date) *time.Time {
-	if !d.Valid {
-		return nil
-	}
-	return &d.Time
-}
-
 // Timestamp conversion helpers
 func pgtypeTimestampToTimePtr(v pgtype.Timestamp) *time.Time {
 	if !v.Valid {
 		return nil
 	}
 	return &v.Time
-}
-
-func timePtrToPgtypeTimestamp(v *time.Time) pgtype.Timestamp {
-	if v == nil {
-		return pgtype.Timestamp{Valid: false}
-	}
-	return pgtype.Timestamp{
-		Time:  *v,
-		Valid: true,
-	}
 }
 
 // JSONB conversion helpers
@@ -154,32 +126,6 @@ func float64PtrToPgtypeNumeric(v *float64) pgtype.Numeric {
 	}
 }
 
-// JSONB conversion helpers for interface values
-func interfaceToPgtypeJSON(data interface{}) []byte {
-	if data == nil {
-		return nil
-	}
-
-	jsonBytes, err := json.Marshal(data)
-	if err != nil {
-		return nil
-	}
-
-	return jsonBytes
-}
-
-func pgtypeJSONToInterface(data []byte) interface{} {
-	if len(data) == 0 {
-		return nil
-	}
-
-	var result interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return nil
-	}
-
-	return result
-}
 
 func pgtypeNumericToFloat64Ptr(v pgtype.Numeric) *float64 {
 	if !v.Valid || v.Int == nil {
@@ -208,12 +154,4 @@ func intToPgtypeInt4(v int) pgtype.Int4 {
 		Int32: int32(v),
 		Valid: true,
 	}
-}
-
-// Boolean conversion helpers
-func pgtypeBoolToBool(b pgtype.Bool) bool {
-	if !b.Valid {
-		return false
-	}
-	return b.Bool
 }
