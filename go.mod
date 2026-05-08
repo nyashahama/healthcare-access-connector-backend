@@ -1,7 +1,8 @@
 module github.com/nyashahama/healthcare-access-connector-backend
 
 go 1.25.0
-toolchain go1.25.9
+
+toolchain go1.25.10
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.40.1
@@ -23,7 +24,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/redis v0.40.0
-	golang.org/x/crypto v0.47.0
+	golang.org/x/crypto v0.50.0
 	golang.org/x/time v0.14.0
 )
 
@@ -107,9 +108,9 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.39.0 // indirect
 	go.opentelemetry.io/otel/trace v1.41.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
-	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
