@@ -11,6 +11,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveOldSMSMessages = `-- name: ArchiveOldSMSMessages :exec
+DELETE FROM sms_messages
+WHERE created_at < NOW() - make_interval(secs => $1)
+`
+
+func (q *Queries) ArchiveOldSMSMessages(ctx context.Context, secs float64) error {
+	_, err := q.db.Exec(ctx, archiveOldSMSMessages, secs)
+	return err
+}
+
+const closeSMSConversation = `-- name: CloseSMSConversation :exec
+UPDATE sms_conversations
+SET current_menu = 'closed',
+    conversation_state = COALESCE(conversation_state, '{}'::jsonb) ||
+      jsonb_build_object('is_closed', true, 'closed_at', NOW(), 'closed_reason', $2),
+    last_interaction_at = NOW()
+WHERE id = $1
+`
+
+type CloseSMSConversationParams struct {
+	ID               pgtype.UUID `json:"id"`
+	JsonbBuildObject interface{} `json:"jsonb_build_object"`
+}
+
+func (q *Queries) CloseSMSConversation(ctx context.Context, arg CloseSMSConversationParams) error {
+	_, err := q.db.Exec(ctx, closeSMSConversation, arg.ID, arg.JsonbBuildObject)
+	return err
+}
+
 const createSMSConversation = `-- name: CreateSMSConversation :one
 
 INSERT INTO sms_conversations (
@@ -54,12 +83,114 @@ func (q *Queries) CreateSMSConversation(ctx context.Context, arg CreateSMSConver
 	return i, err
 }
 
+const getActiveSMSConversations = `-- name: GetActiveSMSConversations :many
+SELECT id, user_id, phone_number, current_menu, conversation_state, last_message_sent, last_message_received, last_interaction_at, last_location, last_search_query, callback_scheduled, created_at, updated_at FROM sms_conversations
+WHERE (current_menu IS NULL OR LOWER(current_menu) <> 'closed')
+ORDER BY COALESCE(last_interaction_at, created_at) DESC
+`
+
+func (q *Queries) GetActiveSMSConversations(ctx context.Context) ([]SmsConversation, error) {
+	rows, err := q.db.Query(ctx, getActiveSMSConversations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SmsConversation{}
+	for rows.Next() {
+		var i SmsConversation
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.PhoneNumber,
+			&i.CurrentMenu,
+			&i.ConversationState,
+			&i.LastMessageSent,
+			&i.LastMessageReceived,
+			&i.LastInteractionAt,
+			&i.LastLocation,
+			&i.LastSearchQuery,
+			&i.CallbackScheduled,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSMSConversation = `-- name: GetSMSConversation :one
+SELECT id, user_id, phone_number, current_menu, conversation_state, last_message_sent, last_message_received, last_interaction_at, last_location, last_search_query, callback_scheduled, created_at, updated_at FROM sms_conversations WHERE id = $1
+`
+
+func (q *Queries) GetSMSConversation(ctx context.Context, id pgtype.UUID) (SmsConversation, error) {
+	row := q.db.QueryRow(ctx, getSMSConversation, id)
+	var i SmsConversation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PhoneNumber,
+		&i.CurrentMenu,
+		&i.ConversationState,
+		&i.LastMessageSent,
+		&i.LastMessageReceived,
+		&i.LastInteractionAt,
+		&i.LastLocation,
+		&i.LastSearchQuery,
+		&i.CallbackScheduled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSMSConversationByPhone = `-- name: GetSMSConversationByPhone :one
-SELECT id, user_id, phone_number, current_menu, conversation_state, last_message_sent, last_message_received, last_interaction_at, last_location, last_search_query, callback_scheduled, created_at, updated_at FROM sms_conversations WHERE phone_number = $1
+SELECT id, user_id, phone_number, current_menu, conversation_state, last_message_sent,
+    last_message_received, last_interaction_at, last_location, last_search_query,
+    callback_scheduled, created_at, updated_at
+FROM sms_conversations
+WHERE phone_number = $1
+ORDER BY COALESCE(last_interaction_at, created_at) DESC, created_at DESC, id DESC
+LIMIT 1
 `
 
 func (q *Queries) GetSMSConversationByPhone(ctx context.Context, phoneNumber string) (SmsConversation, error) {
 	row := q.db.QueryRow(ctx, getSMSConversationByPhone, phoneNumber)
+	var i SmsConversation
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.PhoneNumber,
+		&i.CurrentMenu,
+		&i.ConversationState,
+		&i.LastMessageSent,
+		&i.LastMessageReceived,
+		&i.LastInteractionAt,
+		&i.LastLocation,
+		&i.LastSearchQuery,
+		&i.CallbackScheduled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getSMSConversationByUserID = `-- name: GetSMSConversationByUserID :one
+SELECT id, user_id, phone_number, current_menu, conversation_state, last_message_sent,
+    last_message_received, last_interaction_at, last_location, last_search_query,
+    callback_scheduled, created_at, updated_at
+FROM sms_conversations
+WHERE user_id = $1
+ORDER BY COALESCE(last_interaction_at, created_at) DESC, created_at DESC, id DESC
+LIMIT 1
+`
+
+func (q *Queries) GetSMSConversationByUserID(ctx context.Context, userID pgtype.UUID) (SmsConversation, error) {
+	row := q.db.QueryRow(ctx, getSMSConversationByUserID, userID)
 	var i SmsConversation
 	err := row.Scan(
 		&i.ID,

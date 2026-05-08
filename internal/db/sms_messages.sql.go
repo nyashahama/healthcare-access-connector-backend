@@ -13,7 +13,8 @@ import (
 
 const getConversationMessages = `-- name: GetConversationMessages :many
 SELECT id, conversation_id, direction, message_body, 
-    twilio_status, sent_at, delivered_at, created_at
+    twilio_message_id, twilio_status, sent_at, delivered_at,
+    segments, cost, cost_currency, created_at
 FROM sms_messages
 WHERE conversation_id = $1
 ORDER BY created_at DESC
@@ -26,34 +27,27 @@ type GetConversationMessagesParams struct {
 	Offset         int32       `json:"offset"`
 }
 
-type GetConversationMessagesRow struct {
-	ID             pgtype.UUID      `json:"id"`
-	ConversationID pgtype.UUID      `json:"conversation_id"`
-	Direction      string           `json:"direction"`
-	MessageBody    string           `json:"message_body"`
-	TwilioStatus   pgtype.Text      `json:"twilio_status"`
-	SentAt         pgtype.Timestamp `json:"sent_at"`
-	DeliveredAt    pgtype.Timestamp `json:"delivered_at"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-}
-
-func (q *Queries) GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error) {
+func (q *Queries) GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]SmsMessage, error) {
 	rows, err := q.db.Query(ctx, getConversationMessages, arg.ConversationID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetConversationMessagesRow{}
+	items := []SmsMessage{}
 	for rows.Next() {
-		var i GetConversationMessagesRow
+		var i SmsMessage
 		if err := rows.Scan(
 			&i.ID,
 			&i.ConversationID,
 			&i.Direction,
 			&i.MessageBody,
+			&i.TwilioMessageID,
 			&i.TwilioStatus,
 			&i.SentAt,
 			&i.DeliveredAt,
+			&i.Segments,
+			&i.Cost,
+			&i.CostCurrency,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -66,13 +60,91 @@ func (q *Queries) GetConversationMessages(ctx context.Context, arg GetConversati
 	return items, nil
 }
 
+const getFailedMessages = `-- name: GetFailedMessages :many
+SELECT id, conversation_id, direction, message_body,
+    twilio_message_id, twilio_status, sent_at,
+    delivered_at, segments, cost, cost_currency, created_at
+FROM sms_messages
+WHERE created_at >= $1
+  AND created_at <= $2
+  AND (twilio_status IS NULL OR lower(twilio_status) NOT IN ('sent', 'delivered', 'queued'))
+ORDER BY created_at DESC
+`
+
+type GetFailedMessagesParams struct {
+	CreatedAt   pgtype.Timestamp `json:"created_at"`
+	CreatedAt_2 pgtype.Timestamp `json:"created_at_2"`
+}
+
+func (q *Queries) GetFailedMessages(ctx context.Context, arg GetFailedMessagesParams) ([]SmsMessage, error) {
+	rows, err := q.db.Query(ctx, getFailedMessages, arg.CreatedAt, arg.CreatedAt_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SmsMessage{}
+	for rows.Next() {
+		var i SmsMessage
+		if err := rows.Scan(
+			&i.ID,
+			&i.ConversationID,
+			&i.Direction,
+			&i.MessageBody,
+			&i.TwilioMessageID,
+			&i.TwilioStatus,
+			&i.SentAt,
+			&i.DeliveredAt,
+			&i.Segments,
+			&i.Cost,
+			&i.CostCurrency,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getMessage = `-- name: GetMessage :one
+SELECT id, conversation_id, direction, message_body,
+    twilio_message_id, twilio_status, sent_at,
+    delivered_at, segments, cost, cost_currency, created_at
+FROM sms_messages
+WHERE id = $1
+`
+
+func (q *Queries) GetMessage(ctx context.Context, id pgtype.UUID) (SmsMessage, error) {
+	row := q.db.QueryRow(ctx, getMessage, id)
+	var i SmsMessage
+	err := row.Scan(
+		&i.ID,
+		&i.ConversationID,
+		&i.Direction,
+		&i.MessageBody,
+		&i.TwilioMessageID,
+		&i.TwilioStatus,
+		&i.SentAt,
+		&i.DeliveredAt,
+		&i.Segments,
+		&i.Cost,
+		&i.CostCurrency,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const logSMSMessage = `-- name: LogSMSMessage :one
 INSERT INTO sms_messages (
     conversation_id, direction, message_body, twilio_message_id,
     twilio_status, segments, cost, cost_currency
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, conversation_id, direction, created_at
+RETURNING id, conversation_id, direction, message_body, twilio_message_id,
+    twilio_status, sent_at, delivered_at, segments, cost, cost_currency, created_at
 `
 
 type LogSMSMessageParams struct {
@@ -86,14 +158,7 @@ type LogSMSMessageParams struct {
 	CostCurrency    pgtype.Text    `json:"cost_currency"`
 }
 
-type LogSMSMessageRow struct {
-	ID             pgtype.UUID      `json:"id"`
-	ConversationID pgtype.UUID      `json:"conversation_id"`
-	Direction      string           `json:"direction"`
-	CreatedAt      pgtype.Timestamp `json:"created_at"`
-}
-
-func (q *Queries) LogSMSMessage(ctx context.Context, arg LogSMSMessageParams) (LogSMSMessageRow, error) {
+func (q *Queries) LogSMSMessage(ctx context.Context, arg LogSMSMessageParams) (SmsMessage, error) {
 	row := q.db.QueryRow(ctx, logSMSMessage,
 		arg.ConversationID,
 		arg.Direction,
@@ -104,11 +169,19 @@ func (q *Queries) LogSMSMessage(ctx context.Context, arg LogSMSMessageParams) (L
 		arg.Cost,
 		arg.CostCurrency,
 	)
-	var i LogSMSMessageRow
+	var i SmsMessage
 	err := row.Scan(
 		&i.ID,
 		&i.ConversationID,
 		&i.Direction,
+		&i.MessageBody,
+		&i.TwilioMessageID,
+		&i.TwilioStatus,
+		&i.SentAt,
+		&i.DeliveredAt,
+		&i.Segments,
+		&i.Cost,
+		&i.CostCurrency,
 		&i.CreatedAt,
 	)
 	return i, err
