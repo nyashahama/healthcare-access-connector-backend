@@ -98,6 +98,7 @@ type Querier interface {
 	// CORE CRUD OPERATIONS
 	// ============================================
 	AddPatientSurgery(ctx context.Context, arg AddPatientSurgeryParams) (PatientSurgery, error)
+	ArchiveOldSMSMessages(ctx context.Context, secs float64) error
 	BulkUpdateUserStatus(ctx context.Context, arg BulkUpdateUserStatusParams) error
 	CancelAppointment(ctx context.Context, arg CancelAppointmentParams) (Appointment, error)
 	CancelConsultation(ctx context.Context, arg CancelConsultationParams) (Consultation, error)
@@ -106,6 +107,7 @@ type Querier interface {
 	CheckSchedulingConflict(ctx context.Context, arg CheckSchedulingConflictParams) (CheckSchedulingConflictRow, error)
 	CheckServiceNameExists(ctx context.Context, arg CheckServiceNameExistsParams) (bool, error)
 	CheckStaffEmailExists(ctx context.Context, arg CheckStaffEmailExistsParams) (bool, error)
+	CloseSMSConversation(ctx context.Context, arg CloseSMSConversationParams) error
 	CompleteAppointment(ctx context.Context, id pgtype.UUID) (Appointment, error)
 	CompleteConsultation(ctx context.Context, arg CompleteConsultationParams) (Consultation, error)
 	CompleteUserOnboarding(ctx context.Context, id pgtype.UUID) error
@@ -296,6 +298,7 @@ type Querier interface {
 	GetActiveMedications(ctx context.Context, patientID pgtype.UUID) ([]GetActiveMedicationsRow, error)
 	GetActivePatientAllergies(ctx context.Context, patientID pgtype.UUID) ([]GetActivePatientAllergiesRow, error)
 	GetActiveResearchConsents(ctx context.Context) ([]PrivacyConsent, error)
+	GetActiveSMSConversations(ctx context.Context) ([]SmsConversation, error)
 	GetActivitiesByResource(ctx context.Context, arg GetActivitiesByResourceParams) ([]UserActivity, error)
 	GetActivitiesByType(ctx context.Context, arg GetActivitiesByTypeParams) ([]UserActivity, error)
 	GetAllClinicStaff(ctx context.Context, clinicID pgtype.UUID) ([]GetAllClinicStaffRow, error)
@@ -346,7 +349,7 @@ type Querier interface {
 	// Full consultation row joined with session summary and patient name.
 	// Used by both patient and provider to hydrate a chat screen.
 	GetConsultationWithDetails(ctx context.Context, id pgtype.UUID) (GetConsultationWithDetailsRow, error)
-	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]GetConversationMessagesRow, error)
+	GetConversationMessages(ctx context.Context, arg GetConversationMessagesParams) ([]SmsMessage, error)
 	GetCredentialByID(ctx context.Context, id pgtype.UUID) (ProfessionalCredential, error)
 	GetDataAccessLogs(ctx context.Context, arg GetDataAccessLogsParams) ([]DataAccessLog, error)
 	GetDependentChildren(ctx context.Context, patientID pgtype.UUID) ([]GetDependentChildrenRow, error)
@@ -361,6 +364,7 @@ type Querier interface {
 	GetEmergencyContact(ctx context.Context, id pgtype.UUID) (EmergencyContact, error)
 	GetEmergencySurgeryInfo(ctx context.Context, patientID pgtype.UUID) ([]GetEmergencySurgeryInfoRow, error)
 	GetExpiredConsents(ctx context.Context) ([]PrivacyConsent, error)
+	GetFailedMessages(ctx context.Context, arg GetFailedMessagesParams) ([]SmsMessage, error)
 	GetFamilyHistoryEntry(ctx context.Context, id pgtype.UUID) (PatientFamilyHistory, error)
 	GetGrowthRecords(ctx context.Context, dependentID pgtype.UUID) ([]GetGrowthRecordsRow, error)
 	// Used in consultation list previews.
@@ -373,6 +377,7 @@ type Querier interface {
 	// Preflight check: patient has a recent telemedicine-eligible session.
 	// Called before showing the provider list.
 	GetLatestEligibleSession(ctx context.Context, patientID pgtype.UUID) (GetLatestEligibleSessionRow, error)
+	GetMessage(ctx context.Context, id pgtype.UUID) (SmsMessage, error)
 	// ============================================
 	// READ OPERATIONS
 	// ============================================
@@ -476,7 +481,9 @@ type Querier interface {
 	GetRecentOTPs(ctx context.Context, arg GetRecentOTPsParams) ([]OtpVerification, error)
 	GetRecentSurgeries(ctx context.Context, patientID pgtype.UUID) ([]GetRecentSurgeriesRow, error)
 	GetRecentSurgicalPatients(ctx context.Context, procedureDate pgtype.Date) ([]GetRecentSurgicalPatientsRow, error)
+	GetSMSConversation(ctx context.Context, id pgtype.UUID) (SmsConversation, error)
 	GetSMSConversationByPhone(ctx context.Context, phoneNumber string) (SmsConversation, error)
+	GetSMSConversationByUserID(ctx context.Context, userID pgtype.UUID) (SmsConversation, error)
 	GetServiceByID(ctx context.Context, id pgtype.UUID) (ClinicService, error)
 	GetSession(ctx context.Context, sessionToken string) (GetSessionRow, error)
 	// ============================================
@@ -585,7 +592,7 @@ type Querier interface {
 	// Data Access Log Queries
 	// ============================================
 	LogDataAccess(ctx context.Context, arg LogDataAccessParams) error
-	LogSMSMessage(ctx context.Context, arg LogSMSMessageParams) (LogSMSMessageRow, error)
+	LogSMSMessage(ctx context.Context, arg LogSMSMessageParams) (SmsMessage, error)
 	// ============================================
 	// User Activity Queries
 	// ============================================

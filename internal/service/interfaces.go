@@ -10,6 +10,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/sms"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/telemedicine"
 )
 
@@ -274,6 +275,11 @@ type SystemAdminService interface {
 	GetSystemAdminByUserID(ctx context.Context, userID uuid.UUID) (admin.SystemAdmin, error)
 }
 
+type NGOPartnerService interface {
+	CreateNGOPartner(ctx context.Context, partner admin.NGOPartner) (admin.NGOPartner, error)
+	GetNGOPartnerByUserID(ctx context.Context, userID uuid.UUID) (admin.NGOPartner, error)
+}
+
 type AppointmentService interface {
 	// Create
 	BookAppointment(ctx context.Context, appointment appointments.Appointment) (appointments.Appointment, error)
@@ -297,6 +303,24 @@ type AppointmentService interface {
 
 	// Delete
 	DeleteAppointment(ctx context.Context, id uuid.UUID) error
+}
+
+type SMSService interface {
+	CreateConversation(ctx context.Context, conv sms.SMSConversation) (sms.SMSConversation, error)
+	GetConversation(ctx context.Context, id uuid.UUID) (sms.SMSConversation, error)
+	GetConversationByPhone(ctx context.Context, phone string) (sms.SMSConversation, error)
+	GetConversationByUserID(ctx context.Context, userID uuid.UUID) (sms.SMSConversation, error)
+	UpdateConversation(ctx context.Context, conv sms.SMSConversation) error
+	CloseConversation(ctx context.Context, id uuid.UUID, reason string) error
+	GetActiveConversations(ctx context.Context) ([]sms.SMSConversation, error)
+
+	LogMessage(ctx context.Context, msg sms.SMSMessage) (sms.SMSMessage, error)
+	GetMessage(ctx context.Context, id uuid.UUID) (sms.SMSMessage, error)
+	GetConversationMessages(ctx context.Context, conversationID uuid.UUID, limit, offset int) ([]sms.SMSMessage, error)
+
+	GetFailedMessages(ctx context.Context, startDate, endDate time.Time) ([]sms.SMSMessage, error)
+	ArchiveOldMessages(ctx context.Context, olderThan time.Duration) error
+	ExportConversation(ctx context.Context, conversationID uuid.UUID) ([]byte, error)
 }
 
 // SymptomCheckerService defines all operations for the symptom checker workflow.

@@ -641,6 +641,158 @@ func (_c *MockQuerier_AddPatientSurgery_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// ArchiveOldSMSMessages provides a mock function with given fields: ctx, secs
+func (_m *MockQuerier) ArchiveOldSMSMessages(ctx context.Context, secs float64) error {
+	ret := _m.Called(ctx, secs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ArchiveOldSMSMessages")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, float64) error); ok {
+		r0 = rf(ctx, secs)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockQuerier_ArchiveOldSMSMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ArchiveOldSMSMessages'
+type MockQuerier_ArchiveOldSMSMessages_Call struct {
+	*mock.Call
+}
+
+// ArchiveOldSMSMessages is a helper method to define mock.On call
+//   - ctx context.Context
+//   - secs float64
+func (_e *MockQuerier_Expecter) ArchiveOldSMSMessages(ctx interface{}, secs interface{}) *MockQuerier_ArchiveOldSMSMessages_Call {
+	return &MockQuerier_ArchiveOldSMSMessages_Call{Call: _e.mock.On("ArchiveOldSMSMessages", ctx, secs)}
+}
+
+func (_c *MockQuerier_ArchiveOldSMSMessages_Call) Run(run func(ctx context.Context, secs float64)) *MockQuerier_ArchiveOldSMSMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(float64))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_ArchiveOldSMSMessages_Call) Return(_a0 error) *MockQuerier_ArchiveOldSMSMessages_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockQuerier_ArchiveOldSMSMessages_Call) RunAndReturn(run func(context.Context, float64) error) *MockQuerier_ArchiveOldSMSMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CloseSMSConversation provides a mock function with given fields: ctx, arg
+func (_m *MockQuerier) CloseSMSConversation(ctx context.Context, arg sqlc.CloseSMSConversationParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CloseSMSConversation")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.CloseSMSConversationParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockQuerier_CloseSMSConversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CloseSMSConversation'
+type MockQuerier_CloseSMSConversation_Call struct {
+	*mock.Call
+}
+
+// CloseSMSConversation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - arg sqlc.CloseSMSConversationParams
+func (_e *MockQuerier_Expecter) CloseSMSConversation(ctx interface{}, arg interface{}) *MockQuerier_CloseSMSConversation_Call {
+	return &MockQuerier_CloseSMSConversation_Call{Call: _e.mock.On("CloseSMSConversation", ctx, arg)}
+}
+
+func (_c *MockQuerier_CloseSMSConversation_Call) Run(run func(ctx context.Context, arg sqlc.CloseSMSConversationParams)) *MockQuerier_CloseSMSConversation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(sqlc.CloseSMSConversationParams))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_CloseSMSConversation_Call) Return(_a0 error) *MockQuerier_CloseSMSConversation_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockQuerier_CloseSMSConversation_Call) RunAndReturn(run func(context.Context, sqlc.CloseSMSConversationParams) error) *MockQuerier_CloseSMSConversation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetActiveSMSConversations provides a mock function with given fields: ctx
+func (_m *MockQuerier) GetActiveSMSConversations(ctx context.Context) ([]sqlc.SmsConversation, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetActiveSMSConversations")
+	}
+
+	var r0 []sqlc.SmsConversation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]sqlc.SmsConversation, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []sqlc.SmsConversation); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.SmsConversation)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetActiveSMSConversations_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetActiveSMSConversations'
+type MockQuerier_GetActiveSMSConversations_Call struct {
+	*mock.Call
+}
+
+// GetActiveSMSConversations is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockQuerier_Expecter) GetActiveSMSConversations(ctx interface{}) *MockQuerier_GetActiveSMSConversations_Call {
+	return &MockQuerier_GetActiveSMSConversations_Call{Call: _e.mock.On("GetActiveSMSConversations", ctx)}
+}
+
+func (_c *MockQuerier_GetActiveSMSConversations_Call) Run(run func(ctx context.Context)) *MockQuerier_GetActiveSMSConversations_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetActiveSMSConversations_Call) Return(_a0 []sqlc.SmsConversation, _a1 error) *MockQuerier_GetActiveSMSConversations_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetActiveSMSConversations_Call) RunAndReturn(run func(context.Context) ([]sqlc.SmsConversation, error)) *MockQuerier_GetActiveSMSConversations_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BulkUpdateUserStatus provides a mock function with given fields: ctx, arg
 func (_m *MockQuerier) BulkUpdateUserStatus(ctx context.Context, arg sqlc.BulkUpdateUserStatusParams) error {
 	ret := _m.Called(ctx, arg)
@@ -6693,23 +6845,23 @@ func (_c *MockQuerier_GetConsultationWithDetails_Call) RunAndReturn(run func(con
 }
 
 // GetConversationMessages provides a mock function with given fields: ctx, arg
-func (_m *MockQuerier) GetConversationMessages(ctx context.Context, arg sqlc.GetConversationMessagesParams) ([]sqlc.GetConversationMessagesRow, error) {
+func (_m *MockQuerier) GetConversationMessages(ctx context.Context, arg sqlc.GetConversationMessagesParams) ([]sqlc.SmsMessage, error) {
 	ret := _m.Called(ctx, arg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetConversationMessages")
 	}
 
-	var r0 []sqlc.GetConversationMessagesRow
+	var r0 []sqlc.SmsMessage
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetConversationMessagesParams) ([]sqlc.GetConversationMessagesRow, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetConversationMessagesParams) ([]sqlc.SmsMessage, error)); ok {
 		return rf(ctx, arg)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetConversationMessagesParams) []sqlc.GetConversationMessagesRow); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetConversationMessagesParams) []sqlc.SmsMessage); ok {
 		r0 = rf(ctx, arg)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]sqlc.GetConversationMessagesRow)
+			r0 = ret.Get(0).([]sqlc.SmsMessage)
 		}
 	}
 
@@ -6741,12 +6893,12 @@ func (_c *MockQuerier_GetConversationMessages_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *MockQuerier_GetConversationMessages_Call) Return(_a0 []sqlc.GetConversationMessagesRow, _a1 error) *MockQuerier_GetConversationMessages_Call {
+func (_c *MockQuerier_GetConversationMessages_Call) Return(_a0 []sqlc.SmsMessage, _a1 error) *MockQuerier_GetConversationMessages_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQuerier_GetConversationMessages_Call) RunAndReturn(run func(context.Context, sqlc.GetConversationMessagesParams) ([]sqlc.GetConversationMessagesRow, error)) *MockQuerier_GetConversationMessages_Call {
+func (_c *MockQuerier_GetConversationMessages_Call) RunAndReturn(run func(context.Context, sqlc.GetConversationMessagesParams) ([]sqlc.SmsMessage, error)) *MockQuerier_GetConversationMessages_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -7334,6 +7486,65 @@ func (_c *MockQuerier_GetExpiredConsents_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// GetFailedMessages provides a mock function with given fields: ctx, arg
+func (_m *MockQuerier) GetFailedMessages(ctx context.Context, arg sqlc.GetFailedMessagesParams) ([]sqlc.SmsMessage, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetFailedMessages")
+	}
+
+	var r0 []sqlc.SmsMessage
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetFailedMessagesParams) ([]sqlc.SmsMessage, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.GetFailedMessagesParams) []sqlc.SmsMessage); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.SmsMessage)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.GetFailedMessagesParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetFailedMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetFailedMessages'
+type MockQuerier_GetFailedMessages_Call struct {
+	*mock.Call
+}
+
+// GetFailedMessages is a helper method to define mock.On call
+//   - ctx context.Context
+//   - arg sqlc.GetFailedMessagesParams
+func (_e *MockQuerier_Expecter) GetFailedMessages(ctx interface{}, arg interface{}) *MockQuerier_GetFailedMessages_Call {
+	return &MockQuerier_GetFailedMessages_Call{Call: _e.mock.On("GetFailedMessages", ctx, arg)}
+}
+
+func (_c *MockQuerier_GetFailedMessages_Call) Run(run func(ctx context.Context, arg sqlc.GetFailedMessagesParams)) *MockQuerier_GetFailedMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(sqlc.GetFailedMessagesParams))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetFailedMessages_Call) Return(_a0 []sqlc.SmsMessage, _a1 error) *MockQuerier_GetFailedMessages_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetFailedMessages_Call) RunAndReturn(run func(context.Context, sqlc.GetFailedMessagesParams) ([]sqlc.SmsMessage, error)) *MockQuerier_GetFailedMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetFamilyHistoryEntry provides a mock function with given fields: ctx, id
 func (_m *MockQuerier) GetFamilyHistoryEntry(ctx context.Context, id pgtype.UUID) (sqlc.PatientFamilyHistory, error) {
 	ret := _m.Called(ctx, id)
@@ -7676,6 +7887,64 @@ func (_c *MockQuerier_GetLatestEligibleSession_Call) Return(_a0 sqlc.GetLatestEl
 }
 
 func (_c *MockQuerier_GetLatestEligibleSession_Call) RunAndReturn(run func(context.Context, pgtype.UUID) (sqlc.GetLatestEligibleSessionRow, error)) *MockQuerier_GetLatestEligibleSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetMessageByID provides a mock function with given fields: ctx, id
+// GetMessage provides a mock function with given fields: ctx, id
+func (_m *MockQuerier) GetMessage(ctx context.Context, id pgtype.UUID) (sqlc.SmsMessage, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMessage")
+	}
+
+	var r0 sqlc.SmsMessage
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) (sqlc.SmsMessage, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) sqlc.SmsMessage); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(sqlc.SmsMessage)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetMessage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetMessage'
+type MockQuerier_GetMessage_Call struct {
+	*mock.Call
+}
+
+// GetMessage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id pgtype.UUID
+func (_e *MockQuerier_Expecter) GetMessage(ctx interface{}, id interface{}) *MockQuerier_GetMessage_Call {
+	return &MockQuerier_GetMessage_Call{Call: _e.mock.On("GetMessage", ctx, id)}
+}
+
+func (_c *MockQuerier_GetMessage_Call) Run(run func(ctx context.Context, id pgtype.UUID)) *MockQuerier_GetMessage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(pgtype.UUID))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetMessage_Call) Return(_a0 sqlc.SmsMessage, _a1 error) *MockQuerier_GetMessage_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetMessage_Call) RunAndReturn(run func(context.Context, pgtype.UUID) (sqlc.SmsMessage, error)) *MockQuerier_GetMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -10576,6 +10845,120 @@ func (_c *MockQuerier_GetSMSConversationByPhone_Call) Return(_a0 sqlc.SmsConvers
 }
 
 func (_c *MockQuerier_GetSMSConversationByPhone_Call) RunAndReturn(run func(context.Context, string) (sqlc.SmsConversation, error)) *MockQuerier_GetSMSConversationByPhone_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetSMSConversation provides a mock function with given fields: ctx, id
+func (_m *MockQuerier) GetSMSConversation(ctx context.Context, id pgtype.UUID) (sqlc.SmsConversation, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSMSConversation")
+	}
+
+	var r0 sqlc.SmsConversation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) (sqlc.SmsConversation, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) sqlc.SmsConversation); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(sqlc.SmsConversation)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetSMSConversation_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSMSConversation'
+type MockQuerier_GetSMSConversation_Call struct {
+	*mock.Call
+}
+
+// GetSMSConversation is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id pgtype.UUID
+func (_e *MockQuerier_Expecter) GetSMSConversation(ctx interface{}, id interface{}) *MockQuerier_GetSMSConversation_Call {
+	return &MockQuerier_GetSMSConversation_Call{Call: _e.mock.On("GetSMSConversation", ctx, id)}
+}
+
+func (_c *MockQuerier_GetSMSConversation_Call) Run(run func(ctx context.Context, id pgtype.UUID)) *MockQuerier_GetSMSConversation_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(pgtype.UUID))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetSMSConversation_Call) Return(_a0 sqlc.SmsConversation, _a1 error) *MockQuerier_GetSMSConversation_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetSMSConversation_Call) RunAndReturn(run func(context.Context, pgtype.UUID) (sqlc.SmsConversation, error)) *MockQuerier_GetSMSConversation_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetSMSConversationByUserID provides a mock function with given fields: ctx, userID
+func (_m *MockQuerier) GetSMSConversationByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.SmsConversation, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetSMSConversationByUserID")
+	}
+
+	var r0 sqlc.SmsConversation
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) (sqlc.SmsConversation, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) sqlc.SmsConversation); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Get(0).(sqlc.SmsConversation)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetSMSConversationByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSMSConversationByUserID'
+type MockQuerier_GetSMSConversationByUserID_Call struct {
+	*mock.Call
+}
+
+// GetSMSConversationByUserID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID pgtype.UUID
+func (_e *MockQuerier_Expecter) GetSMSConversationByUserID(ctx interface{}, userID interface{}) *MockQuerier_GetSMSConversationByUserID_Call {
+	return &MockQuerier_GetSMSConversationByUserID_Call{Call: _e.mock.On("GetSMSConversationByUserID", ctx, userID)}
+}
+
+func (_c *MockQuerier_GetSMSConversationByUserID_Call) Run(run func(ctx context.Context, userID pgtype.UUID)) *MockQuerier_GetSMSConversationByUserID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(pgtype.UUID))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetSMSConversationByUserID_Call) Return(_a0 sqlc.SmsConversation, _a1 error) *MockQuerier_GetSMSConversationByUserID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetSMSConversationByUserID_Call) RunAndReturn(run func(context.Context, pgtype.UUID) (sqlc.SmsConversation, error)) *MockQuerier_GetSMSConversationByUserID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -13609,22 +13992,22 @@ func (_c *MockQuerier_LogDataAccess_Call) RunAndReturn(run func(context.Context,
 }
 
 // LogSMSMessage provides a mock function with given fields: ctx, arg
-func (_m *MockQuerier) LogSMSMessage(ctx context.Context, arg sqlc.LogSMSMessageParams) (sqlc.LogSMSMessageRow, error) {
+func (_m *MockQuerier) LogSMSMessage(ctx context.Context, arg sqlc.LogSMSMessageParams) (sqlc.SmsMessage, error) {
 	ret := _m.Called(ctx, arg)
 
 	if len(ret) == 0 {
 		panic("no return value specified for LogSMSMessage")
 	}
 
-	var r0 sqlc.LogSMSMessageRow
+	var r0 sqlc.SmsMessage
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.LogSMSMessageParams) (sqlc.LogSMSMessageRow, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.LogSMSMessageParams) (sqlc.SmsMessage, error)); ok {
 		return rf(ctx, arg)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, sqlc.LogSMSMessageParams) sqlc.LogSMSMessageRow); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.LogSMSMessageParams) sqlc.SmsMessage); ok {
 		r0 = rf(ctx, arg)
 	} else {
-		r0 = ret.Get(0).(sqlc.LogSMSMessageRow)
+		r0 = ret.Get(0).(sqlc.SmsMessage)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, sqlc.LogSMSMessageParams) error); ok {
@@ -13655,12 +14038,12 @@ func (_c *MockQuerier_LogSMSMessage_Call) Run(run func(ctx context.Context, arg 
 	return _c
 }
 
-func (_c *MockQuerier_LogSMSMessage_Call) Return(_a0 sqlc.LogSMSMessageRow, _a1 error) *MockQuerier_LogSMSMessage_Call {
+func (_c *MockQuerier_LogSMSMessage_Call) Return(_a0 sqlc.SmsMessage, _a1 error) *MockQuerier_LogSMSMessage_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQuerier_LogSMSMessage_Call) RunAndReturn(run func(context.Context, sqlc.LogSMSMessageParams) (sqlc.LogSMSMessageRow, error)) *MockQuerier_LogSMSMessage_Call {
+func (_c *MockQuerier_LogSMSMessage_Call) RunAndReturn(run func(context.Context, sqlc.LogSMSMessageParams) (sqlc.SmsMessage, error)) *MockQuerier_LogSMSMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }
