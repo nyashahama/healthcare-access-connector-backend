@@ -222,12 +222,12 @@ func TestAuthHandler_Register(t *testing.T) {
 		userID := uuid.New()
 		email := "test@example.com"
 		user := core.User{
-			ID:        userID,
-			Email:     &email,
-			Role:      "patient",
-			Status:    "active",
+			ID:         userID,
+			Email:      &email,
+			Role:       "patient",
+			Status:     "active",
 			IsVerified: false,
-			CreatedAt: time.Now(),
+			CreatedAt:  time.Now(),
 		}
 
 		mockAuth.On("Register", mock.Anything, email, "", "password123", "patient").Return(user, nil)
@@ -284,12 +284,12 @@ func TestAuthHandler_Login(t *testing.T) {
 		userID := uuid.New()
 		email := "test@example.com"
 		user := core.User{
-			ID:        userID,
-			Email:     &email,
-			Role:      "patient",
-			Status:    "active",
+			ID:         userID,
+			Email:      &email,
+			Role:       "patient",
+			Status:     "active",
 			IsVerified: true,
-			CreatedAt: time.Now(),
+			CreatedAt:  time.Now(),
 		}
 
 		mockAuth.On("Login", mock.Anything, "test@example.com", "password123", mock.Anything, mock.Anything).Return("token", time.Now().Add(time.Hour), user, nil)
@@ -345,12 +345,12 @@ func TestAuthHandler_RefreshToken(t *testing.T) {
 		userID := uuid.New()
 		email := "test@example.com"
 		user := core.User{
-			ID:        userID,
-			Email:     &email,
-			Role:      "patient",
-			Status:    "active",
+			ID:         userID,
+			Email:      &email,
+			Role:       "patient",
+			Status:     "active",
 			IsVerified: true,
-			CreatedAt: time.Now(),
+			CreatedAt:  time.Now(),
 		}
 
 		mockAuth.On("RefreshToken", mock.Anything, "valid-token", mock.Anything, mock.Anything).Return("new-token", time.Now().Add(time.Hour), user, nil)
@@ -409,6 +409,22 @@ func TestAuthHandler_Logout(t *testing.T) {
 		handler := newTestHandler(mockAuth, mockUser)
 
 		req := newTestRequest("POST", "/api/v1/auth/logout", nil)
+		w := httptest.NewRecorder()
+
+		handler.Logout(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("invalid token", func(t *testing.T) {
+		mockAuth := new(MockAuthService)
+		mockUser := new(MockUserService)
+		handler := newTestHandler(mockAuth, mockUser)
+
+		mockAuth.On("ValidateToken", mock.Anything, "bad-token").Return(nil, domain.ErrInvalidToken)
+
+		req := newTestRequest("POST", "/api/v1/auth/logout", nil)
+		req.Header.Set("Authorization", "Bearer bad-token")
 		w := httptest.NewRecorder()
 
 		handler.Logout(w, req)

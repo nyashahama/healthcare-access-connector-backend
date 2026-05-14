@@ -39,6 +39,7 @@ type authService struct {
 	logger       *zerolog.Logger
 	jwtSecret    string
 	jwtExpiry    time.Duration
+	tokenTTL     time.Duration
 	smsEnabled   bool
 	bcryptCost   int
 
@@ -57,6 +58,16 @@ type loginAttempt struct {
 	lastFailed  time.Time
 	lockedUntil *time.Time
 }
+
+type cachedLoginAttempt struct {
+	Attempts    int   `json:"attempts"`
+	LastFailed  int64 `json:"last_failed"`
+	LockedUntil int64 `json:"locked_until"`
+}
+
+const (
+	fallbackLoginAttemptTTL = 15 * time.Minute
+)
 
 // NewAuthService creates a new authentication service
 func NewAuthService(
@@ -77,6 +88,7 @@ func NewAuthService(
 	bcryptCost int,
 	loginMaxAttempts int,
 	loginLockout time.Duration,
+	tokenTTL time.Duration,
 ) service.AuthService {
 	// Validate bcrypt cost
 	if bcryptCost < bcrypt.MinCost {
@@ -110,6 +122,7 @@ func NewAuthService(
 		jwtExpiry:        jwtExpiry,
 		smsEnabled:       smsEnabled,
 		bcryptCost:       bcryptCost,
+		tokenTTL:         tokenTTL,
 		loginMaxAttempts: loginMaxAttempts,
 		loginLockout:     loginLockout,
 		loginAttempts:    make(map[string]loginAttempt),
@@ -120,8 +133,14 @@ func NewAuthService(
 		},
 	}
 
-	// Start background cleanup goroutine
-	go service.cleanupLoginAttempts()
+	if service.tokenTTL <= 0 {
+		service.tokenTTL = 5 * time.Minute
+	}
+
+	if cache == nil || !cache.IsAvailable() {
+		// Start background cleanup goroutine only for in-memory login tracking.
+		go service.cleanupLoginAttempts()
+	}
 
 	return service
 }
@@ -202,8 +221,14 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 		return core.User{}, domain.NewAppError(err, "User creation failed", 500)
 	}
 
-	// Handle post-registration tasks asynchronously
-	go s.handlePostRegistration(created, email, phone, role)
+	if err := s.handlePostRegistration(ctx, created, email, phone, role); err != nil {
+		if s.userRepo != nil {
+			if delErr := s.userRepo.DeleteUser(ctx, created.ID); delErr != nil {
+				s.logger.Warn().Err(delErr).Str("user_id", created.ID.String()).Msg("Failed to rollback user after registration failure")
+			}
+		}
+		return core.User{}, domain.NewAppError(err, "Registration failed", 500)
+	}
 
 	s.logger.Info().
 		Str("user_id", created.ID.String()).
@@ -412,14 +437,22 @@ func (s *authService) Login(ctx context.Context, identifier, password, ipAddress
 
 // ValidateToken validates JWT token
 func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*service.TokenClaims, error) {
-	// Try cache first
 	cacheKey := fmt.Sprintf("token:valid:%s", tokenString)
 
+	// Return cached claim first, but always verify the session is still active to avoid
+	// accepting revoked tokens after cache reads.
 	if s.cache != nil && s.cache.IsAvailable() {
-		var claims service.TokenClaims
-		if err := s.cache.Get(ctx, cacheKey, &claims); err == nil {
-			s.logger.Debug().Msg("Cache hit for token validation")
-			return &claims, nil
+		var cachedClaims service.TokenClaims
+		if err := s.cache.Get(ctx, cacheKey, &cachedClaims); err == nil {
+			session, err := s.sessionSvc.GetSession(ctx, tokenString)
+			if err == nil && !session.ExpiresAt.Before(time.Now()) {
+				return &cachedClaims, nil
+			}
+
+			// Remove stale cache entry to avoid repeated false positives.
+			if err := s.cache.Delete(ctx, cacheKey); err != nil {
+				s.logger.Warn().Err(err).Str("cache_key", cacheKey).Msg("Failed to delete stale token cache entry")
+			}
 		}
 	}
 
@@ -453,11 +486,19 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*s
 		return nil, domain.NewAppError(domain.ErrInvalidToken, "Invalid user ID format", 401)
 	}
 
-	// Check expiration
-	if exp, ok := claims["exp"].(float64); ok {
-		if time.Now().Unix() > int64(exp) {
+	// Check expiration.
+	if expUnix, ok := claims["exp"].(float64); ok {
+		if time.Now().Unix() > int64(expUnix) {
 			return nil, domain.NewAppError(domain.ErrExpiredToken, "Token expired", 401)
 		}
+	} else {
+		return nil, domain.NewAppError(domain.ErrInvalidToken, "Token missing exp claim", 401)
+	}
+
+	nbfUnix, hasNBF := claims["nbf"].(float64)
+	// Keep backward compatibility for older tokens that may not include nbf.
+	if hasNBF && time.Now().Unix() < int64(nbfUnix) {
+		return nil, domain.NewAppError(domain.ErrInvalidToken, "Token not yet valid", 401)
 	}
 
 	// Check if session exists
@@ -468,21 +509,37 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*s
 
 	role, _ := claims["role"].(string)
 	email, _ := claims["email"].(string)
+	jti, _ := claims["jti"].(string)
 
-	tokenClaims := &service.TokenClaims{
+	expiry := time.Until(time.Now().Add(s.tokenTTL))
+	if expClaim, ok := claims["exp"].(float64); ok {
+		expAt := time.Unix(int64(expClaim), 0)
+		if ttl := time.Until(expAt); ttl < expiry {
+			expiry = ttl
+		}
+	}
+	if expiry < time.Second {
+		expiry = time.Second
+	}
+
+	claimsResult := &service.TokenClaims{
 		UserID: userID,
 		Role:   role,
 		Email:  email,
+		JTI:    jti,
 	}
 
-	// Cache token validation
 	if s.cache != nil && s.cache.IsAvailable() {
-		if err := s.cache.Set(ctx, cacheKey, tokenClaims, 1*time.Minute); err != nil {
+		if err := s.cache.Set(ctx, cacheKey, claimsResult, expiry); err != nil {
 			s.logger.Warn().Err(err).Str("cache_key", cacheKey).Msg("Failed to cache token validation result")
 		}
 	}
 
-	return tokenClaims, nil
+	// Validate token was issued for this session (must match current active session)
+	role, _ = claims["role"].(string)
+	email, _ = claims["email"].(string)
+
+	return claimsResult, nil
 }
 
 // RefreshToken refreshes JWT token
@@ -684,18 +741,8 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 		return domain.NewAppError(err, "Password reset failed", 500)
 	}
 
-	// Update password
-	if err := s.authRepo.UpdateUserPassword(ctx, user.ID, string(hash)); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to update password")
-		return domain.NewAppError(err, "Password reset failed", 500)
-	}
-
-	// Delete all user sessions
-	if err := s.sessionSvc.RevokeAllSessions(ctx, user.ID); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to delete user sessions")
-	}
-
-	// Send verification email when possible.
+	// Notify user before persisting the change so that an email failure can
+	// short-circuit without committing a password change.
 	if user.Email != nil {
 		if s.emailService != nil && s.emailService.IsAvailable() {
 			if err := s.emailService.SendPasswordChangedEmail(ctx, *user.Email, *user.Email); err != nil {
@@ -705,6 +752,17 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 		} else {
 			s.logger.Warn().Str("user_id", user.ID.String()).Msg("Email service unavailable; skipping password changed notification")
 		}
+	}
+
+	// Update password
+	if err := s.authRepo.UpdateUserPassword(ctx, user.ID, string(hash)); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to update password")
+		return domain.NewAppError(err, "Password reset failed", 500)
+	}
+
+	// Delete all user sessions
+	if err := s.sessionSvc.RevokeAllSessions(ctx, user.ID); err != nil {
+		s.logger.Warn().Err(err).Msg("Failed to delete user sessions")
 	}
 
 	// Invalidate all caches for this user
@@ -1039,7 +1097,7 @@ func (s *authService) GetUserClinics(ctx context.Context, userID uuid.UUID) ([]c
 }
 
 // Helper methods for auth service
-func (s *authService) handlePostRegistration(user core.User, email, phone, role string) {
+func (s *authService) handlePostRegistration(ctx context.Context, user core.User, email, phone, role string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -1060,7 +1118,8 @@ func (s *authService) handlePostRegistration(user core.User, email, phone, role 
 	}
 
 	if _, err := s.consentRepo.CreatePrivacyConsent(ctx, consent); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to create consent record")
+		s.logger.Error().Err(err).Msg("Failed to create consent record")
+		return fmt.Errorf("create consent record: %w", err)
 	}
 
 	// For patients, create empty patient profile
@@ -1078,7 +1137,8 @@ func (s *authService) handlePostRegistration(user core.User, email, phone, role 
 		}
 
 		if _, err := s.patientRepo.CreatePatientProfile(ctx, patientProfile); err != nil {
-			s.logger.Warn().Err(err).Msg("Failed to create patient profile")
+			s.logger.Error().Err(err).Msg("Failed to create patient profile")
+			return fmt.Errorf("create patient profile: %w", err)
 		}
 	}
 
@@ -1087,19 +1147,22 @@ func (s *authService) handlePostRegistration(user core.User, email, phone, role 
 		verificationToken := s.generateSecureToken()
 		if verificationToken == "" {
 			s.logger.Error().Msg("Failed to generate verification token during registration")
-			return
+			return fmt.Errorf("generate verification token: failed")
 		}
 		tokenExpires := time.Now().Add(24 * time.Hour)
 
 		if err := s.authRepo.SetVerificationToken(ctx, user.ID, verificationToken, tokenExpires); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to set verification token")
-			return
+			return fmt.Errorf("set verification token: %w", err)
 		}
 
 		if err := s.emailService.SendVerificationEmail(ctx, email, verificationToken); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to send verification email")
+			return fmt.Errorf("send verification email: %w", err)
 		}
 	}
+
+	return nil
 }
 
 func (s *authService) generateToken(user core.User, expiresAt time.Time) (string, error) {
@@ -1114,6 +1177,8 @@ func (s *authService) generateToken(user core.User, expiresAt time.Time) (string
 		"role":    user.Role,
 		"exp":     expiresAt.Unix(),
 		"iat":     time.Now().Unix(),
+		"nbf":     time.Now().Add(-30 * time.Second).Unix(),
+		"jti":     uuid.New().String(),
 		"iss":     "healthcare-access-connector",
 	}
 
@@ -1139,6 +1204,21 @@ func (s *authService) generateSecureToken() string {
 
 // Rate limiting helpers
 func (s *authService) isLoginLocked(identifier string) bool {
+	// Prefer cache-backed enforcement when available for shared state across
+	// instances. Fall back to in-memory counters only when cache is unavailable.
+	if s.cache != nil && s.cache.IsAvailable() {
+		var cached cachedLoginAttempt
+		key := fmt.Sprintf("auth:login:%s", identifier)
+		if err := s.cache.Get(context.Background(), key, &cached); err == nil {
+			if cached.LockedUntil > 0 && time.Now().Before(time.Unix(cached.LockedUntil, 0)) {
+				return true
+			}
+			if cached.LockedUntil > 0 && time.Now().After(time.Unix(cached.LockedUntil, 0)) {
+				_ = s.cache.Delete(context.Background(), key)
+			}
+		}
+	}
+
 	s.loginAttemptsMu.RLock()
 	defer s.loginAttemptsMu.RUnlock()
 
@@ -1155,6 +1235,37 @@ func (s *authService) isLoginLocked(identifier string) bool {
 }
 
 func (s *authService) recordFailedLogin(identifier string) {
+	// Shared state via cache keeps lockout policy consistent across instances.
+	if s.cache != nil && s.cache.IsAvailable() {
+		key := fmt.Sprintf("auth:login:%s", identifier)
+		var attempt cachedLoginAttempt
+		if err := s.cache.Get(context.Background(), key, &attempt); err != nil {
+			attempt = cachedLoginAttempt{}
+		}
+
+		attempt.Attempts++
+		attempt.LastFailed = time.Now().Unix()
+		if attempt.Attempts >= s.loginMaxAttempts {
+			lockedUntil := time.Now().Add(s.loginLockout)
+			attempt.LockedUntil = lockedUntil.Unix()
+			s.logger.Warn().
+				Str("identifier", maskIdentifier(identifier)).
+				Int("attempts", attempt.Attempts).
+				Time("locked_until", lockedUntil).
+				Msg("Login locked due to too many failed attempts")
+		}
+
+		ttl := time.Until(time.Unix(attempt.LastFailed, 0).Add(fallbackLoginAttemptTTL))
+		if ttl < 0 {
+			ttl = fallbackLoginAttemptTTL
+		}
+
+		if err := s.cache.Set(context.Background(), key, attempt, ttl); err != nil {
+			s.logger.Warn().Err(err).Str("identifier", maskIdentifier(identifier)).Msg("Failed to persist login attempt in cache")
+		}
+		return
+	}
+
 	s.loginAttemptsMu.Lock()
 	defer s.loginAttemptsMu.Unlock()
 
@@ -1180,6 +1291,10 @@ func (s *authService) recordFailedLogin(identifier string) {
 }
 
 func (s *authService) resetLoginAttempts(identifier string) {
+	if s.cache != nil && s.cache.IsAvailable() {
+		_ = s.cache.Delete(context.Background(), fmt.Sprintf("auth:login:%s", identifier))
+	}
+
 	s.loginAttemptsMu.Lock()
 	defer s.loginAttemptsMu.Unlock()
 	delete(s.loginAttempts, identifier)

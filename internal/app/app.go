@@ -186,6 +186,7 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.BcryptCost,
 		cfg.LoginMaxAttempts,
 		time.Duration(cfg.LoginLockoutMins)*time.Minute,
+		cfg.JWTExpiry,
 	)
 
 	userService := servicecore.NewUserService(

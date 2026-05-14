@@ -78,9 +78,9 @@ func TestValidator_ValidatePhone(t *testing.T) {
 
 func TestValidator_ValidateUsername(t *testing.T) {
 	tests := []struct {
-		name    string
+		name     string
 		username string
-		wantErr bool
+		wantErr  bool
 	}{
 		{"valid username", "john_doe", false},
 		{"valid alphanumeric", "user123", false},
@@ -111,10 +111,13 @@ func TestValidator_ValidatePassword(t *testing.T) {
 		wantErr  bool
 	}{
 		{"valid password", "SecurePass123!", false},
-		{"exactly 8 chars", "12345678", false},
+		{"exactly 8 chars", "A1!abcde", false},
 		{"long password", "VeryLongSecurePassword123!", false},
+		{"without uppercase", "securepass123!", true},
+		{"without digit", "SecurePassword!", true},
+		{"without special", "SecurePassword123", true},
 		{"too short", "short", true},
-		{"exactly 7 chars", "1234567", true},
+		{"exactly 7 chars", "A1!abcd", true},
 	}
 
 	for _, tt := range tests {
