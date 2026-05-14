@@ -70,7 +70,9 @@ func (s *sessionService) CreateSession(ctx context.Context, userID uuid.UUID, to
 	}
 
 	// Invalidate user sessions cache
-	s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String()))
+	if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
+		s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+	}
 
 	s.logger.Info().
 		Str("session_id", createdSession.ID.String()).
@@ -226,7 +228,9 @@ func (s *sessionService) RevokeAllSessions(ctx context.Context, userID uuid.UUID
 	}
 
 	// Invalidate cache
-	s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String()))
+	if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
+		s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+	}
 
 	s.logger.Info().
 		Str("user_id", userID.String()).
@@ -253,7 +257,9 @@ func (s *sessionService) RevokeAllExceptCurrent(ctx context.Context, userID, cur
 	}
 
 	// Invalidate cache
-	s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String()))
+	if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
+		s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+	}
 
 	s.logger.Info().
 		Str("user_id", userID.String()).
@@ -397,7 +403,7 @@ func (s *sessionService) ValidateAndExtendSession(ctx context.Context, token str
 	}
 
 	// Check if session is close to expiration and should be extended
-	timeUntilExpiry := session.ExpiresAt.Sub(time.Now())
+	timeUntilExpiry := time.Until(session.ExpiresAt)
 	if extendDuration > 0 && timeUntilExpiry < extendDuration/2 {
 		// Extend the session
 		newExpiresAt := time.Now().Add(extendDuration)
@@ -428,7 +434,9 @@ func (s *sessionService) cleanupExpiredSession(token string) {
 	}
 
 	// Invalidate cache
-	s.cache.Delete(ctx, fmt.Sprintf("session:%s", token))
+	if err := s.cache.Delete(ctx, fmt.Sprintf("session:%s", token)); err != nil {
+		s.logger.Warn().Err(err).Str("token_prefix", token[:8]).Msg("Failed to remove expired session cache")
+	}
 }
 
 func (s *sessionService) invalidateSessionCaches(ctx context.Context, token string, userID uuid.UUID) {

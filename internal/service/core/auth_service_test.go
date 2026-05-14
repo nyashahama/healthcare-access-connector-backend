@@ -14,10 +14,10 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email/types"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
-	"github.com/rs/zerolog"
 )
 
 func generateValidJWT(t *testing.T, userID uuid.UUID, secret string, expiry time.Time) string {
@@ -36,31 +36,15 @@ func generateValidJWT(t *testing.T, userID uuid.UUID, secret string, expiry time
 	return signedToken
 }
 
-func generateExpiredJWT(t *testing.T, userID uuid.UUID, secret string) string {
-	t.Helper()
-	claims := jwt.MapClaims{
-		"user_id": userID.String(),
-		"email":   "user@example.com",
-		"role":    "patient",
-		"exp":     time.Now().Add(-time.Hour).Unix(),
-		"iat":     time.Now().Add(-2 * time.Hour).Unix(),
-		"iss":     "healthcare-access-connector",
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(secret))
-	require.NoError(t, err)
-	return signedToken
-}
-
 type mockAuthRepository struct {
-	getUserByEmailFunc            func(ctx context.Context, email string) (core.User, string, error)
-	getUserByVerificationTokenFunc func(ctx context.Context, token string) (core.User, string, error)
+	getUserByEmailFunc              func(ctx context.Context, email string) (core.User, string, error)
+	getUserByVerificationTokenFunc  func(ctx context.Context, token string) (core.User, string, error)
 	getUserByPasswordResetTokenFunc func(ctx context.Context, token string) (core.User, string, error)
-	setVerificationTokenFunc      func(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
-	setPasswordResetTokenFunc     func(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
-	verifyUserFunc                func(ctx context.Context, id uuid.UUID) error
-	updateUserPasswordFunc        func(ctx context.Context, id uuid.UUID, passwordHash string) error
-	updateLastLoginFunc           func(ctx context.Context, id uuid.UUID) error
+	setVerificationTokenFunc        func(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
+	setPasswordResetTokenFunc       func(ctx context.Context, id uuid.UUID, token string, expires time.Time) error
+	verifyUserFunc                  func(ctx context.Context, id uuid.UUID) error
+	updateUserPasswordFunc          func(ctx context.Context, id uuid.UUID, passwordHash string) error
+	updateLastLoginFunc             func(ctx context.Context, id uuid.UUID) error
 }
 
 func (m *mockAuthRepository) CreateUser(ctx context.Context, user core.User, passwordHash string) (core.User, error) {
@@ -152,8 +136,8 @@ func (m *mockAuthRepository) GetUserClinics(ctx context.Context, userID uuid.UUI
 }
 
 type mockUserRepository struct {
-	getUserByIDFunc       func(ctx context.Context, id uuid.UUID) (core.User, error)
-	updateUserStatusFunc  func(ctx context.Context, id uuid.UUID, status string) error
+	getUserByIDFunc      func(ctx context.Context, id uuid.UUID) (core.User, error)
+	updateUserStatusFunc func(ctx context.Context, id uuid.UUID, status string) error
 }
 
 func (m *mockUserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (core.User, error) {
@@ -227,9 +211,9 @@ func (m *mockUserRepository) GetUsersByIDs(ctx context.Context, ids []uuid.UUID)
 }
 
 type mockSessionService struct {
-	createSessionFunc   func(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time, ipAddress, userAgent, deviceType string) (core.UserSession, error)
-	getSessionFunc      func(ctx context.Context, token string) (core.UserSession, error)
-	revokeSessionFunc   func(ctx context.Context, token string, userID uuid.UUID) error
+	createSessionFunc     func(ctx context.Context, userID uuid.UUID, token string, expiresAt time.Time, ipAddress, userAgent, deviceType string) (core.UserSession, error)
+	getSessionFunc        func(ctx context.Context, token string) (core.UserSession, error)
+	revokeSessionFunc     func(ctx context.Context, token string, userID uuid.UUID) error
 	revokeAllSessionsFunc func(ctx context.Context, userID uuid.UUID) error
 }
 
@@ -292,12 +276,12 @@ func (m *mockSessionService) ValidateAndExtendSession(ctx context.Context, token
 func (m *mockSessionService) StartSessionCleanupJob(interval time.Duration) {}
 
 type mockEmailService struct {
-	available         bool
-	sendWelcomeEmailFunc func(ctx context.Context, to, username string) error
-	sendPasswordResetEmailFunc func(ctx context.Context, to, resetToken string) error
+	available                    bool
+	sendWelcomeEmailFunc         func(ctx context.Context, to, username string) error
+	sendPasswordResetEmailFunc   func(ctx context.Context, to, resetToken string) error
 	sendPasswordChangedEmailFunc func(ctx context.Context, to, username string) error
-	sendVerificationEmailFunc func(ctx context.Context, to, verificationToken string) error
-	sendLoginAlertEmailFunc func(ctx context.Context, to, username, ipAddress, location string) error
+	sendVerificationEmailFunc    func(ctx context.Context, to, verificationToken string) error
+	sendLoginAlertEmailFunc      func(ctx context.Context, to, username, ipAddress, location string) error
 }
 
 func (m *mockEmailService) Send(ctx context.Context, msg *types.Message, callback func(error)) error {
@@ -395,17 +379,17 @@ func newAuthServiceWithMocks(t *testing.T, maxAttempts int, lockout time.Duratio
 	mockEmailSvc := &mockEmailService{available: true}
 
 	return &authService{
-		authRepo:       mockAuthRepo,
-		userRepo:       mockUserRepo,
-		sessionSvc:     mockSessionSvc,
-		emailService:   mockEmailSvc,
-		logger:         &logger,
-		jwtSecret:      strings.Repeat("x", 32),
-		jwtExpiry:      time.Hour,
-		bcryptCost:     bcrypt.MinCost,
-		loginAttempts:  make(map[string]loginAttempt),
+		authRepo:         mockAuthRepo,
+		userRepo:         mockUserRepo,
+		sessionSvc:       mockSessionSvc,
+		emailService:     mockEmailSvc,
+		logger:           &logger,
+		jwtSecret:        strings.Repeat("x", 32),
+		jwtExpiry:        time.Hour,
+		bcryptCost:       bcrypt.MinCost,
+		loginAttempts:    make(map[string]loginAttempt),
 		loginMaxAttempts: maxAttempts,
-		loginLockout:   lockout,
+		loginLockout:     lockout,
 		tokenPool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 32)
@@ -584,9 +568,9 @@ func TestVerifyEmailSuccess(t *testing.T) {
 	svc, mockAuth, _, _ := newAuthServiceWithMocks(t, 5, 5*time.Minute)
 
 	testUser := core.User{
-		ID:           uuid.New(),
-		Email:         stringPtr("user@example.com"),
-		IsVerified:   false,
+		ID:                  uuid.New(),
+		Email:               stringPtr("user@example.com"),
+		IsVerified:          false,
 		VerificationExpires: func() *time.Time { t := time.Now().Add(time.Hour); return &t }(),
 	}
 

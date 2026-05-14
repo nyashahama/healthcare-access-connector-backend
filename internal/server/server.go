@@ -482,7 +482,9 @@ func (s *Server) setupRoutes() http.Handler {
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error": "Route not found"}`))
+		if _, err := w.Write([]byte(`{"error": "Route not found"}`)); err != nil {
+			s.logger.Error().Err(err).Msg("failed to write 404 response")
+		}
 	})
 
 	// ── Combine routers ────────────────────────────────────────────────────────

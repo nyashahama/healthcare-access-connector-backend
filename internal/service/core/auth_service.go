@@ -255,7 +255,7 @@ func (s *authService) RegisterInvitedStaff(ctx context.Context, token, email, pa
 	}
 
 	// Verify email matches
-	if strings.ToLower(invitation.WorkEmail) != strings.ToLower(email) {
+	if !strings.EqualFold(invitation.WorkEmail, email) {
 		return core.User{}, domain.NewAppError(domain.ErrValidation, "Email does not match invitation", 400)
 	}
 
@@ -536,9 +536,6 @@ func (s *authService) ValidateToken(ctx context.Context, tokenString string) (*s
 	}
 
 	// Validate token was issued for this session (must match current active session)
-	role, _ = claims["role"].(string)
-	email, _ = claims["email"].(string)
-
 	return claimsResult, nil
 }
 
@@ -1098,7 +1095,7 @@ func (s *authService) GetUserClinics(ctx context.Context, userID uuid.UUID) ([]c
 
 // Helper methods for auth service
 func (s *authService) handlePostRegistration(ctx context.Context, user core.User, email, phone, role string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Create default consent record
@@ -1117,7 +1114,7 @@ func (s *authService) handlePostRegistration(ctx context.Context, user core.User
 		UpdatedAt:                  user.CreatedAt,
 	}
 
-	if _, err := s.consentRepo.CreatePrivacyConsent(ctx, consent); err != nil {
+	if _, err := s.consentRepo.CreatePrivacyConsent(ctxWithTimeout, consent); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to create consent record")
 		return fmt.Errorf("create consent record: %w", err)
 	}
@@ -1193,7 +1190,7 @@ func (s *authService) generateToken(user core.User, expiresAt time.Time) (string
 
 func (s *authService) generateSecureToken() string {
 	b := s.tokenPool.Get().([]byte)
-	defer s.tokenPool.Put(b)
+	defer s.tokenPool.Put(b) //nolint:staticcheck // avoid allocation from copying interface values
 
 	n, err := rand.Read(b)
 	if err != nil || n != len(b) {

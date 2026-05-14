@@ -300,9 +300,6 @@ func (c *Config) Validate() error {
 				errors = append(errors, "EMAIL_FROM_ADDRESS is required when EMAIL_PROVIDER=smtp in production")
 			}
 		}
-		if c.EmailProvider == "resend" && c.RedisURL == "" {
-			// Resend doesn't require Redis, but this is an example of provider-specific validation
-		}
 		if c.EmailProvider == "ses" {
 			if c.EmailFromAddress == "" {
 				errors = append(errors, "EMAIL_FROM_ADDRESS is required when EMAIL_PROVIDER=ses in production")
@@ -320,20 +317,10 @@ func (c *Config) Validate() error {
 // Logger creates a configured logger instance
 func (c *Config) Logger() *zerolog.Logger {
 	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
-
-	// Add color for different environments
 	if c.IsDevelopment() {
-		output = zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
-			NoColor:    false,
-		}
+		output.NoColor = false
 	} else {
-		output = zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
-			NoColor:    true,
-		}
+		output.NoColor = true
 	}
 
 	logger := zerolog.New(output).With().Timestamp().Logger()
