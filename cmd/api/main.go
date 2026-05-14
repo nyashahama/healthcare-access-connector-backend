@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/app"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/config"
@@ -33,6 +32,4 @@ func main() {
 	if err := application.Run(); err != nil {
 		log.Fatal("Application failed:", err)
 	}
-
-	os.Exit(0)
 }

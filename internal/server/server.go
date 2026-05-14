@@ -19,7 +19,6 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -146,7 +145,6 @@ func NewServer(
 	// misc
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
-	txManager repository.TxManager,
 ) *Server {
 	return &Server{
 		config:                      cfg,

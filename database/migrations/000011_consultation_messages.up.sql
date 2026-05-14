@@ -1,4 +1,3 @@
-
 -- ============================================
 -- CONSULTATION MESSAGES REPOSITORY QUERIES
 -- Maps to: ConsultationMessageRepository interface
@@ -51,13 +50,8 @@ CREATE TABLE consultation_messages (
     )
 );
 
--- Primary read path: all messages in a consultation ordered by time
 CREATE INDEX idx_messages_consultation ON consultation_messages(consultation_id, sent_at ASC);
--- Unread count queries
 CREATE INDEX idx_messages_unread ON consultation_messages(consultation_id, is_read)
     WHERE is_read = false AND is_deleted = false;
--- Polling fallback: messages newer than a cursor timestamp
 CREATE INDEX idx_messages_after_timestamp ON consultation_messages(consultation_id, sent_at)
     WHERE is_deleted = false;
-
-

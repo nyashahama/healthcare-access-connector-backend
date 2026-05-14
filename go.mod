@@ -1,8 +1,8 @@
 module github.com/nyashahama/healthcare-access-connector-backend
 
-go 1.25.0
+go 1.24.0
 
-toolchain go1.25.10
+toolchain go1.24.0
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.40.1

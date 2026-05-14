@@ -23,7 +23,6 @@ import (
 	handlerproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	repoadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/admin"
 	repoappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/appointments"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
@@ -152,9 +151,6 @@ func New(cfg *config.Config) (*App, error) {
 	consultationMessagesRepo := repotele.NewConsultationMessagesRepository(pool)
 	consultationNotesRepo := repotele.NewConsultationNotesRepository(pool)
 	providerAvailabilityRepo := repotele.NewProviderAvailabilityRepository(pool)
-
-	// Initialize transaction manager
-	txManager := repository.NewTxManager(pool)
 
 	// ── Services ──────────────────────────────────────────────────────────────
 
@@ -467,7 +463,6 @@ func New(cfg *config.Config) (*App, error) {
 		wsHandler,
 		healthHandler,
 		authService,
-		txManager,
 	)
 
 	return &App{

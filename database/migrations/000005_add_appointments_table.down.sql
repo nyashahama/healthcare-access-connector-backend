@@ -1,1 +1,1 @@
-DROP TABLE appointments;
+DROP TABLE IF EXISTS appointments CASCADE;

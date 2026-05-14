@@ -1,4 +1,3 @@
-
 -- ============================================
 -- CONSULTATIONS REPOSITORY QUERIES
 -- Maps to: ConsultationRepository interface
@@ -63,4 +62,11 @@ CREATE TABLE consultations (
     CONSTRAINT valid_payment_status CHECK (payment_status IN ('pending', 'paid', 'waived', 'failed'))
 );
 
-
+CREATE INDEX idx_consultations_patient         ON consultations(patient_id);
+CREATE INDEX idx_consultations_provider        ON consultations(provider_staff_id);
+CREATE INDEX idx_consultations_status          ON consultations(status);
+CREATE INDEX idx_consultations_triage          ON consultations(triage_level_at_start);
+CREATE INDEX idx_consultations_requested_at    ON consultations(requested_at DESC);
+CREATE INDEX idx_consultations_symptom_session ON consultations(symptom_session_id);
+CREATE INDEX idx_consultations_provider_open   ON consultations(provider_staff_id, status)
+    WHERE status IN ('accepted', 'in_progress', 'pending_acceptance');
