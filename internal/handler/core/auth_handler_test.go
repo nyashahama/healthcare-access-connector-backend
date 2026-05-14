@@ -230,9 +230,9 @@ func TestAuthHandler_Register(t *testing.T) {
 			CreatedAt:  time.Now(),
 		}
 
-		mockAuth.On("Register", mock.Anything, email, "", "password123", "patient").Return(user, nil)
+		mockAuth.On("Register", mock.Anything, email, "", "Password123!", "patient").Return(user, nil)
 
-		body := []byte(`{"email":"test@example.com","password":"password123","role":"patient"}`)
+		body := []byte(`{"email":"test@example.com","password":"Password123!","role":"patient"}`)
 		req := newTestRequest("POST", "/api/v1/auth/register", body)
 		w := httptest.NewRecorder()
 
@@ -262,9 +262,9 @@ func TestAuthHandler_Register(t *testing.T) {
 		handler := newTestHandler(mockAuth, mockUser)
 
 		email := "test@example.com"
-		mockAuth.On("Register", mock.Anything, email, "", "password123", "patient").Return(core.User{}, domain.ErrDuplicateEmail)
+		mockAuth.On("Register", mock.Anything, email, "", "Password123!", "patient").Return(core.User{}, domain.ErrDuplicateEmail)
 
-		body := []byte(`{"email":"test@example.com","password":"password123","role":"patient"}`)
+		body := []byte(`{"email":"test@example.com","password":"Password123!","role":"patient"}`)
 		req := newTestRequest("POST", "/api/v1/auth/register", body)
 		w := httptest.NewRecorder()
 
@@ -506,9 +506,9 @@ func TestAuthHandler_ResetPassword(t *testing.T) {
 		mockUser := new(MockUserService)
 		handler := newTestHandler(mockAuth, mockUser)
 
-		mockAuth.On("ResetPassword", mock.Anything, "valid-token", "newpassword123").Return(nil)
+		mockAuth.On("ResetPassword", mock.Anything, "valid-token", "NewPassword123!").Return(nil)
 
-		body := []byte(`{"token":"valid-token","new_password":"newpassword123"}`)
+		body := []byte(`{"token":"valid-token","new_password":"NewPassword123!"}`)
 		req := newTestRequest("POST", "/api/v1/auth/reset-password", body)
 		w := httptest.NewRecorder()
 
@@ -523,9 +523,9 @@ func TestAuthHandler_ResetPassword(t *testing.T) {
 		mockUser := new(MockUserService)
 		handler := newTestHandler(mockAuth, mockUser)
 
-		mockAuth.On("ResetPassword", mock.Anything, "invalid-token", "newpassword123").Return(domain.ErrInvalidToken)
+		mockAuth.On("ResetPassword", mock.Anything, "invalid-token", "NewPassword123!").Return(domain.ErrInvalidToken)
 
-		body := []byte(`{"token":"invalid-token","new_password":"newpassword123"}`)
+		body := []byte(`{"token":"invalid-token","new_password":"NewPassword123!"}`)
 		req := newTestRequest("POST", "/api/v1/auth/reset-password", body)
 		w := httptest.NewRecorder()
 

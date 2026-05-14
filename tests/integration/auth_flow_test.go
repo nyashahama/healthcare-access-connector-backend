@@ -125,8 +125,18 @@ func TestAuthFlow(t *testing.T) {
 		t.Fatalf("Expected status 200, got %d", resp.StatusCode)
 	}
 
+	var refreshResp struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&refreshResp); err != nil {
+		t.Fatalf("Failed to decode refresh response: %v", err)
+	}
+	if refreshResp.Token == "" {
+		t.Fatal("Refresh token is empty")
+	}
+
 	req, _ = http.NewRequest("POST", ts.URL+"/api/v1/auth/logout", nil)
-	req.Header.Set("Authorization", "Bearer "+loginResp.Token)
+	req.Header.Set("Authorization", "Bearer "+refreshResp.Token)
 
 	resp, err = ts.Client().Do(req)
 	if err != nil {
