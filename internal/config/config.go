@@ -173,8 +173,9 @@ func Load() (*Config, error) {
 		ProfilingPort:    getEnv("PROFILING_PORT", "6060"),
 	}
 
-	// Ensure port has colon prefix
-	if !strings.HasPrefix(cfg.Port, ":") {
+	// Ensure port has colon prefix once.
+	cfg.Port = strings.TrimSpace(cfg.Port)
+	if strings.Count(cfg.Port, ":") == 0 {
 		cfg.Port = ":" + cfg.Port
 	}
 
@@ -366,7 +367,7 @@ func (c *Config) IsStaging() bool {
 func (c *Config) GetBcryptCost() int {
 	if c.IsDevelopment() && c.BcryptCost > 8 {
 		// Auto-reduce cost in development for faster testing
-		c.logDevelopmentWarning("Using bcrypt cost 4 for development (was %d)", c.BcryptCost)
+		c.logDevelopmentWarning("Using bcrypt cost %d for development (configured %d)", 4, c.BcryptCost)
 		return 4
 	}
 	return c.BcryptCost
@@ -425,20 +426,32 @@ func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 	if valueStr == "" {
 		return defaultValue
 	}
+	valueStr = strings.TrimSpace(valueStr)
+
+	if duration, err := time.ParseDuration(valueStr); err == nil {
+		return duration
+	}
 
 	// Try parsing as integer (seconds/hours depending on key)
 	if value, err := strconv.Atoi(valueStr); err == nil {
-		if strings.Contains(key, "HOURS") {
+		normalized := strings.ToUpper(key)
+		switch {
+		case strings.Contains(normalized, "HOURS"):
 			return time.Duration(value) * time.Hour
-		} else if strings.Contains(key, "MINUTES") {
+		case strings.Contains(normalized, "MINUTES"):
+			return time.Duration(value) * time.Minute
+		case strings.Contains(normalized, "SECONDS"):
+			return time.Duration(value) * time.Second
+		case strings.Contains(normalized, "DAYS") || strings.Contains(normalized, "DAY"):
+			return time.Duration(value) * 24 * time.Hour
+		case strings.Contains(normalized, "WEEKS") || strings.Contains(normalized, "WEEK"):
+			return time.Duration(value) * 24 * 7 * time.Hour
+		case strings.Contains(normalized, "TTL"):
 			return time.Duration(value) * time.Minute
 		}
-		return time.Duration(value) * time.Second
-	}
 
-	// Try parsing as duration string
-	if duration, err := time.ParseDuration(valueStr); err == nil {
-		return duration
+		// Fallback to historical behavior for unspecified unit suffixes.
+		return time.Duration(value) * time.Second
 	}
 
 	return defaultValue

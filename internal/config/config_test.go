@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,4 +99,33 @@ func TestLoadAllowsOptionalNatsEmpty(t *testing.T) {
 	cfg, err := Load()
 	require.NoError(t, err)
 	assert.Equal(t, "nats://localhost:4222", cfg.NatsURL)
+}
+
+func TestGetBcryptCostReturnsReducedValueWithoutMutation(t *testing.T) {
+	cfg := &Config{
+		Environment: "development",
+		BcryptCost:  12,
+	}
+	assert.Equal(t, 4, cfg.GetBcryptCost())
+	assert.Equal(t, 12, cfg.BcryptCost)
+}
+
+func TestGetEnvAsDurationSupportsAdditionalUnits(t *testing.T) {
+	t.Setenv("CACHE_TTL", "5")
+	assert.Equal(t, 5*time.Minute, getEnvAsDuration("CACHE_TTL", time.Minute))
+
+	t.Setenv("CACHE_MINUTES", "5")
+	assert.Equal(t, 5*time.Minute, getEnvAsDuration("CACHE_MINUTES", time.Minute))
+
+	t.Setenv("CACHE_SECONDS", "2")
+	assert.Equal(t, 2*time.Second, getEnvAsDuration("CACHE_SECONDS", time.Minute))
+
+	t.Setenv("CACHE_DAYS", "2")
+	assert.Equal(t, 48*time.Hour, getEnvAsDuration("CACHE_DAYS", time.Minute))
+
+	t.Setenv("CACHE_WEEKS", "1")
+	assert.Equal(t, 7*24*time.Hour, getEnvAsDuration("CACHE_WEEKS", time.Minute))
+
+	t.Setenv("JWT_EXPIRY", "3")
+	assert.Equal(t, 3*time.Second, getEnvAsDuration("JWT_EXPIRY", time.Minute))
 }
