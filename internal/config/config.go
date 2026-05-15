@@ -173,8 +173,9 @@ func Load() (*Config, error) {
 		ProfilingPort:    getEnv("PROFILING_PORT", "6060"),
 	}
 
-	// Ensure port has colon prefix
-	if !strings.HasPrefix(cfg.Port, ":") {
+	// Ensure port has colon prefix once.
+	cfg.Port = strings.TrimSpace(cfg.Port)
+	if strings.Count(cfg.Port, ":") == 0 {
 		cfg.Port = ":" + cfg.Port
 	}
 
@@ -299,9 +300,6 @@ func (c *Config) Validate() error {
 				errors = append(errors, "EMAIL_FROM_ADDRESS is required when EMAIL_PROVIDER=smtp in production")
 			}
 		}
-		if c.EmailProvider == "resend" && c.RedisURL == "" {
-			// Resend doesn't require Redis, but this is an example of provider-specific validation
-		}
 		if c.EmailProvider == "ses" {
 			if c.EmailFromAddress == "" {
 				errors = append(errors, "EMAIL_FROM_ADDRESS is required when EMAIL_PROVIDER=ses in production")
@@ -319,20 +317,10 @@ func (c *Config) Validate() error {
 // Logger creates a configured logger instance
 func (c *Config) Logger() *zerolog.Logger {
 	output := zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}
-
-	// Add color for different environments
 	if c.IsDevelopment() {
-		output = zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
-			NoColor:    false,
-		}
+		output.NoColor = false
 	} else {
-		output = zerolog.ConsoleWriter{
-			Out:        os.Stdout,
-			TimeFormat: time.RFC3339,
-			NoColor:    true,
-		}
+		output.NoColor = true
 	}
 
 	logger := zerolog.New(output).With().Timestamp().Logger()
@@ -366,7 +354,7 @@ func (c *Config) IsStaging() bool {
 func (c *Config) GetBcryptCost() int {
 	if c.IsDevelopment() && c.BcryptCost > 8 {
 		// Auto-reduce cost in development for faster testing
-		c.logDevelopmentWarning("Using bcrypt cost 4 for development (was %d)", c.BcryptCost)
+		c.logDevelopmentWarning("Using bcrypt cost %d for development (configured %d)", 4, c.BcryptCost)
 		return 4
 	}
 	return c.BcryptCost
@@ -425,20 +413,32 @@ func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
 	if valueStr == "" {
 		return defaultValue
 	}
+	valueStr = strings.TrimSpace(valueStr)
+
+	if duration, err := time.ParseDuration(valueStr); err == nil {
+		return duration
+	}
 
 	// Try parsing as integer (seconds/hours depending on key)
 	if value, err := strconv.Atoi(valueStr); err == nil {
-		if strings.Contains(key, "HOURS") {
+		normalized := strings.ToUpper(key)
+		switch {
+		case strings.Contains(normalized, "HOURS"):
 			return time.Duration(value) * time.Hour
-		} else if strings.Contains(key, "MINUTES") {
+		case strings.Contains(normalized, "MINUTES"):
+			return time.Duration(value) * time.Minute
+		case strings.Contains(normalized, "SECONDS"):
+			return time.Duration(value) * time.Second
+		case strings.Contains(normalized, "DAYS") || strings.Contains(normalized, "DAY"):
+			return time.Duration(value) * 24 * time.Hour
+		case strings.Contains(normalized, "WEEKS") || strings.Contains(normalized, "WEEK"):
+			return time.Duration(value) * 24 * 7 * time.Hour
+		case strings.Contains(normalized, "TTL"):
 			return time.Duration(value) * time.Minute
 		}
-		return time.Duration(value) * time.Second
-	}
 
-	// Try parsing as duration string
-	if duration, err := time.ParseDuration(valueStr); err == nil {
-		return duration
+		// Fallback to historical behavior for unspecified unit suffixes.
+		return time.Duration(value) * time.Second
 	}
 
 	return defaultValue

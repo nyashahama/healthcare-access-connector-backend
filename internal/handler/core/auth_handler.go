@@ -203,9 +203,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := h.authService.ValidateToken(ctx, tokenString)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusOK, map[string]string{
-			"message": "Logged out successfully",
-		})
+		handler.RespondError(w, h.logger, err)
 		return
 	}
 

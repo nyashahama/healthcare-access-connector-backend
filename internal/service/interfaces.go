@@ -409,4 +409,5 @@ type TokenClaims struct {
 	UserID uuid.UUID `json:"user_id"`
 	Role   string    `json:"role"`
 	Email  string    `json:"email"`
+	JTI    string    `json:"jti"`
 }

@@ -11,6 +11,9 @@ import (
 var (
 	// Username: 3-50 chars, alphanumeric + underscore
 	usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_]{3,50}$`)
+	upperRegex    = regexp.MustCompile(`[A-Z]`)
+	digitRegex    = regexp.MustCompile(`[0-9]`)
+	specialRegex  = regexp.MustCompile(`[^a-zA-Z0-9]`)
 	// Password: min 8 chars
 	minPasswordLength = 8
 )
@@ -80,6 +83,16 @@ func (v *Validator) ValidateUsername(field, username string) {
 func (v *Validator) ValidatePassword(field, password string) {
 	if len(password) < minPasswordLength {
 		v.AddError(field, fmt.Sprintf("must be at least %d characters long", minPasswordLength))
+		return
+	}
+	if !upperRegex.MatchString(password) {
+		v.AddError(field, "must contain at least one uppercase letter")
+	}
+	if !digitRegex.MatchString(password) {
+		v.AddError(field, "must contain at least one digit")
+	}
+	if !specialRegex.MatchString(password) {
+		v.AddError(field, "must contain at least one special character")
 	}
 }
 

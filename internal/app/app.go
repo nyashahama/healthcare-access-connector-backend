@@ -23,7 +23,6 @@ import (
 	handlerproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	repoadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/admin"
 	repoappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/appointments"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
@@ -153,9 +152,6 @@ func New(cfg *config.Config) (*App, error) {
 	consultationNotesRepo := repotele.NewConsultationNotesRepository(pool)
 	providerAvailabilityRepo := repotele.NewProviderAvailabilityRepository(pool)
 
-	// Initialize transaction manager
-	txManager := repository.NewTxManager(pool)
-
 	// ── Services ──────────────────────────────────────────────────────────────
 
 	sessionService := servicecore.NewSessionService(
@@ -190,6 +186,7 @@ func New(cfg *config.Config) (*App, error) {
 		cfg.BcryptCost,
 		cfg.LoginMaxAttempts,
 		time.Duration(cfg.LoginLockoutMins)*time.Minute,
+		cfg.JWTExpiry,
 	)
 
 	userService := servicecore.NewUserService(
@@ -467,7 +464,6 @@ func New(cfg *config.Config) (*App, error) {
 		wsHandler,
 		healthHandler,
 		authService,
-		txManager,
 	)
 
 	return &App{

@@ -446,7 +446,7 @@ func (s *userService) invalidateUserCache(ctx context.Context, userID uuid.UUID)
 		fmt.Sprintf("user:%s", userID.String()),
 		fmt.Sprintf("user:profile:%s", userID.String()),
 		// Invalidate login caches too
-		fmt.Sprintf("user:login:*"), // This would need pattern matching
+		"user:login:*", // This would need pattern matching
 	}
 
 	for _, key := range cacheKeys {

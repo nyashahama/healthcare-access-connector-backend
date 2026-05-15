@@ -42,7 +42,7 @@ func TestCORSBlocksDisallowedOrigin(t *testing.T) {
 
 func TestCORSEchoesOriginWithCredentialsInsteadOfWildcard(t *testing.T) {
 	// Even when "*" is in allowed origins, we must NOT emit "*" because
-	// Access-Control-Allow-Credentials is set to true.
+	// credentials cannot be used with wildcard origins.
 	handler := CORS([]string{"*"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -55,7 +55,7 @@ func TestCORSEchoesOriginWithCredentialsInsteadOfWildcard(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 	assert.Equal(t, "https://frontend.example.com", rr.Header().Get("Access-Control-Allow-Origin"))
-	assert.Equal(t, "true", rr.Header().Get("Access-Control-Allow-Credentials"))
+	assert.Equal(t, "", rr.Header().Get("Access-Control-Allow-Credentials"))
 	assert.NotEqual(t, "*", rr.Header().Get("Access-Control-Allow-Origin"))
 }
 

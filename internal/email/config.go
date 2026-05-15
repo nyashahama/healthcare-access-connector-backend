@@ -12,7 +12,7 @@ import (
 // ConfigFromEnv loads email configuration from environment variables
 func ConfigFromEnv() *types.Config {
 	cfg := &types.Config{
-		Provider:    getEnv("EMAIL_PROVIDER", "ses"),
+		Provider:    getEnv("EMAIL_PROVIDER", "resend"),
 		FromAddress: getEnv("EMAIL_FROM_ADDRESS", "noreply@hac.com"),
 		FromName:    getEnv("EMAIL_FROM_NAME", "Healthcare Access Connector"),
 

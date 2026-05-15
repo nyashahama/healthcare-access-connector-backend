@@ -19,7 +19,6 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
-	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -146,7 +145,6 @@ func NewServer(
 	// misc
 	healthHandler *handler.HealthHandler,
 	authService service.AuthService,
-	txManager repository.TxManager,
 ) *Server {
 	return &Server{
 		config:                      cfg,
@@ -484,7 +482,9 @@ func (s *Server) setupRoutes() http.Handler {
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"error": "Route not found"}`))
+		if _, err := w.Write([]byte(`{"error": "Route not found"}`)); err != nil {
+			s.logger.Error().Err(err).Msg("failed to write 404 response")
+		}
 	})
 
 	// ── Combine routers ────────────────────────────────────────────────────────

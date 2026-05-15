@@ -1,4 +1,3 @@
-
 -- ============================================
 -- CONSULTATION NOTES REPOSITORY QUERIES
 -- Maps to: ConsultationNotesRepository interface
@@ -19,7 +18,7 @@ CREATE TABLE consultation_notes (
     -- SOAP format (standard clinical note structure)
     subjective  TEXT,   -- Patient's reported symptoms in provider's words  (S)
     objective   TEXT,   -- Observations, vitals where available             (O)
-    assessment  TEXT,   -- Clinical impression / working diagnosis           (A)
+    assessment  TEXT,   -- Clinical impression / clinical impression / working diagnosis           (A)
     plan        TEXT,   -- Treatment plan, advice, next steps               (P)
 
     -- Diagnosis
@@ -55,6 +54,3 @@ CREATE TABLE consultation_notes (
 CREATE INDEX idx_notes_consultation ON consultation_notes(consultation_id);
 CREATE INDEX idx_notes_provider     ON consultation_notes(authored_by_staff_id);
 CREATE INDEX idx_notes_finalised    ON consultation_notes(is_finalised);
-
-
-
