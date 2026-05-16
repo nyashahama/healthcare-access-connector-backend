@@ -246,7 +246,7 @@ func (s *systemAdminService) UpdateSystemAdmin(ctx context.Context, sysAdmin adm
 		&updated.UserID,
 		"system_admin_updated",
 		map[string]interface{}{
-			"description":     fmt.Sprintf("System admin profile updated"),
+			"description":     "System admin profile updated",
 			"system_admin_id": updated.ID.String(),
 		},
 		stringPtr("system_admin"),
