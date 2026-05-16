@@ -40,6 +40,40 @@ func (m *MockSystemAdminService) GetSystemAdminByUserID(ctx context.Context, use
 	return args.Get(0).(admin.SystemAdmin), args.Error(1)
 }
 
+func (m *MockSystemAdminService) GetSystemAdmin(ctx context.Context, id uuid.UUID) (admin.SystemAdmin, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return admin.SystemAdmin{}, args.Error(1)
+	}
+	return args.Get(0).(admin.SystemAdmin), args.Error(1)
+}
+
+func (m *MockSystemAdminService) UpdateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error) {
+	args := m.Called(ctx, sysAdmin)
+	if args.Get(0) == nil {
+		return admin.SystemAdmin{}, args.Error(1)
+	}
+	return args.Get(0).(admin.SystemAdmin), args.Error(1)
+}
+
+func (m *MockSystemAdminService) DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockSystemAdminService) DeleteSystemAdminByUserID(ctx context.Context, userID uuid.UUID) error {
+	args := m.Called(ctx, userID)
+	return args.Error(0)
+}
+
+func (m *MockSystemAdminService) SearchSystemAdmins(ctx context.Context, params admin.SystemAdminSearchParams) ([]admin.SystemAdmin, error) {
+	args := m.Called(ctx, params)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]admin.SystemAdmin), args.Error(1)
+}
+
 func setupTestAdminHandler(mockService *MockSystemAdminService) *AdminHandler {
 	logger := zerolog.New(nil)
 	return NewAdminHandler(mockService, &logger, 0)
@@ -252,6 +286,285 @@ func TestAdminHandler_GetSystemAdminByUserID(t *testing.T) {
 		handler.GetSystemAdminByUserID(w, req)
 
 		assert.Equal(t, http.StatusForbidden, w.Code)
+		mockService.AssertExpectations(t)
+	})
+}
+
+func TestAdminHandler_GetSystemAdmin(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		adminID := uuid.New()
+		userID := uuid.New()
+		sysAdmin := createTestSystemAdmin(adminID, userID)
+
+		mockService.On("GetSystemAdmin", mock.Anything, adminID).Return(sysAdmin, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/system-admins/"+adminID.String(), nil)
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", adminID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.GetSystemAdmin(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		adminID := uuid.New()
+		mockService.On("GetSystemAdmin", mock.Anything, adminID).Return(admin.SystemAdmin{}, domain.ErrNotFound).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/system-admins/"+adminID.String(), nil)
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", adminID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.GetSystemAdmin(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		mockService.AssertExpectations(t)
+	})
+}
+
+func TestAdminHandler_UpdateSystemAdmin(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		adminID := uuid.New()
+		existing := createTestSystemAdmin(adminID, uuid.New())
+		updated := existing
+		updated.AdminLevel = "regional"
+
+		body := `{"admin_level":"regional","can_manage_users":true}`
+
+		mockService.On("GetSystemAdmin", mock.Anything, adminID).Return(existing, nil).Once()
+		mockService.On("UpdateSystemAdmin", mock.Anything, mock.MatchedBy(func(req admin.SystemAdmin) bool {
+			return req.ID == adminID && req.AdminLevel == "regional"
+		})).Return(updated, nil).Once()
+
+		req := httptest.NewRequest(http.MethodPut, "/admin/system-admins/"+adminID.String(), bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", adminID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.UpdateSystemAdmin(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("invalid admin level", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		adminID := uuid.New()
+		body := `{"admin_level":"invalid"}`
+
+		req := httptest.NewRequest(http.MethodPut, "/admin/system-admins/"+adminID.String(), bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", adminID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.UpdateSystemAdmin(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("no fields", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		adminID := uuid.New()
+		body := `{}`
+
+		req := httptest.NewRequest(http.MethodPut, "/admin/system-admins/"+adminID.String(), bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", adminID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.UpdateSystemAdmin(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockService.AssertExpectations(t)
+	})
+}
+
+func TestAdminHandler_DeleteSystemAdmin(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		adminID := uuid.New()
+		mockService.On("DeleteSystemAdmin", mock.Anything, adminID).Return(nil).Once()
+
+		req := httptest.NewRequest(http.MethodDelete, "/admin/system-admins/"+adminID.String(), nil)
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", adminID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.DeleteSystemAdmin(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("invalid id", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		req := httptest.NewRequest(http.MethodDelete, "/admin/system-admins/not-a-uuid", nil)
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", "not-a-uuid")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.DeleteSystemAdmin(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		mockService.AssertExpectations(t)
+	})
+}
+
+func TestAdminHandler_DeleteSystemAdminByUserID(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		userID := uuid.New()
+		mockService.On("DeleteSystemAdminByUserID", mock.Anything, userID).Return(nil).Once()
+
+		req := httptest.NewRequest(http.MethodDelete, "/admin/system-admins/user/"+userID.String(), nil)
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("user_id", userID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.DeleteSystemAdminByUserID(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		userID := uuid.New()
+		mockService.On("DeleteSystemAdminByUserID", mock.Anything, userID).Return(domain.ErrNotFound).Once()
+
+		req := httptest.NewRequest(http.MethodDelete, "/admin/system-admins/user/"+userID.String(), nil)
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("user_id", userID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.DeleteSystemAdminByUserID(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		mockService.AssertExpectations(t)
+	})
+}
+
+func TestAdminHandler_SearchSystemAdmins(t *testing.T) {
+	t.Run("success with filters", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		adminID := uuid.New()
+		userID := uuid.New()
+		sysAdmin := createTestSystemAdmin(adminID, userID)
+		result := []admin.SystemAdmin{sysAdmin}
+
+		expected := admin.SystemAdminSearchParams{
+			AdminLevel: "super_admin",
+			Region:     "North",
+			Department: "Cardiology",
+			Query:      "john",
+			Limit:      10,
+			Offset:     2,
+		}
+
+		mockService.On("SearchSystemAdmins", mock.Anything, expected).Return(result, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/system-admins/search?admin_level=super_admin&region=North&department=Cardiology&query=john&limit=10&offset=2", nil)
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		w := httptest.NewRecorder()
+		handler.SearchSystemAdmins(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockService.AssertExpectations(t)
+	})
+
+	t.Run("invalid admin level", func(t *testing.T) {
+		mockService := new(MockSystemAdminService)
+		handler := setupTestAdminHandler(mockService)
+
+		req := httptest.NewRequest(http.MethodGet, "/admin/system-admins/search?admin_level=invalid", nil)
+		adminIDClaims := uuid.New()
+		claims := &service.TokenClaims{UserID: adminIDClaims, Role: "system_admin", Email: "admin@example.com"}
+		req = req.WithContext(addUserToContext(req.Context(), claims))
+
+		w := httptest.NewRecorder()
+		handler.SearchSystemAdmins(w, req)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 		mockService.AssertExpectations(t)
 	})
 }

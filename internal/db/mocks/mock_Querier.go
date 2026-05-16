@@ -12265,6 +12265,202 @@ func (_m *MockQuerier) GetSystemAdminByUserID(ctx context.Context, userID pgtype
 	return r0, r1
 }
 
+// DeleteSystemAdmin provides a mock function with given fields: ctx, id
+func (_m *MockQuerier) DeleteSystemAdmin(ctx context.Context, id pgtype.UUID) error {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteSystemAdmin")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) error); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockQuerier_DeleteSystemAdmin_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteSystemAdmin'
+type MockQuerier_DeleteSystemAdmin_Call struct {
+	*mock.Call
+}
+
+// DeleteSystemAdmin is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id pgtype.UUID
+func (_e *MockQuerier_Expecter) DeleteSystemAdmin(ctx interface{}, id interface{}) *MockQuerier_DeleteSystemAdmin_Call {
+	return &MockQuerier_DeleteSystemAdmin_Call{Call: _e.mock.On("DeleteSystemAdmin", ctx, id)}
+}
+
+func (_c *MockQuerier_DeleteSystemAdmin_Call) Return(_a0 error) *MockQuerier_DeleteSystemAdmin_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockQuerier_DeleteSystemAdmin_Call) RunAndReturn(run func(context.Context, pgtype.UUID) error) *MockQuerier_DeleteSystemAdmin_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteSystemAdminByUserID provides a mock function with given fields: ctx, userID
+func (_m *MockQuerier) DeleteSystemAdminByUserID(ctx context.Context, userID pgtype.UUID) error {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteSystemAdminByUserID")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) error); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockQuerier_DeleteSystemAdminByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteSystemAdminByUserID'
+type MockQuerier_DeleteSystemAdminByUserID_Call struct {
+	*mock.Call
+}
+
+// DeleteSystemAdminByUserID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID pgtype.UUID
+func (_e *MockQuerier_Expecter) DeleteSystemAdminByUserID(ctx interface{}, userID interface{}) *MockQuerier_DeleteSystemAdminByUserID_Call {
+	return &MockQuerier_DeleteSystemAdminByUserID_Call{Call: _e.mock.On("DeleteSystemAdminByUserID", ctx, userID)}
+}
+
+func (_c *MockQuerier_DeleteSystemAdminByUserID_Call) Return(_a0 error) *MockQuerier_DeleteSystemAdminByUserID_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockQuerier_DeleteSystemAdminByUserID_Call) RunAndReturn(run func(context.Context, pgtype.UUID) error) *MockQuerier_DeleteSystemAdminByUserID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SearchSystemAdmins provides a mock function with given fields: ctx, arg
+func (_m *MockQuerier) SearchSystemAdmins(ctx context.Context, arg sqlc.SearchSystemAdminsParams) ([]sqlc.SystemAdmin, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SearchSystemAdmins")
+	}
+
+	var r0 []sqlc.SystemAdmin
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.SearchSystemAdminsParams) ([]sqlc.SystemAdmin, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.SearchSystemAdminsParams) []sqlc.SystemAdmin); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]sqlc.SystemAdmin)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.SearchSystemAdminsParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_SearchSystemAdmins_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SearchSystemAdmins'
+type MockQuerier_SearchSystemAdmins_Call struct {
+	*mock.Call
+}
+
+// SearchSystemAdmins is a helper method to define mock.On call
+//   - ctx context.Context
+//   - arg sqlc.SearchSystemAdminsParams
+func (_e *MockQuerier_Expecter) SearchSystemAdmins(ctx interface{}, arg interface{}) *MockQuerier_SearchSystemAdmins_Call {
+	return &MockQuerier_SearchSystemAdmins_Call{Call: _e.mock.On("SearchSystemAdmins", ctx, arg)}
+}
+
+func (_c *MockQuerier_SearchSystemAdmins_Call) Run(run func(ctx context.Context, arg sqlc.SearchSystemAdminsParams)) *MockQuerier_SearchSystemAdmins_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(sqlc.SearchSystemAdminsParams))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_SearchSystemAdmins_Call) Return(_a0 []sqlc.SystemAdmin, _a1 error) *MockQuerier_SearchSystemAdmins_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_SearchSystemAdmins_Call) RunAndReturn(run func(context.Context, sqlc.SearchSystemAdminsParams) ([]sqlc.SystemAdmin, error)) *MockQuerier_SearchSystemAdmins_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateSystemAdmin provides a mock function with given fields: ctx, arg
+func (_m *MockQuerier) UpdateSystemAdmin(ctx context.Context, arg sqlc.UpdateSystemAdminParams) (sqlc.SystemAdmin, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateSystemAdmin")
+	}
+
+	var r0 sqlc.SystemAdmin
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateSystemAdminParams) (sqlc.SystemAdmin, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, sqlc.UpdateSystemAdminParams) sqlc.SystemAdmin); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Get(0).(sqlc.SystemAdmin)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, sqlc.UpdateSystemAdminParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_UpdateSystemAdmin_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateSystemAdmin'
+type MockQuerier_UpdateSystemAdmin_Call struct {
+	*mock.Call
+}
+
+// UpdateSystemAdmin is a helper method to define mock.On call
+//   - ctx context.Context
+//   - arg sqlc.UpdateSystemAdminParams
+func (_e *MockQuerier_Expecter) UpdateSystemAdmin(ctx interface{}, arg interface{}) *MockQuerier_UpdateSystemAdmin_Call {
+	return &MockQuerier_UpdateSystemAdmin_Call{Call: _e.mock.On("UpdateSystemAdmin", ctx, arg)}
+}
+
+func (_c *MockQuerier_UpdateSystemAdmin_Call) Run(run func(ctx context.Context, arg sqlc.UpdateSystemAdminParams)) *MockQuerier_UpdateSystemAdmin_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(sqlc.UpdateSystemAdminParams))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_UpdateSystemAdmin_Call) Return(_a0 sqlc.SystemAdmin, _a1 error) *MockQuerier_UpdateSystemAdmin_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_UpdateSystemAdmin_Call) RunAndReturn(run func(context.Context, sqlc.UpdateSystemAdminParams) (sqlc.SystemAdmin, error)) *MockQuerier_UpdateSystemAdmin_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // MockQuerier_GetSystemAdminByUserID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSystemAdminByUserID'
 type MockQuerier_GetSystemAdminByUserID_Call struct {
 	*mock.Call

@@ -458,14 +458,21 @@ func (s *Server) setupRoutes() http.Handler {
 				})
 			})
 
-			// Admin-only routes
-			r.Group(func(r chi.Router) {
-				r.Use(middleware.RequireRole("system_admin"))
+				// Admin-only routes
+				r.Group(func(r chi.Router) {
+					r.Use(middleware.RequireRole("system_admin"))
 
-				r.Route("/admin", func(r chi.Router) {
-					r.Post("/system-admins", s.adminHandler.CreateSystemAdmin)
-					r.Get("/system-admins/user/{user_id}", s.adminHandler.GetSystemAdminByUserID)
-				})
+					r.Route("/admin", func(r chi.Router) {
+						r.Route("/system-admins", func(r chi.Router) {
+							r.Post("/", s.adminHandler.CreateSystemAdmin)
+							r.Get("/user/{user_id}", s.adminHandler.GetSystemAdminByUserID)
+							r.Get("/search", s.adminHandler.SearchSystemAdmins)
+							r.Get("/{id}", s.adminHandler.GetSystemAdmin)
+							r.Put("/{id}", s.adminHandler.UpdateSystemAdmin)
+							r.Delete("/user/{user_id}", s.adminHandler.DeleteSystemAdminByUserID)
+							r.Delete("/{id}", s.adminHandler.DeleteSystemAdmin)
+						})
+					})
 
 				r.Put("/users/{id}/role", s.userHandler.UpdateUserRole)
 				r.Put("/users/{id}/status", s.userHandler.UpdateUserStatus)
