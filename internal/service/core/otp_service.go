@@ -125,7 +125,6 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 	} else if channel == "sms" && user.Phone != nil {
 		s.logger.Error().
 			Str("phone", maskIdentifier(*user.Phone)).
-			Str("otp", otp).
 			Msg("SMS OTP delivery is unavailable")
 
 		return domain.NewAppError(
