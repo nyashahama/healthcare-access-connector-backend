@@ -1,8 +1,25 @@
 version: "2"
 sql:
   - engine: "postgresql"
-    schema: "database/schemas/**/*.sql"
-    queries: "database/queries/**/*.sql"
+    schema:
+      - "database/schemas/admin"
+      - "database/schemas/appointments"
+      - "database/schemas/core"
+      - "database/schemas/functions_triggers"
+      - "database/schemas/indexes"
+      - "database/schemas/patients"
+      - "database/schemas/providers"
+      - "database/schemas/sms"
+      - "database/schemas/telemedicine"
+      - "database/schemas/views"
+    queries:
+      - "database/queries/admin"
+      - "database/queries/appointments"
+      - "database/queries/core"
+      - "database/queries/patients"
+      - "database/queries/providers"
+      - "database/queries/sms"
+      - "database/queries/telemedicine"
     gen:
       go:
         package: "sqlc"
