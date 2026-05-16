@@ -27,10 +27,10 @@ type emailService struct {
 	circuitBreaker *retry.CircuitBreaker
 
 	// Async email queue
-	queue      chan *queuedEmail
-	wg         sync.WaitGroup
-	ctx        context.Context
-	cancel     context.CancelFunc
+	queue  chan *queuedEmail
+	wg     sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // queuedEmail represents an email in the queue
@@ -275,6 +275,20 @@ func (s *emailService) SendPasswordChangedEmail(ctx context.Context, to, usernam
 		HTMLBody: html,
 		Template: types.TemplatePasswordChanged,
 		ReplyTo:  s.config.GetReplyTo(types.TemplatePasswordChanged),
+	})
+}
+
+// SendStaffInvitationEmail sends a staff invitation email
+func (s *emailService) SendStaffInvitationEmail(ctx context.Context, to, firstName, lastName, clinicName, invitationToken string) error {
+	subject, text, html := s.templates.RenderStaffInvitation(firstName, lastName, clinicName, invitationToken)
+
+	return s.SendSync(ctx, &types.Message{
+		To:       []string{to},
+		Subject:  subject,
+		Body:     text,
+		HTMLBody: html,
+		Template: types.TemplateStaffInvitation,
+		ReplyTo:  s.config.GetReplyTo(types.TemplateStaffInvitation),
 	})
 }
 

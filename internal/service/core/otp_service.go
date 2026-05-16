@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -122,12 +122,17 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 			s.logger.Error().Err(err).Msg("Failed to send OTP email")
 			return domain.NewAppError(err, "Failed to send OTP email", 500)
 		}
-	} else if channel == "sms" && user.Phone != nil && s.smsEnabled {
-		// TODO: Implement SMS sending for OTP
-		s.logger.Info().
+	} else if channel == "sms" && user.Phone != nil {
+		s.logger.Error().
 			Str("phone", maskIdentifier(*user.Phone)).
 			Str("otp", otp).
-			Msg("OTP generated for SMS (SMS service not implemented)")
+			Msg("SMS OTP delivery is unavailable")
+
+		return domain.NewAppError(
+			domain.ErrServiceNotAvailable,
+			"SMS verification is currently unavailable. Please use email instead.",
+			503,
+		)
 	}
 
 	s.logger.Info().

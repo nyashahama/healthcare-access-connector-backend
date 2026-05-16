@@ -4,6 +4,7 @@ package templates
 import (
 	"fmt"
 	"html/template"
+	"strings"
 	"time"
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email/types"
@@ -437,6 +438,59 @@ Healthcare Access Connector Team`, greeting, otp)
 		</p>`, greeting, otp, supportEmail, supportEmail)
 
 	html = m.baseTemplate("Your Verification Code", content, supportEmail, true)
+	return subject, text, html
+}
+
+// RenderStaffInvitation generates a staff invitation email
+func (m *Manager) RenderStaffInvitation(firstName, lastName, clinicName, invitationToken string) (subject, text, html string) {
+	invitationURL := fmt.Sprintf("%s/auth/register/staff?invitation_token=%s", m.frontendURL, invitationToken)
+	supportEmail := m.config.GetSupportAddress()
+
+	fullName := strings.TrimSpace(fmt.Sprintf("%s %s", strings.TrimSpace(firstName), strings.TrimSpace(lastName)))
+	recipientName := "Healthcare professional"
+	if fullName != "" {
+		recipientName = fullName
+	}
+	if clinicName == "" {
+		clinicName = "our clinic"
+	}
+
+	subject = "You are invited to join " + clinicName + " on Healthcare Access Connector"
+
+	text = fmt.Sprintf(`Hello %s,
+
+You've been invited to join %s as a team member on Healthcare Access Connector.
+
+Please complete your account registration using this link:
+%s
+
+This invitation link expires in 7 days.
+
+Medical Emergency? Call 10177 or go to the nearest emergency room immediately.
+
+Best regards,
+Healthcare Access Connector Team`, recipientName, clinicName, invitationURL)
+
+	content := fmt.Sprintf(`
+		<h2>Staff Invitation</h2>
+		
+		<p>Hello %s,</p>
+		<p>You've been invited to join <strong>%s</strong> as a team member.</p>
+		<a href="%s" class="button">Accept Invitation &amp; Register</a>
+		<p style="margin-top: 18px; color: #6b7280; font-size: 14px;">
+			This invitation link expires in <strong>7 days</strong>.
+		</p>
+		<p style="margin-top: 24px; color: #6b7280; font-size: 12px; word-break: break-all;">
+			If the button does not work, copy this URL:
+			<br />
+			<code style="background: #f3f4f6; padding: 6px 10px; border-radius: 4px; font-size: 11px; display: inline-block; margin-top: 8px; color: #1f2937;">%s</code>
+		</p>
+		<div class="warning-box">
+			<h3>⚠️ Security Notice</h3>
+			<p>This invitation is only valid for the email address this message was sent to.</p>
+		</div>`, recipientName, clinicName, invitationURL, invitationURL)
+
+	html = m.baseTemplate("Staff Invitation", content, supportEmail, true)
 	return subject, text, html
 }
 

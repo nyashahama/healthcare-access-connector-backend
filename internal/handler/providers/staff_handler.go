@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	dproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/domain/providers"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/providers"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
@@ -22,6 +23,7 @@ import (
 type StaffHandler struct {
 	staffService service.StaffService
 	userService  service.UserService
+	emailService email.Service
 	logger       *zerolog.Logger
 	timeout      time.Duration
 }
@@ -30,12 +32,14 @@ type StaffHandler struct {
 func NewStaffHandler(
 	staffService service.StaffService,
 	userService service.UserService,
+	emailService email.Service,
 	logger *zerolog.Logger,
 	timeout time.Duration,
 ) *StaffHandler {
 	return &StaffHandler{
 		staffService: staffService,
 		userService:  userService,
+		emailService: emailService,
 		logger:       logger,
 		timeout:      timeout,
 	}
@@ -748,9 +752,34 @@ func generateSecureToken() string {
 }
 
 func (h *StaffHandler) sendInvitationEmail(staff dproviders.ClinicStaff, email, token string) {
-	// TODO: Integrate email service here (current implementation logs intent only)
+	if h.emailService == nil {
+		h.logger.Warn().Str("staff_id", staff.ID.String()).Msg("email service unavailable, cannot send staff invitation")
+		return
+	}
+
+	ctx := context.Background()
+
+	inviteErr := h.emailService.SendStaffInvitationEmail(
+		ctx,
+		email,
+		staff.FirstName,
+		staff.LastName,
+		"",
+		token,
+	)
+	if inviteErr != nil {
+		h.logger.Error().
+			Err(inviteErr).
+			Str("email", email).
+			Str("staff_id", staff.ID.String()).
+			Str("invitation_token", token).
+			Msg("failed to send staff invitation email")
+		return
+	}
+
 	h.logger.Info().
 		Str("email", email).
 		Str("staff_id", staff.ID.String()).
-		Msg("Staff invitation queued for delivery")
+		Str("invitation_token", token).
+		Msg("staff invitation email sent")
 }
