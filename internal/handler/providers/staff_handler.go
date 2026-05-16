@@ -758,13 +758,25 @@ func (h *StaffHandler) sendInvitationEmail(staff dproviders.ClinicStaff, email, 
 	}
 
 	ctx := context.Background()
+	clinicName := ""
+
+	invitationDetails, err := h.staffService.GetStaffInvitationByToken(ctx, token)
+	if err != nil {
+		h.logger.Warn().
+			Err(err).
+			Str("staff_id", staff.ID.String()).
+			Str("invitation_token", token).
+			Msg("unable to resolve clinic name for invitation email")
+	} else if invitationDetails != nil && invitationDetails.ClinicName != "" {
+		clinicName = invitationDetails.ClinicName
+	}
 
 	inviteErr := h.emailService.SendStaffInvitationEmail(
 		ctx,
 		email,
 		staff.FirstName,
 		staff.LastName,
-		"",
+		clinicName,
 		token,
 	)
 	if inviteErr != nil {
