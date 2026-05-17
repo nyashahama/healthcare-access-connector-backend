@@ -425,7 +425,7 @@ type Querier interface {
 	// ============================================
 	// QUERYING BY PATIENT
 	// ============================================
-	GetPatientEmergencyContacts(ctx context.Context, patientID pgtype.UUID) ([]GetPatientEmergencyContactsRow, error)
+	GetPatientEmergencyContacts(ctx context.Context, patientID pgtype.UUID) ([]EmergencyContact, error)
 	// ============================================
 	// QUERYING BY PATIENT
 	// ============================================
@@ -465,7 +465,7 @@ type Querier interface {
 	GetPendingAppointments(ctx context.Context, clinicID pgtype.UUID) ([]Appointment, error)
 	GetPendingInvitationsByClinic(ctx context.Context, clinicID pgtype.UUID) ([]GetPendingInvitationsByClinicRow, error)
 	GetPendingVerificationClinics(ctx context.Context, arg GetPendingVerificationClinicsParams) ([]GetPendingVerificationClinicsRow, error)
-	GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (GetPrimaryEmergencyContactRow, error)
+	GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (EmergencyContact, error)
 	GetPrivacyConsent(ctx context.Context, userID pgtype.UUID) (PrivacyConsent, error)
 	// ============================================
 	// PROVIDER-FACING QUERIES

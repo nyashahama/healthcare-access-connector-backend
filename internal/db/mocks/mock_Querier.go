@@ -9045,23 +9045,23 @@ func (_c *MockQuerier_GetPatientDependents_Call) RunAndReturn(run func(context.C
 }
 
 // GetPatientEmergencyContacts provides a mock function with given fields: ctx, patientID
-func (_m *MockQuerier) GetPatientEmergencyContacts(ctx context.Context, patientID pgtype.UUID) ([]sqlc.GetPatientEmergencyContactsRow, error) {
+func (_m *MockQuerier) GetPatientEmergencyContacts(ctx context.Context, patientID pgtype.UUID) ([]sqlc.EmergencyContact, error) {
 	ret := _m.Called(ctx, patientID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPatientEmergencyContacts")
 	}
 
-	var r0 []sqlc.GetPatientEmergencyContactsRow
+	var r0 []sqlc.EmergencyContact
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) ([]sqlc.GetPatientEmergencyContactsRow, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) ([]sqlc.EmergencyContact, error)); ok {
 		return rf(ctx, patientID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) []sqlc.GetPatientEmergencyContactsRow); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) []sqlc.EmergencyContact); ok {
 		r0 = rf(ctx, patientID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]sqlc.GetPatientEmergencyContactsRow)
+			r0 = ret.Get(0).([]sqlc.EmergencyContact)
 		}
 	}
 
@@ -9093,12 +9093,12 @@ func (_c *MockQuerier_GetPatientEmergencyContacts_Call) Run(run func(ctx context
 	return _c
 }
 
-func (_c *MockQuerier_GetPatientEmergencyContacts_Call) Return(_a0 []sqlc.GetPatientEmergencyContactsRow, _a1 error) *MockQuerier_GetPatientEmergencyContacts_Call {
+func (_c *MockQuerier_GetPatientEmergencyContacts_Call) Return(_a0 []sqlc.EmergencyContact, _a1 error) *MockQuerier_GetPatientEmergencyContacts_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQuerier_GetPatientEmergencyContacts_Call) RunAndReturn(run func(context.Context, pgtype.UUID) ([]sqlc.GetPatientEmergencyContactsRow, error)) *MockQuerier_GetPatientEmergencyContacts_Call {
+func (_c *MockQuerier_GetPatientEmergencyContacts_Call) RunAndReturn(run func(context.Context, pgtype.UUID) ([]sqlc.EmergencyContact, error)) *MockQuerier_GetPatientEmergencyContacts_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -10209,22 +10209,22 @@ func (_c *MockQuerier_GetPendingVerificationClinics_Call) RunAndReturn(run func(
 }
 
 // GetPrimaryEmergencyContact provides a mock function with given fields: ctx, patientID
-func (_m *MockQuerier) GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (sqlc.GetPrimaryEmergencyContactRow, error) {
+func (_m *MockQuerier) GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (sqlc.EmergencyContact, error) {
 	ret := _m.Called(ctx, patientID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetPrimaryEmergencyContact")
 	}
 
-	var r0 sqlc.GetPrimaryEmergencyContactRow
+	var r0 sqlc.EmergencyContact
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) (sqlc.GetPrimaryEmergencyContactRow, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) (sqlc.EmergencyContact, error)); ok {
 		return rf(ctx, patientID)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) sqlc.GetPrimaryEmergencyContactRow); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, pgtype.UUID) sqlc.EmergencyContact); ok {
 		r0 = rf(ctx, patientID)
 	} else {
-		r0 = ret.Get(0).(sqlc.GetPrimaryEmergencyContactRow)
+		r0 = ret.Get(0).(sqlc.EmergencyContact)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, pgtype.UUID) error); ok {
@@ -10255,12 +10255,12 @@ func (_c *MockQuerier_GetPrimaryEmergencyContact_Call) Run(run func(ctx context.
 	return _c
 }
 
-func (_c *MockQuerier_GetPrimaryEmergencyContact_Call) Return(_a0 sqlc.GetPrimaryEmergencyContactRow, _a1 error) *MockQuerier_GetPrimaryEmergencyContact_Call {
+func (_c *MockQuerier_GetPrimaryEmergencyContact_Call) Return(_a0 sqlc.EmergencyContact, _a1 error) *MockQuerier_GetPrimaryEmergencyContact_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQuerier_GetPrimaryEmergencyContact_Call) RunAndReturn(run func(context.Context, pgtype.UUID) (sqlc.GetPrimaryEmergencyContactRow, error)) *MockQuerier_GetPrimaryEmergencyContact_Call {
+func (_c *MockQuerier_GetPrimaryEmergencyContact_Call) RunAndReturn(run func(context.Context, pgtype.UUID) (sqlc.EmergencyContact, error)) *MockQuerier_GetPrimaryEmergencyContact_Call {
 	_c.Call.Return(run)
 	return _c
 }

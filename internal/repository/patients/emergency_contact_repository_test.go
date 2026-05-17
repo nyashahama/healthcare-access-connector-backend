@@ -41,12 +41,12 @@ func TestEmergencyContactRepository_AddEmergencyContact(t *testing.T) {
 			mockSetup: func(m *mocks.MockQuerier) {
 				expectedRow := sqlc.EmergencyContact{
 					ID:           uuidPgtypeFromString(contactID.String()),
-					PatientID:   uuidPgtypeFromString(patientID.String()),
-					ContactName: "Jane Doe",
+					PatientID:    uuidPgtypeFromString(patientID.String()),
+					ContactName:  "Jane Doe",
 					Relationship: "Spouse",
 					PhoneNumber:  "555-1234",
-					CreatedAt:   pgtype.Timestamp{Time: now, Valid: true},
-					UpdatedAt:   pgtype.Timestamp{Time: now, Valid: true},
+					CreatedAt:    pgtype.Timestamp{Time: now, Valid: true},
+					UpdatedAt:    pgtype.Timestamp{Time: now, Valid: true},
 				}
 				m.On("AddEmergencyContact", ctx, mock.Anything).Return(expectedRow, nil)
 			},
@@ -117,10 +117,10 @@ func TestEmergencyContactRepository_GetPatientEmergencyContacts(t *testing.T) {
 			name:      "success",
 			patientID: patientID,
 			mockSetup: func(m *mocks.MockQuerier) {
-				expectedRows := []sqlc.GetPatientEmergencyContactsRow{
+				expectedRows := []sqlc.EmergencyContact{
 					{
-						ID:            uuidPgtypeFromString(contactID.String()),
-						PatientID:     uuidPgtypeFromString(patientID.String()),
+						ID:           uuidPgtypeFromString(contactID.String()),
+						PatientID:    uuidPgtypeFromString(patientID.String()),
 						ContactName:  "Jane Doe",
 						Relationship: "Spouse",
 						PhoneNumber:  "555-1234",
@@ -136,7 +136,7 @@ func TestEmergencyContactRepository_GetPatientEmergencyContacts(t *testing.T) {
 			name:      "not found",
 			patientID: patientID,
 			mockSetup: func(m *mocks.MockQuerier) {
-				m.On("GetPatientEmergencyContacts", ctx, uuidPgtypeFromString(patientID.String())).Return([]sqlc.GetPatientEmergencyContactsRow{}, pgx.ErrNoRows)
+				m.On("GetPatientEmergencyContacts", ctx, uuidPgtypeFromString(patientID.String())).Return([]sqlc.EmergencyContact{}, pgx.ErrNoRows)
 			},
 			expectErr:  true,
 			errIsFound: true,
@@ -145,7 +145,7 @@ func TestEmergencyContactRepository_GetPatientEmergencyContacts(t *testing.T) {
 			name:      "database error",
 			patientID: patientID,
 			mockSetup: func(m *mocks.MockQuerier) {
-				m.On("GetPatientEmergencyContacts", ctx, mock.Anything).Return([]sqlc.GetPatientEmergencyContactsRow{}, assert.AnError)
+				m.On("GetPatientEmergencyContacts", ctx, mock.Anything).Return([]sqlc.EmergencyContact{}, assert.AnError)
 			},
 			expectErr: true,
 		},

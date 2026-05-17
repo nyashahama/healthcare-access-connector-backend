@@ -128,35 +128,18 @@ ORDER BY
     contact_name
 `
 
-type GetPatientEmergencyContactsRow struct {
-	ID                   pgtype.UUID      `json:"id"`
-	PatientID            pgtype.UUID      `json:"patient_id"`
-	ContactName          string           `json:"contact_name"`
-	Relationship         string           `json:"relationship"`
-	PhoneNumber          string           `json:"phone_number"`
-	Email                pgtype.Text      `json:"email"`
-	Address              pgtype.Text      `json:"address"`
-	IsPrimary            pgtype.Bool      `json:"is_primary"`
-	CanAccessMedicalInfo pgtype.Bool      `json:"can_access_medical_info"`
-	AccessLevel          pgtype.Text      `json:"access_level"`
-	RelationshipVerified pgtype.Bool      `json:"relationship_verified"`
-	VerificationNotes    pgtype.Text      `json:"verification_notes"`
-	CreatedAt            pgtype.Timestamp `json:"created_at"`
-	UpdatedAt            pgtype.Timestamp `json:"updated_at"`
-}
-
 // ============================================
 // QUERYING BY PATIENT
 // ============================================
-func (q *Queries) GetPatientEmergencyContacts(ctx context.Context, patientID pgtype.UUID) ([]GetPatientEmergencyContactsRow, error) {
+func (q *Queries) GetPatientEmergencyContacts(ctx context.Context, patientID pgtype.UUID) ([]EmergencyContact, error) {
 	rows, err := q.db.Query(ctx, getPatientEmergencyContacts, patientID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetPatientEmergencyContactsRow{}
+	items := []EmergencyContact{}
 	for rows.Next() {
-		var i GetPatientEmergencyContactsRow
+		var i EmergencyContact
 		if err := rows.Scan(
 			&i.ID,
 			&i.PatientID,
@@ -195,26 +178,9 @@ WHERE
 LIMIT 1
 `
 
-type GetPrimaryEmergencyContactRow struct {
-	ID                   pgtype.UUID      `json:"id"`
-	PatientID            pgtype.UUID      `json:"patient_id"`
-	ContactName          string           `json:"contact_name"`
-	Relationship         string           `json:"relationship"`
-	PhoneNumber          string           `json:"phone_number"`
-	Email                pgtype.Text      `json:"email"`
-	Address              pgtype.Text      `json:"address"`
-	IsPrimary            pgtype.Bool      `json:"is_primary"`
-	CanAccessMedicalInfo pgtype.Bool      `json:"can_access_medical_info"`
-	AccessLevel          pgtype.Text      `json:"access_level"`
-	RelationshipVerified pgtype.Bool      `json:"relationship_verified"`
-	VerificationNotes    pgtype.Text      `json:"verification_notes"`
-	CreatedAt            pgtype.Timestamp `json:"created_at"`
-	UpdatedAt            pgtype.Timestamp `json:"updated_at"`
-}
-
-func (q *Queries) GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (GetPrimaryEmergencyContactRow, error) {
+func (q *Queries) GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (EmergencyContact, error) {
 	row := q.db.QueryRow(ctx, getPrimaryEmergencyContact, patientID)
-	var i GetPrimaryEmergencyContactRow
+	var i EmergencyContact
 	err := row.Scan(
 		&i.ID,
 		&i.PatientID,
