@@ -59,7 +59,7 @@ type UserService interface {
 
 // OTPService handles otp operations
 type OTPService interface {
-	GenerateOTP(ctx context.Context, identifier string) error
+	GenerateOTP(ctx context.Context, identifier string) (string, error)
 	VerifyOTP(ctx context.Context, identifier, otp string) (string, core.User, error)
 	ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error
 }
@@ -272,7 +272,12 @@ type CredentialService interface {
 
 type SystemAdminService interface {
 	CreateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error)
+	GetSystemAdmin(ctx context.Context, id uuid.UUID) (admin.SystemAdmin, error)
 	GetSystemAdminByUserID(ctx context.Context, userID uuid.UUID) (admin.SystemAdmin, error)
+	UpdateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error)
+	DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error
+	DeleteSystemAdminByUserID(ctx context.Context, userID uuid.UUID) error
+	SearchSystemAdmins(ctx context.Context, params admin.SystemAdminSearchParams) ([]admin.SystemAdmin, error)
 }
 
 type NGOPartnerService interface {

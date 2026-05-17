@@ -31,6 +31,9 @@ SET
     address = COALESCE($6, address),
     can_access_medical_info = COALESCE($7, can_access_medical_info),
     access_level = COALESCE($8, access_level),
+    is_primary = COALESCE($9, is_primary),
+    relationship_verified = COALESCE($10, relationship_verified),
+    verification_notes = COALESCE($11, verification_notes),
     updated_at = NOW()
 WHERE id = $1;
 
@@ -45,7 +48,7 @@ DELETE FROM emergency_contacts WHERE id = $1;
 SELECT 
     id, patient_id, contact_name, relationship, phone_number,
     email, address, is_primary, can_access_medical_info,
-    access_level, relationship_verified, created_at, updated_at
+    access_level, relationship_verified, verification_notes, created_at, updated_at
 FROM emergency_contacts
 WHERE patient_id = $1
 ORDER BY 
@@ -54,11 +57,11 @@ ORDER BY
 
 -- name: GetPrimaryEmergencyContact :one
 SELECT 
-    id, contact_name, relationship, phone_number, email,
-    can_access_medical_info, access_level
+    id, patient_id, contact_name, relationship, phone_number, email,
+    address, is_primary, can_access_medical_info, access_level,
+    relationship_verified, verification_notes, created_at, updated_at
 FROM emergency_contacts
 WHERE 
     patient_id = $1
     AND is_primary = true
 LIMIT 1;
-

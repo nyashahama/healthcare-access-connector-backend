@@ -321,7 +321,7 @@ tidy:
 # Install development tools
 install-tools:
 	@echo "${GREEN}Installing development tools...${RESET}"
-	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+	go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.23.0
 	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install mvdan.cc/gofumpt@latest

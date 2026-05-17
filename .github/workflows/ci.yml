@@ -58,7 +58,7 @@ jobs:
       - run: go mod download
       - name: Check sqlc drift
         run: |
-          go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.23.0
           sqlc generate
           git diff --exit-code || (echo "sqlc generated code is out of date. Run 'make sqlc' and commit the changes." && exit 1)
       - name: Check mock drift (optional)

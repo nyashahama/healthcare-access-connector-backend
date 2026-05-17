@@ -32,4 +32,5 @@ const (
 	TemplatePasswordChanged EmailTemplate = "password_changed"
 	TemplateLoginAlert      EmailTemplate = "login_alert"
 	TemplateOTP             EmailTemplate = "otp"
+	TemplateStaffInvitation EmailTemplate = "staff_invitation"
 )

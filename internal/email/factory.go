@@ -27,6 +27,7 @@ type Service interface {
 	SendVerificationEmail(ctx context.Context, to, verificationToken string) error
 	SendPasswordChangedEmail(ctx context.Context, to, username string) error
 	SendLoginAlertEmail(ctx context.Context, to, username, ipAddress, location string) error
+	SendStaffInvitationEmail(ctx context.Context, to, firstName, lastName, clinicName, invitationToken string) error
 
 	// Health & Monitoring
 	HealthCheck(ctx context.Context) error

@@ -336,10 +336,12 @@ type CredentialRepository interface {
 
 type SystemAdminRepository interface {
 	CreateSystemAdmin(ctx context.Context, admin admin.SystemAdmin) (admin.SystemAdmin, error)
-	//	GetSystemAdmin(ctx context.Context, id uuid.UUID) (admin.SystemAdmin, error)
+	GetSystemAdmin(ctx context.Context, id uuid.UUID) (admin.SystemAdmin, error)
 	GetSystemAdminByUserID(ctx context.Context, userID uuid.UUID) (admin.SystemAdmin, error)
-	//	UpdateSystemAdmin(ctx context.Context, admin admin.SystemAdmin) error
-	//	DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error
+	UpdateSystemAdmin(ctx context.Context, admin admin.SystemAdmin) error
+	DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error
+	DeleteSystemAdminByUserID(ctx context.Context, userID uuid.UUID) error
+	SearchSystemAdmins(ctx context.Context, params admin.SystemAdminSearchParams) ([]admin.SystemAdmin, error)
 }
 
 type NGOPartnerRepository interface {

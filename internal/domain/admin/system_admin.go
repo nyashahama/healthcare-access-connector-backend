@@ -91,3 +91,13 @@ type AdminPermissions struct {
 	CanViewAnalytics bool        `json:"can_view_analytics"`
 	CanManageSystem  bool        `json:"can_manage_system"`
 }
+
+// SystemAdminSearchParams represents search filters for system admins
+type SystemAdminSearchParams struct {
+	AdminLevel string
+	Region     string
+	Department string
+	Query      string
+	Limit      int
+	Offset     int
+}

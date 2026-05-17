@@ -151,6 +151,237 @@ func (s *systemAdminService) GetSystemAdminByUserID(ctx context.Context, userID 
 	return sysAdmin, nil
 }
 
+// GetSystemAdmin gets system admin by ID
+func (s *systemAdminService) GetSystemAdmin(ctx context.Context, id uuid.UUID) (admin.SystemAdmin, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("system_admin_id", id.String()).
+			Msg("GetSystemAdmin completed")
+	}()
+
+	if id == uuid.Nil {
+		s.logger.Warn().Msg("GetSystemAdmin called with nil ID")
+		return admin.SystemAdmin{}, domain.NewAppError(domain.ErrValidation, "System admin ID is required", 400)
+	}
+
+	sysAdmin, err := s.sysAdminRepo.GetSystemAdmin(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return admin.SystemAdmin{}, domain.NewAppError(domain.ErrNotFound, "System admin not found", 404)
+		}
+		s.logger.Error().Err(err).Str("system_admin_id", id.String()).Msg("Failed to get system admin")
+		return admin.SystemAdmin{}, domain.NewAppError(err, "Failed to get system admin", 500)
+	}
+
+	return sysAdmin, nil
+}
+
+// UpdateSystemAdmin updates system admin profile
+func (s *systemAdminService) UpdateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("system_admin_id", sysAdmin.ID.String()).
+			Msg("UpdateSystemAdmin completed")
+	}()
+
+	if sysAdmin.ID == uuid.Nil {
+		return admin.SystemAdmin{}, domain.NewAppError(domain.ErrValidation, "System admin ID is required", 400)
+	}
+
+	existing, err := s.sysAdminRepo.GetSystemAdmin(ctx, sysAdmin.ID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return admin.SystemAdmin{}, domain.NewAppError(domain.ErrNotFound, "System admin not found", 404)
+		}
+		s.logger.Error().Err(err).Str("system_admin_id", sysAdmin.ID.String()).Msg("Failed to get existing system admin")
+		return admin.SystemAdmin{}, domain.NewAppError(err, "Failed to update system admin", 500)
+	}
+
+	if sysAdmin.AdminLevel != "" && !isValidAdminLevel(sysAdmin.AdminLevel) {
+		return admin.SystemAdmin{}, domain.NewAppError(domain.ErrValidation, "Invalid admin level", 400)
+	}
+
+	sysAdmin.UserID = existing.UserID
+	sysAdmin.CreatedAt = existing.CreatedAt
+	sysAdmin.UpdatedAt = time.Now()
+
+	if sysAdmin.AdminLevel == "" {
+		sysAdmin.AdminLevel = existing.AdminLevel
+	}
+	if sysAdmin.AssignedRegions == nil {
+		sysAdmin.AssignedRegions = existing.AssignedRegions
+	}
+	if sysAdmin.Department == nil {
+		sysAdmin.Department = existing.Department
+	}
+	if sysAdmin.Permissions == nil {
+		sysAdmin.Permissions = existing.Permissions
+	}
+	if sysAdmin.WorkPhone == nil {
+		sysAdmin.WorkPhone = existing.WorkPhone
+	}
+	if sysAdmin.Extension == nil {
+		sysAdmin.Extension = existing.Extension
+	}
+
+	if err := s.sysAdminRepo.UpdateSystemAdmin(ctx, sysAdmin); err != nil {
+		s.logger.Error().Err(err).Str("system_admin_id", sysAdmin.ID.String()).Msg("Failed to update system admin")
+		return admin.SystemAdmin{}, domain.NewAppError(err, "Failed to update system admin", 500)
+	}
+
+	// Invalidate cache
+	s.invalidateSystemAdminCache(ctx, existing.UserID)
+
+	updated, err := s.sysAdminRepo.GetSystemAdmin(ctx, sysAdmin.ID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("system_admin_id", sysAdmin.ID.String()).Msg("Failed to load updated system admin")
+		return admin.SystemAdmin{}, domain.NewAppError(err, "Failed to fetch updated system admin", 500)
+	}
+
+	s.logActivityAsync(
+		&updated.UserID,
+		"system_admin_updated",
+		map[string]interface{}{
+			"description":     "System admin profile updated",
+			"system_admin_id": updated.ID.String(),
+		},
+		stringPtr("system_admin"),
+		&updated.ID,
+	)
+
+	s.logger.Info().Str("system_admin_id", updated.ID.String()).Msg("System admin updated successfully")
+
+	return updated, nil
+}
+
+// DeleteSystemAdmin removes system admin by system admin ID
+func (s *systemAdminService) DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("system_admin_id", id.String()).
+			Msg("DeleteSystemAdmin completed")
+	}()
+
+	if id == uuid.Nil {
+		return domain.NewAppError(domain.ErrValidation, "System admin ID is required", 400)
+	}
+
+	existing, err := s.sysAdminRepo.GetSystemAdmin(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.NewAppError(domain.ErrNotFound, "System admin not found", 404)
+		}
+		s.logger.Error().Err(err).Str("system_admin_id", id.String()).Msg("Failed to find system admin")
+		return domain.NewAppError(err, "Failed to delete system admin", 500)
+	}
+
+	if err := s.sysAdminRepo.DeleteSystemAdmin(ctx, id); err != nil {
+		s.logger.Error().Err(err).Str("system_admin_id", id.String()).Msg("Failed to delete system admin")
+		return domain.NewAppError(err, "Failed to delete system admin", 500)
+	}
+
+	s.invalidateSystemAdminCache(ctx, existing.UserID)
+
+	s.logActivityAsync(
+		&existing.UserID,
+		"system_admin_deleted",
+		map[string]interface{}{
+			"description":     "System admin profile deleted",
+			"system_admin_id": existing.ID.String(),
+		},
+		stringPtr("system_admin"),
+		&existing.ID,
+	)
+
+	s.logger.Info().Str("system_admin_id", id.String()).Msg("System admin deleted successfully")
+	return nil
+}
+
+// DeleteSystemAdminByUserID removes system admin by user ID
+func (s *systemAdminService) DeleteSystemAdminByUserID(ctx context.Context, userID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Str("user_id", userID.String()).
+			Msg("DeleteSystemAdminByUserID completed")
+	}()
+
+	if userID == uuid.Nil {
+		return domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
+	}
+
+	existing, err := s.sysAdminRepo.GetSystemAdminByUserID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.NewAppError(domain.ErrNotFound, "System admin not found", 404)
+		}
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to find system admin")
+		return domain.NewAppError(err, "Failed to delete system admin", 500)
+	}
+
+	if err := s.sysAdminRepo.DeleteSystemAdminByUserID(ctx, userID); err != nil {
+		s.logger.Error().Err(err).Str("user_id", userID.String()).Msg("Failed to delete system admin")
+		return domain.NewAppError(err, "Failed to delete system admin", 500)
+	}
+
+	s.invalidateSystemAdminCache(ctx, userID)
+
+	s.logActivityAsync(
+		&userID,
+		"system_admin_deleted",
+		map[string]interface{}{
+			"description":     "System admin profile deleted by user ID",
+			"system_admin_id": existing.ID.String(),
+			"user_id":        userID.String(),
+		},
+		stringPtr("system_admin"),
+		&existing.ID,
+	)
+
+	s.logger.Info().
+		Str("system_admin_id", existing.ID.String()).
+		Str("user_id", userID.String()).
+		Msg("System admin deleted successfully by user ID")
+	return nil
+}
+
+// SearchSystemAdmins searches system admins using filters
+func (s *systemAdminService) SearchSystemAdmins(ctx context.Context, params admin.SystemAdminSearchParams) ([]admin.SystemAdmin, error) {
+	start := time.Now()
+	defer func() {
+		s.logger.Debug().
+			Dur("duration_ms", time.Since(start)).
+			Msg("SearchSystemAdmins completed")
+	}()
+
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if params.Offset < 0 {
+		params.Offset = 0
+	}
+	params.Limit = limit
+
+	result, err := s.sysAdminRepo.SearchSystemAdmins(ctx, params)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to search system admins")
+		return nil, domain.NewAppError(err, "Failed to search system admins", 500)
+	}
+
+	return result, nil
+}
+
 // Helper method for asynchronous activity logging
 func (s *systemAdminService) logActivityAsync(userID *uuid.UUID, activityType string, details map[string]interface{}, resourceType *string, resourceID *uuid.UUID) {
 	if s.auditService == nil {
@@ -204,6 +435,16 @@ func (s *systemAdminService) invalidateSystemAdminCache(ctx context.Context, use
 			s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate cache")
 		}
 	}
+}
+
+func isValidAdminLevel(level string) bool {
+	validLevels := map[string]bool{
+		"super_admin":  true,
+		"regional":     true,
+		"departmental": true,
+		"support":      true,
+	}
+	return validLevels[level]
 }
 
 // sanitizeActivityDetails ensures all values in the details map are JSON-serializable

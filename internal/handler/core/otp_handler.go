@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
@@ -56,7 +55,7 @@ func (h *OTPHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate OTP
-	err := h.otpService.GenerateOTP(ctx, req.Identifier)
+	channel, err := h.otpService.GenerateOTP(ctx, req.Identifier)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -69,11 +68,7 @@ func (h *OTPHandler) GenerateOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Determine channel for user feedback
-	if strings.Contains(req.Identifier, "@") {
-		response.Channel = "email"
-	} else {
-		response.Channel = "sms"
-	}
+	response.Channel = channel
 
 	handler.RespondJSON(w, http.StatusOK, response)
 }

@@ -281,6 +281,7 @@ type mockEmailService struct {
 	sendPasswordResetEmailFunc   func(ctx context.Context, to, resetToken string) error
 	sendPasswordChangedEmailFunc func(ctx context.Context, to, username string) error
 	sendVerificationEmailFunc    func(ctx context.Context, to, verificationToken string) error
+	sendStaffInvitationEmailFunc func(ctx context.Context, to, firstName, lastName, clinicName, invitationToken string) error
 	sendLoginAlertEmailFunc      func(ctx context.Context, to, username, ipAddress, location string) error
 }
 
@@ -313,6 +314,16 @@ func (m *mockEmailService) SendPasswordResetEmail(ctx context.Context, to, reset
 func (m *mockEmailService) SendVerificationEmail(ctx context.Context, to, verificationToken string) error {
 	if m.sendVerificationEmailFunc != nil {
 		return m.sendVerificationEmailFunc(ctx, to, verificationToken)
+	}
+	return nil
+}
+
+func (m *mockEmailService) SendStaffInvitationEmail(
+	ctx context.Context,
+	to, firstName, lastName, clinicName, invitationToken string,
+) error {
+	if m.sendStaffInvitationEmailFunc != nil {
+		return m.sendStaffInvitationEmailFunc(ctx, to, firstName, lastName, clinicName, invitationToken)
 	}
 	return nil
 }

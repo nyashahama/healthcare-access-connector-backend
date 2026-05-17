@@ -39,22 +39,20 @@ func NewPatientHandler(
 
 // RegisterRoutes registers patient routes
 func (h *PatientHandler) RegisterRoutes(router chi.Router) {
-	router.Route("/patients", func(r chi.Router) {
-		r.Post("/", h.CreatePatientProfile)
-		r.Get("/search", h.SearchPatients)
-		r.Get("/demographics", h.GetDemographicsSummary)
-		r.Get("/national-id/{nationalID}", h.GetPatientByNationalID)
+	router.Post("/", h.CreatePatientProfile)
+	router.Get("/search", h.SearchPatients)
+	router.Get("/demographics", h.GetDemographicsSummary)
+	router.Get("/national-id/{nationalID}", h.GetPatientByNationalID)
 
-		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", h.GetPatientProfile)
-			r.Put("/", h.UpdatePatientProfile)
-			r.Delete("/", h.DeletePatientProfile)
-		})
+	router.Route("/{id}", func(r chi.Router) {
+		r.Get("/", h.GetPatientProfile)
+		r.Put("/", h.UpdatePatientProfile)
+		r.Delete("/", h.DeletePatientProfile)
+	})
 
-		r.Route("/user/{userID}", func(r chi.Router) {
-			r.Get("/", h.GetPatientByUserID)
-			r.Delete("/", h.DeletePatientProfileByUserID)
-		})
+	router.Route("/user/{userID}", func(r chi.Router) {
+		r.Get("/", h.GetPatientByUserID)
+		r.Delete("/", h.DeletePatientProfileByUserID)
 	})
 }
 

@@ -101,6 +101,116 @@ func (r *systemAdminRepository) GetSystemAdminByUserID(ctx context.Context, user
 	return r.mapToSystemAdmin(row), nil
 }
 
+func (r *systemAdminRepository) GetSystemAdmin(ctx context.Context, id uuid.UUID) (admin.SystemAdmin, error) {
+	start := time.Now()
+	defer func() {
+		systemAdminDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	row, err := r.querier.GetSystemAdmin(ctx, uuidToPgtypeUUID(id))
+	if err != nil {
+		systemAdminDBQueryTotal.WithLabelValues("get_system_admin", "error").Inc()
+		return admin.SystemAdmin{}, r.handleError(err, "get system admin")
+	}
+
+	systemAdminDBQueryTotal.WithLabelValues("get_system_admin", "success").Inc()
+	return r.mapToSystemAdmin(row), nil
+}
+
+func (r *systemAdminRepository) UpdateSystemAdmin(ctx context.Context, adminRec admin.SystemAdmin) error {
+	start := time.Now()
+	defer func() {
+		systemAdminDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	if adminRec.ID == uuid.Nil {
+		systemAdminDBQueryTotal.WithLabelValues("update_system_admin", "error").Inc()
+		return domain.ErrValidation
+	}
+
+	_, err := r.querier.UpdateSystemAdmin(ctx, sqlc.UpdateSystemAdminParams{
+		ID:               uuidToPgtypeUUID(adminRec.ID),
+		AdminLevel:       adminRec.AdminLevel,
+		AssignedRegions:  adminRec.AssignedRegions,
+		Department:       pgtypeTextFromStringPtr(adminRec.Department),
+		Column5:          interfaceToJSONRawMessage(adminRec.Permissions),
+		CanManageUsers:   pgtype.Bool{Bool: adminRec.CanManageUsers, Valid: true},
+		CanManageClinics: pgtype.Bool{Bool: adminRec.CanManageClinics, Valid: true},
+		CanManageContent: pgtype.Bool{Bool: adminRec.CanManageContent, Valid: true},
+		CanViewAnalytics: pgtype.Bool{Bool: adminRec.CanViewAnalytics, Valid: true},
+		CanManageSystem:  pgtype.Bool{Bool: adminRec.CanManageSystem, Valid: true},
+		WorkPhone:        pgtypeTextFromStringPtr(adminRec.WorkPhone),
+		Extension:        pgtypeTextFromStringPtr(adminRec.Extension),
+	})
+	if err != nil {
+		systemAdminDBQueryTotal.WithLabelValues("update_system_admin", "error").Inc()
+		return r.handleError(err, "update system admin")
+	}
+
+	systemAdminDBQueryTotal.WithLabelValues("update_system_admin", "success").Inc()
+	return nil
+}
+
+func (r *systemAdminRepository) DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		systemAdminDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.DeleteSystemAdmin(ctx, uuidToPgtypeUUID(id))
+	if err != nil {
+		systemAdminDBQueryTotal.WithLabelValues("delete_system_admin", "error").Inc()
+		return r.handleError(err, "delete system admin")
+	}
+
+	systemAdminDBQueryTotal.WithLabelValues("delete_system_admin", "success").Inc()
+	return nil
+}
+
+func (r *systemAdminRepository) DeleteSystemAdminByUserID(ctx context.Context, userID uuid.UUID) error {
+	start := time.Now()
+	defer func() {
+		systemAdminDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	err := r.querier.DeleteSystemAdminByUserID(ctx, uuidToPgtypeUUID(userID))
+	if err != nil {
+		systemAdminDBQueryTotal.WithLabelValues("delete_system_admin_by_user_id", "error").Inc()
+		return r.handleError(err, "delete system admin by user id")
+	}
+
+	systemAdminDBQueryTotal.WithLabelValues("delete_system_admin_by_user_id", "success").Inc()
+	return nil
+}
+
+func (r *systemAdminRepository) SearchSystemAdmins(ctx context.Context, params admin.SystemAdminSearchParams) ([]admin.SystemAdmin, error) {
+	start := time.Now()
+	defer func() {
+		systemAdminDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	rows, err := r.querier.SearchSystemAdmins(ctx, sqlc.SearchSystemAdminsParams{
+		Column1: params.AdminLevel,
+		Column2: params.Region,
+		Column3: params.Department,
+		Column4: params.Query,
+		Limit:      int32(params.Limit),
+		Offset:     int32(params.Offset),
+	})
+	if err != nil {
+		systemAdminDBQueryTotal.WithLabelValues("search_system_admins", "error").Inc()
+		return nil, r.handleError(err, "search system admins")
+	}
+
+	out := make([]admin.SystemAdmin, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, r.mapToSystemAdmin(row))
+	}
+
+	systemAdminDBQueryTotal.WithLabelValues("search_system_admins", "success").Inc()
+	return out, nil
+}
+
 // ===== Helper Functions =====
 
 func (r *systemAdminRepository) mapToSystemAdmin(row sqlc.SystemAdmin) admin.SystemAdmin {

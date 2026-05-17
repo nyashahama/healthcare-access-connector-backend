@@ -108,6 +108,7 @@ func (r *emergencyContactRepository) GetPatientEmergencyContacts(ctx context.Con
 			CanAccessMedicalInfo: row.CanAccessMedicalInfo,
 			AccessLevel:          row.AccessLevel,
 			RelationshipVerified: row.RelationshipVerified,
+			VerificationNotes:    row.VerificationNotes,
 			CreatedAt:            row.CreatedAt,
 			UpdatedAt:            row.UpdatedAt,
 		})
@@ -140,8 +141,14 @@ func (r *emergencyContactRepository) GetPrimaryEmergencyContact(ctx context.Cont
 		Relationship:         row.Relationship,
 		PhoneNumber:          row.PhoneNumber,
 		Email:                pgtypeTextToStringPtr(row.Email),
+		Address:              pgtypeTextToStringPtr(row.Address),
+		IsPrimary:            row.IsPrimary.Bool,
 		CanAccessMedicalInfo: row.CanAccessMedicalInfo.Bool,
 		AccessLevel:          pgtypeTextToStringPtr(row.AccessLevel),
+		RelationshipVerified: row.RelationshipVerified.Bool,
+		VerificationNotes:    pgtypeTextToStringPtr(row.VerificationNotes),
+		CreatedAt:            row.CreatedAt.Time,
+		UpdatedAt:            row.UpdatedAt.Time,
 	}
 
 	emergencyContactDBQueryTotal.WithLabelValues("get_primary_emergency_contact", "success").Inc()
@@ -163,6 +170,9 @@ func (r *emergencyContactRepository) UpdateEmergencyContact(ctx context.Context,
 		Address:              pgtypeTextFromStringPtr(contact.Address),
 		CanAccessMedicalInfo: pgtype.Bool{Bool: contact.CanAccessMedicalInfo, Valid: true},
 		AccessLevel:          pgtypeTextFromStringPtr(contact.AccessLevel),
+		IsPrimary:            pgtype.Bool{Bool: contact.IsPrimary, Valid: true},
+		RelationshipVerified: pgtype.Bool{Bool: contact.RelationshipVerified, Valid: true},
+		VerificationNotes:    pgtypeTextFromStringPtr(contact.VerificationNotes),
 	})
 	if err != nil {
 		emergencyContactDBQueryTotal.WithLabelValues("update_emergency_contact", "error").Inc()

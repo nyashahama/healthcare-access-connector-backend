@@ -381,7 +381,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	adminHandler := handleradmin.NewAdminHandler(systemAdminService, logger, cfg.Timeout)
 
-	staffHandler := handlerproviders.NewStaffHandler(staffService, userService, logger, cfg.Timeout)
+	staffHandler := handlerproviders.NewStaffHandler(staffService, userService, emailService, logger, cfg.Timeout)
 	clinicHandler := handlerproviders.NewClinicHandler(clinicService, logger, cfg.Timeout)
 	serviceHandler := handlerproviders.NewServiceHandler(serviceService, logger, cfg.Timeout)
 	credentialHandler := handlerproviders.NewCredentialHandler(credentialService, logger, cfg.Timeout)
