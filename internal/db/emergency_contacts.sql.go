@@ -120,7 +120,7 @@ const getPatientEmergencyContacts = `-- name: GetPatientEmergencyContacts :many
 SELECT 
     id, patient_id, contact_name, relationship, phone_number,
     email, address, is_primary, can_access_medical_info,
-    access_level, relationship_verified, created_at, updated_at
+    access_level, relationship_verified, verification_notes, created_at, updated_at
 FROM emergency_contacts
 WHERE patient_id = $1
 ORDER BY 
@@ -140,6 +140,7 @@ type GetPatientEmergencyContactsRow struct {
 	CanAccessMedicalInfo pgtype.Bool      `json:"can_access_medical_info"`
 	AccessLevel          pgtype.Text      `json:"access_level"`
 	RelationshipVerified pgtype.Bool      `json:"relationship_verified"`
+	VerificationNotes    pgtype.Text      `json:"verification_notes"`
 	CreatedAt            pgtype.Timestamp `json:"created_at"`
 	UpdatedAt            pgtype.Timestamp `json:"updated_at"`
 }
@@ -168,6 +169,7 @@ func (q *Queries) GetPatientEmergencyContacts(ctx context.Context, patientID pgt
 			&i.CanAccessMedicalInfo,
 			&i.AccessLevel,
 			&i.RelationshipVerified,
+			&i.VerificationNotes,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -183,8 +185,9 @@ func (q *Queries) GetPatientEmergencyContacts(ctx context.Context, patientID pgt
 
 const getPrimaryEmergencyContact = `-- name: GetPrimaryEmergencyContact :one
 SELECT 
-    id, contact_name, relationship, phone_number, email,
-    can_access_medical_info, access_level
+    id, patient_id, contact_name, relationship, phone_number, email,
+    address, is_primary, can_access_medical_info, access_level,
+    relationship_verified, verification_notes, created_at, updated_at
 FROM emergency_contacts
 WHERE 
     patient_id = $1
@@ -193,13 +196,20 @@ LIMIT 1
 `
 
 type GetPrimaryEmergencyContactRow struct {
-	ID                   pgtype.UUID `json:"id"`
-	ContactName          string      `json:"contact_name"`
-	Relationship         string      `json:"relationship"`
-	PhoneNumber          string      `json:"phone_number"`
-	Email                pgtype.Text `json:"email"`
-	CanAccessMedicalInfo pgtype.Bool `json:"can_access_medical_info"`
-	AccessLevel          pgtype.Text `json:"access_level"`
+	ID                   pgtype.UUID      `json:"id"`
+	PatientID            pgtype.UUID      `json:"patient_id"`
+	ContactName          string           `json:"contact_name"`
+	Relationship         string           `json:"relationship"`
+	PhoneNumber          string           `json:"phone_number"`
+	Email                pgtype.Text      `json:"email"`
+	Address              pgtype.Text      `json:"address"`
+	IsPrimary            pgtype.Bool      `json:"is_primary"`
+	CanAccessMedicalInfo pgtype.Bool      `json:"can_access_medical_info"`
+	AccessLevel          pgtype.Text      `json:"access_level"`
+	RelationshipVerified pgtype.Bool      `json:"relationship_verified"`
+	VerificationNotes    pgtype.Text      `json:"verification_notes"`
+	CreatedAt            pgtype.Timestamp `json:"created_at"`
+	UpdatedAt            pgtype.Timestamp `json:"updated_at"`
 }
 
 func (q *Queries) GetPrimaryEmergencyContact(ctx context.Context, patientID pgtype.UUID) (GetPrimaryEmergencyContactRow, error) {
@@ -207,12 +217,19 @@ func (q *Queries) GetPrimaryEmergencyContact(ctx context.Context, patientID pgty
 	var i GetPrimaryEmergencyContactRow
 	err := row.Scan(
 		&i.ID,
+		&i.PatientID,
 		&i.ContactName,
 		&i.Relationship,
 		&i.PhoneNumber,
 		&i.Email,
+		&i.Address,
+		&i.IsPrimary,
 		&i.CanAccessMedicalInfo,
 		&i.AccessLevel,
+		&i.RelationshipVerified,
+		&i.VerificationNotes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -227,6 +244,9 @@ SET
     address = COALESCE($6, address),
     can_access_medical_info = COALESCE($7, can_access_medical_info),
     access_level = COALESCE($8, access_level),
+    is_primary = COALESCE($9, is_primary),
+    relationship_verified = COALESCE($10, relationship_verified),
+    verification_notes = COALESCE($11, verification_notes),
     updated_at = NOW()
 WHERE id = $1
 `
@@ -240,6 +260,9 @@ type UpdateEmergencyContactParams struct {
 	Address              pgtype.Text `json:"address"`
 	CanAccessMedicalInfo pgtype.Bool `json:"can_access_medical_info"`
 	AccessLevel          pgtype.Text `json:"access_level"`
+	IsPrimary            pgtype.Bool `json:"is_primary"`
+	RelationshipVerified pgtype.Bool `json:"relationship_verified"`
+	VerificationNotes    pgtype.Text `json:"verification_notes"`
 }
 
 func (q *Queries) UpdateEmergencyContact(ctx context.Context, arg UpdateEmergencyContactParams) error {
@@ -252,6 +275,9 @@ func (q *Queries) UpdateEmergencyContact(ctx context.Context, arg UpdateEmergenc
 		arg.Address,
 		arg.CanAccessMedicalInfo,
 		arg.AccessLevel,
+		arg.IsPrimary,
+		arg.RelationshipVerified,
+		arg.VerificationNotes,
 	)
 	return err
 }

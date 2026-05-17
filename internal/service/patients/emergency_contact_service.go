@@ -78,7 +78,7 @@ func (s *emergencyContactService) AddEmergencyContact(ctx context.Context, conta
 
 	// If this contact is marked as primary, unset primary flag from other contacts
 	if contact.IsPrimary {
-		if err := s.unsetPrimaryContact(ctx, contact.PatientID); err != nil {
+		if err := s.unsetPrimaryContact(ctx, contact.PatientID, uuid.Nil); err != nil {
 			s.logger.Warn().Err(err).Str("patient_id", contact.PatientID.String()).Msg("Failed to unset primary flag from existing contacts")
 		}
 	}
@@ -263,7 +263,7 @@ func (s *emergencyContactService) UpdateEmergencyContact(ctx context.Context, co
 
 	// If this contact is being set as primary and wasn't before, unset primary flag from other contacts
 	if contact.IsPrimary && !oldIsPrimary {
-		if err := s.unsetPrimaryContact(ctx, contact.PatientID); err != nil {
+		if err := s.unsetPrimaryContact(ctx, contact.PatientID, contact.ID); err != nil {
 			s.logger.Warn().Err(err).Str("patient_id", contact.PatientID.String()).Msg("Failed to unset primary flag from existing contacts")
 		}
 	}
@@ -322,16 +322,26 @@ func (s *emergencyContactService) DeleteEmergencyContact(ctx context.Context, id
 	return nil
 }
 
-// Unset primary flag from all contacts for a patient
-func (s *emergencyContactService) unsetPrimaryContact(ctx context.Context, patientID uuid.UUID) error {
-	_, err := s.emergencyContactRepo.GetPatientEmergencyContacts(ctx, patientID)
+// Unset primary flag from all contacts for a patient, optionally keeping one contact primary.
+func (s *emergencyContactService) unsetPrimaryContact(ctx context.Context, patientID uuid.UUID, excludeContactID uuid.UUID) error {
+	contacts, err := s.emergencyContactRepo.GetPatientEmergencyContacts(ctx, patientID)
 	if err != nil {
 		return err
 	}
 
-	// In a real implementation, you would have a repository method to unset primary flag
-	// For now, we'll just log a warning
-	s.logger.Warn().Str("patient_id", patientID.String()).Msg("Unsetting primary flag not implemented in repository")
+	for _, contact := range contacts {
+		if !contact.IsPrimary {
+			continue
+		}
+		if excludeContactID != uuid.Nil && contact.ID == excludeContactID {
+			continue
+		}
+
+		contact.IsPrimary = false
+		if err := s.emergencyContactRepo.UpdateEmergencyContact(ctx, contact); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

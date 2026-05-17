@@ -59,7 +59,7 @@ type UserService interface {
 
 // OTPService handles otp operations
 type OTPService interface {
-	GenerateOTP(ctx context.Context, identifier string) error
+	GenerateOTP(ctx context.Context, identifier string) (string, error)
 	VerifyOTP(ctx context.Context, identifier, otp string) (string, core.User, error)
 	ResetPasswordWithOTP(ctx context.Context, identifier, otp, newPassword string) error
 }

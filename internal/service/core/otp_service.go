@@ -48,11 +48,12 @@ func NewOTPService(
 }
 
 // GenerateOTP generates and sends OTP to user
-func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
+func (s *otpService) GenerateOTP(ctx context.Context, identifier string) (string, error) {
 	// Find user by email or phone
 	var user core.User
 	var err error
 	channel := "email"
+	sentVia := "email"
 
 	if strings.Contains(identifier, "@") {
 		user, _, err = s.authRepo.GetUserByEmail(ctx, strings.ToLower(identifier))
@@ -64,7 +65,7 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 	if err != nil {
 		// Don't reveal if user exists for security
 		s.logger.Info().Str("identifier", maskIdentifier(identifier)).Msg("OTP requested for non-existent user")
-		return nil
+		return sentVia, nil
 	}
 
 	// Check OTP attempt count (rate limiting)
@@ -73,24 +74,47 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 		s.logger.Warn().Err(err).Msg("Failed to get OTP attempt count")
 	}
 	if attempts >= 5 {
-		return domain.NewAppError(domain.ErrOTPRateLimited, "Too many OTP requests. Please try again later.", 429)
+		return sentVia, domain.NewAppError(domain.ErrOTPRateLimited, "Too many OTP requests. Please try again later.", 429)
 	}
 
 	// Check if user can receive OTP
 	if channel == "email" && (user.Email == nil || *user.Email == "") {
 		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive email OTP")
-		return nil
+		return sentVia, nil
 	}
-	if channel == "sms" && (user.Phone == nil || *user.Phone == "" || !user.SMSConsentGiven) {
-		s.logger.Warn().Str("user_id", user.ID.String()).Msg("User cannot receive SMS OTP")
-		return nil
+
+	// Keep backward-compatible behavior for SMS requests while preserving a successful
+	// response path for users that also have an email address.
+	if channel == "sms" {
+		sentVia = "sms"
+		canReceiveSMS := s.smsEnabled && user.Phone != nil && *user.Phone != "" && user.SMSConsentGiven
+
+		if !canReceiveSMS {
+			s.logger.Warn().
+				Str("user_id", user.ID.String()).
+				Bool("sms_enabled", s.smsEnabled).
+				Msg("User cannot receive SMS OTP")
+
+			if user.Email != nil && *user.Email != "" &&
+				s.emailService != nil &&
+				s.emailService.IsAvailable() {
+				channel = "email"
+				sentVia = "email"
+			} else {
+				return sentVia, domain.NewAppError(
+					domain.ErrServiceNotAvailable,
+					"SMS verification is currently unavailable. Please use email instead.",
+					503,
+				)
+			}
+		}
 	}
 
 	// Generate 6-digit OTP
 	otp, err := s.generateNumericOTP(6)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Failed to generate OTP")
-		return domain.NewAppError(err, "Failed to generate OTP", 500)
+		return sentVia, domain.NewAppError(err, "Failed to generate OTP", 500)
 	}
 	expiresAt := time.Now().Add(10 * time.Minute)
 
@@ -113,21 +137,22 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 	// Save OTP to repository
 	if err := s.otpRepo.SaveOTP(ctx, otpRecord); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to save OTP")
-		return domain.NewAppError(err, "Failed to generate OTP", 500)
+		return sentVia, domain.NewAppError(err, "Failed to generate OTP", 500)
 	}
 
 	// Send OTP via email or SMS
 	if channel == "email" && user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
 		if err := s.emailService.SendOTPEmail(ctx, *user.Email, otp, user.ID.String()); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to send OTP email")
-			return domain.NewAppError(err, "Failed to send OTP email", 500)
+			return sentVia, domain.NewAppError(err, "Failed to send OTP email", 500)
 		}
 	} else if channel == "sms" && user.Phone != nil {
 		s.logger.Error().
 			Str("phone", maskIdentifier(*user.Phone)).
 			Msg("SMS OTP delivery is unavailable")
+		s.logger.Info().Str("user_id", user.ID.String()).Msg("SMS remains selected, returning unavailable")
 
-		return domain.NewAppError(
+		return sentVia, domain.NewAppError(
 			domain.ErrServiceNotAvailable,
 			"SMS verification is currently unavailable. Please use email instead.",
 			503,
@@ -136,10 +161,10 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) error {
 
 	s.logger.Info().
 		Str("user_id", user.ID.String()).
-		Str("channel", channel).
+		Str("channel", sentVia).
 		Msg("OTP generated and sent")
 
-	return nil
+	return sentVia, nil
 }
 
 // VerifyOTP verifies OTP and returns reset token
