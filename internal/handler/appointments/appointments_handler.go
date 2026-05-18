@@ -38,23 +38,21 @@ func NewAppointmentHandler(
 
 // RegisterRoutes registers appointment routes
 func (h *AppointmentHandler) RegisterRoutes(router chi.Router) {
-	router.Route("/appointments", func(r chi.Router) {
-		r.Post("/", h.CreateAppointment)
-		r.Get("/{id}", h.GetAppointmentByID)
-		r.Get("/patient/{patientId}", h.GetAppointmentsByPatient)
-		r.Get("/clinic/{clinicId}", h.GetAppointmentsByClinic)
-		r.Get("/clinic/{clinicId}/date/{date}", h.GetAppointmentsByClinicAndDate)
-		r.Get("/clinic/{clinicId}/today", h.GetTodayAppointments)
-		r.Get("/clinic/{clinicId}/pending", h.GetPendingAppointments)
-		r.Put("/{id}/reschedule", h.RescheduleAppointment)
-		r.Put("/{id}/confirm", h.ConfirmAppointment)
-		r.Put("/{id}/notes", h.UpdateAppointmentNotes)
-		r.Put("/{id}/complete", h.CompleteAppointment)
-		r.Put("/{id}/cancel", h.CancelAppointment)
-		r.Put("/{id}/status", h.UpdateAppointmentStatus)
-		r.Delete("/{id}", h.DeleteAppointment)
-		r.Get("/patient/{patientId}/count", h.GetAppointmentCount)
-	})
+	router.Post("/", h.CreateAppointment)
+	router.Get("/{id}", h.GetAppointmentByID)
+	router.Get("/patient/{patientId}", h.GetAppointmentsByPatient)
+	router.Get("/clinic/{clinicId}", h.GetAppointmentsByClinic)
+	router.Get("/clinic/{clinicId}/date/{date}", h.GetAppointmentsByClinicAndDate)
+	router.Get("/clinic/{clinicId}/today", h.GetTodayAppointments)
+	router.Get("/clinic/{clinicId}/pending", h.GetPendingAppointments)
+	router.Put("/{id}/reschedule", h.RescheduleAppointment)
+	router.Put("/{id}/confirm", h.ConfirmAppointment)
+	router.Put("/{id}/notes", h.UpdateAppointmentNotes)
+	router.Put("/{id}/complete", h.CompleteAppointment)
+	router.Put("/{id}/cancel", h.CancelAppointment)
+	router.Put("/{id}/status", h.UpdateAppointmentStatus)
+	router.Delete("/{id}", h.DeleteAppointment)
+	router.Get("/patient/{patientId}/count", h.GetAppointmentCount)
 }
 
 // CreateAppointment handles creation of a new appointment

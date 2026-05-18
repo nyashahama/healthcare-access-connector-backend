@@ -651,12 +651,31 @@ func (h *UserHandler) GetUsersByIDs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// CountUsers counts users by role
+// CountUsers counts users by role or all users if no role specified
 func (h *UserHandler) CountUsers(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
 	role := r.URL.Query().Get("role")
+
+	if role == "" {
+		// Count all users by summing across known roles
+		roles := []string{"patient", "caregiver", "provider_staff", "clinic_admin", "system_admin", "ngo_partner"}
+		var total int64
+		for _, r := range roles {
+			c, err := h.userService.CountUsers(ctx, r)
+			if err != nil {
+				h.logger.Warn().Err(err).Str("role", r).Msg("Failed to count users for role")
+				continue
+			}
+			total += c
+		}
+		handler.RespondJSON(w, http.StatusOK, map[string]interface{}{
+			"count": total,
+			"role":  "",
+		})
+		return
+	}
 
 	count, err := h.userService.CountUsers(ctx, role)
 	if err != nil {
