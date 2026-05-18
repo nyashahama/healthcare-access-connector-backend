@@ -429,6 +429,9 @@ func (r *userRepository) mapToUserFromGetByID(u sqlc.GetUserByIDRow) core.User {
 		LoginCount:           int(u.LoginCount.Int32),
 		IsSMSOnly:            pgtypeBoolToBool(u.IsSmsOnly),
 		ProfileCompletionPct: int(u.ProfileCompletionPercentage.Int32),
+		PrimaryClinicID:      pgtypeUUIDToUUIDPtr(u.PrimaryClinicID),
+		OnboardingCompleted:  pgtypeBoolToBool(u.OnboardingCompleted),
+		OnboardingStep:       pgtypeTextToStringPtr(u.OnboardingStep),
 		CreatedAt:            u.CreatedAt.Time,
 		UpdatedAt:            u.UpdatedAt.Time,
 	}
