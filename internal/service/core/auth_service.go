@@ -148,13 +148,6 @@ func NewAuthService(
 // Register handles user registration
 func (s *authService) Register(ctx context.Context, email, phone, password, role string) (core.User, error) {
 	start := time.Now()
-	defer func() {
-		s.logger.Debug().
-			Dur("duration_ms", time.Since(start)).
-			Str("email", email).
-			Str("role", role).
-			Msg("Registration completed")
-	}()
 
 	// Validate input
 	if email == "" && phone == "" {
@@ -222,12 +215,13 @@ func (s *authService) Register(ctx context.Context, email, phone, password, role
 	}
 
 	if err := s.handlePostRegistration(ctx, created, email, phone, role); err != nil {
-		if s.userRepo != nil {
-			if delErr := s.userRepo.DeleteUser(ctx, created.ID); delErr != nil {
-				s.logger.Warn().Err(delErr).Str("user_id", created.ID.String()).Msg("Failed to rollback user after registration failure")
-			}
-		}
-		return core.User{}, domain.NewAppError(err, "Registration failed", 500)
+		// Log the post-registration error but don't fail the entire registration.
+		// The user account was created successfully; post-registration steps
+		// (consent, profile, verification email) are best-effort.
+		s.logger.Warn().
+			Err(err).
+			Str("user_id", created.ID.String()).
+			Msg("Post-registration steps failed; user account created but some setup incomplete")
 	}
 
 	s.logger.Info().
