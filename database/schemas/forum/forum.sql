@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS forum_posts (
+    id UUID PRIMARY KEY,
+    author_id UUID NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    content TEXT NOT NULL,
+    category VARCHAR(100) NOT NULL DEFAULT 'general',
+    is_pinned BOOLEAN DEFAULT false,
+    view_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS forum_comments (
+    id UUID PRIMARY KEY,
+    post_id UUID NOT NULL,
+    author_id UUID NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
