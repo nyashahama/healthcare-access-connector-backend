@@ -114,6 +114,8 @@ type Querier interface {
 	ConfirmAppointment(ctx context.Context, arg ConfirmAppointmentParams) (Appointment, error)
 	CountActiveConsents(ctx context.Context) (int64, error)
 	CountConsentsByType(ctx context.Context) (CountConsentsByTypeRow, error)
+	CountForumComments(ctx context.Context, postID pgtype.UUID) (int64, error)
+	CountForumPosts(ctx context.Context) (int64, error)
 	// ============================================
 	// STATISTICS & ANALYTICS
 	// ============================================
@@ -160,6 +162,8 @@ type Querier interface {
 	// CORE CRUD OPERATIONS
 	// ============================================
 	CreateCredential(ctx context.Context, arg CreateCredentialParams) (ProfessionalCredential, error)
+	CreateForumComment(ctx context.Context, arg CreateForumCommentParams) (ForumComment, error)
+	CreateForumPost(ctx context.Context, arg CreateForumPostParams) (ForumPost, error)
 	// ============================================
 	// NGO PARTNERS REPOSITORY QUERIES
 	// Maps to: NGOPartnerRepository interface
@@ -252,6 +256,8 @@ type Querier interface {
 	DeleteExpiredOTPs(ctx context.Context) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteFamilyHistory(ctx context.Context, id pgtype.UUID) error
+	DeleteForumComment(ctx context.Context, arg DeleteForumCommentParams) error
+	DeleteForumPost(ctx context.Context, arg DeleteForumPostParams) error
 	DeleteNotificationPreferences(ctx context.Context, userID pgtype.UUID) error
 	DeleteOldDataAccessLogs(ctx context.Context, accessedAt pgtype.Timestamp) error
 	DeleteOldUserActivities(ctx context.Context, performedAt pgtype.Timestamp) error
@@ -368,6 +374,7 @@ type Querier interface {
 	GetExpiredConsents(ctx context.Context) ([]PrivacyConsent, error)
 	GetFailedMessages(ctx context.Context, arg GetFailedMessagesParams) ([]SmsMessage, error)
 	GetFamilyHistoryEntry(ctx context.Context, id pgtype.UUID) (PatientFamilyHistory, error)
+	GetForumPostByID(ctx context.Context, id pgtype.UUID) (GetForumPostByIDRow, error)
 	GetGrowthRecords(ctx context.Context, dependentID pgtype.UUID) ([]GetGrowthRecordsRow, error)
 	// Used in consultation list previews.
 	GetLastMessage(ctx context.Context, consultationID pgtype.UUID) (GetLastMessageRow, error)
@@ -573,6 +580,7 @@ type Querier interface {
 	// Called atomically when a provider accepts a consultation.
 	// Returns the updated row so the service layer can enforce the cap.
 	IncrementActiveConsultations(ctx context.Context, staffID pgtype.UUID) (ProviderAvailability, error)
+	IncrementForumPostView(ctx context.Context, id pgtype.UUID) error
 	// ============================================
 	// CORE WRITE OPERATIONS
 	// ============================================
@@ -589,6 +597,8 @@ type Querier interface {
 	// FILTERING & LISTING
 	// ============================================
 	ListClinics(ctx context.Context, arg ListClinicsParams) ([]ListClinicsRow, error)
+	ListForumComments(ctx context.Context, arg ListForumCommentsParams) ([]ListForumCommentsRow, error)
+	ListForumPosts(ctx context.Context, arg ListForumPostsParams) ([]ListForumPostsRow, error)
 	ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams) ([]ListUsersByRoleRow, error)
 	// ============================================
 	// Data Access Log Queries
@@ -680,6 +690,7 @@ type Querier interface {
 	UpdateEmergencyAlerts(ctx context.Context, arg UpdateEmergencyAlertsParams) error
 	UpdateEmergencyContact(ctx context.Context, arg UpdateEmergencyContactParams) error
 	UpdateFamilyHistory(ctx context.Context, arg UpdateFamilyHistoryParams) error
+	UpdateForumPost(ctx context.Context, arg UpdateForumPostParams) (ForumPost, error)
 	UpdateHealthDataConsent(ctx context.Context, arg UpdateHealthDataConsentParams) error
 	UpdateHealthTips(ctx context.Context, arg UpdateHealthTipsParams) error
 	// Provider dashboard pings every 30 s. If last_seen_at is stale (> 2 min),
