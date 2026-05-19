@@ -22,6 +22,7 @@ import (
 	handlerpatients "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	handlerproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
+	handlerforum "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	repoadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/admin"
 	repoappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/appointments"
@@ -29,6 +30,7 @@ import (
 	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
 	repoproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/providers"
 	repotele "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/telemedicine"
+	repoforum "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	serviceadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/service/admin"
 	serviceappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/service/appointments"
@@ -151,6 +153,7 @@ func New(cfg *config.Config) (*App, error) {
 	consultationMessagesRepo := repotele.NewConsultationMessagesRepository(pool)
 	consultationNotesRepo := repotele.NewConsultationNotesRepository(pool)
 	providerAvailabilityRepo := repotele.NewProviderAvailabilityRepository(pool)
+	forumRepo := repoforum.NewRepository(pool, logger)
 
 	// ── Services ──────────────────────────────────────────────────────────────
 
@@ -428,6 +431,8 @@ func New(cfg *config.Config) (*App, error) {
 	// upgrade so unauthenticated clients never reach the hub.
 	wsHandler := handlertele.NewWSHandler(wsHub, authService, logger)
 
+	forumHandler := handlerforum.NewForumHandler(forumRepo, logger, cfg.Timeout)
+
 	// Initialize server with all handlers
 	srv := server.NewServer(
 		cfg,
@@ -461,6 +466,7 @@ func New(cfg *config.Config) (*App, error) {
 		consultationMessagesHandler,
 		consultationNotesHandler,
 		providerAvailabilityHandler,
+		forumHandler,
 		wsHandler,
 		healthHandler,
 		authService,
