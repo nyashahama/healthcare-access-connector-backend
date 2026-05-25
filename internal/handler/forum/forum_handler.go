@@ -13,17 +13,26 @@ import (
 	forumDomain "github.com/nyashahama/healthcare-access-connector-backend/internal/domain/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
-	forumRepo "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/forum"
 	"github.com/rs/zerolog"
 )
 
+type forumRepository interface {
+	CreatePost(ctx context.Context, authorID uuid.UUID, req forumDomain.CreatePostRequest) (forumDomain.ForumPost, error)
+	GetPost(ctx context.Context, postID uuid.UUID) (forumDomain.ForumPost, error)
+	ListPosts(ctx context.Context, limit, offset int32) ([]forumDomain.ForumPost, int64, error)
+	CreateComment(ctx context.Context, postID, authorID uuid.UUID, content string) (forumDomain.ForumComment, error)
+	ListComments(ctx context.Context, postID uuid.UUID, limit, offset int32) ([]forumDomain.ForumComment, int64, error)
+	DeletePost(ctx context.Context, postID, authorID uuid.UUID) error
+	IncrementView(ctx context.Context, postID uuid.UUID) error
+}
+
 type ForumHandler struct {
-	repo    *forumRepo.Repository
+	repo    forumRepository
 	logger  *zerolog.Logger
 	timeout time.Duration
 }
 
-func NewForumHandler(repo *forumRepo.Repository, logger *zerolog.Logger, timeout time.Duration) *ForumHandler {
+func NewForumHandler(repo forumRepository, logger *zerolog.Logger, timeout time.Duration) *ForumHandler {
 	return &ForumHandler{repo: repo, logger: logger, timeout: timeout}
 }
 
