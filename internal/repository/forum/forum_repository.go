@@ -30,14 +30,6 @@ func fromPgUUID(pg pgtype.UUID) uuid.UUID {
 	return pg.Bytes
 }
 
-func fromPgUUIDPtr(pg pgtype.UUID) *uuid.UUID {
-	if !pg.Valid {
-		return nil
-	}
-	id := uuid.UUID(pg.Bytes)
-	return &id
-}
-
 func (r *Repository) CreatePost(ctx context.Context, authorID uuid.UUID, req forum.CreatePostRequest) (forum.ForumPost, error) {
 	row, err := r.q.CreateForumPost(ctx, sqlc.CreateForumPostParams{
 		AuthorID: toPgUUID(authorID),

@@ -200,16 +200,22 @@ func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Cli
 	// Invalidate user cache
 	if c.cacheAvailable() {
 		userCacheKey := fmt.Sprintf("user:%s", ownerUserID.String())
-		c.cache.Delete(ctx, userCacheKey)
+		if err := c.cache.Delete(ctx, userCacheKey); err != nil {
+			c.logger.Warn().Err(err).Str("cache_key", userCacheKey).Msg("Failed to invalidate user cache")
+		}
 
 		// Also invalidate any login caches
 		if owner.Email != nil {
 			loginCacheKey := fmt.Sprintf("user:login:%s", *owner.Email)
-			c.cache.Delete(ctx, loginCacheKey)
+			if err := c.cache.Delete(ctx, loginCacheKey); err != nil {
+				c.logger.Warn().Err(err).Str("cache_key", loginCacheKey).Msg("Failed to invalidate user login cache by email")
+			}
 		}
 		if owner.Phone != nil {
 			loginCacheKey := fmt.Sprintf("user:login:%s", *owner.Phone)
-			c.cache.Delete(ctx, loginCacheKey)
+			if err := c.cache.Delete(ctx, loginCacheKey); err != nil {
+				c.logger.Warn().Err(err).Str("cache_key", loginCacheKey).Msg("Failed to invalidate user login cache by phone")
+			}
 		}
 	}
 
@@ -968,11 +974,15 @@ func (c *clinicService) UpdateClinicOwner(ctx context.Context, clinicID, newOwne
 	c.invalidateClinicCache(ctx, clinicID)
 	if c.cacheAvailable() && oldOwnerID != uuid.Nil {
 		cacheKey := fmt.Sprintf("clinic:owner:%s", oldOwnerID.String())
-		c.cache.Delete(ctx, cacheKey)
+		if err := c.cache.Delete(ctx, cacheKey); err != nil {
+			c.logger.Warn().Err(err).Str("cache_key", cacheKey).Msg("Failed to invalidate old clinic owner cache")
+		}
 	}
 	if c.cacheAvailable() {
 		cacheKey := fmt.Sprintf("clinic:owner:%s", newOwnerUserID.String())
-		c.cache.Delete(ctx, cacheKey)
+		if err := c.cache.Delete(ctx, cacheKey); err != nil {
+			c.logger.Warn().Err(err).Str("cache_key", cacheKey).Msg("Failed to invalidate new clinic owner cache")
+		}
 	}
 	c.invalidateClinicListCache(ctx)
 

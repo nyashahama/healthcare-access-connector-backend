@@ -834,17 +834,6 @@ func (s *appointmentService) requirePrivilegedAppointmentActorForClinic(actor co
 	return nil
 }
 
-func (s *appointmentService) requirePrivilegedAppointmentActor(ctx context.Context, actorID uuid.UUID, action string, clinicID uuid.UUID) (core.User, error) {
-	actor, err := s.getManagementActor(ctx, actorID)
-	if err != nil {
-		return core.User{}, err
-	}
-	if err := s.requirePrivilegedAppointmentActorForClinic(actor, action, clinicID); err != nil {
-		return core.User{}, err
-	}
-	return actor, nil
-}
-
 func (s *appointmentService) authorizeClinicScopedCancellation(actor core.User, appointment appointments.Appointment) error {
 	switch actor.Role {
 	case "provider_staff", "doctor", "clinic_admin":
