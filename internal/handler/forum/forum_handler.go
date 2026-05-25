@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/google/uuid"
 	forumDomain "github.com/nyashahama/healthcare-access-connector-backend/internal/domain/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
@@ -129,6 +130,9 @@ func (h *ForumHandler) GetPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ForumHandler) DeletePost(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
+	defer cancel()
+
 	userID, ok := getUserID(r)
 	if !ok {
 		handler.RespondJSON(w, http.StatusUnauthorized, map[string]string{"error": "Not authenticated"})
@@ -140,8 +144,29 @@ func (h *ForumHandler) DeletePost(w http.ResponseWriter, r *http.Request) {
 		handler.RespondJSON(w, http.StatusBadRequest, map[string]string{"error": "Invalid post ID"})
 		return
 	}
-	_ = userID
-	_ = postID
+
+	post, err := h.repo.GetPost(ctx, postID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			handler.RespondJSON(w, http.StatusNotFound, map[string]string{"error": "Post not found"})
+			return
+		}
+		h.logger.Error().Err(err).Msg("Failed to lookup forum post for deletion")
+		handler.RespondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete post"})
+		return
+	}
+
+	if post.AuthorID != userID {
+		handler.RespondJSON(w, http.StatusForbidden, map[string]string{"error": "You can only delete your own posts"})
+		return
+	}
+
+	if err := h.repo.DeletePost(ctx, postID, userID); err != nil {
+		h.logger.Error().Err(err).Msg("Failed to delete forum post")
+		handler.RespondJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to delete post"})
+		return
+	}
+
 	handler.RespondJSON(w, http.StatusOK, map[string]string{"message": "Post deleted"})
 }
 

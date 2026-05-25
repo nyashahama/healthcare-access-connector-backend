@@ -147,6 +147,13 @@ func (r *Repository) ListComments(ctx context.Context, postID uuid.UUID, limit, 
 	return comments, count, nil
 }
 
+func (r *Repository) DeletePost(ctx context.Context, postID, authorID uuid.UUID) error {
+	return r.q.DeleteForumPost(ctx, sqlc.DeleteForumPostParams{
+		ID:       toPgUUID(postID),
+		AuthorID: toPgUUID(authorID),
+	})
+}
+
 func (r *Repository) IncrementView(ctx context.Context, postID uuid.UUID) error {
 	return r.q.IncrementForumPostView(ctx, toPgUUID(postID))
 }
