@@ -616,34 +616,65 @@ func TestConsultationHandler_StartConsultation(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		handler := setupTestHandler()
 		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
 
 		consultationID := uuid.New()
+		userID := uuid.New()
 		consultation := newTestConsultation(consultationID)
 		consultation.Status = telemedicine.ConsultationStatusInProgress
 
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{
+			ID: uuid.New(),
+		}, nil).Once()
 		mockConsultationSvc.On("StartConsultation", mock.Anything, consultationID).Return(consultation, nil).Once()
 
 		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/start", nil)
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
 		rctx := chi.NewRouteContext()
 		rctx.URLParams.Add("id", consultationID.String())
-		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
 
 		w := httptest.NewRecorder()
 		handler.StartConsultation(w, req.WithContext(ctx))
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		mockConsultationSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
 	})
 
 	t.Run("wrong state (409)", func(t *testing.T) {
 		handler := setupTestHandler()
 		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
 
 		consultationID := uuid.New()
+		userID := uuid.New()
 
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{
+			ID: uuid.New(),
+		}, nil).Once()
 		err := domain.NewAppError(domain.ErrValidation, "consultation must be in accepted state", 409)
 		mockConsultationSvc.On("StartConsultation", mock.Anything, consultationID).Return(telemedicine.Consultation{}, err).Once()
 
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/start", nil)
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.StartConsultation(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("requires authenticated staff", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+
+		consultationID := uuid.New()
 		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/start", nil)
 		rctx := chi.NewRouteContext()
 		rctx.URLParams.Add("id", consultationID.String())
@@ -652,8 +683,96 @@ func TestConsultationHandler_StartConsultation(t *testing.T) {
 		w := httptest.NewRecorder()
 		handler.StartConsultation(w, req.WithContext(ctx))
 
-		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "StartConsultation", mock.Anything, mock.Anything)
+	})
+}
+
+func TestConsultationHandler_DeclineConsultation(t *testing.T) {
+	t.Run("allows authenticated staff", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New()}, nil).Once()
+		mockConsultationSvc.On("DeclineConsultation", mock.Anything, consultationID).Return(nil).Once()
+
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/decline", nil)
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.DeclineConsultation(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
 		mockConsultationSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("rejects unauthenticated request", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+
+		consultationID := uuid.New()
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/decline", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.DeclineConsultation(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "DeclineConsultation", mock.Anything, mock.Anything)
+	})
+}
+
+func TestConsultationHandler_MarkNoShow(t *testing.T) {
+	t.Run("allows authenticated staff", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New()}, nil).Once()
+		mockConsultationSvc.On("MarkNoShow", mock.Anything, consultationID).Return(nil).Once()
+
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/no-show", nil)
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.MarkNoShow(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("rejects unauthenticated request", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+
+		consultationID := uuid.New()
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/no-show", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.MarkNoShow(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "MarkNoShow", mock.Anything, mock.Anything)
 	})
 }
 
@@ -772,10 +891,236 @@ func TestConsultationHandler_GetPatientActiveConsultation(t *testing.T) {
 	})
 }
 
+func TestConsultationHandler_GetConsultationByID(t *testing.T) {
+	t.Run("allows owning patient", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+		consultationID := uuid.New()
+		userID := uuid.New()
+		patientID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		consultation.PatientID = patientID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{ID: patientID}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/consultations/"+consultationID.String(), nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.GetConsultationByID(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+	})
+
+	t.Run("allows assigned provider staff", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+		staffID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		consultation.ProviderStaffID = &staffID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{}, domain.NewAppError(domain.ErrNotFound, "not found", 404)).Once()
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: staffID}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/consultations/"+consultationID.String(), nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.GetConsultationByID(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("rejects unrelated authenticated user", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+		patientID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		consultation.PatientID = patientID
+		otherStaffID := uuid.New()
+		consultation.ProviderStaffID = &otherStaffID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{}, domain.NewAppError(domain.ErrNotFound, "not found", 404)).Once()
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New()}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/consultations/"+consultationID.String(), nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.GetConsultationByID(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("rejects unauthenticated request", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+
+		consultationID := uuid.New()
+		req := httptest.NewRequest(http.MethodGet, "/consultations/"+consultationID.String(), nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.GetConsultationByID(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "GetConsultationByID", mock.Anything, mock.Anything)
+	})
+}
+
+func TestConsultationHandler_GetConsultationWithDetails(t *testing.T) {
+	t.Run("allows owning patient", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+		consultationID := uuid.New()
+		userID := uuid.New()
+		patientID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		consultation.PatientID = patientID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockConsultationSvc.On("GetConsultationWithDetails", mock.Anything, consultationID).Return(telemedicine.ConsultationWithDetails{}, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{ID: patientID}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/consultations/"+consultationID.String()+"/details", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.GetConsultationWithDetails(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+	})
+
+	t.Run("allows assigned provider staff", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+		staffID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		consultation.ProviderStaffID = &staffID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockConsultationSvc.On("GetConsultationWithDetails", mock.Anything, consultationID).Return(telemedicine.ConsultationWithDetails{}, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{}, domain.NewAppError(domain.ErrNotFound, "not found", 404)).Once()
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: staffID}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/consultations/"+consultationID.String()+"/details", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.GetConsultationWithDetails(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("rejects unrelated authenticated user", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+		patientID := uuid.New()
+		otherStaffID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		consultation.PatientID = patientID
+		consultation.ProviderStaffID = &otherStaffID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{}, domain.NewAppError(domain.ErrNotFound, "not found", 404)).Once()
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New()}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/consultations/"+consultationID.String()+"/details", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.GetConsultationWithDetails(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+		mockConsultationSvc.AssertNotCalled(t, "GetConsultationWithDetails", mock.Anything, mock.Anything)
+	})
+
+	t.Run("rejects unauthenticated request", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+
+		consultationID := uuid.New()
+		req := httptest.NewRequest(http.MethodGet, "/consultations/"+consultationID.String()+"/details", nil)
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.GetConsultationWithDetails(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "GetConsultationByID", mock.Anything, mock.Anything)
+		mockConsultationSvc.AssertNotCalled(t, "GetConsultationWithDetails", mock.Anything, mock.Anything)
+	})
+}
+
 func TestConsultationHandler_GetWaitingRoom(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		handler := setupTestHandler()
 		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+		userID := uuid.New()
 
 		entries := []telemedicine.WaitingRoomEntry{
 			{
@@ -787,29 +1132,266 @@ func TestConsultationHandler_GetWaitingRoom(t *testing.T) {
 			},
 		}
 
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New(), ClinicID: uuid.New()}, nil).Once()
 		mockConsultationSvc.On("GetWaitingRoom", mock.Anything).Return(entries, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/consultations/waiting-room", nil)
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
 
 		w := httptest.NewRecorder()
-		handler.GetWaitingRoom(w, req)
+		handler.GetWaitingRoom(w, req.WithContext(ctx))
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		mockConsultationSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
 	})
 
 	t.Run("empty", func(t *testing.T) {
 		handler := setupTestHandler()
 		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+		userID := uuid.New()
 
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New(), ClinicID: uuid.New()}, nil).Once()
 		mockConsultationSvc.On("GetWaitingRoom", mock.Anything).Return([]telemedicine.WaitingRoomEntry{}, nil).Once()
+
+		req := httptest.NewRequest(http.MethodGet, "/consultations/waiting-room", nil)
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+
+		w := httptest.NewRecorder()
+		handler.GetWaitingRoom(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("requires authenticated staff identity", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
 
 		req := httptest.NewRequest(http.MethodGet, "/consultations/waiting-room", nil)
 
 		w := httptest.NewRecorder()
 		handler.GetWaitingRoom(w, req)
 
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "GetWaitingRoom", mock.Anything)
+	})
+}
+
+func TestConsultationHandler_UpdatePaymentStatus(t *testing.T) {
+	t.Run("allows authenticated staff", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+		userID := uuid.New()
+		consultationID := uuid.New()
+
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New(), ClinicID: uuid.New()}, nil).Once()
+		mockConsultationSvc.On("UpdatePaymentStatus", mock.Anything, consultationID, telemedicine.PaymentStatusPaid, (*string)(nil)).Return(nil).Once()
+
+		body := `{"status":"paid"}`
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/payment", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+
+		w := httptest.NewRecorder()
+		handler.UpdatePaymentStatus(w, req.WithContext(ctx))
+
 		assert.Equal(t, http.StatusOK, w.Code)
 		mockConsultationSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("rejects unauthenticated request", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+
+		consultationID := uuid.New()
+		body := `{"status":"paid"}`
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/payment", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.UpdatePaymentStatus(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "UpdatePaymentStatus", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+func TestConsultationHandler_LinkFollowUpAppointment(t *testing.T) {
+	t.Run("allows authenticated staff", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+		userID := uuid.New()
+		consultationID := uuid.New()
+		appointmentID := uuid.New()
+
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New(), ClinicID: uuid.New()}, nil).Once()
+		mockConsultationSvc.On("LinkFollowUpAppointment", mock.Anything, consultationID, appointmentID).Return(nil).Once()
+
+		body := `{"appointment_id":"` + appointmentID.String() + `"}`
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/follow-up", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+
+		w := httptest.NewRecorder()
+		handler.LinkFollowUpAppointment(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("rejects unauthenticated request", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+
+		consultationID := uuid.New()
+		appointmentID := uuid.New()
+		body := `{"appointment_id":"` + appointmentID.String() + `"}`
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/follow-up", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		w := httptest.NewRecorder()
+		handler.LinkFollowUpAppointment(w, req)
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "LinkFollowUpAppointment", mock.Anything, mock.Anything, mock.Anything)
+	})
+}
+
+func TestConsultationHandler_UpdateConsultationChannel(t *testing.T) {
+	t.Run("allows owning patient", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+		patientID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		consultation.PatientID = patientID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{ID: patientID}, nil).Once()
+		mockConsultationSvc.On("UpdateConsultationChannel", mock.Anything, consultationID, telemedicine.ChannelVideo).Return(nil).Once()
+
+		body := `{"channel":"video"}`
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/channel", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.UpdateConsultationChannel(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+	})
+
+	t.Run("allows assigned provider staff", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+		staffID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		consultation.ProviderStaffID = &staffID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{}, domain.NewAppError(domain.ErrNotFound, "not found", 404)).Once()
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: staffID}, nil).Once()
+		mockConsultationSvc.On("UpdateConsultationChannel", mock.Anything, consultationID, telemedicine.ChannelPhone).Return(nil).Once()
+
+		body := `{"channel":"phone"}`
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/channel", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.UpdateConsultationChannel(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+	})
+
+	t.Run("rejects unrelated authenticated user", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+		mockPatientSvc := handler.patientService.(*mockPatientService)
+		mockStaffSvc := handler.staffService.(*mockStaffService)
+
+		consultationID := uuid.New()
+		userID := uuid.New()
+		consultation := newTestConsultation(consultationID)
+		otherStaffID := uuid.New()
+		consultation.ProviderStaffID = &otherStaffID
+
+		mockConsultationSvc.On("GetConsultationByID", mock.Anything, consultationID).Return(consultation, nil).Once()
+		mockPatientSvc.On("GetPatientProfile", mock.Anything, userID).Return(patients.PatientProfile{}, domain.NewAppError(domain.ErrNotFound, "not found", 404)).Once()
+		mockStaffSvc.On("GetStaffByUserID", mock.Anything, userID).Return(providers.ClinicStaff{ID: uuid.New()}, nil).Once()
+
+		body := `{"channel":"video"}`
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/channel", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := addUserToCtx(req.Context(), &service.TokenClaims{UserID: userID})
+		ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.UpdateConsultationChannel(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusForbidden, w.Code)
+		mockConsultationSvc.AssertExpectations(t)
+		mockPatientSvc.AssertExpectations(t)
+		mockStaffSvc.AssertExpectations(t)
+		mockConsultationSvc.AssertNotCalled(t, "UpdateConsultationChannel", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("rejects unauthenticated request", func(t *testing.T) {
+		handler := setupTestHandler()
+		mockConsultationSvc := handler.consultationService.(*mockConsultationService)
+
+		consultationID := uuid.New()
+		body := `{"channel":"video"}`
+		req := httptest.NewRequest(http.MethodPut, "/consultations/"+consultationID.String()+"/channel", bytes.NewBufferString(body))
+		req.Header.Set("Content-Type", "application/json")
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("id", consultationID.String())
+		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
+
+		w := httptest.NewRecorder()
+		handler.UpdateConsultationChannel(w, req.WithContext(ctx))
+
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+		mockConsultationSvc.AssertNotCalled(t, "GetConsultationByID", mock.Anything, mock.Anything)
 	})
 }
