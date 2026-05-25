@@ -65,8 +65,38 @@ type cachedLoginAttempt struct {
 	LockedUntil int64 `json:"locked_until"`
 }
 
+type loginAttemptScriptRunner interface {
+	Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error)
+}
+
 const (
 	fallbackLoginAttemptTTL = 15 * time.Minute
+	loginAttemptUpdateScript = `
+local raw = redis.call("GET", KEYS[1])
+local attempts = 0
+local locked_until = 0
+
+if raw then
+	local decoded = cjson.decode(raw)
+	attempts = tonumber(decoded.attempts) or 0
+	locked_until = tonumber(decoded.locked_until) or 0
+end
+
+attempts = attempts + 1
+
+if attempts >= tonumber(ARGV[1]) then
+	locked_until = tonumber(ARGV[3]) + tonumber(ARGV[2])
+end
+
+local payload = cjson.encode({
+	attempts = attempts,
+	last_failed = tonumber(ARGV[3]),
+	locked_until = locked_until
+})
+
+redis.call("SET", KEYS[1], payload, "EX", tonumber(ARGV[4]))
+return {attempts, locked_until}
+`
 )
 
 // NewAuthService creates a new authentication service
@@ -732,23 +762,22 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 		return domain.NewAppError(err, "Password reset failed", 500)
 	}
 
-	// Notify user before persisting the change so that an email failure can
-	// short-circuit without committing a password change.
-	if user.Email != nil {
-		if s.emailService != nil && s.emailService.IsAvailable() {
-			if err := s.emailService.SendPasswordChangedEmail(ctx, *user.Email, *user.Email); err != nil {
-				s.logger.Error().Err(err).Msg("Failed to send password changed email")
-				return domain.NewAppError(err, "Failed to send password changed email", 500)
-			}
-		} else {
-			s.logger.Warn().Str("user_id", user.ID.String()).Msg("Email service unavailable; skipping password changed notification")
-		}
-	}
-
 	// Update password
 	if err := s.authRepo.UpdateUserPassword(ctx, user.ID, string(hash)); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to update password")
 		return domain.NewAppError(err, "Password reset failed", 500)
+	}
+
+	// Notify user after the password has been changed. Notification failure
+	// should not roll back a successful password reset.
+	if user.Email != nil {
+		if s.emailService != nil && s.emailService.IsAvailable() {
+			if err := s.emailService.SendPasswordChangedEmail(ctx, *user.Email, *user.Email); err != nil {
+				s.logger.Warn().Err(err).Msg("Failed to send password changed email after password reset")
+			}
+		} else {
+			s.logger.Warn().Str("user_id", user.ID.String()).Msg("Email service unavailable; skipping password changed notification")
+		}
 	}
 
 	// Delete all user sessions
@@ -1229,15 +1258,51 @@ func (s *authService) recordFailedLogin(identifier string) {
 	// Shared state via cache keeps lockout policy consistent across instances.
 	if s.cache != nil && s.cache.IsAvailable() {
 		key := fmt.Sprintf("auth:login:%s", identifier)
+		now := time.Now()
+
+		if runner, ok := s.cache.(loginAttemptScriptRunner); ok {
+			ttlSeconds := int64(s.loginAttemptTTL(now, 0) / time.Second)
+			if ttlSeconds < 1 {
+				ttlSeconds = 1
+			}
+
+			result, err := runner.Eval(
+				context.Background(),
+				loginAttemptUpdateScript,
+				[]string{key},
+				s.loginMaxAttempts,
+				int64(s.loginLockout/time.Second),
+				now.Unix(),
+				ttlSeconds,
+			)
+			if err == nil {
+				attempts, lockedUntil, parseErr := parseLoginAttemptEvalResult(result)
+				if parseErr == nil {
+					if lockedUntil > 0 {
+						s.logger.Warn().
+							Str("identifier", maskIdentifier(identifier)).
+							Int("attempts", attempts).
+							Time("locked_until", time.Unix(lockedUntil, 0)).
+							Msg("Login locked due to too many failed attempts")
+					}
+					return
+				}
+
+				s.logger.Warn().Err(parseErr).Str("identifier", maskIdentifier(identifier)).Msg("Failed to parse atomic login attempt result")
+			} else {
+				s.logger.Warn().Err(err).Str("identifier", maskIdentifier(identifier)).Msg("Failed to update login attempt atomically")
+			}
+		}
+
 		var attempt cachedLoginAttempt
 		if err := s.cache.Get(context.Background(), key, &attempt); err != nil {
 			attempt = cachedLoginAttempt{}
 		}
 
 		attempt.Attempts++
-		attempt.LastFailed = time.Now().Unix()
+		attempt.LastFailed = now.Unix()
 		if attempt.Attempts >= s.loginMaxAttempts {
-			lockedUntil := time.Now().Add(s.loginLockout)
+			lockedUntil := now.Add(s.loginLockout)
 			attempt.LockedUntil = lockedUntil.Unix()
 			s.logger.Warn().
 				Str("identifier", maskIdentifier(identifier)).
@@ -1246,7 +1311,7 @@ func (s *authService) recordFailedLogin(identifier string) {
 				Msg("Login locked due to too many failed attempts")
 		}
 
-		ttl := time.Until(time.Unix(attempt.LastFailed, 0).Add(fallbackLoginAttemptTTL))
+		ttl := s.loginAttemptTTL(now, attempt.LockedUntil)
 		if ttl < 0 {
 			ttl = fallbackLoginAttemptTTL
 		}
@@ -1309,6 +1374,61 @@ func (s *authService) cleanupLoginAttempts() {
 			}
 		}
 		s.loginAttemptsMu.Unlock()
+	}
+}
+
+func (s *authService) loginAttemptTTL(now time.Time, lockedUntil int64) time.Duration {
+	ttl := fallbackLoginAttemptTTL
+	if s.loginLockout > ttl {
+		ttl = s.loginLockout
+	}
+	if lockedUntil > 0 {
+		if lockTTL := time.Until(time.Unix(lockedUntil, 0)); lockTTL > ttl {
+			ttl = lockTTL
+		}
+	}
+	if ttl <= 0 {
+		return fallbackLoginAttemptTTL
+	}
+	return ttl
+}
+
+func parseLoginAttemptEvalResult(result interface{}) (int, int64, error) {
+	values, ok := result.([]interface{})
+	if !ok || len(values) != 2 {
+		return 0, 0, fmt.Errorf("unexpected login attempt result type %T", result)
+	}
+
+	attempts, err := parseRedisInteger(values[0])
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse attempts: %w", err)
+	}
+
+	lockedUntil, err := parseRedisInteger(values[1])
+	if err != nil {
+		return 0, 0, fmt.Errorf("parse locked_until: %w", err)
+	}
+
+	return int(attempts), lockedUntil, nil
+}
+
+func parseRedisInteger(value interface{}) (int64, error) {
+	switch v := value.(type) {
+	case int64:
+		return v, nil
+	case int:
+		return int64(v), nil
+	case float64:
+		return int64(v), nil
+	case string:
+		var parsed int64
+		_, err := fmt.Sscanf(v, "%d", &parsed)
+		if err != nil {
+			return 0, err
+		}
+		return parsed, nil
+	default:
+		return 0, fmt.Errorf("unsupported redis integer type %T", value)
 	}
 }
 

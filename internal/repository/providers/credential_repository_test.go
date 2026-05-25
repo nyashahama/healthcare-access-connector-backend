@@ -198,3 +198,39 @@ func TestCredentialRepository_GetStaffCredentials(t *testing.T) {
 		})
 	}
 }
+
+func TestCredentialRepository_GetCredentialByID(t *testing.T) {
+	ctx := context.Background()
+	credentialID := uuid.New()
+	staffID := uuid.New()
+
+	t.Run("credential found", func(t *testing.T) {
+		mockQuerier := mocks.NewMockQuerier(t)
+		mockQuerier.On("GetCredentialByID", ctx, uuidToPgtype(credentialID)).Return(sqlc.ProfessionalCredential{
+			ID:               uuidToPgtype(credentialID),
+			StaffID:          uuidToPgtype(staffID),
+			CredentialType:   "medical_license",
+			IssuingAuthority: "Medical Board",
+			Status:           pgtype.Text{String: "active", Valid: true},
+		}, nil)
+
+		repo := NewCredentialRepositoryWithQuerier(mockQuerier)
+		credential, err := repo.GetCredentialByID(ctx, credentialID)
+
+		require.NoError(t, err)
+		assert.Equal(t, credentialID, credential.ID)
+		mockQuerier.AssertExpectations(t)
+	})
+
+	t.Run("database error", func(t *testing.T) {
+		mockQuerier := mocks.NewMockQuerier(t)
+		mockQuerier.On("GetCredentialByID", ctx, uuidToPgtype(credentialID)).Return(sqlc.ProfessionalCredential{}, assert.AnError)
+
+		repo := NewCredentialRepositoryWithQuerier(mockQuerier)
+		_, err := repo.GetCredentialByID(ctx, credentialID)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "get credential by id failed")
+		mockQuerier.AssertExpectations(t)
+	})
+}

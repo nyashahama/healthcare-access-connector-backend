@@ -23,6 +23,10 @@ type medicationService struct {
 	logger         *zerolog.Logger
 }
 
+func (s *medicationService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewMedicationService creates a new medication service
 func NewMedicationService(
 	medicationRepo repository.PatientMedicationRepository,
@@ -124,9 +128,11 @@ func (s *medicationService) GetPatientMedications(ctx context.Context, patientID
 
 	// Try cache first
 	var medications []patients.PatientMedication
-	if err := s.cache.Get(ctx, cacheKey, &medications); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient medications retrieved from cache")
-		return medications, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &medications); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient medications retrieved from cache")
+			return medications, nil
+		}
 	}
 
 	// Fetch from database
@@ -137,8 +143,10 @@ func (s *medicationService) GetPatientMedications(ctx context.Context, patientID
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, medications, 15*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient medications")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, medications, 15*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient medications")
+		}
 	}
 
 	s.logger.Debug().
@@ -174,9 +182,11 @@ func (s *medicationService) GetActiveMedications(ctx context.Context, patientID 
 	// Try cache first
 	cacheKey := fmt.Sprintf("medications:active:%s", patientID.String())
 	var medications []patients.PatientMedication
-	if err := s.cache.Get(ctx, cacheKey, &medications); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Active medications retrieved from cache")
-		return medications, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &medications); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Active medications retrieved from cache")
+			return medications, nil
+		}
 	}
 
 	// Fetch from database
@@ -187,8 +197,10 @@ func (s *medicationService) GetActiveMedications(ctx context.Context, patientID 
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, medications, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache active medications")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, medications, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache active medications")
+		}
 	}
 
 	s.logger.Debug().
@@ -330,6 +342,10 @@ func (s *medicationService) validatePatientMedication(medication patients.Patien
 
 // Helper methods
 func (s *medicationService) invalidateMedicationCache(ctx context.Context, patientID uuid.UUID, status *string) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("medications:all:%s", patientID.String()),
 		fmt.Sprintf("medications:active:%s", patientID.String()),

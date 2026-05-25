@@ -330,6 +330,7 @@ type StaffRepository interface {
 
 type CredentialRepository interface {
 	CreateCredential(ctx context.Context, credential providers.ProfessionalCredential) (providers.ProfessionalCredential, error)
+	GetCredentialByID(ctx context.Context, id uuid.UUID) (providers.ProfessionalCredential, error)
 	GetStaffCredentials(ctx context.Context, staffID uuid.UUID) ([]providers.ProfessionalCredential, error)
 	DeleteCredential(ctx context.Context, id uuid.UUID) error
 }

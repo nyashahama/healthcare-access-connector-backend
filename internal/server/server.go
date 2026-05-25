@@ -18,6 +18,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
+	handlerforum "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 
@@ -94,6 +95,7 @@ type Server struct {
 	consultationMessagesHandler *handlertele.ConsultationMessagesHandler
 	consultationNotesHandler    *handlertele.ConsultationNotesHandler
 	providerAvailabilityHandler *handlertele.ProviderAvailabilityHandler
+	forumHandler                *handlerforum.ForumHandler
 	// wsHandler upgrades HTTP connections to WebSocket for real-time chat.
 	wsHandler *handlertele.WSHandler
 
@@ -141,6 +143,7 @@ func NewServer(
 	consultationMessagesHandler *handlertele.ConsultationMessagesHandler,
 	consultationNotesHandler *handlertele.ConsultationNotesHandler,
 	providerAvailabilityHandler *handlertele.ProviderAvailabilityHandler,
+	forumHandler *handlerforum.ForumHandler,
 	wsHandler *handlertele.WSHandler,
 	// misc
 	healthHandler *handler.HealthHandler,
@@ -178,6 +181,7 @@ func NewServer(
 		consultationMessagesHandler: consultationMessagesHandler,
 		consultationNotesHandler:    consultationNotesHandler,
 		providerAvailabilityHandler: providerAvailabilityHandler,
+		forumHandler:                forumHandler,
 		wsHandler:                   wsHandler,
 		healthHandler:               healthHandler,
 		authService:                 authService,
@@ -362,6 +366,11 @@ func (s *Server) setupRoutes() http.Handler {
 				s.providerAvailabilityHandler.RegisterRoutes(r)
 			})
 
+			// Forum
+			r.Route("/forum", func(r chi.Router) {
+				s.forumHandler.RegisterRoutes(r)
+			})
+
 			// Provider management
 			r.Route("/providers", func(r chi.Router) {
 				r.Route("/clinics", func(r chi.Router) {
@@ -471,6 +480,10 @@ func (s *Server) setupRoutes() http.Handler {
 						r.Put("/{id}", s.adminHandler.UpdateSystemAdmin)
 						r.Delete("/user/{user_id}", s.adminHandler.DeleteSystemAdminByUserID)
 						r.Delete("/{id}", s.adminHandler.DeleteSystemAdmin)
+					})
+					r.Route("/ngo-partners", func(r chi.Router) {
+						r.Post("/", s.adminHandler.CreateNGOPartner)
+						r.Get("/user/{user_id}", s.adminHandler.GetNGOPartnerByUserID)
 					})
 				})
 

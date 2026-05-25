@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	c_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
 	sc_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
@@ -136,6 +137,13 @@ func (h *ConsultationHandler) GetConsultationByID(w http.ResponseWriter, r *http
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
+	if _, ok := middleware.GetUserFromContext(ctx); !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
@@ -145,6 +153,9 @@ func (h *ConsultationHandler) GetConsultationByID(w http.ResponseWriter, r *http
 	consultation, err := h.consultationService.GetConsultationByID(ctx, consultationID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
+		return
+	}
+	if !h.authorizeConsultationActor(ctx, w, consultation) {
 		return
 	}
 
@@ -157,9 +168,25 @@ func (h *ConsultationHandler) GetConsultationWithDetails(w http.ResponseWriter, 
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
+	if _, ok := middleware.GetUserFromContext(ctx); !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		return
+	}
+
+	consultation, err := h.consultationService.GetConsultationByID(ctx, consultationID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+	if !h.authorizeConsultationActor(ctx, w, consultation) {
 		return
 	}
 
@@ -333,6 +360,10 @@ func (h *ConsultationHandler) StartConsultation(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	if _, _, ok := h.resolveStaffID(ctx, w); !ok {
+		return
+	}
+
 	updated, err := h.consultationService.StartConsultation(ctx, consultationID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
@@ -405,6 +436,10 @@ func (h *ConsultationHandler) DeclineConsultation(w http.ResponseWriter, r *http
 		return
 	}
 
+	if _, _, ok := h.resolveStaffID(ctx, w); !ok {
+		return
+	}
+
 	if err := h.consultationService.DeclineConsultation(ctx, consultationID); err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -423,6 +458,10 @@ func (h *ConsultationHandler) MarkNoShow(w http.ResponseWriter, r *http.Request)
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		return
+	}
+
+	if _, _, ok := h.resolveStaffID(ctx, w); !ok {
 		return
 	}
 
@@ -503,6 +542,10 @@ func (h *ConsultationHandler) GetWaitingRoom(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
+	if _, _, ok := h.resolveStaffID(ctx, w); !ok {
+		return
+	}
+
 	entries, err := h.consultationService.GetWaitingRoom(ctx)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
@@ -526,6 +569,10 @@ func (h *ConsultationHandler) GetWaitingRoom(w http.ResponseWriter, r *http.Requ
 func (h *ConsultationHandler) UpdatePaymentStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
+
+	if _, _, ok := h.resolveStaffID(ctx, w); !ok {
+		return
+	}
 
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -564,9 +611,26 @@ func (h *ConsultationHandler) UpdateConsultationChannel(w http.ResponseWriter, r
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
+	if _, ok := middleware.GetUserFromContext(ctx); !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		return
+	}
+
+	consultation, err := h.consultationService.GetConsultationByID(ctx, consultationID)
+	if err != nil {
+		handler.RespondError(w, h.logger, err)
+		return
+	}
+
+	if !h.authorizeConsultationActor(ctx, w, consultation) {
 		return
 	}
 
@@ -600,6 +664,10 @@ func (h *ConsultationHandler) UpdateConsultationChannel(w http.ResponseWriter, r
 func (h *ConsultationHandler) LinkFollowUpAppointment(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
+
+	if _, _, ok := h.resolveStaffID(ctx, w); !ok {
+		return
+	}
 
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -676,4 +744,30 @@ func (h *ConsultationHandler) resolveStaffID(ctx context.Context, w http.Respons
 	}
 
 	return staff.ID, staff.ClinicID, true
+}
+
+// authorizeConsultationActor checks if the authenticated user is either the owning
+// patient of the consultation or the assigned provider staff member.
+func (h *ConsultationHandler) authorizeConsultationActor(ctx context.Context, w http.ResponseWriter, consultation telemedicine.Consultation) bool {
+	claims, found := middleware.GetUserFromContext(ctx)
+	if !found {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return false
+	}
+
+	if patient, err := h.patientService.GetPatientProfile(ctx, claims.UserID); err == nil && patient.ID == consultation.PatientID {
+		return true
+	}
+
+	if staff, err := h.staffService.GetStaffByUserID(ctx, claims.UserID); err == nil &&
+		consultation.ProviderStaffID != nil && *consultation.ProviderStaffID == staff.ID {
+		return true
+	}
+
+	handler.RespondJSON(w, http.StatusForbidden, sc_dto.ErrorResponse{
+		Error: "Access denied",
+	})
+	return false
 }

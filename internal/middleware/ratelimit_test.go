@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -100,4 +102,30 @@ func TestRateLimiterCleanupRemovesStaleClients(t *testing.T) {
 	rr2 := httptest.NewRecorder()
 	handler.ServeHTTP(rr2, req)
 	assert.Equal(t, http.StatusOK, rr2.Code)
+}
+
+func TestRedisRateLimiterFallsBackToMemoryOnRedisError(t *testing.T) {
+	limiter := &redisRateLimiter{
+		rps:      1,
+		burst:    1,
+		fallback: newInMemoryRateLimiter(1, 1),
+		evalFunc: func(ctx context.Context, key string, nowMs int64) (int64, error) {
+			return 0, errors.New("redis unavailable")
+		},
+	}
+
+	assert.True(t, limiter.Allow(context.Background(), "203.0.113.10"))
+	assert.False(t, limiter.Allow(context.Background(), "203.0.113.10"))
+}
+
+func TestRedisRateLimiterWithoutFallbackFailsOpen(t *testing.T) {
+	limiter := &redisRateLimiter{
+		rps:   1,
+		burst: 1,
+		evalFunc: func(ctx context.Context, key string, nowMs int64) (int64, error) {
+			return 0, errors.New("redis unavailable")
+		},
+	}
+
+	assert.True(t, limiter.Allow(context.Background(), "203.0.113.11"))
 }

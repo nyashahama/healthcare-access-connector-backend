@@ -12,6 +12,7 @@ sql:
       - "database/schemas/sms"
       - "database/schemas/telemedicine"
       - "database/schemas/views"
+      - "database/schemas/forum"
     queries:
       - "database/queries/admin"
       - "database/queries/appointments"
@@ -20,6 +21,7 @@ sql:
       - "database/queries/providers"
       - "database/queries/sms"
       - "database/queries/telemedicine"
+      - "database/queries/forum"
     gen:
       go:
         package: "sqlc"

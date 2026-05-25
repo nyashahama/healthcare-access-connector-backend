@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/patients"
@@ -362,6 +364,77 @@ func (m *mockEmailService) Close() error {
 	return nil
 }
 
+type mockAuthCache struct {
+	mu       sync.Mutex
+	attempts map[string]cachedLoginAttempt
+	evalFunc func(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error)
+}
+
+func (m *mockAuthCache) Get(ctx context.Context, key string, dest interface{}) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	attempt, ok := m.attempts[key]
+	if !ok {
+		return cache.ErrCacheMiss
+	}
+
+	target, ok := dest.(*cachedLoginAttempt)
+	if !ok {
+		return assert.AnError
+	}
+
+	*target = attempt
+	return nil
+}
+
+func (m *mockAuthCache) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	attempt, ok := value.(cachedLoginAttempt)
+	if !ok {
+		return assert.AnError
+	}
+
+	if m.attempts == nil {
+		m.attempts = make(map[string]cachedLoginAttempt)
+	}
+	m.attempts[key] = attempt
+	return nil
+}
+
+func (m *mockAuthCache) Delete(ctx context.Context, key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.attempts, key)
+	return nil
+}
+
+func (m *mockAuthCache) Exists(ctx context.Context, key string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.attempts[key]
+	return ok, nil
+}
+
+func (m *mockAuthCache) Ping(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockAuthCache) IsAvailable() bool {
+	return true
+}
+
+func (m *mockAuthCache) Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
+	if m.evalFunc != nil {
+		return m.evalFunc(ctx, script, keys, args...)
+	}
+	return nil, cache.ErrCacheUnavailable
+}
+
+var _ cache.Service = (*mockAuthCache)(nil)
+
 func newAuthServiceForTest(t *testing.T, maxAttempts int, lockout time.Duration) *authService {
 	t.Helper()
 	logger := zerolog.New(io.Discard)
@@ -421,6 +494,42 @@ func TestRecordFailedLoginUsesConfiguredThresholds(t *testing.T) {
 	svc.recordFailedLogin("user@example.com")
 	svc.recordFailedLogin("user@example.com")
 	assert.True(t, svc.isLoginLocked("user@example.com"))
+}
+
+func TestRecordFailedLoginUsesAtomicCacheUpdateWhenAvailable(t *testing.T) {
+	cacheSvc := &mockAuthCache{
+		attempts: make(map[string]cachedLoginAttempt),
+	}
+	cacheSvc.evalFunc = func(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
+		cacheSvc.mu.Lock()
+		defer cacheSvc.mu.Unlock()
+
+		key := keys[0]
+		attempt := cacheSvc.attempts[key]
+		attempt.Attempts++
+		attempt.LastFailed = time.Now().Unix()
+		if attempt.Attempts >= 3 {
+			attempt.LockedUntil = time.Now().Add(5 * time.Minute).Unix()
+		}
+		cacheSvc.attempts[key] = attempt
+		return []interface{}{int64(attempt.Attempts), attempt.LockedUntil}, nil
+	}
+
+	svc := newAuthServiceForTest(t, 3, 5*time.Minute)
+	svc.cache = cacheSvc
+
+	svc.recordFailedLogin("user@example.com")
+	svc.recordFailedLogin("user@example.com")
+	assert.False(t, svc.isLoginLocked("user@example.com"))
+
+	svc.recordFailedLogin("user@example.com")
+	assert.True(t, svc.isLoginLocked("user@example.com"))
+}
+
+func TestLoginAttemptTTLHonorsLongerLockout(t *testing.T) {
+	svc := newAuthServiceForTest(t, 3, 30*time.Minute)
+	ttl := svc.loginAttemptTTL(time.Now(), time.Now().Add(30*time.Minute).Unix())
+	assert.Equal(t, 30*time.Minute, ttl)
 }
 
 func TestLoginSuccess(t *testing.T) {
@@ -654,6 +763,59 @@ func TestResetPasswordSuccess(t *testing.T) {
 
 	mockAuth.updateUserPasswordFunc = func(ctx context.Context, id uuid.UUID, passwordHash string) error {
 		return nil
+	}
+
+	err := svc.ResetPassword(context.Background(), "valid-reset-token", "NewPassword123!")
+	require.NoError(t, err)
+}
+
+func TestResetPasswordSendsNotificationAfterPasswordUpdate(t *testing.T) {
+	svc, mockAuth, _, _ := newAuthServiceWithMocks(t, 5, 5*time.Minute)
+
+	testUser := core.User{
+		ID:    uuid.New(),
+		Email: stringPtr("user@example.com"),
+	}
+
+	mockAuth.getUserByPasswordResetTokenFunc = func(ctx context.Context, token string) (core.User, string, error) {
+		return testUser, "oldhash", nil
+	}
+
+	updated := false
+	mockAuth.updateUserPasswordFunc = func(ctx context.Context, id uuid.UUID, passwordHash string) error {
+		updated = true
+		return nil
+	}
+
+	mockEmailSvc := svc.emailService.(*mockEmailService)
+	mockEmailSvc.sendPasswordChangedEmailFunc = func(ctx context.Context, to, username string) error {
+		assert.True(t, updated, "password should be updated before sending notification email")
+		return nil
+	}
+
+	err := svc.ResetPassword(context.Background(), "valid-reset-token", "NewPassword123!")
+	require.NoError(t, err)
+}
+
+func TestResetPasswordSucceedsWhenPasswordChangedEmailFails(t *testing.T) {
+	svc, mockAuth, _, _ := newAuthServiceWithMocks(t, 5, 5*time.Minute)
+
+	testUser := core.User{
+		ID:    uuid.New(),
+		Email: stringPtr("user@example.com"),
+	}
+
+	mockAuth.getUserByPasswordResetTokenFunc = func(ctx context.Context, token string) (core.User, string, error) {
+		return testUser, "oldhash", nil
+	}
+
+	mockAuth.updateUserPasswordFunc = func(ctx context.Context, id uuid.UUID, passwordHash string) error {
+		return nil
+	}
+
+	mockEmailSvc := svc.emailService.(*mockEmailService)
+	mockEmailSvc.sendPasswordChangedEmailFunc = func(ctx context.Context, to, username string) error {
+		return errors.New("smtp unavailable")
 	}
 
 	err := svc.ResetPassword(context.Background(), "valid-reset-token", "NewPassword123!")

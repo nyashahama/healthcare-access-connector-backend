@@ -26,6 +26,10 @@ type clinicService struct {
 	logger     *zerolog.Logger
 }
 
+func (c *clinicService) cacheAvailable() bool {
+	return c != nil && c.cache != nil && c.cache.IsAvailable()
+}
+
 func NewClinicService(
 	clinicRepo repository.ClinicRepository,
 	auditRepo repository.AuditRepository,
@@ -194,18 +198,24 @@ func (c *clinicService) RegisterClinic(ctx context.Context, clinic providers.Cli
 	}
 
 	// Invalidate user cache
-	if c.cache != nil {
+	if c.cacheAvailable() {
 		userCacheKey := fmt.Sprintf("user:%s", ownerUserID.String())
-		c.cache.Delete(ctx, userCacheKey)
+		if err := c.cache.Delete(ctx, userCacheKey); err != nil {
+			c.logger.Warn().Err(err).Str("cache_key", userCacheKey).Msg("Failed to invalidate user cache")
+		}
 
 		// Also invalidate any login caches
 		if owner.Email != nil {
 			loginCacheKey := fmt.Sprintf("user:login:%s", *owner.Email)
-			c.cache.Delete(ctx, loginCacheKey)
+			if err := c.cache.Delete(ctx, loginCacheKey); err != nil {
+				c.logger.Warn().Err(err).Str("cache_key", loginCacheKey).Msg("Failed to invalidate user login cache by email")
+			}
 		}
 		if owner.Phone != nil {
 			loginCacheKey := fmt.Sprintf("user:login:%s", *owner.Phone)
-			c.cache.Delete(ctx, loginCacheKey)
+			if err := c.cache.Delete(ctx, loginCacheKey); err != nil {
+				c.logger.Warn().Err(err).Str("cache_key", loginCacheKey).Msg("Failed to invalidate user login cache by phone")
+			}
 		}
 	}
 
@@ -244,9 +254,11 @@ func (c *clinicService) GetClinicByID(ctx context.Context, id uuid.UUID) (provid
 	// Try cache first
 	cacheKey := fmt.Sprintf("clinic:%s", id.String())
 	var clinic providers.Clinic
-	if err := c.cache.Get(ctx, cacheKey, &clinic); err == nil {
-		c.logger.Debug().Str("clinic_id", id.String()).Msg("Clinic retrieved from cache")
-		return clinic, nil
+	if c.cacheAvailable() {
+		if err := c.cache.Get(ctx, cacheKey, &clinic); err == nil {
+			c.logger.Debug().Str("clinic_id", id.String()).Msg("Clinic retrieved from cache")
+			return clinic, nil
+		}
 	}
 
 	// Fetch from database
@@ -260,8 +272,10 @@ func (c *clinicService) GetClinicByID(ctx context.Context, id uuid.UUID) (provid
 	}
 
 	// Cache the result
-	if err := c.cache.Set(ctx, cacheKey, clinic, 10*time.Minute); err != nil {
-		c.logger.Warn().Err(err).Msg("Failed to cache clinic")
+	if c.cacheAvailable() {
+		if err := c.cache.Set(ctx, cacheKey, clinic, 10*time.Minute); err != nil {
+			c.logger.Warn().Err(err).Msg("Failed to cache clinic")
+		}
 	}
 
 	return clinic, nil
@@ -300,9 +314,11 @@ func (c *clinicService) GetClinicByUserID(ctx context.Context, userID uuid.UUID)
 	// Try cache first
 	cacheKey := fmt.Sprintf("clinic:user:%s", userID.String())
 	var clinic providers.Clinic
-	if err := c.cache.Get(ctx, cacheKey, &clinic); err == nil {
-		c.logger.Debug().Str("user_id", userID.String()).Msg("Clinic retrieved from cache")
-		return &clinic, nil
+	if c.cacheAvailable() {
+		if err := c.cache.Get(ctx, cacheKey, &clinic); err == nil {
+			c.logger.Debug().Str("user_id", userID.String()).Msg("Clinic retrieved from cache")
+			return &clinic, nil
+		}
 	}
 
 	// Get the clinic using the primary_clinic_id
@@ -317,8 +333,10 @@ func (c *clinicService) GetClinicByUserID(ctx context.Context, userID uuid.UUID)
 	}
 
 	// Cache the result
-	if err := c.cache.Set(ctx, cacheKey, clinic, 10*time.Minute); err != nil {
-		c.logger.Warn().Err(err).Msg("Failed to cache clinic")
+	if c.cacheAvailable() {
+		if err := c.cache.Set(ctx, cacheKey, clinic, 10*time.Minute); err != nil {
+			c.logger.Warn().Err(err).Msg("Failed to cache clinic")
+		}
 	}
 
 	c.logger.Debug().
@@ -738,9 +756,11 @@ func (c *clinicService) SearchClinics(ctx context.Context, params providers.Clin
 		params.Offset,
 	)
 	var results []providers.ClinicSearchResult
-	if err := c.cache.Get(ctx, cacheKey, &results); err == nil {
-		c.logger.Debug().Str("query", params.Query).Msg("Search results retrieved from cache")
-		return results, nil
+	if c.cacheAvailable() {
+		if err := c.cache.Get(ctx, cacheKey, &results); err == nil {
+			c.logger.Debug().Str("query", params.Query).Msg("Search results retrieved from cache")
+			return results, nil
+		}
 	}
 
 	// Search clinics
@@ -751,8 +771,10 @@ func (c *clinicService) SearchClinics(ctx context.Context, params providers.Clin
 	}
 
 	// Cache the result (shorter TTL for search results)
-	if err := c.cache.Set(ctx, cacheKey, results, 2*time.Minute); err != nil {
-		c.logger.Warn().Err(err).Msg("Failed to cache search results")
+	if c.cacheAvailable() {
+		if err := c.cache.Set(ctx, cacheKey, results, 2*time.Minute); err != nil {
+			c.logger.Warn().Err(err).Msg("Failed to cache search results")
+		}
 	}
 
 	c.logger.Debug().
@@ -805,9 +827,11 @@ func (c *clinicService) GetClinicByOwner(ctx context.Context, ownerUserID uuid.U
 	// Try cache first
 	cacheKey := fmt.Sprintf("clinic:owner:%s", ownerUserID.String())
 	var clinic providers.Clinic
-	if err := c.cache.Get(ctx, cacheKey, &clinic); err == nil {
-		c.logger.Debug().Str("owner_user_id", ownerUserID.String()).Msg("Clinic retrieved from cache")
-		return &clinic, nil
+	if c.cacheAvailable() {
+		if err := c.cache.Get(ctx, cacheKey, &clinic); err == nil {
+			c.logger.Debug().Str("owner_user_id", ownerUserID.String()).Msg("Clinic retrieved from cache")
+			return &clinic, nil
+		}
 	}
 
 	// Fetch from repository (returns *providers.Clinic)
@@ -821,8 +845,10 @@ func (c *clinicService) GetClinicByOwner(ctx context.Context, ownerUserID uuid.U
 	}
 
 	// Cache the result
-	if err := c.cache.Set(ctx, cacheKey, *clinicPtr, 10*time.Minute); err != nil {
-		c.logger.Warn().Err(err).Msg("Failed to cache clinic")
+	if c.cacheAvailable() {
+		if err := c.cache.Set(ctx, cacheKey, *clinicPtr, 10*time.Minute); err != nil {
+			c.logger.Warn().Err(err).Msg("Failed to cache clinic")
+		}
 	}
 
 	c.logger.Debug().
@@ -851,9 +877,11 @@ func (c *clinicService) GetClinicWithOwnerInfo(ctx context.Context, clinicID uui
 	// Try cache first
 	cacheKey := fmt.Sprintf("clinic:with_owner:%s", clinicID.String())
 	var clinicWithOwner providers.ClinicWithOwner
-	if err := c.cache.Get(ctx, cacheKey, &clinicWithOwner); err == nil {
-		c.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic with owner retrieved from cache")
-		return &clinicWithOwner, nil
+	if c.cacheAvailable() {
+		if err := c.cache.Get(ctx, cacheKey, &clinicWithOwner); err == nil {
+			c.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic with owner retrieved from cache")
+			return &clinicWithOwner, nil
+		}
 	}
 
 	// Fetch from repository (returns *providers.ClinicWithOwner)
@@ -867,8 +895,10 @@ func (c *clinicService) GetClinicWithOwnerInfo(ctx context.Context, clinicID uui
 	}
 
 	// Cache the result
-	if err := c.cache.Set(ctx, cacheKey, *clinicWithOwnerPtr, 10*time.Minute); err != nil {
-		c.logger.Warn().Err(err).Msg("Failed to cache clinic with owner")
+	if c.cacheAvailable() {
+		if err := c.cache.Set(ctx, cacheKey, *clinicWithOwnerPtr, 10*time.Minute); err != nil {
+			c.logger.Warn().Err(err).Msg("Failed to cache clinic with owner")
+		}
 	}
 
 	c.logger.Debug().
@@ -942,12 +972,18 @@ func (c *clinicService) UpdateClinicOwner(ctx context.Context, clinicID, newOwne
 
 	// Invalidate cache
 	c.invalidateClinicCache(ctx, clinicID)
-	if oldOwnerID != uuid.Nil {
+	if c.cacheAvailable() && oldOwnerID != uuid.Nil {
 		cacheKey := fmt.Sprintf("clinic:owner:%s", oldOwnerID.String())
-		c.cache.Delete(ctx, cacheKey)
+		if err := c.cache.Delete(ctx, cacheKey); err != nil {
+			c.logger.Warn().Err(err).Str("cache_key", cacheKey).Msg("Failed to invalidate old clinic owner cache")
+		}
 	}
-	cacheKey := fmt.Sprintf("clinic:owner:%s", newOwnerUserID.String())
-	c.cache.Delete(ctx, cacheKey)
+	if c.cacheAvailable() {
+		cacheKey := fmt.Sprintf("clinic:owner:%s", newOwnerUserID.String())
+		if err := c.cache.Delete(ctx, cacheKey); err != nil {
+			c.logger.Warn().Err(err).Str("cache_key", cacheKey).Msg("Failed to invalidate new clinic owner cache")
+		}
+	}
 	c.invalidateClinicListCache(ctx)
 
 	// Log audit activity
@@ -985,9 +1021,11 @@ func (c *clinicService) GetClinicVerificationStatus(ctx context.Context, clinicI
 	// Try cache first
 	cacheKey := fmt.Sprintf("clinic:verification:%s", clinicID.String())
 	var verification providers.ClinicVerification
-	if err := c.cache.Get(ctx, cacheKey, &verification); err == nil {
-		c.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic verification status retrieved from cache")
-		return &verification, nil
+	if c.cacheAvailable() {
+		if err := c.cache.Get(ctx, cacheKey, &verification); err == nil {
+			c.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic verification status retrieved from cache")
+			return &verification, nil
+		}
 	}
 
 	// Fetch from repository (returns *providers.ClinicVerification)
@@ -1001,8 +1039,10 @@ func (c *clinicService) GetClinicVerificationStatus(ctx context.Context, clinicI
 	}
 
 	// Cache the result
-	if err := c.cache.Set(ctx, cacheKey, *verificationPtr, 5*time.Minute); err != nil {
-		c.logger.Warn().Err(err).Msg("Failed to cache clinic verification status")
+	if c.cacheAvailable() {
+		if err := c.cache.Set(ctx, cacheKey, *verificationPtr, 5*time.Minute); err != nil {
+			c.logger.Warn().Err(err).Msg("Failed to cache clinic verification status")
+		}
 	}
 
 	c.logger.Debug().
@@ -1039,6 +1079,9 @@ func (c *clinicService) logClinicActivityWithUser(ctx context.Context, activityT
 
 // Helper methods
 func (c *clinicService) invalidateClinicCache(ctx context.Context, clinicID uuid.UUID) {
+	if !c.cacheAvailable() {
+		return
+	}
 	cacheKeys := []string{
 		fmt.Sprintf("clinic:%s", clinicID.String()),
 	}

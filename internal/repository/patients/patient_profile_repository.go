@@ -219,36 +219,7 @@ func (r *patientRepository) DeletePatientProfile(ctx context.Context, id uuid.UU
 // ===== Querying & Search =====
 
 func (r *patientRepository) ListPatientProfiles(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error) {
-	start := time.Now()
-	defer func() {
-		patientDBQueryDuration.Observe(time.Since(start).Seconds())
-	}()
-
-	rows, err := r.querier.SearchPatients(ctx, sqlc.SearchPatientsParams{
-		Column1: "",   // NULL
-		Column2: "",   // NULL
-		Column3: "",   // NULL
-		Column4: true, // NULL
-		Column5: "",   // NULL
-		Limit:   int32(limit),
-		Offset:  int32(offset),
-	})
-	if err != nil {
-		patientDBQueryTotal.WithLabelValues("list_patient_profiles", "error").Inc()
-		return nil, r.handleError(err, "list patient profiles")
-	}
-
-	var profiles []patients.PatientProfile
-	for _, row := range rows {
-		// Get full profile for each result
-		fullProfile, err := r.GetPatientProfileByID(ctx, pgtypeUUIDToUUID(row.ID))
-		if err == nil {
-			profiles = append(profiles, fullProfile)
-		}
-	}
-
-	patientDBQueryTotal.WithLabelValues("list_patient_profiles", "success").Inc()
-	return profiles, nil
+	return r.SearchPatientProfiles(ctx, "", limit, offset)
 }
 
 func (r *patientRepository) SearchPatientProfiles(ctx context.Context, query string, limit, offset int) ([]patients.PatientProfile, error) {
@@ -258,7 +229,7 @@ func (r *patientRepository) SearchPatientProfiles(ctx context.Context, query str
 	}()
 
 	rows, err := r.querier.SearchPatientsByName(ctx, sqlc.SearchPatientsByNameParams{
-		Column1: pgtype.Text{String: query, Valid: query != ""},
+		Column1: pgtype.Text{String: query, Valid: true},
 		Limit:   int32(limit),
 		Offset:  int32(offset),
 	})

@@ -24,6 +24,10 @@ type MockSystemAdminService struct {
 	mock.Mock
 }
 
+type MockNGOPartnerService struct {
+	mock.Mock
+}
+
 func (m *MockSystemAdminService) CreateSystemAdmin(ctx context.Context, sysAdmin admin.SystemAdmin) (admin.SystemAdmin, error) {
 	args := m.Called(ctx, sysAdmin)
 	if args.Get(0) == nil {
@@ -74,9 +78,29 @@ func (m *MockSystemAdminService) SearchSystemAdmins(ctx context.Context, params 
 	return args.Get(0).([]admin.SystemAdmin), args.Error(1)
 }
 
-func setupTestAdminHandler(mockService *MockSystemAdminService) *AdminHandler {
+func (m *MockNGOPartnerService) CreateNGOPartner(ctx context.Context, partner admin.NGOPartner) (admin.NGOPartner, error) {
+	args := m.Called(ctx, partner)
+	if args.Get(0) == nil {
+		return admin.NGOPartner{}, args.Error(1)
+	}
+	return args.Get(0).(admin.NGOPartner), args.Error(1)
+}
+
+func (m *MockNGOPartnerService) GetNGOPartnerByUserID(ctx context.Context, userID uuid.UUID) (admin.NGOPartner, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return admin.NGOPartner{}, args.Error(1)
+	}
+	return args.Get(0).(admin.NGOPartner), args.Error(1)
+}
+
+func setupTestAdminHandler(mockService *MockSystemAdminService, mockNGOService ...*MockNGOPartnerService) *AdminHandler {
 	logger := zerolog.New(nil)
-	return NewAdminHandler(mockService, &logger, 0)
+	var ngoSvc *MockNGOPartnerService
+	if len(mockNGOService) > 0 {
+		ngoSvc = mockNGOService[0]
+	}
+	return NewAdminHandler(mockService, ngoSvc, &logger, 0)
 }
 
 func addUserToContext(ctx context.Context, claims *service.TokenClaims) context.Context {
@@ -102,7 +126,7 @@ func createTestSystemAdmin(id, userID uuid.UUID) admin.SystemAdmin {
 func TestAdminHandler_CreateSystemAdmin(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockService := new(MockSystemAdminService)
-		handler := setupTestAdminHandler(mockService)
+		handler := setupTestAdminHandler(mockService, new(MockNGOPartnerService))
 
 		userID := uuid.New()
 		adminID := uuid.New()
@@ -137,7 +161,7 @@ func TestAdminHandler_CreateSystemAdmin(t *testing.T) {
 
 	t.Run("forbidden - non-admin role", func(t *testing.T) {
 		mockService := new(MockSystemAdminService)
-		handler := setupTestAdminHandler(mockService)
+		handler := setupTestAdminHandler(mockService, new(MockNGOPartnerService))
 
 		body := `{
 			"user_id": "` + uuid.New().String() + `",
@@ -159,7 +183,7 @@ func TestAdminHandler_CreateSystemAdmin(t *testing.T) {
 
 	t.Run("duplicate", func(t *testing.T) {
 		mockService := new(MockSystemAdminService)
-		handler := setupTestAdminHandler(mockService)
+		handler := setupTestAdminHandler(mockService, new(MockNGOPartnerService))
 
 		userID := uuid.New()
 		mockService.On("CreateSystemAdmin", mock.Anything, mock.Anything).Return(admin.SystemAdmin{}, domain.ErrDuplicate).Once()
@@ -190,7 +214,7 @@ func TestAdminHandler_CreateSystemAdmin(t *testing.T) {
 
 	t.Run("validation error", func(t *testing.T) {
 		mockService := new(MockSystemAdminService)
-		handler := setupTestAdminHandler(mockService)
+		handler := setupTestAdminHandler(mockService, new(MockNGOPartnerService))
 
 		body := `{
 			"user_id": "00000000-0000-0000-0000-000000000000",
@@ -219,7 +243,7 @@ func TestAdminHandler_CreateSystemAdmin(t *testing.T) {
 func TestAdminHandler_GetSystemAdminByUserID(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockService := new(MockSystemAdminService)
-		handler := setupTestAdminHandler(mockService)
+		handler := setupTestAdminHandler(mockService, new(MockNGOPartnerService))
 
 		userID := uuid.New()
 		adminID := uuid.New()

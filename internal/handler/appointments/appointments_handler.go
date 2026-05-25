@@ -89,6 +89,20 @@ func (h *AppointmentHandler) CreateAppointment(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+	if claims.Role == "patient" && claims.UserID != req.PatientID {
+		handler.RespondJSON(w, http.StatusForbidden, app_dto.ErrorResponse{
+			Error: "Cannot create an appointment for another user",
+		})
+		return
+	}
+
 	// Convert to domain model
 	appointment := app_dto.ToDomainAppointment(req)
 
@@ -116,7 +130,15 @@ func (h *AppointmentHandler) GetAppointmentByID(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	appointment, err := h.appointmentService.GetAppointmentByID(ctx, id)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	appointment, err := h.appointmentService.GetAppointmentByID(ctx, id, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -135,6 +157,20 @@ func (h *AppointmentHandler) GetAppointmentsByPatient(w http.ResponseWriter, r *
 	if err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, app_dto.ErrorResponse{
 			Error: "Invalid patient ID",
+		})
+		return
+	}
+
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+	if claims.Role == "patient" && claims.UserID != patientID {
+		handler.RespondJSON(w, http.StatusForbidden, app_dto.ErrorResponse{
+			Error: "Cannot view another user's appointments",
 		})
 		return
 	}
@@ -171,7 +207,21 @@ func (h *AppointmentHandler) GetAppointmentsByClinic(w http.ResponseWriter, r *h
 		return
 	}
 
-	appointmentList, err := h.appointmentService.GetAppointmentsByClinic(ctx, clinicID)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+	if !canReadClinicAppointments(claims) {
+		handler.RespondJSON(w, http.StatusForbidden, app_dto.ErrorResponse{
+			Error: "Cannot view clinic appointments",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetAppointmentsByClinic(ctx, clinicID, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -212,7 +262,21 @@ func (h *AppointmentHandler) GetAppointmentsByClinicAndDate(w http.ResponseWrite
 		return
 	}
 
-	appointmentList, err := h.appointmentService.GetAppointmentsByClinicAndDate(ctx, clinicID, date)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+	if !canReadClinicAppointments(claims) {
+		handler.RespondJSON(w, http.StatusForbidden, app_dto.ErrorResponse{
+			Error: "Cannot view clinic appointments",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetAppointmentsByClinicAndDate(ctx, clinicID, date, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -244,7 +308,21 @@ func (h *AppointmentHandler) GetTodayAppointments(w http.ResponseWriter, r *http
 		return
 	}
 
-	appointmentList, err := h.appointmentService.GetTodayAppointments(ctx, clinicID)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+	if !canReadClinicAppointments(claims) {
+		handler.RespondJSON(w, http.StatusForbidden, app_dto.ErrorResponse{
+			Error: "Cannot view clinic appointments",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetTodayAppointments(ctx, clinicID, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -276,7 +354,21 @@ func (h *AppointmentHandler) GetPendingAppointments(w http.ResponseWriter, r *ht
 		return
 	}
 
-	appointmentList, err := h.appointmentService.GetPendingAppointments(ctx, clinicID)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+	if !canReadClinicAppointments(claims) {
+		handler.RespondJSON(w, http.StatusForbidden, app_dto.ErrorResponse{
+			Error: "Cannot view clinic appointments",
+		})
+		return
+	}
+
+	appointmentList, err := h.appointmentService.GetPendingAppointments(ctx, clinicID, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -327,7 +419,15 @@ func (h *AppointmentHandler) RescheduleAppointment(w http.ResponseWriter, r *htt
 		return
 	}
 
-	rescheduled, err := h.appointmentService.RescheduleAppointment(ctx, id, req.AppointmentDate, req.AppointmentTime, req.AppointmentDatetime)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	rescheduled, err := h.appointmentService.RescheduleAppointment(ctx, id, req.AppointmentDate, req.AppointmentTime, req.AppointmentDatetime, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -417,7 +517,13 @@ func (h *AppointmentHandler) UpdateAppointmentNotes(w http.ResponseWriter, r *ht
 		return
 	}
 
-	updated, err := h.appointmentService.UpdateAppointmentNotes(ctx, id, req.Notes)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	updated, err := h.appointmentService.UpdateAppointmentNotes(ctx, id, req.Notes, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -440,7 +546,13 @@ func (h *AppointmentHandler) CompleteAppointment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	completed, err := h.appointmentService.CompleteAppointment(ctx, id)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	completed, err := h.appointmentService.CompleteAppointment(ctx, id, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -474,14 +586,21 @@ func (h *AppointmentHandler) CancelAppointment(w http.ResponseWriter, r *http.Re
 	// Validate input
 	v := validator.New()
 	v.ValidateRequired("cancellation_reason", req.CancellationReason)
-	v.ValidateRequired("cancelled_by", req.CancelledBy.String())
 
 	if !v.Valid() {
 		handler.RespondValidationError(w, v.Errors())
 		return
 	}
 
-	cancelled, err := h.appointmentService.CancelAppointment(ctx, id, req.CancellationReason, req.CancelledBy)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
+	cancelled, err := h.appointmentService.CancelAppointment(ctx, id, req.CancellationReason, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -533,7 +652,13 @@ func (h *AppointmentHandler) UpdateAppointmentStatus(w http.ResponseWriter, r *h
 		return
 	}
 
-	updated, err := h.appointmentService.UpdateAppointmentStatus(ctx, id, appointments.AppointmentStatus(req.Status))
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	updated, err := h.appointmentService.UpdateAppointmentStatus(ctx, id, appointments.AppointmentStatus(req.Status), claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -556,7 +681,13 @@ func (h *AppointmentHandler) DeleteAppointment(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	err = h.appointmentService.DeleteAppointment(ctx, id)
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	err = h.appointmentService.DeleteAppointment(ctx, id, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
@@ -579,6 +710,20 @@ func (h *AppointmentHandler) GetAppointmentCount(w http.ResponseWriter, r *http.
 		return
 	}
 
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, app_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+	if claims.Role == "patient" && claims.UserID != patientID {
+		handler.RespondJSON(w, http.StatusForbidden, app_dto.ErrorResponse{
+			Error: "Cannot view another user's appointment count",
+		})
+		return
+	}
+
 	count, err := h.appointmentService.GetAppointmentCount(ctx, patientID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
@@ -589,4 +734,16 @@ func (h *AppointmentHandler) GetAppointmentCount(w http.ResponseWriter, r *http.
 		"patient_id": patientID,
 		"count":      count,
 	})
+}
+
+func canReadClinicAppointments(claims *service.TokenClaims) bool {
+	if claims == nil {
+		return false
+	}
+	switch claims.Role {
+	case "provider_staff", "doctor", "clinic_admin", "system_admin":
+		return true
+	default:
+		return false
+	}
 }

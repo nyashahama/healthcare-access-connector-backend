@@ -21,6 +21,7 @@ import (
 
 type AdminHandler struct {
 	adminService service.SystemAdminService
+	ngoService   service.NGOPartnerService
 	logger       *zerolog.Logger
 	timeout      time.Duration
 }
@@ -28,11 +29,13 @@ type AdminHandler struct {
 // NewAdminHandler creates a new admin handler
 func NewAdminHandler(
 	adminService service.SystemAdminService,
+	ngoService service.NGOPartnerService,
 	logger *zerolog.Logger,
 	timeout time.Duration,
 ) *AdminHandler {
 	return &AdminHandler{
 		adminService: adminService,
+		ngoService:   ngoService,
 		logger:       logger,
 		timeout:      timeout,
 	}

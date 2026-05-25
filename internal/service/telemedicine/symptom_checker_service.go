@@ -23,6 +23,7 @@ const (
 	patientSessionsCacheTTL = 5 * time.Minute
 	eligibleSessionCacheTTL = 2 * time.Minute // short TTL — eligibility window is time-sensitive
 	adminSessionsCacheTTL   = 5 * time.Minute
+	patientSessionIndexTTL  = 5 * time.Minute
 )
 
 type symptomCheckerService struct {
@@ -197,6 +198,8 @@ func (s *symptomCheckerService) GetPatientSessions(ctx context.Context, patientI
 		cacheKey := patientSessionsCacheKey(patientID, limit)
 		if err := s.cache.Set(ctx, cacheKey, sessions, patientSessionsCacheTTL); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to cache patient sessions")
+		} else {
+			s.registerPatientSessionCacheKey(ctx, patientID, cacheKey)
 		}
 	}
 
@@ -564,6 +567,8 @@ func (s *symptomCheckerService) invalidateSessionCache(ctx context.Context, sess
 		sessionCacheKey(sessionID),
 		eligibleSessionCacheKey(patientID),
 	}
+	keys = append(keys, s.collectPatientSessionCacheKeys(ctx, patientID)...)
+	keys = append(keys, patientSessionsCacheKey(patientID, 20), patientSessionIndexKey(patientID))
 	for _, k := range keys {
 		if err := s.cache.Delete(ctx, k); err != nil {
 			s.logger.Warn().Err(err).Str("key", k).Msg("Failed to invalidate cache key")
@@ -576,15 +581,37 @@ func (s *symptomCheckerService) invalidatePatientSessionCache(ctx context.Contex
 		return
 	}
 	keys := []string{
-		// invalidate the default first-page key; other page keys will expire naturally
-		patientSessionsCacheKey(patientID, 20),
 		eligibleSessionCacheKey(patientID),
 	}
+	keys = append(keys, s.collectPatientSessionCacheKeys(ctx, patientID)...)
+	keys = append(keys, patientSessionsCacheKey(patientID, 20), patientSessionIndexKey(patientID))
 	for _, k := range keys {
 		if err := s.cache.Delete(ctx, k); err != nil {
 			s.logger.Warn().Err(err).Str("key", k).Msg("Failed to invalidate patient session cache key")
 		}
 	}
+}
+
+func (s *symptomCheckerService) registerPatientSessionCacheKey(ctx context.Context, patientID uuid.UUID, cacheKey string) {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return
+	}
+	keys := s.collectPatientSessionCacheKeys(ctx, patientID)
+	keys = append(keys, cacheKey)
+	if err := s.cache.Set(ctx, patientSessionIndexKey(patientID), uniqueStrings(keys), patientSessionIndexTTL); err != nil {
+		s.logger.Warn().Err(err).Str("patient_id", patientID.String()).Msg("Failed to update patient session cache index")
+	}
+}
+
+func (s *symptomCheckerService) collectPatientSessionCacheKeys(ctx context.Context, patientID uuid.UUID) []string {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return nil
+	}
+	var keys []string
+	if err := s.cache.Get(ctx, patientSessionIndexKey(patientID), &keys); err != nil {
+		return nil
+	}
+	return keys
 }
 
 // ─── Cache key builders ───────────────────────────────────────────────────────
@@ -595,6 +622,10 @@ func sessionCacheKey(id uuid.UUID) string {
 
 func patientSessionsCacheKey(patientID uuid.UUID, limit int) string {
 	return fmt.Sprintf("symptom_sessions:patient:%s:limit:%d", patientID.String(), limit)
+}
+
+func patientSessionIndexKey(patientID uuid.UUID) string {
+	return fmt.Sprintf("symptom_sessions:patient:index:%s", patientID.String())
 }
 
 func eligibleSessionCacheKey(patientID uuid.UUID) string {

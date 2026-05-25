@@ -1,6 +1,8 @@
 package admin
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/admin"
 )
@@ -169,4 +171,130 @@ type ErrorResponse struct {
 	Error  string            `json:"error"`
 	Fields map[string]string `json:"fields,omitempty"`
 	Code   string            `json:"code,omitempty"`
+}
+
+type CreateNGOPartnerRequest struct {
+	UserID                uuid.UUID   `json:"user_id"`
+	OrganizationName      string      `json:"organization_name"`
+	OrganizationType      *string     `json:"organization_type,omitempty"`
+	RegistrationNumber    *string     `json:"registration_number,omitempty"`
+	TaxID                 *string     `json:"tax_id,omitempty"`
+	OrganizationAddress   *string     `json:"organization_address,omitempty"`
+	OrganizationPhone     *string     `json:"organization_phone,omitempty"`
+	OrganizationEmail     *string     `json:"organization_email,omitempty"`
+	Website               *string     `json:"website,omitempty"`
+	ContactPersonName     *string     `json:"contact_person_name,omitempty"`
+	ContactPersonRole     *string     `json:"contact_person_role,omitempty"`
+	ContactPersonPhone    *string     `json:"contact_person_phone,omitempty"`
+	ContactPersonEmail    *string     `json:"contact_person_email,omitempty"`
+	PartnershipType       *string     `json:"partnership_type,omitempty"`
+	PartnershipStartDate  *time.Time  `json:"partnership_start_date,omitempty"`
+	PartnershipEndDate    *time.Time  `json:"partnership_end_date,omitempty"`
+	PartnershipStatus     string      `json:"partnership_status"`
+	OperatingRegions      []string    `json:"operating_regions,omitempty"`
+	FocusAreas            []string    `json:"focus_areas,omitempty"`
+	CanAccessReports      bool        `json:"can_access_reports"`
+	ReportAccessLevel     *string     `json:"report_access_level,omitempty"`
+	CustomReportFilters   interface{} `json:"custom_report_filters,omitempty"`
+	LogoURL               *string     `json:"logo_url,omitempty"`
+	BrandingColor         *string     `json:"branding_color,omitempty"`
+}
+
+func (r CreateNGOPartnerRequest) ToDomain() admin.NGOPartner {
+	return admin.NGOPartner{
+		UserID:                r.UserID,
+		OrganizationName:      r.OrganizationName,
+		OrganizationType:      r.OrganizationType,
+		RegistrationNumber:    r.RegistrationNumber,
+		TaxID:                 r.TaxID,
+		OrganizationAddress:   r.OrganizationAddress,
+		OrganizationPhone:     r.OrganizationPhone,
+		OrganizationEmail:     r.OrganizationEmail,
+		Website:               r.Website,
+		ContactPersonName:     r.ContactPersonName,
+		ContactPersonRole:     r.ContactPersonRole,
+		ContactPersonPhone:    r.ContactPersonPhone,
+		ContactPersonEmail:    r.ContactPersonEmail,
+		PartnershipType:       r.PartnershipType,
+		PartnershipStartDate:  r.PartnershipStartDate,
+		PartnershipEndDate:    r.PartnershipEndDate,
+		PartnershipStatus:     r.PartnershipStatus,
+		OperatingRegions:      r.OperatingRegions,
+		FocusAreas:            r.FocusAreas,
+		CanAccessReports:      r.CanAccessReports,
+		ReportAccessLevel:     r.ReportAccessLevel,
+		CustomReportFilters:   r.CustomReportFilters,
+		LogoURL:               r.LogoURL,
+		BrandingColor:         r.BrandingColor,
+	}
+}
+
+type NGOPartnerResponse struct {
+	ID                   uuid.UUID   `json:"id"`
+	UserID               uuid.UUID   `json:"user_id"`
+	OrganizationName     string      `json:"organization_name"`
+	OrganizationType     *string     `json:"organization_type,omitempty"`
+	RegistrationNumber   *string     `json:"registration_number,omitempty"`
+	TaxID                *string     `json:"tax_id,omitempty"`
+	OrganizationAddress  *string     `json:"organization_address,omitempty"`
+	OrganizationPhone    *string     `json:"organization_phone,omitempty"`
+	OrganizationEmail    *string     `json:"organization_email,omitempty"`
+	Website              *string     `json:"website,omitempty"`
+	ContactPersonName    *string     `json:"contact_person_name,omitempty"`
+	ContactPersonRole    *string     `json:"contact_person_role,omitempty"`
+	ContactPersonPhone   *string     `json:"contact_person_phone,omitempty"`
+	ContactPersonEmail   *string     `json:"contact_person_email,omitempty"`
+	PartnershipType      *string     `json:"partnership_type,omitempty"`
+	PartnershipStartDate *string     `json:"partnership_start_date,omitempty"`
+	PartnershipEndDate   *string     `json:"partnership_end_date,omitempty"`
+	PartnershipStatus    string      `json:"partnership_status"`
+	OperatingRegions     []string    `json:"operating_regions,omitempty"`
+	FocusAreas           []string    `json:"focus_areas,omitempty"`
+	CanAccessReports     bool        `json:"can_access_reports"`
+	ReportAccessLevel    *string     `json:"report_access_level,omitempty"`
+	CustomReportFilters  interface{} `json:"custom_report_filters,omitempty"`
+	LogoURL              *string     `json:"logo_url,omitempty"`
+	BrandingColor        *string     `json:"branding_color,omitempty"`
+	CreatedAt            string      `json:"created_at"`
+	UpdatedAt            string      `json:"updated_at"`
+}
+
+func ToNGOPartnerResponse(partner admin.NGOPartner) NGOPartnerResponse {
+	return NGOPartnerResponse{
+		ID:                   partner.ID,
+		UserID:               partner.UserID,
+		OrganizationName:     partner.OrganizationName,
+		OrganizationType:     partner.OrganizationType,
+		RegistrationNumber:   partner.RegistrationNumber,
+		TaxID:                partner.TaxID,
+		OrganizationAddress:  partner.OrganizationAddress,
+		OrganizationPhone:    partner.OrganizationPhone,
+		OrganizationEmail:    partner.OrganizationEmail,
+		Website:              partner.Website,
+		ContactPersonName:    partner.ContactPersonName,
+		ContactPersonRole:    partner.ContactPersonRole,
+		ContactPersonPhone:   partner.ContactPersonPhone,
+		ContactPersonEmail:   partner.ContactPersonEmail,
+		PartnershipType:      partner.PartnershipType,
+		PartnershipStartDate: timePtrToString(partner.PartnershipStartDate),
+		PartnershipEndDate:   timePtrToString(partner.PartnershipEndDate),
+		PartnershipStatus:    partner.PartnershipStatus,
+		OperatingRegions:     partner.OperatingRegions,
+		FocusAreas:           partner.FocusAreas,
+		CanAccessReports:     partner.CanAccessReports,
+		ReportAccessLevel:    partner.ReportAccessLevel,
+		CustomReportFilters:  partner.CustomReportFilters,
+		LogoURL:              partner.LogoURL,
+		BrandingColor:        partner.BrandingColor,
+		CreatedAt:            partner.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		UpdatedAt:            partner.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+}
+
+func timePtrToString(v *time.Time) *string {
+	if v == nil {
+		return nil
+	}
+	formatted := v.Format("2006-01-02T15:04:05Z07:00")
+	return &formatted
 }

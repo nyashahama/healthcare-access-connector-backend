@@ -23,6 +23,10 @@ type conditionService struct {
 	logger        *zerolog.Logger
 }
 
+func (s *conditionService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewConditionService creates a new condition service
 func NewConditionService(
 	conditionRepo repository.PatientConditionRepository,
@@ -124,9 +128,11 @@ func (s *conditionService) GetPatientConditions(ctx context.Context, patientID u
 
 	// Try cache first
 	var conditions []patients.PatientCondition
-	if err := s.cache.Get(ctx, cacheKey, &conditions); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient conditions retrieved from cache")
-		return conditions, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &conditions); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient conditions retrieved from cache")
+			return conditions, nil
+		}
 	}
 
 	// Fetch from database
@@ -137,8 +143,10 @@ func (s *conditionService) GetPatientConditions(ctx context.Context, patientID u
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, conditions, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient conditions")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, conditions, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient conditions")
+		}
 	}
 
 	s.logger.Debug().
@@ -174,9 +182,11 @@ func (s *conditionService) GetActiveConditions(ctx context.Context, patientID uu
 	// Try cache first
 	cacheKey := fmt.Sprintf("conditions:active:%s", patientID.String())
 	var conditions []patients.PatientCondition
-	if err := s.cache.Get(ctx, cacheKey, &conditions); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Active conditions retrieved from cache")
-		return conditions, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &conditions); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Active conditions retrieved from cache")
+			return conditions, nil
+		}
 	}
 
 	// Fetch from database
@@ -187,8 +197,10 @@ func (s *conditionService) GetActiveConditions(ctx context.Context, patientID uu
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, conditions, 15*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache active conditions")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, conditions, 15*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache active conditions")
+		}
 	}
 
 	s.logger.Debug().
@@ -330,6 +342,10 @@ func (s *conditionService) validatePatientCondition(condition patients.PatientCo
 
 // Helper methods
 func (s *conditionService) invalidateConditionCache(ctx context.Context, patientID uuid.UUID, status *string) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("conditions:all:%s", patientID.String()),
 		fmt.Sprintf("conditions:active:%s", patientID.String()),

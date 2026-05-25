@@ -25,6 +25,7 @@ type mockClinicRepository struct {
 	deleteClinicFunc        func(ctx context.Context, id uuid.UUID) error
 	verifyClinicFunc     func(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error
 	getClinicByOwnerFunc func(ctx context.Context, ownerUserID uuid.UUID) (*providers.Clinic, error)
+	updateClinicOwnerFunc  func(ctx context.Context, clinicID, newOwnerUserID uuid.UUID) error
 }
 
 func (m *mockClinicRepository) CreateClinic(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error) {
@@ -98,6 +99,9 @@ func (m *mockClinicRepository) GetClinicWithOwnerInfo(ctx context.Context, clini
 }
 
 func (m *mockClinicRepository) UpdateClinicOwner(ctx context.Context, clinicID, newOwnerUserID uuid.UUID) error {
+	if m.updateClinicOwnerFunc != nil {
+		return m.updateClinicOwnerFunc(ctx, clinicID, newOwnerUserID)
+	}
 	return nil
 }
 
@@ -611,6 +615,28 @@ func TestClinicService_GetClinicByID(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Clinic not found")
 	})
+
+	t.Run("without cache", func(t *testing.T) {
+		svc, mockClinicRepo, _, _ := newClinicServiceWithMocks(t)
+		svc.cache = nil
+
+		clinicID := uuid.New()
+		expectedClinic := providers.Clinic{
+			ID:         clinicID,
+			ClinicName: "No Cache Clinic",
+			ClinicType: "private",
+		}
+
+		mockClinicRepo.getClinicByIDFunc = func(ctx context.Context, id uuid.UUID) (providers.Clinic, error) {
+			require.Equal(t, clinicID, id)
+			return expectedClinic, nil
+		}
+
+		result, err := svc.GetClinicByID(context.Background(), clinicID)
+		require.NoError(t, err)
+		assert.Equal(t, expectedClinic.ID, result.ID)
+		assert.Equal(t, expectedClinic.ClinicName, result.ClinicName)
+	})
 }
 
 func TestClinicService_UpdateClinic(t *testing.T) {
@@ -813,6 +839,80 @@ func TestClinicService_VerifyClinic(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Clinic not found")
 	})
+}
+
+func TestClinicService_RegisterClinicWithoutCache(t *testing.T) {
+	svc, mockClinicRepo, mockUserRepo, _ := newClinicServiceWithMocks(t)
+	svc.cache = nil
+
+	ownerUserID := uuid.New()
+	createdBy := uuid.New()
+	email := "owner@example.com"
+	phone := "+27123456789"
+
+	mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+		require.Equal(t, ownerUserID, id)
+		return core.User{
+			ID:    id,
+			Email: &email,
+			Phone: &phone,
+			Role:  "provider",
+		}, nil
+	}
+
+	mockClinicRepo.createClinicFunc = func(ctx context.Context, clinic providers.Clinic, gotCreatedBy, gotOwner uuid.UUID) (providers.Clinic, error) {
+		require.Equal(t, createdBy, gotCreatedBy)
+		require.Equal(t, ownerUserID, gotOwner)
+		clinic.ID = uuid.New()
+		return clinic, nil
+	}
+
+	clinic := providers.Clinic{
+		ClinicName:      "No Cache Clinic",
+		ClinicType:      "private",
+		PhysicalAddress: "123 Test St",
+	}
+
+	result, err := svc.RegisterClinic(context.Background(), clinic, createdBy, ownerUserID)
+	require.NoError(t, err)
+	assert.NotEqual(t, uuid.Nil, result.ID)
+	assert.Equal(t, "No Cache Clinic", result.ClinicName)
+}
+
+func TestClinicService_UpdateClinicOwnerWithoutCache(t *testing.T) {
+	svc, mockClinicRepo, mockUserRepo, _ := newClinicServiceWithMocks(t)
+	svc.cache = nil
+
+	clinicID := uuid.New()
+	oldOwnerID := uuid.New()
+	newOwnerID := uuid.New()
+	updatedBy := uuid.New()
+
+	mockClinicRepo.getClinicByIDFunc = func(ctx context.Context, id uuid.UUID) (providers.Clinic, error) {
+		require.Equal(t, clinicID, id)
+		return providers.Clinic{
+			ID:          clinicID,
+			ClinicName:  "Transfer Clinic",
+			OwnerUserID: &oldOwnerID,
+		}, nil
+	}
+
+	mockClinicRepo.updateClinicOwnerFunc = func(ctx context.Context, gotClinicID, gotNewOwner uuid.UUID) error {
+		require.Equal(t, clinicID, gotClinicID)
+		require.Equal(t, newOwnerID, gotNewOwner)
+		return nil
+	}
+
+	mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+		require.Equal(t, newOwnerID, id)
+		return core.User{
+			ID:   newOwnerID,
+			Role: "provider",
+		}, nil
+	}
+
+	err := svc.UpdateClinicOwner(context.Background(), clinicID, newOwnerID, updatedBy)
+	require.NoError(t, err)
 }
 
 var _ repository.ClinicRepository = (*mockClinicRepository)(nil)

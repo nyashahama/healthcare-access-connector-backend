@@ -108,6 +108,14 @@ func (c *redisCache) IsAvailable() bool {
 	return c.redis != nil && c.useRedis
 }
 
+// Eval executes a Redis Lua script when Redis is available.
+func (c *redisCache) Eval(ctx context.Context, script string, keys []string, args ...interface{}) (interface{}, error) {
+	if !c.useRedis || c.redis == nil {
+		return nil, ErrCacheUnavailable
+	}
+	return c.redis.Eval(ctx, script, keys, args...).Result()
+}
+
 // getFromRedis retrieves value from Redis
 func (c *redisCache) getFromRedis(ctx context.Context, key string, dest interface{}) error {
 	val, err := c.redis.Get(ctx, key).Result()

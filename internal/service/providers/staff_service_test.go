@@ -181,6 +181,7 @@ type mockStaffRepositoryFull struct {
 	getStaffByUserAndClinicFunc   func(ctx context.Context, userID, clinicID uuid.UUID) (*providers.ClinicStaff, error)
 	getStaffByIDFunc            func(ctx context.Context, id uuid.UUID) (providers.ClinicStaff, error)
 	getAllClinicStaffFunc       func(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
+	getPendingInvitationsByClinicFunc func(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error)
 	deleteStaffMemberFunc        func(ctx context.Context, id uuid.UUID) error
 	checkStaffEmailExistsFunc    func(ctx context.Context, clinicID uuid.UUID, email string) (bool, error)
 }
@@ -256,6 +257,9 @@ func (m *mockStaffRepositoryFull) DeclineStaffInvitation(ctx context.Context, to
 }
 
 func (m *mockStaffRepositoryFull) GetPendingInvitationsByClinic(ctx context.Context, clinicID uuid.UUID) ([]providers.ClinicStaff, error) {
+	if m.getPendingInvitationsByClinicFunc != nil {
+		return m.getPendingInvitationsByClinicFunc(ctx, clinicID)
+	}
 	return nil, nil
 }
 
@@ -545,6 +549,76 @@ func TestStaffService_InviteStaff(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "Clinic must be verified")
 	})
+}
+
+func TestStaffService_CreateStaffMemberNilUserID(t *testing.T) {
+	svc := newStaffServiceForTest(t)
+
+	staff := providers.ClinicStaff{
+		ClinicID:   uuid.New(),
+		UserID:     nil,
+		FirstName:  "Jane",
+		LastName:   "Doe",
+		StaffRole:  providers.StaffRoleDoctor,
+	}
+
+	_, err := svc.CreateStaffMember(context.Background(), staff)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "User ID is required")
+}
+
+func TestStaffService_GetPendingInvitationsByClinicWithoutCache(t *testing.T) {
+	svc, mockStaffRepo, _, _ := newStaffServiceWithMocks(t)
+	svc.cache = nil
+
+	clinicID := uuid.New()
+	expectedID := uuid.New()
+	mockStaffRepo.getAllClinicStaffFunc = nil
+	mockStaffRepo.getPendingInvitationsByClinicFunc = func(ctx context.Context, got uuid.UUID) ([]providers.ClinicStaff, error) {
+		require.Equal(t, clinicID, got)
+		return []providers.ClinicStaff{{ID: expectedID, ClinicID: clinicID}}, nil
+	}
+
+	result, err := svc.GetPendingInvitationsByClinic(context.Background(), clinicID)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, expectedID, result[0].ID)
+}
+
+func TestStaffService_GetStaffByUserAndClinicWithoutCache(t *testing.T) {
+	svc, mockStaffRepo, _, _ := newStaffServiceWithMocks(t)
+	svc.cache = nil
+
+	userID := uuid.New()
+	clinicID := uuid.New()
+	staffID := uuid.New()
+	mockStaffRepo.getStaffByUserAndClinicFunc = func(ctx context.Context, gotUserID, gotClinicID uuid.UUID) (*providers.ClinicStaff, error) {
+		require.Equal(t, userID, gotUserID)
+		require.Equal(t, clinicID, gotClinicID)
+		return &providers.ClinicStaff{ID: staffID, ClinicID: clinicID, UserID: &userID}, nil
+	}
+
+	result, err := svc.GetStaffByUserAndClinic(context.Background(), userID, clinicID)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, staffID, result.ID)
+}
+
+func TestStaffService_GetAllClinicStaffWithoutCache(t *testing.T) {
+	svc, mockStaffRepo, _, _ := newStaffServiceWithMocks(t)
+	svc.cache = nil
+
+	clinicID := uuid.New()
+	staffID := uuid.New()
+	mockStaffRepo.getAllClinicStaffFunc = func(ctx context.Context, got uuid.UUID) ([]providers.ClinicStaff, error) {
+		require.Equal(t, clinicID, got)
+		return []providers.ClinicStaff{{ID: staffID, ClinicID: clinicID}}, nil
+	}
+
+	result, err := svc.GetAllClinicStaff(context.Background(), clinicID)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+	assert.Equal(t, staffID, result[0].ID)
 }
 
 func TestStaffService_AcceptInvitation(t *testing.T) {

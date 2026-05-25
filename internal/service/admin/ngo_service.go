@@ -129,7 +129,7 @@ func (s *ngoPartnerService) GetNGOPartnerByUserID(ctx context.Context, userID uu
 	}
 
 	cacheKey := fmt.Sprintf("ngo_partner:user:%s", userID.String())
-	if s.cache == nil {
+	if s.cache == nil || !s.cache.IsAvailable() {
 		partner, err := s.ngoRepo.GetNGOPartnerByUserID(ctx, userID)
 		if err != nil {
 			if errors.Is(err, domain.ErrNotFound) {

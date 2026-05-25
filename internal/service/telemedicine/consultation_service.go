@@ -22,6 +22,7 @@ const (
 	patientConsultationsCacheTTL        = 3 * time.Minute
 	providerActiveConsultationsCacheTTL = 30 * time.Second // hot path — keep short
 	waitingRoomCacheTTL                 = 15 * time.Second // near-real-time
+	consultationHistoryIndexTTL         = 5 * time.Minute
 )
 
 type consultationService struct {
@@ -186,6 +187,8 @@ func (s *consultationService) GetPatientConsultations(ctx context.Context, patie
 		cacheKey := patientConsultationsCacheKey(patientID, limit)
 		if err := s.cache.Set(ctx, cacheKey, results, patientConsultationsCacheTTL); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to cache patient consultations")
+		} else {
+			s.registerPatientConsultationCacheKey(ctx, patientID, cacheKey)
 		}
 	}
 
@@ -224,7 +227,7 @@ func (s *consultationService) CancelConsultation(ctx context.Context, id uuid.UU
 		return telemedicine.Consultation{}, domain.NewAppError(err, "failed to cancel consultation", 500)
 	}
 
-	s.invalidateConsultationCache(ctx, id, c.PatientID)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	s.logger.Info().Str("consultation_id", id.String()).Str("cancelled_by", cancelledBy.String()).Msg("Consultation cancelled")
 	return updated, nil
 }
@@ -303,7 +306,7 @@ func (s *consultationService) AcceptConsultation(ctx context.Context, id uuid.UU
 		}
 	}
 
-	s.invalidateConsultationCache(ctx, id, c.PatientID)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID, &providerStaffID, updated.ProviderStaffID)...)
 	s.logger.Info().
 		Str("consultation_id", id.String()).
 		Str("staff_id", providerStaffID.String()).
@@ -330,7 +333,7 @@ func (s *consultationService) StartConsultation(ctx context.Context, id uuid.UUI
 		return telemedicine.Consultation{}, domain.NewAppError(err, "failed to start consultation", 500)
 	}
 
-	s.invalidateConsultationCache(ctx, id, c.PatientID)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	return updated, nil
 }
 
@@ -353,7 +356,7 @@ func (s *consultationService) CompleteConsultation(ctx context.Context, id uuid.
 	}
 
 	s.decrementProviderCount(ctx, c.ProviderStaffID)
-	s.invalidateConsultationCache(ctx, id, c.PatientID)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	s.logger.Info().Str("consultation_id", id.String()).Str("ended_by", endedBy.String()).Msg("Consultation completed")
 	return updated, nil
 }
@@ -377,7 +380,7 @@ func (s *consultationService) EscalateConsultation(ctx context.Context, id uuid.
 	}
 
 	s.decrementProviderCount(ctx, c.ProviderStaffID)
-	s.invalidateConsultationCache(ctx, id, c.PatientID)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	s.logger.Info().Str("consultation_id", id.String()).Str("escalated_by", endedBy.String()).Msg("Consultation escalated")
 	return updated, nil
 }
@@ -399,7 +402,7 @@ func (s *consultationService) DeclineConsultation(ctx context.Context, id uuid.U
 		return domain.NewAppError(err, "failed to decline consultation", 500)
 	}
 
-	s.invalidateConsultationCache(ctx, id, c.PatientID)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	return nil
 }
 
@@ -421,7 +424,7 @@ func (s *consultationService) MarkNoShow(ctx context.Context, id uuid.UUID) erro
 	}
 
 	s.decrementProviderCount(ctx, c.ProviderStaffID)
-	s.invalidateConsultationCache(ctx, id, c.PatientID)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	return nil
 }
 
@@ -492,6 +495,11 @@ func (s *consultationService) GetProviderConsultationHistory(ctx context.Context
 
 // UpdatePaymentStatus updates the payment state and records a payment reference.
 func (s *consultationService) UpdatePaymentStatus(ctx context.Context, id uuid.UUID, status telemedicine.PaymentStatus, reference *string) error {
+	c, err := s.mustGetConsultation(ctx, id)
+	if err != nil {
+		return err
+	}
+
 	if err := s.consultationRepo.UpdatePaymentStatus(ctx, id, status, reference); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.NewAppError(err, "consultation not found", 404)
@@ -499,12 +507,17 @@ func (s *consultationService) UpdatePaymentStatus(ctx context.Context, id uuid.U
 		s.logger.Error().Err(err).Str("consultation_id", id.String()).Msg("Failed to update payment status")
 		return domain.NewAppError(err, "failed to update payment status", 500)
 	}
-	s.invalidateCacheByID(ctx, id)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	return nil
 }
 
 // UpdateConsultationChannel changes the channel (e.g. chat → video).
 func (s *consultationService) UpdateConsultationChannel(ctx context.Context, id uuid.UUID, channel telemedicine.ConsultationChannel) error {
+	c, err := s.mustGetConsultation(ctx, id)
+	if err != nil {
+		return err
+	}
+
 	if err := s.consultationRepo.UpdateConsultationChannel(ctx, id, channel); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.NewAppError(err, "consultation not found", 404)
@@ -512,12 +525,17 @@ func (s *consultationService) UpdateConsultationChannel(ctx context.Context, id 
 		s.logger.Error().Err(err).Str("consultation_id", id.String()).Msg("Failed to update channel")
 		return domain.NewAppError(err, "failed to update consultation channel", 500)
 	}
-	s.invalidateCacheByID(ctx, id)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	return nil
 }
 
 // LinkFollowUpAppointment associates a follow-up booking with a closed consultation.
 func (s *consultationService) LinkFollowUpAppointment(ctx context.Context, id uuid.UUID, appointmentID uuid.UUID) error {
+	c, err := s.mustGetConsultation(ctx, id)
+	if err != nil {
+		return err
+	}
+
 	if err := s.consultationRepo.LinkFollowUpAppointment(ctx, id, appointmentID); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.NewAppError(err, "consultation not found", 404)
@@ -525,7 +543,7 @@ func (s *consultationService) LinkFollowUpAppointment(ctx context.Context, id uu
 		s.logger.Error().Err(err).Str("consultation_id", id.String()).Msg("Failed to link follow-up appointment")
 		return domain.NewAppError(err, "failed to link follow-up appointment", 500)
 	}
-	s.invalidateCacheByID(ctx, id)
+	s.invalidateConsultationCache(ctx, id, c.PatientID, providerUUIDs(c.ProviderStaffID)...)
 	return nil
 }
 
@@ -564,15 +582,23 @@ func (s *consultationService) setConsultationCache(ctx context.Context, c teleme
 	}
 }
 
-func (s *consultationService) invalidateConsultationCache(ctx context.Context, id uuid.UUID, patientID uuid.UUID) {
+func (s *consultationService) invalidateConsultationCache(ctx context.Context, id uuid.UUID, patientID uuid.UUID, providerStaffIDs ...uuid.UUID) {
 	if s.cache == nil || !s.cache.IsAvailable() {
 		return
 	}
-	for _, k := range []string{
+	keys := []string{
 		consultationCacheKey(id),
-		patientConsultationsCacheKey(patientID, 20),
 		"consultation:waiting_room",
-	} {
+	}
+	keys = append(keys, s.collectPatientConsultationCacheKeys(ctx, patientID)...)
+	keys = append(keys, patientConsultationsCacheKey(patientID, 20), patientConsultationIndexKey(patientID))
+	for _, providerStaffID := range providerStaffIDs {
+		if providerStaffID == uuid.Nil {
+			continue
+		}
+		keys = append(keys, providerActiveConsultationsCacheKey(providerStaffID))
+	}
+	for _, k := range uniqueStrings(keys) {
 		if err := s.cache.Delete(ctx, k); err != nil {
 			s.logger.Warn().Err(err).Str("key", k).Msg("Failed to invalidate cache key")
 		}
@@ -592,14 +618,38 @@ func (s *consultationService) invalidatePatientConsultationCache(ctx context.Con
 	if s.cache == nil || !s.cache.IsAvailable() {
 		return
 	}
-	for _, k := range []string{
+	keys := append(s.collectPatientConsultationCacheKeys(ctx, patientID),
 		patientConsultationsCacheKey(patientID, 20),
+		patientConsultationIndexKey(patientID),
 		"consultation:waiting_room",
-	} {
+	)
+	for _, k := range uniqueStrings(keys) {
 		if err := s.cache.Delete(ctx, k); err != nil {
 			s.logger.Warn().Err(err).Str("key", k).Msg("Failed to invalidate cache key")
 		}
 	}
+}
+
+func (s *consultationService) registerPatientConsultationCacheKey(ctx context.Context, patientID uuid.UUID, cacheKey string) {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return
+	}
+	keys := s.collectPatientConsultationCacheKeys(ctx, patientID)
+	keys = append(keys, cacheKey)
+	if err := s.cache.Set(ctx, patientConsultationIndexKey(patientID), uniqueStrings(keys), consultationHistoryIndexTTL); err != nil {
+		s.logger.Warn().Err(err).Str("patient_id", patientID.String()).Msg("Failed to update patient consultation cache index")
+	}
+}
+
+func (s *consultationService) collectPatientConsultationCacheKeys(ctx context.Context, patientID uuid.UUID) []string {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return nil
+	}
+	var keys []string
+	if err := s.cache.Get(ctx, patientConsultationIndexKey(patientID), &keys); err != nil {
+		return nil
+	}
+	return keys
 }
 
 // ─── Cache key builders ───────────────────────────────────────────────────────
@@ -612,6 +662,34 @@ func patientConsultationsCacheKey(patientID uuid.UUID, limit int) string {
 	return fmt.Sprintf("consultations:patient:%s:limit:%d", patientID.String(), limit)
 }
 
+func patientConsultationIndexKey(patientID uuid.UUID) string {
+	return fmt.Sprintf("consultations:patient:index:%s", patientID.String())
+}
+
 func providerActiveConsultationsCacheKey(staffID uuid.UUID) string {
 	return fmt.Sprintf("consultations:provider:active:%s", staffID.String())
+}
+
+func providerUUIDs(ids ...*uuid.UUID) []uuid.UUID {
+	result := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if id == nil || *id == uuid.Nil {
+			continue
+		}
+		result = append(result, *id)
+	}
+	return result
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
 }

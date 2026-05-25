@@ -23,6 +23,10 @@ type immunizationService struct {
 	logger           *zerolog.Logger
 }
 
+func (s *immunizationService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewImmunizationService creates a new immunization service
 func NewImmunizationService(
 	immunizationRepo repository.PatientImmunizationRepository,
@@ -123,9 +127,11 @@ func (s *immunizationService) GetPatientImmunizations(ctx context.Context, patie
 	// Try cache first
 	cacheKey := fmt.Sprintf("immunizations:all:%s", patientID.String())
 	var immunizations []patients.PatientImmunization
-	if err := s.cache.Get(ctx, cacheKey, &immunizations); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient immunizations retrieved from cache")
-		return immunizations, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &immunizations); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient immunizations retrieved from cache")
+			return immunizations, nil
+		}
 	}
 
 	// Fetch from database
@@ -136,8 +142,10 @@ func (s *immunizationService) GetPatientImmunizations(ctx context.Context, patie
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, immunizations, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient immunizations")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, immunizations, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient immunizations")
+		}
 	}
 
 	s.logger.Debug().
@@ -172,9 +180,11 @@ func (s *immunizationService) GetUpcomingImmunizations(ctx context.Context, pati
 	// Try cache first
 	cacheKey := fmt.Sprintf("immunizations:upcoming:%s", patientID.String())
 	var immunizations []patients.PatientImmunization
-	if err := s.cache.Get(ctx, cacheKey, &immunizations); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Upcoming immunizations retrieved from cache")
-		return immunizations, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &immunizations); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Upcoming immunizations retrieved from cache")
+			return immunizations, nil
+		}
 	}
 
 	// Fetch from database
@@ -194,8 +204,10 @@ func (s *immunizationService) GetUpcomingImmunizations(ctx context.Context, pati
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, futureImmunizations, 24*time.Hour); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache upcoming immunizations")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, futureImmunizations, 24*time.Hour); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache upcoming immunizations")
+		}
 	}
 
 	s.logger.Debug().
@@ -339,8 +351,10 @@ func (s *immunizationService) invalidateImmunizationCache(ctx context.Context, p
 	}
 
 	for _, key := range cacheKeys {
-		if err := s.cache.Delete(ctx, key); err != nil {
-			s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate immunization cache")
+		if s.cacheAvailable() {
+			if err := s.cache.Delete(ctx, key); err != nil {
+				s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate immunization cache")
+			}
 		}
 	}
 }

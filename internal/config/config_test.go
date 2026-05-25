@@ -129,3 +129,45 @@ func TestGetEnvAsDurationSupportsAdditionalUnits(t *testing.T) {
 	t.Setenv("JWT_EXPIRY", "3")
 	assert.Equal(t, 3*time.Second, getEnvAsDuration("JWT_EXPIRY", time.Minute))
 }
+
+func TestLoadRejectsSMSEnabledWithoutProvider(t *testing.T) {
+	t.Setenv("DB_URL", "postgresql://postgres:replace_me@localhost:5432/healthcare_db?sslmode=disable")
+	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
+	t.Setenv("ENVIRONMENT", "development")
+	t.Setenv("SMS_ENABLED", "true")
+
+	_, err := Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "SMS_PROVIDER is required")
+}
+
+func TestLoadRejectsTwilioSMSWithoutCredentials(t *testing.T) {
+	t.Setenv("DB_URL", "postgresql://postgres:replace_me@localhost:5432/healthcare_db?sslmode=disable")
+	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
+	t.Setenv("ENVIRONMENT", "development")
+	t.Setenv("SMS_ENABLED", "true")
+	t.Setenv("SMS_PROVIDER", "twilio")
+
+	_, err := Load()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "TWILIO_ACCOUNT_SID is required")
+	assert.Contains(t, err.Error(), "TWILIO_AUTH_TOKEN is required")
+	assert.Contains(t, err.Error(), "TWILIO_FROM_NUMBER is required")
+}
+
+func TestLoadAllowsTwilioSMSWhenConfigured(t *testing.T) {
+	t.Setenv("DB_URL", "postgresql://postgres:replace_me@localhost:5432/healthcare_db?sslmode=disable")
+	t.Setenv("JWT_SECRET", strings.Repeat("x", 32))
+	t.Setenv("ENVIRONMENT", "development")
+	t.Setenv("SMS_ENABLED", "true")
+	t.Setenv("SMS_PROVIDER", "twilio")
+	t.Setenv("TWILIO_ACCOUNT_SID", "AC123")
+	t.Setenv("TWILIO_AUTH_TOKEN", "secret")
+	t.Setenv("TWILIO_FROM_NUMBER", "+15551234567")
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	assert.True(t, cfg.SMSEnabled)
+	assert.Equal(t, "twilio", cfg.SMSProvider)
+	assert.Equal(t, "AC123", cfg.TwilioAccountSID)
+}

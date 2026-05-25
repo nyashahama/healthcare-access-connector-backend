@@ -128,9 +128,11 @@ func (s *systemAdminService) GetSystemAdminByUserID(ctx context.Context, userID 
 	// Try cache first
 	cacheKey := fmt.Sprintf("system_admin:user:%s", userID.String())
 	var sysAdmin admin.SystemAdmin
-	if err := s.cache.Get(ctx, cacheKey, &sysAdmin); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("System admin retrieved from cache")
-		return sysAdmin, nil
+	if s.cache != nil && s.cache.IsAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &sysAdmin); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("System admin retrieved from cache")
+			return sysAdmin, nil
+		}
 	}
 
 	// Fetch from database
@@ -144,8 +146,10 @@ func (s *systemAdminService) GetSystemAdminByUserID(ctx context.Context, userID 
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, sysAdmin, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache system admin")
+	if s.cache != nil && s.cache.IsAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, sysAdmin, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache system admin")
+		}
 	}
 
 	return sysAdmin, nil

@@ -22,6 +22,10 @@ type notificationService struct {
 	logger           *zerolog.Logger
 }
 
+func (s *notificationService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewNotificationService creates a new notification service
 func NewNotificationService(
 	notificationRepo repository.NotificationRepository,
@@ -50,9 +54,11 @@ func (s *notificationService) GetPreferences(ctx context.Context, userID uuid.UU
 	// Try cache first
 	cacheKey := fmt.Sprintf("notification:preferences:%s", userID.String())
 	var prefs core.NotificationPreferences
-	if err := s.cache.Get(ctx, cacheKey, &prefs); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("Notification preferences retrieved from cache")
-		return prefs, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &prefs); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("Notification preferences retrieved from cache")
+			return prefs, nil
+		}
 	}
 
 	// Fetch from database
@@ -67,8 +73,10 @@ func (s *notificationService) GetPreferences(ctx context.Context, userID uuid.UU
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, prefs, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache notification preferences")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, prefs, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache notification preferences")
+		}
 	}
 
 	return prefs, nil
@@ -263,8 +271,10 @@ func (s *notificationService) createDefaultPreferences(ctx context.Context, user
 
 	// Cache the result
 	cacheKey := fmt.Sprintf("notification:preferences:%s", userID.String())
-	if err := s.cache.Set(ctx, cacheKey, createdPrefs, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache default notification preferences")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, createdPrefs, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache default notification preferences")
+		}
 	}
 
 	s.logger.Info().
@@ -315,6 +325,10 @@ func (s *notificationService) validatePreferences(prefs core.NotificationPrefere
 }
 
 func (s *notificationService) invalidatePreferencesCache(ctx context.Context, userID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKey := fmt.Sprintf("notification:preferences:%s", userID.String())
 	if err := s.cache.Delete(ctx, cacheKey); err != nil {
 		s.logger.Warn().Err(err).Str("key", cacheKey).Msg("Failed to invalidate notification preferences cache")

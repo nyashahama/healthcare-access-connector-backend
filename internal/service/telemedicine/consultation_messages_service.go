@@ -20,6 +20,7 @@ import (
 const (
 	messageThreadCacheTTL = 30 * time.Second // messages change frequently; keep very short
 	unreadCountCacheTTL   = 15 * time.Second
+	messageThreadIndexTTL = 5 * time.Minute
 )
 
 type consultationMessagesService struct {
@@ -117,6 +118,7 @@ func (s *consultationMessagesService) SendMessage(ctx context.Context, msg telem
 
 	// Invalidate the thread cache so the next poll gets fresh data
 	s.invalidateThreadCache(ctx, msg.ConsultationID)
+	s.invalidateUnreadCache(ctx, msg.ConsultationID, msg.SenderRole)
 
 	return created, nil
 }
@@ -148,6 +150,7 @@ func (s *consultationMessagesService) DeleteMessage(ctx context.Context, id uuid
 	}
 
 	s.invalidateThreadCache(ctx, msg.ConsultationID)
+	s.invalidateUnreadCache(ctx, msg.ConsultationID, msg.SenderRole)
 	return nil
 }
 
@@ -195,6 +198,8 @@ func (s *consultationMessagesService) GetConsultationMessages(ctx context.Contex
 		cacheKey := messageThreadCacheKey(consultationID, limit)
 		if err := s.cache.Set(ctx, cacheKey, msgs, messageThreadCacheTTL); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to cache message thread")
+		} else {
+			s.registerThreadCacheKey(ctx, consultationID, cacheKey)
 		}
 	}
 
@@ -248,6 +253,15 @@ func (s *consultationMessagesService) GetConsultationAttachments(ctx context.Con
 
 // MarkMessageRead marks a single message as read.
 func (s *consultationMessagesService) MarkMessageRead(ctx context.Context, id uuid.UUID) error {
+	msg, err := s.messagesRepo.GetMessageByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.NewAppError(err, "message not found", 404)
+		}
+		s.logger.Error().Err(err).Str("message_id", id.String()).Msg("Failed to retrieve message before marking read")
+		return domain.NewAppError(err, "failed to retrieve message", 500)
+	}
+
 	if err := s.messagesRepo.MarkMessageRead(ctx, id); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.NewAppError(err, "message not found", 404)
@@ -255,6 +269,8 @@ func (s *consultationMessagesService) MarkMessageRead(ctx context.Context, id uu
 		s.logger.Error().Err(err).Str("message_id", id.String()).Msg("Failed to mark message read")
 		return domain.NewAppError(err, "failed to mark message as read", 500)
 	}
+
+	s.invalidateUnreadCache(ctx, msg.ConsultationID, msg.SenderRole)
 	return nil
 }
 
@@ -311,9 +327,11 @@ func (s *consultationMessagesService) invalidateThreadCache(ctx context.Context,
 	if s.cache == nil || !s.cache.IsAvailable() {
 		return
 	}
-	key := messageThreadCacheKey(consultationID, 20)
-	if err := s.cache.Delete(ctx, key); err != nil {
-		s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate thread cache")
+	keys := append(s.collectThreadCacheKeys(ctx, consultationID), messageThreadCacheKey(consultationID, 20), messageThreadIndexKey(consultationID))
+	for _, key := range uniqueMessageCacheKeys(keys) {
+		if err := s.cache.Delete(ctx, key); err != nil {
+			s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate thread cache")
+		}
 	}
 }
 
@@ -335,4 +353,48 @@ func messageThreadCacheKey(consultationID uuid.UUID, limit int) string {
 
 func unreadCountCacheKey(consultationID uuid.UUID, role telemedicine.SenderRole) string {
 	return fmt.Sprintf("messages:unread:%s:role:%s", consultationID.String(), string(role))
+}
+
+func messageThreadIndexKey(consultationID uuid.UUID) string {
+	return fmt.Sprintf("messages:thread:index:%s", consultationID.String())
+}
+
+func (s *consultationMessagesService) registerThreadCacheKey(ctx context.Context, consultationID uuid.UUID, cacheKey string) {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return
+	}
+
+	keys := s.collectThreadCacheKeys(ctx, consultationID)
+	keys = append(keys, cacheKey)
+	if err := s.cache.Set(ctx, messageThreadIndexKey(consultationID), uniqueMessageCacheKeys(keys), messageThreadIndexTTL); err != nil {
+		s.logger.Warn().Err(err).Str("consultation_id", consultationID.String()).Msg("Failed to update message thread cache index")
+	}
+}
+
+func (s *consultationMessagesService) collectThreadCacheKeys(ctx context.Context, consultationID uuid.UUID) []string {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return nil
+	}
+
+	var keys []string
+	if err := s.cache.Get(ctx, messageThreadIndexKey(consultationID), &keys); err != nil {
+		return nil
+	}
+	return keys
+}
+
+func uniqueMessageCacheKeys(keys []string) []string {
+	seen := make(map[string]struct{}, len(keys))
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, key)
+	}
+	return result
 }

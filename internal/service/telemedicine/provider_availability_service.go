@@ -21,6 +21,7 @@ const (
 	availabilityByStaffCacheTTL      = 30 * time.Second
 	availableProvidersCacheTTL       = 15 * time.Second // patient-facing list; keep near-real-time
 	availableProvidersBySpecCacheTTL = 15 * time.Second
+	availableProvidersIndexTTL       = 5 * time.Minute
 )
 
 type providerAvailabilityService struct {
@@ -243,6 +244,8 @@ func (s *providerAvailabilityService) GetAvailableProviders(ctx context.Context,
 	if s.cache != nil && s.cache.IsAvailable() {
 		if err := s.cache.Set(ctx, cacheKey, providers, availableProvidersCacheTTL); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to cache available providers")
+		} else {
+			s.registerAvailableProvidersCacheKey(ctx, availableProvidersRegistryKey(), cacheKey)
 		}
 	}
 
@@ -272,6 +275,8 @@ func (s *providerAvailabilityService) GetAvailableProvidersBySpecialization(ctx 
 	if s.cache != nil && s.cache.IsAvailable() {
 		if err := s.cache.Set(ctx, cacheKey, providers, availableProvidersBySpecCacheTTL); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to cache providers by specialization")
+		} else {
+			s.registerAvailableProvidersCacheKey(ctx, availableProvidersBySpecRegistryKey(), cacheKey)
 		}
 	}
 
@@ -314,7 +319,10 @@ func (s *providerAvailabilityService) invalidateProviderCache(ctx context.Contex
 		availabilityByStaffCacheKey(staffID),
 		availableProvidersCacheKey(nil), // global list
 	}
-	for _, k := range keys {
+	keys = append(keys, s.collectRegisteredCacheKeys(ctx, availableProvidersRegistryKey())...)
+	keys = append(keys, s.collectRegisteredCacheKeys(ctx, availableProvidersBySpecRegistryKey())...)
+	keys = append(keys, availableProvidersRegistryKey(), availableProvidersBySpecRegistryKey())
+	for _, k := range uniqueCacheKeys(keys) {
 		if err := s.cache.Delete(ctx, k); err != nil {
 			s.logger.Warn().Err(err).Str("key", k).Msg("Failed to invalidate cache key")
 		}
@@ -325,9 +333,39 @@ func (s *providerAvailabilityService) invalidateAvailableProvidersCache(ctx cont
 	if s.cache == nil || !s.cache.IsAvailable() {
 		return
 	}
-	if err := s.cache.Delete(ctx, availableProvidersCacheKey(nil)); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to invalidate available providers cache")
+	keys := []string{availableProvidersCacheKey(nil)}
+	keys = append(keys, s.collectRegisteredCacheKeys(ctx, availableProvidersRegistryKey())...)
+	keys = append(keys, s.collectRegisteredCacheKeys(ctx, availableProvidersBySpecRegistryKey())...)
+	keys = append(keys, availableProvidersRegistryKey(), availableProvidersBySpecRegistryKey())
+	for _, key := range uniqueCacheKeys(keys) {
+		if err := s.cache.Delete(ctx, key); err != nil {
+			s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate available providers cache")
+		}
 	}
+}
+
+func (s *providerAvailabilityService) registerAvailableProvidersCacheKey(ctx context.Context, indexKey, cacheKey string) {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return
+	}
+
+	keys := s.collectRegisteredCacheKeys(ctx, indexKey)
+	keys = append(keys, cacheKey)
+	if err := s.cache.Set(ctx, indexKey, uniqueCacheKeys(keys), availableProvidersIndexTTL); err != nil {
+		s.logger.Warn().Err(err).Str("index_key", indexKey).Msg("Failed to update provider availability cache index")
+	}
+}
+
+func (s *providerAvailabilityService) collectRegisteredCacheKeys(ctx context.Context, indexKey string) []string {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return nil
+	}
+
+	var keys []string
+	if err := s.cache.Get(ctx, indexKey, &keys); err != nil {
+		return nil
+	}
+	return keys
 }
 
 // ─── Cache key builders ───────────────────────────────────────────────────────
@@ -345,6 +383,30 @@ func availableProvidersCacheKey(clinicID *uuid.UUID) string {
 
 func availableProvidersBySpecCacheKey(specialization string) string {
 	return fmt.Sprintf("providers:available:spec:%s", specialization)
+}
+
+func availableProvidersRegistryKey() string {
+	return "providers:available:index"
+}
+
+func availableProvidersBySpecRegistryKey() string {
+	return "providers:available:spec:index"
+}
+
+func uniqueCacheKeys(keys []string) []string {
+	seen := make(map[string]struct{}, len(keys))
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, key)
+	}
+	return result
 }
 
 // ─── Misc helpers ─────────────────────────────────────────────────────────────

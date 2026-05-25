@@ -277,6 +277,27 @@ type EmergencyContact struct {
 	UpdatedAt            pgtype.Timestamp `json:"updated_at"`
 }
 
+type ForumComment struct {
+	ID        pgtype.UUID      `json:"id"`
+	PostID    pgtype.UUID      `json:"post_id"`
+	AuthorID  pgtype.UUID      `json:"author_id"`
+	Content   string           `json:"content"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+}
+
+type ForumPost struct {
+	ID        pgtype.UUID      `json:"id"`
+	AuthorID  pgtype.UUID      `json:"author_id"`
+	Title     string           `json:"title"`
+	Content   string           `json:"content"`
+	Category  string           `json:"category"`
+	IsPinned  pgtype.Bool      `json:"is_pinned"`
+	ViewCount pgtype.Int4      `json:"view_count"`
+	CreatedAt pgtype.Timestamp `json:"created_at"`
+	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+}
+
 type NgoPartner struct {
 	ID                   pgtype.UUID      `json:"id"`
 	UserID               pgtype.UUID      `json:"user_id"`

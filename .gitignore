@@ -47,3 +47,4 @@ dist/
 build/
 # Air (hot reload)
 tmp/
+api

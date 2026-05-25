@@ -22,6 +22,10 @@ type dependentHealthRecordService struct {
 	logger              *zerolog.Logger
 }
 
+func (s *dependentHealthRecordService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewDependentHealthRecordService creates a new dependent health record service
 func NewDependentHealthRecordService(
 	dependentHealthRepo repository.DependentHealthRecordRepository,
@@ -107,9 +111,11 @@ func (s *dependentHealthRecordService) GetDependentHealthRecords(ctx context.Con
 	// Try cache first
 	cacheKey := fmt.Sprintf("dependent_health:all:%s", dependentID.String())
 	var records []patients.DependentHealthRecord
-	if err := s.cache.Get(ctx, cacheKey, &records); err == nil {
-		s.logger.Debug().Str("dependent_id", dependentID.String()).Msg("Dependent health records retrieved from cache")
-		return records, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &records); err == nil {
+			s.logger.Debug().Str("dependent_id", dependentID.String()).Msg("Dependent health records retrieved from cache")
+			return records, nil
+		}
 	}
 
 	// Fetch from database
@@ -120,8 +126,10 @@ func (s *dependentHealthRecordService) GetDependentHealthRecords(ctx context.Con
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, records, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache dependent health records")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, records, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache dependent health records")
+		}
 	}
 
 	s.logger.Debug().
@@ -152,9 +160,11 @@ func (s *dependentHealthRecordService) GetGrowthRecords(ctx context.Context, dep
 	// Try cache first
 	cacheKey := fmt.Sprintf("dependent_health:growth:%s", dependentID.String())
 	var records []patients.DependentHealthRecord
-	if err := s.cache.Get(ctx, cacheKey, &records); err == nil {
-		s.logger.Debug().Str("dependent_id", dependentID.String()).Msg("Growth records retrieved from cache")
-		return records, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &records); err == nil {
+			s.logger.Debug().Str("dependent_id", dependentID.String()).Msg("Growth records retrieved from cache")
+			return records, nil
+		}
 	}
 
 	// Fetch from database
@@ -165,8 +175,10 @@ func (s *dependentHealthRecordService) GetGrowthRecords(ctx context.Context, dep
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, records, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache growth records")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, records, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache growth records")
+		}
 	}
 
 	s.logger.Debug().
@@ -306,6 +318,10 @@ func (s *dependentHealthRecordService) validateDependentHealthRecord(record pati
 
 // Helper methods
 func (s *dependentHealthRecordService) invalidateDependentHealthCache(ctx context.Context, dependentID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("dependent_health:all:%s", dependentID.String()),
 		fmt.Sprintf("dependent_health:growth:%s", dependentID.String()),

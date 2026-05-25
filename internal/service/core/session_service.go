@@ -22,6 +22,17 @@ type sessionService struct {
 	logger      *zerolog.Logger
 }
 
+func (s *sessionService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
+func sessionTokenPrefix(token string) string {
+	if len(token) <= 8 {
+		return token
+	}
+	return token[:8]
+}
+
 // NewSessionService creates a new session service
 func NewSessionService(
 	sessionRepo repository.SessionRepository,
@@ -65,13 +76,15 @@ func (s *sessionService) CreateSession(ctx context.Context, userID uuid.UUID, to
 
 	// Cache the session
 	cacheKey := fmt.Sprintf("session:%s", token)
-	if err := s.cache.Set(ctx, cacheKey, createdSession, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache session")
-	}
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, createdSession, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache session")
+		}
 
-	// Invalidate user sessions cache
-	if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
-		s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+		// Invalidate user sessions cache
+		if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
+			s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+		}
 	}
 
 	s.logger.Info().
@@ -89,16 +102,18 @@ func (s *sessionService) GetSession(ctx context.Context, token string) (core.Use
 	defer func() {
 		s.logger.Debug().
 			Dur("duration_ms", time.Since(start)).
-			Str("token_prefix", token[:8]).
+			Str("token_prefix", sessionTokenPrefix(token)).
 			Msg("GetSession completed")
 	}()
 
 	// Try cache first
 	cacheKey := fmt.Sprintf("session:%s", token)
 	var session core.UserSession
-	if err := s.cache.Get(ctx, cacheKey, &session); err == nil {
-		s.logger.Debug().Str("token_prefix", token[:8]).Msg("Session retrieved from cache")
-		return session, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &session); err == nil {
+			s.logger.Debug().Str("token_prefix", sessionTokenPrefix(token)).Msg("Session retrieved from cache")
+			return session, nil
+		}
 	}
 
 	// Fetch from database
@@ -119,8 +134,10 @@ func (s *sessionService) GetSession(ctx context.Context, token string) (core.Use
 	}
 
 	// Cache the session
-	if err := s.cache.Set(ctx, cacheKey, session, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache session")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, session, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache session")
+		}
 	}
 
 	return session, nil
@@ -139,9 +156,11 @@ func (s *sessionService) GetUserSessions(ctx context.Context, userID uuid.UUID) 
 	// Try cache first
 	cacheKey := fmt.Sprintf("user:sessions:%s", userID.String())
 	var sessions []core.UserSession
-	if err := s.cache.Get(ctx, cacheKey, &sessions); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("User sessions retrieved from cache")
-		return sessions, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &sessions); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("User sessions retrieved from cache")
+			return sessions, nil
+		}
 	}
 
 	// Fetch from database
@@ -161,8 +180,10 @@ func (s *sessionService) GetUserSessions(ctx context.Context, userID uuid.UUID) 
 	}
 
 	// Cache the active sessions
-	if err := s.cache.Set(ctx, cacheKey, activeSessions, 2*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache user sessions")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, activeSessions, 2*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache user sessions")
+		}
 	}
 
 	return activeSessions, nil
@@ -174,7 +195,7 @@ func (s *sessionService) RevokeSession(ctx context.Context, token string, userID
 	defer func() {
 		s.logger.Debug().
 			Dur("duration_ms", time.Since(start)).
-			Str("token_prefix", token[:8]).
+			Str("token_prefix", sessionTokenPrefix(token)).
 			Str("user_id", userID.String()).
 			Msg("RevokeSession completed")
 	}()
@@ -228,8 +249,10 @@ func (s *sessionService) RevokeAllSessions(ctx context.Context, userID uuid.UUID
 	}
 
 	// Invalidate cache
-	if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
-		s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+	if s.cacheAvailable() {
+		if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
+			s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+		}
 	}
 
 	s.logger.Info().
@@ -257,8 +280,10 @@ func (s *sessionService) RevokeAllExceptCurrent(ctx context.Context, userID, cur
 	}
 
 	// Invalidate cache
-	if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
-		s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+	if s.cacheAvailable() {
+		if err := s.cache.Delete(ctx, fmt.Sprintf("user:sessions:%s", userID.String())); err != nil {
+			s.logger.Warn().Err(err).Str("user_id", userID.String()).Msg("Failed to invalidate user session cache")
+		}
 	}
 
 	s.logger.Info().
@@ -392,7 +417,7 @@ func (s *sessionService) ValidateAndExtendSession(ctx context.Context, token str
 	defer func() {
 		s.logger.Debug().
 			Dur("duration_ms", time.Since(start)).
-			Str("token_prefix", token[:8]).
+			Str("token_prefix", sessionTokenPrefix(token)).
 			Msg("ValidateAndExtendSession completed")
 	}()
 
@@ -434,12 +459,18 @@ func (s *sessionService) cleanupExpiredSession(token string) {
 	}
 
 	// Invalidate cache
-	if err := s.cache.Delete(ctx, fmt.Sprintf("session:%s", token)); err != nil {
-		s.logger.Warn().Err(err).Str("token_prefix", token[:8]).Msg("Failed to remove expired session cache")
+	if s.cacheAvailable() {
+		if err := s.cache.Delete(ctx, fmt.Sprintf("session:%s", token)); err != nil {
+			s.logger.Warn().Err(err).Str("token_prefix", sessionTokenPrefix(token)).Msg("Failed to remove expired session cache")
+		}
 	}
 }
 
 func (s *sessionService) invalidateSessionCaches(ctx context.Context, token string, userID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("session:%s", token),
 		fmt.Sprintf("user:sessions:%s", userID.String()),
