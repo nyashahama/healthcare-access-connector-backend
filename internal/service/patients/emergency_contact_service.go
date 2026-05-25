@@ -23,6 +23,10 @@ type emergencyContactService struct {
 	logger               *zerolog.Logger
 }
 
+func (s *emergencyContactService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewEmergencyContactService creates a new emergency contact service
 func NewEmergencyContactService(
 	emergencyContactRepo repository.EmergencyContactRepository,
@@ -142,9 +146,11 @@ func (s *emergencyContactService) GetPatientEmergencyContacts(ctx context.Contex
 	// Try cache first
 	cacheKey := fmt.Sprintf("emergency_contacts:all:%s", patientID.String())
 	var contacts []patients.EmergencyContact
-	if err := s.cache.Get(ctx, cacheKey, &contacts); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient emergency contacts retrieved from cache")
-		return contacts, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &contacts); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient emergency contacts retrieved from cache")
+			return contacts, nil
+		}
 	}
 
 	// Fetch from database
@@ -155,8 +161,10 @@ func (s *emergencyContactService) GetPatientEmergencyContacts(ctx context.Contex
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, contacts, 60*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient emergency contacts")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, contacts, 60*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient emergency contacts")
+		}
 	}
 
 	s.logger.Debug().
@@ -191,9 +199,11 @@ func (s *emergencyContactService) GetPrimaryEmergencyContact(ctx context.Context
 	// Try cache first
 	cacheKey := fmt.Sprintf("emergency_contacts:primary:%s", patientID.String())
 	var contact patients.EmergencyContact
-	if err := s.cache.Get(ctx, cacheKey, &contact); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Primary emergency contact retrieved from cache")
-		return contact, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &contact); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Primary emergency contact retrieved from cache")
+			return contact, nil
+		}
 	}
 
 	// Fetch from database
@@ -208,8 +218,10 @@ func (s *emergencyContactService) GetPrimaryEmergencyContact(ctx context.Context
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, contact, 60*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache primary emergency contact")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, contact, 60*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache primary emergency contact")
+		}
 	}
 
 	s.logger.Debug().
@@ -389,8 +401,10 @@ func (s *emergencyContactService) invalidateEmergencyContactCache(ctx context.Co
 	}
 
 	for _, key := range cacheKeys {
-		if err := s.cache.Delete(ctx, key); err != nil {
-			s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate emergency contact cache")
+		if s.cacheAvailable() {
+			if err := s.cache.Delete(ctx, key); err != nil {
+				s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate emergency contact cache")
+			}
 		}
 	}
 }

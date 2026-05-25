@@ -29,6 +29,10 @@ type userService struct {
 	logger           *zerolog.Logger
 }
 
+func (s *userService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewUserService creates a new user service
 func NewUserService(
 	userRepo repository.UserRepository,
@@ -63,9 +67,11 @@ func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (core.U
 
 	// Try cache first
 	var user core.User
-	if err := s.cache.Get(ctx, cacheKey, &user); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("User retrieved from cache")
-		return user, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &user); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("User retrieved from cache")
+			return user, nil
+		}
 	}
 
 	// Fetch from database using user repo
@@ -76,8 +82,10 @@ func (s *userService) GetUserByID(ctx context.Context, userID uuid.UUID) (core.U
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, user, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache user")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, user, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache user")
+		}
 	}
 
 	return user, nil
@@ -407,9 +415,11 @@ func (s *userService) GetUserProfile(ctx context.Context, userID uuid.UUID) (cor
 		Profile patients.PatientProfile `json:"profile"`
 	}
 	var cached CachedProfile
-	if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("Profile retrieved from cache")
-		return cached.User, cached.Profile, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("Profile retrieved from cache")
+			return cached.User, cached.Profile, nil
+		}
 	}
 
 	// Get user from user repo
@@ -433,8 +443,10 @@ func (s *userService) GetUserProfile(ctx context.Context, userID uuid.UUID) (cor
 		User:    user,
 		Profile: patientProfile,
 	}
-	if err := s.cache.Set(ctx, cacheKey, cached, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache user profile")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, cached, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache user profile")
+		}
 	}
 
 	return user, patientProfile, nil
@@ -442,6 +454,10 @@ func (s *userService) GetUserProfile(ctx context.Context, userID uuid.UUID) (cor
 
 // Helper methods
 func (s *userService) invalidateUserCache(ctx context.Context, userID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("user:%s", userID.String()),
 		fmt.Sprintf("user:profile:%s", userID.String()),

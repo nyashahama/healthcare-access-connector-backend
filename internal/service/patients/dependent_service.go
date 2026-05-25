@@ -23,6 +23,10 @@ type dependentService struct {
 	logger        *zerolog.Logger
 }
 
+func (s *dependentService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewDependentService creates a new dependent service
 func NewDependentService(
 	dependentRepo repository.PatientDependentRepository,
@@ -122,9 +126,11 @@ func (s *dependentService) GetPatientDependents(ctx context.Context, patientID u
 	// Try cache first
 	cacheKey := fmt.Sprintf("dependents:all:%s", patientID.String())
 	var dependents []patients.PatientDependent
-	if err := s.cache.Get(ctx, cacheKey, &dependents); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient dependents retrieved from cache")
-		return dependents, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &dependents); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient dependents retrieved from cache")
+			return dependents, nil
+		}
 	}
 
 	// Fetch from database
@@ -135,8 +141,10 @@ func (s *dependentService) GetPatientDependents(ctx context.Context, patientID u
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, dependents, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient dependents")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, dependents, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient dependents")
+		}
 	}
 
 	s.logger.Debug().
@@ -171,9 +179,11 @@ func (s *dependentService) GetDependentChildren(ctx context.Context, patientID u
 	// Try cache first
 	cacheKey := fmt.Sprintf("dependents:children:%s", patientID.String())
 	var dependents []patients.PatientDependent
-	if err := s.cache.Get(ctx, cacheKey, &dependents); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Dependent children retrieved from cache")
-		return dependents, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &dependents); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Dependent children retrieved from cache")
+			return dependents, nil
+		}
 	}
 
 	// Fetch from database
@@ -194,8 +204,10 @@ func (s *dependentService) GetDependentChildren(ctx context.Context, patientID u
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, children, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache dependent children")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, children, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache dependent children")
+		}
 	}
 
 	s.logger.Debug().
@@ -362,6 +374,10 @@ func (s *dependentService) validateDependentAge(dependent patients.PatientDepend
 
 // Helper methods
 func (s *dependentService) invalidateDependentCache(ctx context.Context, patientID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("dependents:all:%s", patientID.String()),
 		fmt.Sprintf("dependents:children:%s", patientID.String()),

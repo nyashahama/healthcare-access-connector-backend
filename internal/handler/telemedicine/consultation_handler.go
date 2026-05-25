@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
 	c_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
 	sc_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
@@ -136,6 +137,13 @@ func (h *ConsultationHandler) GetConsultationByID(w http.ResponseWriter, r *http
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
+	if _, ok := middleware.GetUserFromContext(ctx); !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
+
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
@@ -159,6 +167,13 @@ func (h *ConsultationHandler) GetConsultationByID(w http.ResponseWriter, r *http
 func (h *ConsultationHandler) GetConsultationWithDetails(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
+
+	if _, ok := middleware.GetUserFromContext(ctx); !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
 
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {
@@ -595,6 +610,13 @@ func (h *ConsultationHandler) UpdatePaymentStatus(w http.ResponseWriter, r *http
 func (h *ConsultationHandler) UpdateConsultationChannel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
+
+	if _, ok := middleware.GetUserFromContext(ctx); !ok {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return
+	}
 
 	consultationID, err := parseUUIDParam(r, "id")
 	if err != nil {

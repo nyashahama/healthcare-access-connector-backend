@@ -25,6 +25,10 @@ type serviceCatalogService struct {
 	logger      *zerolog.Logger
 }
 
+func (s *serviceCatalogService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 func NewServiceCatalogService(
 	serviceRepo repository.ServiceRepository,
 	clinicRepo repository.ClinicRepository,
@@ -152,9 +156,11 @@ func (s *serviceCatalogService) GetServiceByID(ctx context.Context, id uuid.UUID
 	// Try cache first
 	cacheKey := fmt.Sprintf("service:%s", id.String())
 	var svc providers.ClinicService
-	if err := s.cache.Get(ctx, cacheKey, &svc); err == nil {
-		s.logger.Debug().Str("service_id", id.String()).Msg("Service retrieved from cache")
-		return svc, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &svc); err == nil {
+			s.logger.Debug().Str("service_id", id.String()).Msg("Service retrieved from cache")
+			return svc, nil
+		}
 	}
 
 	// Fetch from database
@@ -168,8 +174,10 @@ func (s *serviceCatalogService) GetServiceByID(ctx context.Context, id uuid.UUID
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, svc, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache service")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, svc, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache service")
+		}
 	}
 
 	return svc, nil
@@ -293,9 +301,11 @@ func (s *serviceCatalogService) GetClinicServices(ctx context.Context, clinicID 
 	// Try cache first
 	cacheKey := fmt.Sprintf("services:clinic:%s", clinicID.String())
 	var services []providers.ClinicService
-	if err := s.cache.Get(ctx, cacheKey, &services); err == nil {
-		s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic services retrieved from cache")
-		return services, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &services); err == nil {
+			s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic services retrieved from cache")
+			return services, nil
+		}
 	}
 
 	// Get clinic services
@@ -306,8 +316,10 @@ func (s *serviceCatalogService) GetClinicServices(ctx context.Context, clinicID 
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, services, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache clinic services")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, services, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache clinic services")
+		}
 	}
 
 	s.logger.Debug().
@@ -330,9 +342,11 @@ func (s *serviceCatalogService) GetActiveClinicServices(ctx context.Context, cli
 	// Try cache first
 	cacheKey := fmt.Sprintf("services:clinic:%s:active", clinicID.String())
 	var services []providers.ClinicService
-	if err := s.cache.Get(ctx, cacheKey, &services); err == nil {
-		s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Active clinic services retrieved from cache")
-		return services, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &services); err == nil {
+			s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Active clinic services retrieved from cache")
+			return services, nil
+		}
 	}
 
 	// Get active clinic services
@@ -343,8 +357,10 @@ func (s *serviceCatalogService) GetActiveClinicServices(ctx context.Context, cli
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, services, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache active clinic services")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, services, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache active clinic services")
+		}
 	}
 
 	s.logger.Debug().
@@ -404,8 +420,10 @@ func (s *serviceCatalogService) invalidateServiceCache(ctx context.Context, serv
 	}
 
 	for _, key := range cacheKeys {
-		if err := s.cache.Delete(ctx, key); err != nil {
-			s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate service cache")
+		if s.cacheAvailable() {
+			if err := s.cache.Delete(ctx, key); err != nil {
+				s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate service cache")
+			}
 		}
 	}
 }

@@ -23,6 +23,10 @@ type allergyService struct {
 	logger      *zerolog.Logger
 }
 
+func (s *allergyService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewAllergyService creates a new allergy service
 func NewAllergyService(
 	allergyRepo repository.PatientAllergyRepository,
@@ -122,9 +126,11 @@ func (s *allergyService) GetPatientAllergies(ctx context.Context, patientID uuid
 	// Try cache first
 	cacheKey := fmt.Sprintf("allergies:all:%s", patientID.String())
 	var allergies []patients.PatientAllergy
-	if err := s.cache.Get(ctx, cacheKey, &allergies); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient allergies retrieved from cache")
-		return allergies, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &allergies); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient allergies retrieved from cache")
+			return allergies, nil
+		}
 	}
 
 	// Fetch from database
@@ -135,8 +141,10 @@ func (s *allergyService) GetPatientAllergies(ctx context.Context, patientID uuid
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, allergies, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient allergies")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, allergies, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient allergies")
+		}
 	}
 
 	s.logger.Debug().
@@ -171,9 +179,11 @@ func (s *allergyService) GetActivePatientAllergies(ctx context.Context, patientI
 	// Try cache first
 	cacheKey := fmt.Sprintf("allergies:active:%s", patientID.String())
 	var allergies []patients.PatientAllergy
-	if err := s.cache.Get(ctx, cacheKey, &allergies); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Active patient allergies retrieved from cache")
-		return allergies, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &allergies); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Active patient allergies retrieved from cache")
+			return allergies, nil
+		}
 	}
 
 	// Fetch from database
@@ -184,8 +194,10 @@ func (s *allergyService) GetActivePatientAllergies(ctx context.Context, patientI
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, allergies, 15*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache active patient allergies")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, allergies, 15*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache active patient allergies")
+		}
 	}
 
 	s.logger.Debug().
@@ -326,6 +338,10 @@ func (s *allergyService) validatePatientAllergy(allergy patients.PatientAllergy)
 
 // Helper methods
 func (s *allergyService) invalidateAllergyCache(ctx context.Context, patientID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("allergies:all:%s", patientID.String()),
 		fmt.Sprintf("allergies:active:%s", patientID.String()),

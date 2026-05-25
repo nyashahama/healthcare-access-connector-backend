@@ -27,6 +27,10 @@ type staffService struct {
 	logger     *zerolog.Logger
 }
 
+func (s *staffService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 func NewStaffService(
 	staffRepo repository.StaffRepository,
 	clinicRepo repository.ClinicRepository,
@@ -59,7 +63,7 @@ func (s *staffService) CreateStaffMember(ctx context.Context, staff providers.Cl
 	if staff.ClinicID == uuid.Nil {
 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "Clinic ID is required", 400)
 	}
-	if *staff.UserID == uuid.Nil {
+	if staff.UserID == nil || *staff.UserID == uuid.Nil {
 		return providers.ClinicStaff{}, domain.NewAppError(domain.ErrValidation, "User ID is required", 400)
 	}
 	if staff.FirstName == "" {
@@ -402,9 +406,11 @@ func (s *staffService) GetPendingInvitationsByClinic(ctx context.Context, clinic
 	// Try cache first
 	cacheKey := fmt.Sprintf("staff:clinic:%s:invitations:pending", clinicID.String())
 	var invitations []providers.ClinicStaff
-	if err := s.cache.Get(ctx, cacheKey, &invitations); err == nil {
-		s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Pending invitations retrieved from cache")
-		return invitations, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &invitations); err == nil {
+			s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Pending invitations retrieved from cache")
+			return invitations, nil
+		}
 	}
 
 	// Fetch from repository
@@ -415,8 +421,10 @@ func (s *staffService) GetPendingInvitationsByClinic(ctx context.Context, clinic
 	}
 
 	// Cache the result (shorter TTL for invitations)
-	if err := s.cache.Set(ctx, cacheKey, invitations, 2*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache pending invitations")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, invitations, 2*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache pending invitations")
+		}
 	}
 
 	s.logger.Debug().
@@ -589,12 +597,14 @@ func (s *staffService) GetStaffByUserAndClinic(ctx context.Context, userID, clin
 	// Try cache first
 	cacheKey := fmt.Sprintf("staff:user:%s:clinic:%s", userID.String(), clinicID.String())
 	var staff providers.ClinicStaff
-	if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
-		s.logger.Debug().
-			Str("user_id", userID.String()).
-			Str("clinic_id", clinicID.String()).
-			Msg("Staff retrieved from cache")
-		return &staff, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
+			s.logger.Debug().
+				Str("user_id", userID.String()).
+				Str("clinic_id", clinicID.String()).
+				Msg("Staff retrieved from cache")
+			return &staff, nil
+		}
 	}
 
 	// Fetch from repository (returns *providers.ClinicStaff)
@@ -611,8 +621,10 @@ func (s *staffService) GetStaffByUserAndClinic(ctx context.Context, userID, clin
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, *staffPtr, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache staff")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, *staffPtr, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache staff")
+		}
 	}
 
 	s.logger.Debug().
@@ -711,9 +723,11 @@ func (s *staffService) GetStaffByID(ctx context.Context, id uuid.UUID) (provider
 	// Try cache first
 	cacheKey := fmt.Sprintf("staff:%s", id.String())
 	var staff providers.ClinicStaff
-	if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
-		s.logger.Debug().Str("staff_id", id.String()).Msg("Staff retrieved from cache")
-		return staff, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
+			s.logger.Debug().Str("staff_id", id.String()).Msg("Staff retrieved from cache")
+			return staff, nil
+		}
 	}
 
 	// Fetch from database
@@ -727,8 +741,10 @@ func (s *staffService) GetStaffByID(ctx context.Context, id uuid.UUID) (provider
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, staff, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache staff")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, staff, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache staff")
+		}
 	}
 
 	return staff, nil
@@ -746,9 +762,11 @@ func (s *staffService) GetStaffByUserID(ctx context.Context, userID uuid.UUID) (
 	// Try cache first
 	cacheKey := fmt.Sprintf("staff:user:%s", userID.String())
 	var staff providers.ClinicStaff
-	if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("Staff retrieved from cache")
-		return staff, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("Staff retrieved from cache")
+			return staff, nil
+		}
 	}
 
 	// Fetch from database
@@ -762,8 +780,10 @@ func (s *staffService) GetStaffByUserID(ctx context.Context, userID uuid.UUID) (
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, staff, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache staff")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, staff, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache staff")
+		}
 	}
 
 	return staff, nil
@@ -781,9 +801,11 @@ func (s *staffService) GetAllClinicStaff(ctx context.Context, clinicID uuid.UUID
 	// Try cache first
 	cacheKey := fmt.Sprintf("staff:clinic:%s:all", clinicID.String())
 	var staff []providers.ClinicStaff
-	if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
-		s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("All clinic staff retrieved from cache")
-		return staff, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
+			s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("All clinic staff retrieved from cache")
+			return staff, nil
+		}
 	}
 
 	// Fetch from database
@@ -794,8 +816,10 @@ func (s *staffService) GetAllClinicStaff(ctx context.Context, clinicID uuid.UUID
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, staff, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache all clinic staff")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, staff, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache all clinic staff")
+		}
 	}
 
 	s.logger.Debug().
@@ -915,9 +939,11 @@ func (s *staffService) GetClinicStaff(ctx context.Context, clinicID uuid.UUID, r
 	// Try cache first
 	cacheKey := fmt.Sprintf("staff:clinic:%s:role:%s", clinicID.String(), stringPtrToString(role))
 	var staff []providers.ClinicStaff
-	if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
-		s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic staff retrieved from cache")
-		return staff, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
+			s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Clinic staff retrieved from cache")
+			return staff, nil
+		}
 	}
 
 	// Get clinic staff
@@ -928,8 +954,10 @@ func (s *staffService) GetClinicStaff(ctx context.Context, clinicID uuid.UUID, r
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, staff, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache clinic staff")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, staff, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache clinic staff")
+		}
 	}
 
 	s.logger.Debug().
@@ -952,9 +980,11 @@ func (s *staffService) GetActiveClinicStaff(ctx context.Context, clinicID uuid.U
 	// Try cache first
 	cacheKey := fmt.Sprintf("staff:clinic:%s:active", clinicID.String())
 	var staff []providers.ClinicStaff
-	if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
-		s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Active clinic staff retrieved from cache")
-		return staff, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &staff); err == nil {
+			s.logger.Debug().Str("clinic_id", clinicID.String()).Msg("Active clinic staff retrieved from cache")
+			return staff, nil
+		}
 	}
 
 	// Get active clinic staff
@@ -965,8 +995,10 @@ func (s *staffService) GetActiveClinicStaff(ctx context.Context, clinicID uuid.U
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, staff, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache active clinic staff")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, staff, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache active clinic staff")
+		}
 	}
 
 	s.logger.Debug().
@@ -997,6 +1029,10 @@ func (s *staffService) StaffExists(ctx context.Context, id uuid.UUID) (bool, err
 
 // Helper methods
 func (s *staffService) invalidateStaffCache(ctx context.Context, staffID, clinicID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("staff:%s", staffID.String()),
 		fmt.Sprintf("staff:user:*"), // Need user ID to be more specific

@@ -481,6 +481,10 @@ func (s *Server) setupRoutes() http.Handler {
 						r.Delete("/user/{user_id}", s.adminHandler.DeleteSystemAdminByUserID)
 						r.Delete("/{id}", s.adminHandler.DeleteSystemAdmin)
 					})
+					r.Route("/ngo-partners", func(r chi.Router) {
+						r.Post("/", s.adminHandler.CreateNGOPartner)
+						r.Get("/user/{user_id}", s.adminHandler.GetNGOPartnerByUserID)
+					})
 				})
 
 				r.Put("/users/{id}/role", s.userHandler.UpdateUserRole)

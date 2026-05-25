@@ -29,6 +29,7 @@ import (
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
 	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
 	repoproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/providers"
+	reposms "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/sms"
 	repotele "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/telemedicine"
 	repoforum "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
@@ -37,6 +38,7 @@ import (
 	servicecore "github.com/nyashahama/healthcare-access-connector-backend/internal/service/core"
 	servicepatients "github.com/nyashahama/healthcare-access-connector-backend/internal/service/patients"
 	serviceproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/service/providers"
+	servicesms "github.com/nyashahama/healthcare-access-connector-backend/internal/service/sms"
 	servicetele "github.com/nyashahama/healthcare-access-connector-backend/internal/service/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/ws"
 	"github.com/rs/zerolog"
@@ -137,6 +139,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	/* admin */
 	systemAdminRepo := repoadmin.NewSystemAdminRepository(pool)
+	ngoPartnerRepo := repoadmin.NewNGOPartnerRepository(pool)
 
 	/* providers */
 	clinicRepo := repoproviders.NewClinicRepository(pool)
@@ -146,6 +149,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	/* appointments */
 	appointmentRepo := repoappointments.NewAppointmentsRepository(pool)
+	smsRepo := reposms.NewSMSRepository(pool)
 
 	/* telemedicine */
 	symptomCheckerRepo := repotele.NewSymptomCheckerRepository(pool)
@@ -202,11 +206,13 @@ func New(cfg *config.Config) (*App, error) {
 		cacheService,
 		logger,
 	)
+	smsService := servicesms.NewSMSService(smsRepo)
 
 	otpService := servicecore.NewOTPService(
 		authRepo,
 		otpRepo,
 		emailService,
+		smsService,
 		logger,
 		cfg.SMSEnabled,
 		cfg.BcryptCost,
@@ -230,6 +236,13 @@ func New(cfg *config.Config) (*App, error) {
 	auditService := servicecore.NewAuditService(
 		auditRepo,
 		userRepo,
+		cacheService,
+		logger,
+	)
+	ngoPartnerService := serviceadmin.NewNGOPartnerService(
+		ngoPartnerRepo,
+		userRepo,
+		auditService,
 		cacheService,
 		logger,
 	)
@@ -382,7 +395,7 @@ func New(cfg *config.Config) (*App, error) {
 	dependentHandler := handlerpatients.NewDependentHandler(dependentService, logger, cfg.Timeout)
 	dependentHealthHandler := handlerpatients.NewDependentHealthRecordHandler(dependentHealthService, logger, cfg.Timeout)
 
-	adminHandler := handleradmin.NewAdminHandler(systemAdminService, logger, cfg.Timeout)
+	adminHandler := handleradmin.NewAdminHandler(systemAdminService, ngoPartnerService, logger, cfg.Timeout)
 
 	staffHandler := handlerproviders.NewStaffHandler(staffService, userService, emailService, logger, cfg.Timeout)
 	clinicHandler := handlerproviders.NewClinicHandler(clinicService, logger, cfg.Timeout)

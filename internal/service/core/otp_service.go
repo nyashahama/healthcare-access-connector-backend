@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
+	domainsms "github.com/nyashahama/healthcare-access-connector-backend/internal/domain/sms"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/email"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
@@ -25,6 +26,8 @@ type otpService struct {
 	emailService email.Service
 	logger       *zerolog.Logger
 	smsEnabled   bool
+	smsSender    otpSMSSender
+	smsService   service.SMSService
 	bcryptCost   int
 }
 
@@ -33,9 +36,23 @@ func NewOTPService(
 	authRepo repository.AuthRepository,
 	otpRepo repository.OTPRepository,
 	emailService email.Service,
+	smsService service.SMSService,
 	logger *zerolog.Logger,
 	smsEnabled bool,
 	bcryptCost int,
+) service.OTPService {
+	return newOTPService(authRepo, otpRepo, emailService, smsService, logger, smsEnabled, bcryptCost, newTwilioOTPSenderFromEnv())
+}
+
+func newOTPService(
+	authRepo repository.AuthRepository,
+	otpRepo repository.OTPRepository,
+	emailService email.Service,
+	smsService service.SMSService,
+	logger *zerolog.Logger,
+	smsEnabled bool,
+	bcryptCost int,
+	smsSender otpSMSSender,
 ) service.OTPService {
 	return &otpService{
 		authRepo:     authRepo,
@@ -43,6 +60,8 @@ func NewOTPService(
 		emailService: emailService,
 		logger:       logger,
 		smsEnabled:   smsEnabled,
+		smsSender:    smsSender,
+		smsService:   smsService,
 		bcryptCost:   bcryptCost,
 	}
 }
@@ -87,7 +106,12 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) (string
 	// response path for users that also have an email address.
 	if channel == "sms" {
 		sentVia = "sms"
-		canReceiveSMS := s.smsEnabled && user.Phone != nil && *user.Phone != "" && user.SMSConsentGiven
+		canReceiveSMS := s.smsEnabled &&
+			user.Phone != nil &&
+			*user.Phone != "" &&
+			user.SMSConsentGiven &&
+			s.smsSender != nil &&
+			s.smsSender.IsAvailable()
 
 		if !canReceiveSMS {
 			s.logger.Warn().
@@ -146,17 +170,25 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) (string
 			s.logger.Error().Err(err).Msg("Failed to send OTP email")
 			return sentVia, domain.NewAppError(err, "Failed to send OTP email", 500)
 		}
-	} else if channel == "sms" && user.Phone != nil {
-		s.logger.Error().
-			Str("phone", maskIdentifier(*user.Phone)).
-			Msg("SMS OTP delivery is unavailable")
-		s.logger.Info().Str("user_id", user.ID.String()).Msg("SMS remains selected, returning unavailable")
+	} else if channel == "sms" && user.Phone != nil && s.smsSender != nil {
+		delivery, err := s.smsSender.SendOTP(ctx, *user.Phone, otp)
+		if err != nil {
+			s.logger.Error().
+				Err(err).
+				Str("phone", maskIdentifier(*user.Phone)).
+				Msg("Failed to send OTP SMS")
+			if deleteErr := s.otpRepo.DeleteUserOTPs(ctx, user.ID, "password_reset"); deleteErr != nil {
+				s.logger.Warn().Err(deleteErr).Msg("Failed to roll back OTP after SMS delivery failure")
+			}
+			return sentVia, domain.NewAppError(domain.ErrSMSDeliveryFailed, "Failed to send OTP SMS", 500)
+		}
 
-		return sentVia, domain.NewAppError(
-			domain.ErrServiceNotAvailable,
-			"SMS verification is currently unavailable. Please use email instead.",
-			503,
-		)
+		if err := s.recordOTPOutboundSMS(ctx, user, *user.Phone, delivery); err != nil {
+			s.logger.Warn().
+				Err(err).
+				Str("user_id", user.ID.String()).
+				Msg("Failed to persist outbound OTP SMS audit trail")
+		}
 	}
 
 	s.logger.Info().
@@ -165,6 +197,59 @@ func (s *otpService) GenerateOTP(ctx context.Context, identifier string) (string
 		Msg("OTP generated and sent")
 
 	return sentVia, nil
+}
+
+func (s *otpService) recordOTPOutboundSMS(ctx context.Context, user core.User, phoneNumber string, delivery *otpSMSDelivery) error {
+	if s.smsService == nil {
+		return nil
+	}
+
+	conversation, err := s.smsService.GetConversationByPhone(ctx, phoneNumber)
+	if err != nil {
+		if !errors.Is(err, domain.ErrNotFound) {
+			return err
+		}
+
+		conversation, err = s.smsService.CreateConversation(ctx, domainsms.SMSConversation{
+			UserID:      &user.ID,
+			PhoneNumber: phoneNumber,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	messageBody := fmt.Sprintf("Your Healthcare Access Connector verification code is %s. It expires in 10 minutes.", "******")
+	message := domainsms.SMSMessage{
+		ConversationID: conversation.ID,
+		Direction:      "outbound",
+		MessageBody:    messageBody,
+		Segments:       1,
+	}
+
+	if delivery != nil {
+		if delivery.TwilioMessageID != nil {
+			message.TwilioMessageID = delivery.TwilioMessageID
+		}
+		if delivery.TwilioStatus != nil {
+			message.TwilioStatus = delivery.TwilioStatus
+		}
+		if delivery.SentAt != nil {
+			message.SentAt = delivery.SentAt
+		}
+		if delivery.Segments > 0 {
+			message.Segments = delivery.Segments
+		}
+		if delivery.Cost != nil {
+			message.Cost = delivery.Cost
+		}
+		if delivery.CostCurrency != "" {
+			message.CostCurrency = delivery.CostCurrency
+		}
+	}
+
+	_, err = s.smsService.LogMessage(ctx, message)
+	return err
 }
 
 // VerifyOTP verifies OTP and returns reset token

@@ -25,6 +25,10 @@ type credentialService struct {
 	logger         *zerolog.Logger
 }
 
+func (c *credentialService) cacheAvailable() bool {
+	return c != nil && c.cache != nil && c.cache.IsAvailable()
+}
+
 func NewCredentialService(
 	credentialRepo repository.CredentialRepository,
 	staffRepo repository.StaffRepository,
@@ -156,9 +160,11 @@ func (c *credentialService) GetStaffCredentials(ctx context.Context, staffID uui
 	// Try cache first
 	cacheKey := fmt.Sprintf("credentials:staff:%s", staffID.String())
 	var credentials []providers.ProfessionalCredential
-	if err := c.cache.Get(ctx, cacheKey, &credentials); err == nil {
-		c.logger.Debug().Str("staff_id", staffID.String()).Msg("Staff credentials retrieved from cache")
-		return credentials, nil
+	if c.cacheAvailable() {
+		if err := c.cache.Get(ctx, cacheKey, &credentials); err == nil {
+			c.logger.Debug().Str("staff_id", staffID.String()).Msg("Staff credentials retrieved from cache")
+			return credentials, nil
+		}
 	}
 
 	// Get staff credentials
@@ -169,8 +175,10 @@ func (c *credentialService) GetStaffCredentials(ctx context.Context, staffID uui
 	}
 
 	// Cache the result
-	if err := c.cache.Set(ctx, cacheKey, credentials, 10*time.Minute); err != nil {
-		c.logger.Warn().Err(err).Msg("Failed to cache staff credentials")
+	if c.cacheAvailable() {
+		if err := c.cache.Set(ctx, cacheKey, credentials, 10*time.Minute); err != nil {
+			c.logger.Warn().Err(err).Msg("Failed to cache staff credentials")
+		}
 	}
 
 	c.logger.Debug().
@@ -240,24 +248,19 @@ func (c *credentialService) DeleteCredential(ctx context.Context, id uuid.UUID) 
 
 // Helper method to get credential for audit logging
 func (c *credentialService) getCredentialForAudit(ctx context.Context, id uuid.UUID) (*providers.ProfessionalCredential, error) {
-	// Get staff credentials to find the specific one
-	credentials, err := c.credentialRepo.GetStaffCredentials(ctx, uuid.Nil) // This won't work as expected
-	if err != nil && !errors.Is(err, domain.ErrCredentialNotFound) {
+	credential, err := c.credentialRepo.GetCredentialByID(ctx, id)
+	if err != nil {
 		return nil, err
 	}
-
-	// Look for the credential by ID (this is inefficient, better to have GetCredentialByID in repository)
-	for _, cred := range credentials {
-		if cred.ID == id {
-			return &cred, nil
-		}
-	}
-
-	return nil, domain.ErrCredentialNotFound
+	return &credential, nil
 }
 
 // Helper methods
 func (c *credentialService) invalidateCredentialCache(ctx context.Context, credentialID, staffID uuid.UUID) {
+	if !c.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("credentials:staff:%s", staffID.String()),
 	}

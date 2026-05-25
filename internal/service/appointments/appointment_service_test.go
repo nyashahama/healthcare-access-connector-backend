@@ -2,6 +2,8 @@ package appointments
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -19,23 +21,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func stringPtr(value string) *string {
+	return &value
+}
+
 type mockAppointmentRepository struct {
-	bookAppointmentFunc           func(ctx context.Context, appointment appointments.Appointment) (appointments.Appointment, error)
-	getAppointmentByIDFunc       func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error)
-	getByPatientFunc              func(ctx context.Context, patientID uuid.UUID) ([]appointments.Appointment, error)
-	getByClinicFunc               func(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
-	getByClinicAndDateFunc        func(ctx context.Context, clinicID uuid.UUID, date time.Time) ([]appointments.Appointment, error)
-	getTodayAppointmentsFunc      func(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
-	getPendingAppointmentsFunc    func(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
-	getAppointmentCountFunc       func(ctx context.Context, patientID uuid.UUID) (int64, error)
-	rescheduleAppointmentFunc     func(ctx context.Context, id uuid.UUID, newDate time.Time, newTime time.Time, newDatetime time.Time) (appointments.Appointment, error)
-	confirmAppointmentFunc        func(ctx context.Context, id uuid.UUID, confirmedBy uuid.UUID) (appointments.Appointment, error)
-	updateAppointmentNotesFunc    func(ctx context.Context, id uuid.UUID, notes string) (appointments.Appointment, error)
-	completeAppointmentFunc       func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error)
-	cancelAppointmentFunc         func(ctx context.Context, id uuid.UUID, reason string, cancelledBy uuid.UUID) (appointments.Appointment, error)
-	updateAppointmentStatusFunc   func(ctx context.Context, id uuid.UUID, status appointments.AppointmentStatus) (appointments.Appointment, error)
-	deleteAppointmentFunc         func(ctx context.Context, id uuid.UUID) error
-	checkSchedulingConflictFunc  func(ctx context.Context, clinicID uuid.UUID, date time.Time, appointmentTime time.Time) (bool, error)
+	bookAppointmentFunc         func(ctx context.Context, appointment appointments.Appointment) (appointments.Appointment, error)
+	getAppointmentByIDFunc      func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error)
+	getByPatientFunc            func(ctx context.Context, patientID uuid.UUID) ([]appointments.Appointment, error)
+	getByClinicFunc             func(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
+	getByClinicAndDateFunc      func(ctx context.Context, clinicID uuid.UUID, date time.Time) ([]appointments.Appointment, error)
+	getTodayAppointmentsFunc    func(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
+	getPendingAppointmentsFunc  func(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error)
+	getAppointmentCountFunc     func(ctx context.Context, patientID uuid.UUID) (int64, error)
+	rescheduleAppointmentFunc   func(ctx context.Context, id uuid.UUID, newDate time.Time, newTime time.Time, newDatetime time.Time) (appointments.Appointment, error)
+	confirmAppointmentFunc      func(ctx context.Context, id uuid.UUID, confirmedBy uuid.UUID) (appointments.Appointment, error)
+	updateAppointmentNotesFunc  func(ctx context.Context, id uuid.UUID, notes string) (appointments.Appointment, error)
+	completeAppointmentFunc     func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error)
+	cancelAppointmentFunc       func(ctx context.Context, id uuid.UUID, reason string, cancelledBy uuid.UUID) (appointments.Appointment, error)
+	updateAppointmentStatusFunc func(ctx context.Context, id uuid.UUID, status appointments.AppointmentStatus) (appointments.Appointment, error)
+	deleteAppointmentFunc       func(ctx context.Context, id uuid.UUID) error
+	checkSchedulingConflictFunc func(ctx context.Context, clinicID uuid.UUID, date time.Time, appointmentTime time.Time) (bool, error)
 }
 
 func (m *mockAppointmentRepository) BookAppointment(ctx context.Context, appointment appointments.Appointment) (appointments.Appointment, error) {
@@ -288,17 +294,32 @@ func (m *mockUserRepositoryForAppointment) GetUsersByIDs(ctx context.Context, id
 	return nil, nil
 }
 
-type mockCacheServiceForAppointment struct{}
+type mockCacheServiceForAppointment struct {
+	deletedKeys []string
+	values      map[string]interface{}
+}
 
 func (m *mockCacheServiceForAppointment) Get(ctx context.Context, key string, dest interface{}) error {
+	if value, ok := m.values[key]; ok {
+		payload, err := json.Marshal(value)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(payload, dest)
+	}
 	return cache.ErrCacheMiss
 }
 
 func (m *mockCacheServiceForAppointment) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+	if m.values == nil {
+		m.values = make(map[string]interface{})
+	}
+	m.values[key] = value
 	return nil
 }
 
 func (m *mockCacheServiceForAppointment) Delete(ctx context.Context, key string) error {
+	m.deletedKeys = append(m.deletedKeys, key)
 	return nil
 }
 
@@ -322,7 +343,7 @@ func newAppointmentServiceForTest(t *testing.T) *appointmentService {
 		clinicRepo:      &mockClinicRepository{},
 		userRepo:        &mockUserRepositoryForAppointment{},
 		cache:           &mockCacheServiceForAppointment{},
-		logger:           &logger,
+		logger:          &logger,
 	}
 }
 
@@ -338,7 +359,7 @@ func newAppointmentServiceWithMocks(t *testing.T) (*appointmentService, *mockApp
 		clinicRepo:      mockClinicRepo,
 		userRepo:        mockUserRepo,
 		cache:           &mockCacheServiceForAppointment{},
-		logger:           &logger,
+		logger:          &logger,
 	}, mockAppointmentRepo, mockClinicRepo, mockUserRepo
 }
 
@@ -491,6 +512,29 @@ func TestAppointmentService_CancelAppointment(t *testing.T) {
 		assert.Equal(t, appointments.StatusCancelled, result.Status)
 	})
 
+	t.Run("rejects cancellation of completed appointment", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		patientID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
+
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{
+				ID:        appointmentID,
+				PatientID: patientID,
+				Status:    appointments.StatusCompleted,
+			}, nil
+		}
+
+		_, err := svc.CancelAppointment(context.Background(), appointmentID, "Changed plans", patientID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot be cancelled")
+	})
+
 	t.Run("error - user not found", func(t *testing.T) {
 		svc, _, _, mockUserRepo := newAppointmentServiceWithMocks(t)
 
@@ -512,22 +556,24 @@ func TestAppointmentService_ConfirmAppointment(t *testing.T) {
 
 		appointmentID := uuid.New()
 		confirmerID := uuid.New()
+		clinicID := uuid.New()
 
 		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
-			return core.User{ID: id, Role: "provider_staff"}, nil
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
 		}
 
 		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
 			return appointments.Appointment{
-				ID:     appointmentID,
-				Status: appointments.StatusPending,
+				ID:       appointmentID,
+				ClinicID: clinicID,
+				Status:   appointments.StatusPending,
 			}, nil
 		}
 
 		mockAppointmentRepo.confirmAppointmentFunc = func(ctx context.Context, id uuid.UUID, confirmedBy uuid.UUID) (appointments.Appointment, error) {
 			return appointments.Appointment{
-				ID:         id,
-				Status:     appointments.StatusConfirmed,
+				ID:          id,
+				Status:      appointments.StatusConfirmed,
 				ConfirmedBy: &confirmedBy,
 			}, nil
 		}
@@ -551,11 +597,335 @@ func TestAppointmentService_ConfirmAppointment(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "permission")
 	})
+
+	t.Run("rejects provider from another clinic", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		confirmerID := uuid.New()
+		ownClinicID := uuid.New()
+		otherClinicID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &ownClinicID}, nil
+		}
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, ClinicID: otherClinicID, Status: appointments.StatusPending}, nil
+		}
+
+		_, err := svc.ConfirmAppointment(context.Background(), appointmentID, confirmerID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "another clinic")
+	})
+}
+
+func TestAppointmentService_UpdateAppointmentNotes(t *testing.T) {
+	t.Run("success for privileged actor", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		updatedBy := uuid.New()
+		clinicID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
+		}
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, ClinicID: clinicID}, nil
+		}
+		mockAppointmentRepo.updateAppointmentNotesFunc = func(ctx context.Context, id uuid.UUID, notes string) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, Notes: stringPtr("updated notes")}, nil
+		}
+
+		result, err := svc.UpdateAppointmentNotes(context.Background(), appointmentID, "updated notes", updatedBy)
+		require.NoError(t, err)
+		require.NotNil(t, result.Notes)
+		assert.Equal(t, "updated notes", *result.Notes)
+	})
+
+	t.Run("rejects patient actor", func(t *testing.T) {
+		svc, _, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
+
+		_, err := svc.UpdateAppointmentNotes(context.Background(), uuid.New(), "updated notes", uuid.New())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "permission")
+	})
+
+	t.Run("rejects provider from another clinic", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		updatedBy := uuid.New()
+		ownClinicID := uuid.New()
+		otherClinicID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &ownClinicID}, nil
+		}
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, ClinicID: otherClinicID}, nil
+		}
+
+		_, err := svc.UpdateAppointmentNotes(context.Background(), appointmentID, "updated notes", updatedBy)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "another clinic")
+	})
+}
+
+func TestAppointmentService_CompleteAppointment(t *testing.T) {
+	t.Run("success from confirmed", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		completedBy := uuid.New()
+		clinicID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
+		}
+
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, Status: appointments.StatusConfirmed, ClinicID: clinicID}, nil
+		}
+		mockAppointmentRepo.completeAppointmentFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, Status: appointments.StatusCompleted}, nil
+		}
+
+		result, err := svc.CompleteAppointment(context.Background(), appointmentID, completedBy)
+		require.NoError(t, err)
+		assert.Equal(t, appointments.StatusCompleted, result.Status)
+	})
+
+	t.Run("rejects completion from cancelled", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		completedBy := uuid.New()
+		clinicID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
+		}
+
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, Status: appointments.StatusCancelled, ClinicID: clinicID}, nil
+		}
+
+		_, err := svc.CompleteAppointment(context.Background(), appointmentID, completedBy)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cannot be completed")
+	})
+
+	t.Run("rejects patient actor", func(t *testing.T) {
+		svc, _, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
+
+		_, err := svc.CompleteAppointment(context.Background(), uuid.New(), uuid.New())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "permission")
+	})
+}
+
+func TestAppointmentService_UpdateAppointmentStatus(t *testing.T) {
+	t.Run("allows valid transition confirmed to no_show", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		updatedBy := uuid.New()
+		clinicID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
+		}
+
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, Status: appointments.StatusConfirmed, ClinicID: clinicID}, nil
+		}
+		mockAppointmentRepo.updateAppointmentStatusFunc = func(ctx context.Context, id uuid.UUID, status appointments.AppointmentStatus) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, Status: status}, nil
+		}
+
+		result, err := svc.UpdateAppointmentStatus(context.Background(), appointmentID, appointments.StatusNoShow, updatedBy)
+		require.NoError(t, err)
+		assert.Equal(t, appointments.StatusNoShow, result.Status)
+	})
+
+	t.Run("rejects invalid terminal transition", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		updatedBy := uuid.New()
+		clinicID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
+		}
+
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, Status: appointments.StatusCompleted, ClinicID: clinicID}, nil
+		}
+
+		_, err := svc.UpdateAppointmentStatus(context.Background(), appointmentID, appointments.StatusPending, updatedBy)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Cannot change appointment status")
+	})
+
+	t.Run("rejects patient actor", func(t *testing.T) {
+		svc, _, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
+
+		_, err := svc.UpdateAppointmentStatus(context.Background(), uuid.New(), appointments.StatusConfirmed, uuid.New())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "permission")
+	})
+}
+
+func TestAppointmentService_DeleteAppointment(t *testing.T) {
+	t.Run("success for privileged actor on cancelled appointment", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		deletedBy := uuid.New()
+		clinicID := uuid.New()
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
+		}
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, Status: appointments.StatusCancelled, ClinicID: clinicID}, nil
+		}
+		mockAppointmentRepo.deleteAppointmentFunc = func(ctx context.Context, id uuid.UUID) error {
+			return nil
+		}
+
+		err := svc.DeleteAppointment(context.Background(), appointmentID, deletedBy)
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects patient actor", func(t *testing.T) {
+		svc, _, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
+
+		err := svc.DeleteAppointment(context.Background(), uuid.New(), uuid.New())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "permission")
+	})
+}
+
+func TestAppointmentService_GetAppointmentByID(t *testing.T) {
+	t.Run("allows owning patient", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		patientID := uuid.New()
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, PatientID: patientID, ClinicID: uuid.New()}, nil
+		}
+
+		result, err := svc.GetAppointmentByID(context.Background(), appointmentID, patientID)
+		require.NoError(t, err)
+		assert.Equal(t, appointmentID, result.ID)
+	})
+
+	t.Run("rejects provider from another clinic", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		requestedBy := uuid.New()
+		ownClinicID := uuid.New()
+		otherClinicID := uuid.New()
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &ownClinicID}, nil
+		}
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{ID: id, PatientID: uuid.New(), ClinicID: otherClinicID}, nil
+		}
+
+		_, err := svc.GetAppointmentByID(context.Background(), appointmentID, requestedBy)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "another clinic")
+	})
+
+	t.Run("rejects provider from another clinic on cache hit", func(t *testing.T) {
+		svc, _, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		requestedBy := uuid.New()
+		ownClinicID := uuid.New()
+		otherClinicID := uuid.New()
+		cacheSvc := &mockCacheServiceForAppointment{
+			values: map[string]interface{}{
+				"appointment:" + appointmentID.String(): appointments.Appointment{
+					ID:        appointmentID,
+					PatientID: uuid.New(),
+					ClinicID:  otherClinicID,
+				},
+			},
+		}
+		svc.cache = cacheSvc
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &ownClinicID}, nil
+		}
+
+		_, err := svc.GetAppointmentByID(context.Background(), appointmentID, requestedBy)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "another clinic")
+	})
+}
+
+func TestAppointmentService_GetAppointmentsByClinic(t *testing.T) {
+	t.Run("allows provider from same clinic", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		clinicID := uuid.New()
+		requestedBy := uuid.New()
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
+		}
+		mockAppointmentRepo.getByClinicFunc = func(ctx context.Context, gotClinicID uuid.UUID) ([]appointments.Appointment, error) {
+			return []appointments.Appointment{{ID: uuid.New(), ClinicID: gotClinicID}}, nil
+		}
+
+		result, err := svc.GetAppointmentsByClinic(context.Background(), clinicID, requestedBy)
+		require.NoError(t, err)
+		assert.Len(t, result, 1)
+	})
+
+	t.Run("rejects provider from another clinic", func(t *testing.T) {
+		svc, _, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		clinicID := uuid.New()
+		requestedBy := uuid.New()
+		otherClinicID := uuid.New()
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &otherClinicID}, nil
+		}
+
+		_, err := svc.GetAppointmentsByClinic(context.Background(), clinicID, requestedBy)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "another clinic")
+	})
 }
 
 func TestAppointmentService_Reschedule(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		svc, mockAppointmentRepo, _, _ := newAppointmentServiceWithMocks(t)
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
 
 		appointmentID := uuid.New()
 		newDate := time.Now().Add(48 * time.Hour)
@@ -584,23 +954,42 @@ func TestAppointmentService_Reschedule(t *testing.T) {
 			}, nil
 		}
 
-		result, err := svc.RescheduleAppointment(context.Background(), appointmentID, newDate, newTime, newDatetime)
+		ownerID := uuid.New()
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{
+				ID:                  appointmentID,
+				ClinicID:            uuid.New(),
+				PatientID:           ownerID,
+				Status:              appointments.StatusPending,
+				AppointmentDatetime: time.Now().Add(24 * time.Hour),
+			}, nil
+		}
+
+		result, err := svc.RescheduleAppointment(context.Background(), appointmentID, newDate, newTime, newDatetime, ownerID)
 		require.NoError(t, err)
 		assert.Equal(t, newDate, result.AppointmentDate)
 	})
 
 	t.Run("conflict on new slot", func(t *testing.T) {
-		svc, mockAppointmentRepo, _, _ := newAppointmentServiceWithMocks(t)
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
 
 		appointmentID := uuid.New()
 		newDate := time.Now().Add(48 * time.Hour)
 		newTime := newDate
 		newDatetime := newDate
 
+		ownerID := uuid.New()
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
 		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
 			return appointments.Appointment{
 				ID:                  appointmentID,
 				ClinicID:            uuid.New(),
+				PatientID:           ownerID,
 				Status:              appointments.StatusPending,
 				AppointmentDatetime: time.Now().Add(24 * time.Hour),
 			}, nil
@@ -610,7 +999,7 @@ func TestAppointmentService_Reschedule(t *testing.T) {
 			return true, nil
 		}
 
-		_, err := svc.RescheduleAppointment(context.Background(), appointmentID, newDate, newTime, newDatetime)
+		_, err := svc.RescheduleAppointment(context.Background(), appointmentID, newDate, newTime, newDatetime, ownerID)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already booked")
 	})
@@ -627,9 +1016,87 @@ func TestAppointmentService_Reschedule(t *testing.T) {
 			return appointments.Appointment{}, domain.ErrNotFound
 		}
 
-		_, err := svc.RescheduleAppointment(context.Background(), appointmentID, newDate, newTime, newDatetime)
+		_, err := svc.RescheduleAppointment(context.Background(), appointmentID, newDate, newTime, newDatetime, uuid.New())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
+	})
+
+	t.Run("rejects patient rescheduling another user's appointment", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		actorID := uuid.New()
+		newDate := time.Now().Add(48 * time.Hour)
+		newTime := newDate
+		newDatetime := newDate
+
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "patient"}, nil
+		}
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{
+				ID:                  appointmentID,
+				ClinicID:            uuid.New(),
+				PatientID:           uuid.New(),
+				Status:              appointments.StatusPending,
+				AppointmentDatetime: time.Now().Add(24 * time.Hour),
+			}, nil
+		}
+
+		_, err := svc.RescheduleAppointment(context.Background(), appointmentID, newDate, newTime, newDatetime, actorID)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "Cannot reschedule another user's appointment")
+	})
+
+	t.Run("invalidates old and new clinic date caches when date changes", func(t *testing.T) {
+		svc, mockAppointmentRepo, _, mockUserRepo := newAppointmentServiceWithMocks(t)
+
+		appointmentID := uuid.New()
+		patientID := uuid.New()
+		rescheduledBy := uuid.New()
+		clinicID := uuid.New()
+		oldDate := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
+		newDate := oldDate.Add(24 * time.Hour)
+		newTime := newDate.Add(2 * time.Hour)
+		newDatetime := newTime
+		cacheSvc := &mockCacheServiceForAppointment{}
+		svc.cache = cacheSvc
+		mockUserRepo.getUserByIDFunc = func(ctx context.Context, id uuid.UUID) (core.User, error) {
+			return core.User{ID: id, Role: "provider_staff", PrimaryClinicID: &clinicID}, nil
+		}
+
+		mockAppointmentRepo.getAppointmentByIDFunc = func(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+			return appointments.Appointment{
+				ID:                  appointmentID,
+				PatientID:           patientID,
+				ClinicID:            clinicID,
+				Status:              appointments.StatusPending,
+				AppointmentDate:     oldDate,
+				AppointmentTime:     oldDate.Add(1 * time.Hour),
+				AppointmentDatetime: oldDate.Add(1 * time.Hour),
+			}, nil
+		}
+
+		mockAppointmentRepo.checkSchedulingConflictFunc = func(ctx context.Context, clinicID uuid.UUID, date time.Time, appointmentTime time.Time) (bool, error) {
+			return false, nil
+		}
+
+		mockAppointmentRepo.rescheduleAppointmentFunc = func(ctx context.Context, id uuid.UUID, newDate time.Time, newTime time.Time, newDatetime time.Time) (appointments.Appointment, error) {
+			return appointments.Appointment{
+				ID:                  id,
+				PatientID:           patientID,
+				ClinicID:            clinicID,
+				AppointmentDate:     newDate,
+				AppointmentTime:     newTime,
+				AppointmentDatetime: newDatetime,
+				Status:              appointments.StatusPending,
+			}, nil
+		}
+
+		_, err := svc.RescheduleAppointment(context.Background(), appointmentID, newDate, newTime, newDatetime, rescheduledBy)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, fmt.Sprintf("appointments:clinic:%s:date:%s", clinicID.String(), oldDate.Format("2006-01-02")))
+		assert.Contains(t, cacheSvc.deletedKeys, fmt.Sprintf("appointments:clinic:%s:date:%s", clinicID.String(), newDate.Format("2006-01-02")))
 	})
 }
 

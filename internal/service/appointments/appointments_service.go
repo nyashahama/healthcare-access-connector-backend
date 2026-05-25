@@ -9,6 +9,7 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/cache"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/appointments"
+	"github.com/nyashahama/healthcare-access-connector-backend/internal/domain/core"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/repository"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/rs/zerolog"
@@ -124,7 +125,7 @@ func (s *appointmentService) BookAppointment(ctx context.Context, appointment ap
 }
 
 // GetAppointmentByID retrieves a single appointment by ID
-func (s *appointmentService) GetAppointmentByID(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+func (s *appointmentService) GetAppointmentByID(ctx context.Context, id uuid.UUID, requestedBy uuid.UUID) (appointments.Appointment, error) {
 	start := time.Now()
 
 	// Try to get from cache
@@ -132,6 +133,9 @@ func (s *appointmentService) GetAppointmentByID(ctx context.Context, id uuid.UUI
 	if s.cache != nil && s.cache.IsAvailable() {
 		var cached appointments.Appointment
 		if err := s.cache.Get(ctx, cacheKey, &cached); err == nil {
+			if err := s.authorizeAppointmentRead(ctx, cached, requestedBy); err != nil {
+				return appointments.Appointment{}, err
+			}
 			s.logger.Debug().Str("appointment_id", id.String()).Msg("Appointment retrieved from cache")
 			return cached, nil
 		}
@@ -141,6 +145,10 @@ func (s *appointmentService) GetAppointmentByID(ctx context.Context, id uuid.UUI
 	if err != nil {
 		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Failed to get appointment")
 		return appointments.Appointment{}, domain.NewAppError(err, "Appointment not found", 404)
+	}
+
+	if err := s.authorizeAppointmentRead(ctx, appointment, requestedBy); err != nil {
+		return appointments.Appointment{}, err
 	}
 
 	// Cache the result
@@ -195,8 +203,12 @@ func (s *appointmentService) GetAppointmentsByPatient(ctx context.Context, patie
 }
 
 // GetAppointmentsByClinic retrieves all upcoming appointments for a clinic
-func (s *appointmentService) GetAppointmentsByClinic(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error) {
+func (s *appointmentService) GetAppointmentsByClinic(ctx context.Context, clinicID uuid.UUID, requestedBy uuid.UUID) ([]appointments.Appointment, error) {
 	start := time.Now()
+
+	if err := s.authorizeClinicAppointmentAccess(ctx, clinicID, requestedBy); err != nil {
+		return nil, err
+	}
 
 	// Try to get from cache
 	cacheKey := fmt.Sprintf("appointments:clinic:%s", clinicID.String())
@@ -231,8 +243,12 @@ func (s *appointmentService) GetAppointmentsByClinic(ctx context.Context, clinic
 }
 
 // GetAppointmentsByClinicAndDate retrieves appointments for a clinic on a specific date
-func (s *appointmentService) GetAppointmentsByClinicAndDate(ctx context.Context, clinicID uuid.UUID, date time.Time) ([]appointments.Appointment, error) {
+func (s *appointmentService) GetAppointmentsByClinicAndDate(ctx context.Context, clinicID uuid.UUID, date time.Time, requestedBy uuid.UUID) ([]appointments.Appointment, error) {
 	start := time.Now()
+
+	if err := s.authorizeClinicAppointmentAccess(ctx, clinicID, requestedBy); err != nil {
+		return nil, err
+	}
 
 	// Try to get from cache
 	cacheKey := fmt.Sprintf("appointments:clinic:%s:date:%s", clinicID.String(), date.Format("2006-01-02"))
@@ -275,8 +291,12 @@ func (s *appointmentService) GetAppointmentsByClinicAndDate(ctx context.Context,
 }
 
 // GetTodayAppointments retrieves today's appointments for a clinic
-func (s *appointmentService) GetTodayAppointments(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error) {
+func (s *appointmentService) GetTodayAppointments(ctx context.Context, clinicID uuid.UUID, requestedBy uuid.UUID) ([]appointments.Appointment, error) {
 	start := time.Now()
+
+	if err := s.authorizeClinicAppointmentAccess(ctx, clinicID, requestedBy); err != nil {
+		return nil, err
+	}
 
 	// Try to get from cache
 	cacheKey := fmt.Sprintf("appointments:clinic:%s:today", clinicID.String())
@@ -311,8 +331,12 @@ func (s *appointmentService) GetTodayAppointments(ctx context.Context, clinicID 
 }
 
 // GetPendingAppointments retrieves all pending appointments for a clinic
-func (s *appointmentService) GetPendingAppointments(ctx context.Context, clinicID uuid.UUID) ([]appointments.Appointment, error) {
+func (s *appointmentService) GetPendingAppointments(ctx context.Context, clinicID uuid.UUID, requestedBy uuid.UUID) ([]appointments.Appointment, error) {
 	start := time.Now()
+
+	if err := s.authorizeClinicAppointmentAccess(ctx, clinicID, requestedBy); err != nil {
+		return nil, err
+	}
 
 	appointmentList, err := s.appointmentRepo.GetPendingAppointments(ctx, clinicID)
 	if err != nil {
@@ -330,7 +354,7 @@ func (s *appointmentService) GetPendingAppointments(ctx context.Context, clinicI
 }
 
 // RescheduleAppointment updates the appointment date and time
-func (s *appointmentService) RescheduleAppointment(ctx context.Context, id uuid.UUID, newDate time.Time, newTime time.Time, newDatetime time.Time) (appointments.Appointment, error) {
+func (s *appointmentService) RescheduleAppointment(ctx context.Context, id uuid.UUID, newDate time.Time, newTime time.Time, newDatetime time.Time, rescheduledBy uuid.UUID) (appointments.Appointment, error) {
 	start := time.Now()
 
 	// Get existing appointment to validate
@@ -338,6 +362,10 @@ func (s *appointmentService) RescheduleAppointment(ctx context.Context, id uuid.
 	if err != nil {
 		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Failed to get appointment for rescheduling")
 		return appointments.Appointment{}, domain.NewAppError(err, "Appointment not found", 404)
+	}
+
+	if err := s.authorizeAppointmentReschedule(ctx, existing, rescheduledBy); err != nil {
+		return appointments.Appointment{}, err
 	}
 
 	// Validate status allows rescheduling
@@ -379,8 +407,10 @@ func (s *appointmentService) RescheduleAppointment(ctx context.Context, id uuid.
 		return appointments.Appointment{}, domain.NewAppError(err, "Failed to reschedule appointment", 500)
 	}
 
-	// Invalidate cache
-	s.invalidateAppointmentCache(ctx, rescheduled)
+	// Invalidate both the old and new appointment views so clinic/date caches do
+	// not remain stale when the booking moves across dates.
+	s.invalidateAppointmentCache(ctx, existing)
+	s.invalidateAppointmentCache(ctx, mergeAppointmentCacheFields(existing, rescheduled))
 
 	s.logger.Info().
 		Str("appointment_id", rescheduled.ID.String()).
@@ -396,22 +426,44 @@ func (s *appointmentService) RescheduleAppointment(ctx context.Context, id uuid.
 	return rescheduled, nil
 }
 
+func (s *appointmentService) authorizeAppointmentReschedule(ctx context.Context, appointment appointments.Appointment, actorID uuid.UUID) error {
+	actor, err := s.userRepo.GetUserByID(ctx, actorID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", actorID.String()).Msg("Failed to get rescheduling actor")
+		return domain.NewAppError(err, "User not found", 404)
+	}
+
+	switch actor.Role {
+	case "patient":
+		if appointment.PatientID != actorID {
+			s.logger.Warn().
+				Str("user_id", actorID.String()).
+				Str("appointment_user_id", appointment.PatientID.String()).
+				Msg("Patient tried to reschedule another user's appointment")
+			return domain.NewAppError(domain.ErrForbidden, "Cannot reschedule another user's appointment", 403)
+		}
+		return nil
+	case "provider_staff", "doctor":
+		if actor.PrimaryClinicID == nil || *actor.PrimaryClinicID != appointment.ClinicID {
+			return domain.NewAppError(domain.ErrForbidden, "Cannot reschedule appointments for another clinic", 403)
+		}
+		return nil
+	default:
+		s.logger.Warn().
+			Str("user_id", actorID.String()).
+			Str("role", actor.Role).
+			Msg("User does not have permission to reschedule appointments")
+		return domain.NewAppError(domain.ErrForbidden, "User does not have permission to reschedule appointments", 403)
+	}
+}
+
 // ConfirmAppointment confirms a pending appointment
 func (s *appointmentService) ConfirmAppointment(ctx context.Context, id uuid.UUID, confirmedBy uuid.UUID) (appointments.Appointment, error) {
 	start := time.Now()
 
-	// Validate confirmer exists and has appropriate role
-	confirmer, err := s.userRepo.GetUserByID(ctx, confirmedBy)
+	manager, err := s.getManagementActor(ctx, confirmedBy)
 	if err != nil {
-		s.logger.Error().Err(err).Str("user_id", confirmedBy.String()).Msg("Failed to get confirmer")
-		return appointments.Appointment{}, domain.NewAppError(err, "User not found", 404)
-	}
-	if confirmer.Role != "provider_staff" && confirmer.Role != "doctor" {
-		s.logger.Warn().
-			Str("user_id", confirmedBy.String()).
-			Str("role", confirmer.Role).
-			Msg("User does not have permission to confirm appointments")
-		return appointments.Appointment{}, domain.NewAppError(domain.ErrValidation, "User does not have permission to confirm appointments", 403)
+		return appointments.Appointment{}, err
 	}
 
 	// Get the appointment first to check its status
@@ -419,6 +471,10 @@ func (s *appointmentService) ConfirmAppointment(ctx context.Context, id uuid.UUI
 	if err != nil {
 		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Appointment not found")
 		return appointments.Appointment{}, domain.NewAppError(err, "Appointment not found", 404)
+	}
+
+	if err := s.requirePrivilegedAppointmentActorForClinic(manager, "confirm appointment", existing.ClinicID); err != nil {
+		return appointments.Appointment{}, err
 	}
 
 	// Check if the appointment is in a confirmable state
@@ -457,8 +513,26 @@ func (s *appointmentService) ConfirmAppointment(ctx context.Context, id uuid.UUI
 }
 
 // UpdateAppointmentNotes updates the notes of an appointment
-func (s *appointmentService) UpdateAppointmentNotes(ctx context.Context, id uuid.UUID, notes string) (appointments.Appointment, error) {
+func (s *appointmentService) UpdateAppointmentNotes(ctx context.Context, id uuid.UUID, notes string, updatedBy uuid.UUID) (appointments.Appointment, error) {
 	start := time.Now()
+
+	manager, err := s.getManagementActor(ctx, updatedBy)
+	if err != nil {
+		return appointments.Appointment{}, err
+	}
+
+	existing, err := s.appointmentRepo.GetAppointmentByID(ctx, id)
+	if err != nil {
+		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Failed to get appointment for notes update")
+		return appointments.Appointment{}, domain.NewAppError(err, "Appointment not found", 404)
+	}
+
+	if err := s.requirePrivilegedAppointmentActorForClinic(manager, "update appointment notes", existing.ClinicID); err != nil {
+		return appointments.Appointment{}, err
+	}
+	if err != nil {
+		return appointments.Appointment{}, err
+	}
 
 	updated, err := s.appointmentRepo.UpdateAppointmentNotes(ctx, id, notes)
 	if err != nil {
@@ -482,8 +556,38 @@ func (s *appointmentService) UpdateAppointmentNotes(ctx context.Context, id uuid
 }
 
 // CompleteAppointment marks an appointment as completed
-func (s *appointmentService) CompleteAppointment(ctx context.Context, id uuid.UUID) (appointments.Appointment, error) {
+func (s *appointmentService) CompleteAppointment(ctx context.Context, id uuid.UUID, completedBy uuid.UUID) (appointments.Appointment, error) {
 	start := time.Now()
+
+	manager, err := s.getManagementActor(ctx, completedBy)
+	if err != nil {
+		return appointments.Appointment{}, err
+	}
+
+	existing, err := s.appointmentRepo.GetAppointmentByID(ctx, id)
+	if err != nil {
+		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Failed to get appointment for completion")
+		return appointments.Appointment{}, domain.NewAppError(err, "Appointment not found", 404)
+	}
+
+	if err := s.requirePrivilegedAppointmentActorForClinic(manager, "complete appointment", existing.ClinicID); err != nil {
+		return appointments.Appointment{}, err
+	}
+	if err != nil {
+		return appointments.Appointment{}, err
+	}
+
+	if existing.Status != appointments.StatusConfirmed {
+		s.logger.Warn().
+			Str("appointment_id", id.String()).
+			Str("current_status", string(existing.Status)).
+			Msg("Appointment cannot be completed - not in confirmed status")
+		return appointments.Appointment{}, domain.NewAppError(
+			domain.ErrValidation,
+			fmt.Sprintf("Appointment cannot be completed. Current status: %s", existing.Status),
+			400,
+		)
+	}
 
 	completed, err := s.appointmentRepo.CompleteAppointment(ctx, id)
 	if err != nil {
@@ -533,6 +637,23 @@ func (s *appointmentService) CancelAppointment(ctx context.Context, id uuid.UUID
 			Msg("Patient trying to cancel another user's appointment")
 		return appointments.Appointment{}, domain.NewAppError(domain.ErrValidation, "Cannot cancel another user's appointment", 403)
 	}
+	if canceller.Role != "patient" {
+		if err := s.authorizeClinicScopedCancellation(canceller, existing); err != nil {
+			return appointments.Appointment{}, err
+		}
+	}
+
+	if existing.Status != appointments.StatusPending && existing.Status != appointments.StatusConfirmed {
+		s.logger.Warn().
+			Str("appointment_id", id.String()).
+			Str("current_status", string(existing.Status)).
+			Msg("Appointment cannot be cancelled in current status")
+		return appointments.Appointment{}, domain.NewAppError(
+			domain.ErrValidation,
+			fmt.Sprintf("Appointment cannot be cancelled. Current status: %s", existing.Status),
+			400,
+		)
+	}
 
 	cancelled, err := s.appointmentRepo.CancelAppointment(ctx, id, reason, cancelledBy)
 	if err != nil {
@@ -558,7 +679,7 @@ func (s *appointmentService) CancelAppointment(ctx context.Context, id uuid.UUID
 }
 
 // UpdateAppointmentStatus updates the status of an appointment
-func (s *appointmentService) UpdateAppointmentStatus(ctx context.Context, id uuid.UUID, status appointments.AppointmentStatus) (appointments.Appointment, error) {
+func (s *appointmentService) UpdateAppointmentStatus(ctx context.Context, id uuid.UUID, status appointments.AppointmentStatus, updatedBy uuid.UUID) (appointments.Appointment, error) {
 	start := time.Now()
 
 	// Validate status
@@ -573,6 +694,37 @@ func (s *appointmentService) UpdateAppointmentStatus(ctx context.Context, id uui
 	if !validStatuses[status] {
 		s.logger.Warn().Str("status", string(status)).Msg("Invalid appointment status")
 		return appointments.Appointment{}, domain.NewAppError(domain.ErrValidation, "Invalid appointment status", 400)
+	}
+
+	manager, err := s.getManagementActor(ctx, updatedBy)
+	if err != nil {
+		return appointments.Appointment{}, err
+	}
+
+	existing, err := s.appointmentRepo.GetAppointmentByID(ctx, id)
+	if err != nil {
+		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Failed to get appointment for status update")
+		return appointments.Appointment{}, domain.NewAppError(err, "Appointment not found", 404)
+	}
+
+	if err := s.requirePrivilegedAppointmentActorForClinic(manager, "update appointment status", existing.ClinicID); err != nil {
+		return appointments.Appointment{}, err
+	}
+	if err != nil {
+		return appointments.Appointment{}, err
+	}
+
+	if !canTransitionAppointmentStatus(existing.Status, status) {
+		s.logger.Warn().
+			Str("appointment_id", id.String()).
+			Str("current_status", string(existing.Status)).
+			Str("requested_status", string(status)).
+			Msg("Invalid appointment status transition")
+		return appointments.Appointment{}, domain.NewAppError(
+			domain.ErrValidation,
+			fmt.Sprintf("Cannot change appointment status from %s to %s", existing.Status, status),
+			400,
+		)
 	}
 
 	updated, err := s.appointmentRepo.UpdateAppointmentStatus(ctx, id, status)
@@ -598,14 +750,26 @@ func (s *appointmentService) UpdateAppointmentStatus(ctx context.Context, id uui
 }
 
 // DeleteAppointment permanently deletes a cancelled appointment
-func (s *appointmentService) DeleteAppointment(ctx context.Context, id uuid.UUID) error {
+func (s *appointmentService) DeleteAppointment(ctx context.Context, id uuid.UUID, deletedBy uuid.UUID) error {
 	start := time.Now()
+
+	manager, err := s.getManagementActor(ctx, deletedBy)
+	if err != nil {
+		return err
+	}
 
 	// Get appointment to verify it's cancelled and for cache invalidation
 	appointment, err := s.appointmentRepo.GetAppointmentByID(ctx, id)
 	if err != nil {
 		s.logger.Error().Err(err).Str("appointment_id", id.String()).Msg("Failed to get appointment for deletion")
 		return domain.NewAppError(err, "Appointment not found", 404)
+	}
+
+	if err := s.requirePrivilegedAppointmentActorForClinic(manager, "delete appointment", appointment.ClinicID); err != nil {
+		return err
+	}
+	if err != nil {
+		return err
 	}
 
 	if appointment.Status != appointments.StatusCancelled {
@@ -635,6 +799,109 @@ func (s *appointmentService) DeleteAppointment(ctx context.Context, id uuid.UUID
 		Msg("DeleteAppointment completed")
 
 	return nil
+}
+
+func (s *appointmentService) getManagementActor(ctx context.Context, actorID uuid.UUID) (core.User, error) {
+	user, err := s.userRepo.GetUserByID(ctx, actorID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", actorID.String()).Msg("Failed to get appointment actor")
+		return core.User{}, domain.NewAppError(err, "User not found", 404)
+	}
+
+	if user.Role != "provider_staff" && user.Role != "doctor" {
+		s.logger.Warn().
+			Str("user_id", actorID.String()).
+			Str("role", user.Role).
+			Str("action", "manage appointment").
+			Msg("User does not have permission to manage appointment")
+		return core.User{}, domain.NewAppError(domain.ErrForbidden, "User does not have permission to manage appointment", 403)
+	}
+
+	return user, nil
+}
+
+func (s *appointmentService) requirePrivilegedAppointmentActorForClinic(actor core.User, action string, clinicID uuid.UUID) error {
+	if actor.PrimaryClinicID == nil || *actor.PrimaryClinicID != clinicID {
+		s.logger.Warn().
+			Str("user_id", actor.ID.String()).
+			Str("role", actor.Role).
+			Str("action", action).
+			Str("clinic_id", clinicID.String()).
+			Msg("User does not belong to appointment clinic")
+		return domain.NewAppError(domain.ErrForbidden, "User does not have permission to manage another clinic's appointment", 403)
+	}
+
+	return nil
+}
+
+func (s *appointmentService) requirePrivilegedAppointmentActor(ctx context.Context, actorID uuid.UUID, action string, clinicID uuid.UUID) (core.User, error) {
+	actor, err := s.getManagementActor(ctx, actorID)
+	if err != nil {
+		return core.User{}, err
+	}
+	if err := s.requirePrivilegedAppointmentActorForClinic(actor, action, clinicID); err != nil {
+		return core.User{}, err
+	}
+	return actor, nil
+}
+
+func (s *appointmentService) authorizeClinicScopedCancellation(actor core.User, appointment appointments.Appointment) error {
+	switch actor.Role {
+	case "provider_staff", "doctor", "clinic_admin":
+		if actor.PrimaryClinicID == nil || *actor.PrimaryClinicID != appointment.ClinicID {
+			return domain.NewAppError(domain.ErrForbidden, "Cannot cancel appointments for another clinic", 403)
+		}
+		return nil
+	case "system_admin":
+		return nil
+	default:
+		return domain.NewAppError(domain.ErrForbidden, "User does not have permission to cancel appointment", 403)
+	}
+}
+
+func (s *appointmentService) authorizeAppointmentRead(ctx context.Context, appointment appointments.Appointment, requestedBy uuid.UUID) error {
+	user, err := s.userRepo.GetUserByID(ctx, requestedBy)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", requestedBy.String()).Msg("Failed to get appointment reader")
+		return domain.NewAppError(err, "User not found", 404)
+	}
+
+	switch user.Role {
+	case "patient":
+		if appointment.PatientID != requestedBy {
+			return domain.NewAppError(domain.ErrForbidden, "Cannot view another user's appointment", 403)
+		}
+		return nil
+	case "system_admin":
+		return nil
+	case "provider_staff", "doctor", "clinic_admin":
+		if user.PrimaryClinicID == nil || *user.PrimaryClinicID != appointment.ClinicID {
+			return domain.NewAppError(domain.ErrForbidden, "Cannot view appointments for another clinic", 403)
+		}
+		return nil
+	default:
+		return domain.NewAppError(domain.ErrForbidden, "User does not have permission to view appointment", 403)
+	}
+}
+
+func (s *appointmentService) authorizeClinicAppointmentAccess(ctx context.Context, clinicID uuid.UUID, requestedBy uuid.UUID) error {
+	user, err := s.userRepo.GetUserByID(ctx, requestedBy)
+	if err != nil {
+		s.logger.Error().Err(err).Str("user_id", requestedBy.String()).Str("clinic_id", clinicID.String()).Msg("Failed to get clinic appointment reader")
+		return domain.NewAppError(err, "User not found", 404)
+	}
+
+	switch user.Role {
+	case "system_admin":
+		return nil
+	case "provider_staff", "doctor", "clinic_admin":
+		if user.PrimaryClinicID == nil || *user.PrimaryClinicID != clinicID {
+			return domain.NewAppError(domain.ErrForbidden, "Cannot view appointments for another clinic", 403)
+		}
+		return nil
+	default:
+		return domain.NewAppError(domain.ErrForbidden, "User does not have permission to view clinic appointments", 403)
+	}
 }
 
 // GetAppointmentCount gets the total count of completed appointments for a patient
@@ -705,5 +972,36 @@ func (s *appointmentService) invalidateAppointmentCache(ctx context.Context, app
 		} else {
 			s.logger.Debug().Str("key", key).Msg("Invalidated appointment cache")
 		}
+	}
+}
+
+func mergeAppointmentCacheFields(existing, updated appointments.Appointment) appointments.Appointment {
+	merged := updated
+	if merged.ID == uuid.Nil {
+		merged.ID = existing.ID
+	}
+	if merged.PatientID == uuid.Nil {
+		merged.PatientID = existing.PatientID
+	}
+	if merged.ClinicID == uuid.Nil {
+		merged.ClinicID = existing.ClinicID
+	}
+	return merged
+}
+
+func canTransitionAppointmentStatus(current, next appointments.AppointmentStatus) bool {
+	if current == next {
+		return true
+	}
+
+	switch current {
+	case appointments.StatusPending:
+		return next == appointments.StatusConfirmed || next == appointments.StatusCancelled
+	case appointments.StatusConfirmed:
+		return next == appointments.StatusCompleted || next == appointments.StatusCancelled || next == appointments.StatusNoShow
+	case appointments.StatusCancelled, appointments.StatusCompleted, appointments.StatusNoShow:
+		return false
+	default:
+		return false
 	}
 }

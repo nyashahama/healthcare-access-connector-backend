@@ -97,6 +97,22 @@ func (r *credentialRepository) CreateCredential(ctx context.Context, credential 
 	return r.mapToProfessionalCredential(created), nil
 }
 
+func (r *credentialRepository) GetCredentialByID(ctx context.Context, id uuid.UUID) (providers.ProfessionalCredential, error) {
+	start := time.Now()
+	defer func() {
+		credentialDBQueryDuration.Observe(time.Since(start).Seconds())
+	}()
+
+	row, err := r.querier.GetCredentialByID(ctx, uuidToPgtypeUUID(id))
+	if err != nil {
+		credentialDBQueryTotal.WithLabelValues("get_credential_by_id", "error").Inc()
+		return providers.ProfessionalCredential{}, r.handleError(err, "get credential by id")
+	}
+
+	credentialDBQueryTotal.WithLabelValues("get_credential_by_id", "success").Inc()
+	return r.mapToProfessionalCredential(row), nil
+}
+
 // ============================================
 // QUERYING BY STAFF MEMBER
 // ============================================

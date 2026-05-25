@@ -23,6 +23,10 @@ type familyHistoryService struct {
 	logger            *zerolog.Logger
 }
 
+func (s *familyHistoryService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewFamilyHistoryService creates a new family history service
 func NewFamilyHistoryService(
 	familyHistoryRepo repository.PatientFamilyHistoryRepository,
@@ -117,9 +121,11 @@ func (s *familyHistoryService) GetPatientFamilyHistory(ctx context.Context, pati
 	// Try cache first
 	cacheKey := fmt.Sprintf("family_history:all:%s", patientID.String())
 	var histories []patients.PatientFamilyHistory
-	if err := s.cache.Get(ctx, cacheKey, &histories); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient family history retrieved from cache")
-		return histories, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &histories); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient family history retrieved from cache")
+			return histories, nil
+		}
 	}
 
 	// Fetch from database
@@ -130,8 +136,10 @@ func (s *familyHistoryService) GetPatientFamilyHistory(ctx context.Context, pati
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, histories, 60*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient family history")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, histories, 60*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient family history")
+		}
 	}
 
 	s.logger.Debug().
@@ -277,6 +285,10 @@ func (s *familyHistoryService) validateFamilyHistory(history patients.PatientFam
 
 // Helper methods
 func (s *familyHistoryService) invalidateFamilyHistoryCache(ctx context.Context, patientID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	// Get all relatives to invalidate their specific caches
 	histories, err := s.familyHistoryRepo.GetPatientFamilyHistory(ctx, patientID)
 	if err != nil {

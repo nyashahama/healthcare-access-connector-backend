@@ -21,6 +21,10 @@ type auditService struct {
 	logger    *zerolog.Logger
 }
 
+func (s *auditService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewAuditService creates a new audit service
 func NewAuditService(
 	auditRepo repository.AuditRepository,
@@ -92,9 +96,11 @@ func (s *auditService) GetUserActivities(ctx context.Context, userID uuid.UUID, 
 	// Try cache first
 	cacheKey := fmt.Sprintf("audit:activities:%s:%d:%d", userID.String(), limit, offset)
 	var activities []core.UserActivity
-	if err := s.cache.Get(ctx, cacheKey, &activities); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("User activities retrieved from cache")
-		return activities, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &activities); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("User activities retrieved from cache")
+			return activities, nil
+		}
 	}
 
 	// Fetch from database
@@ -105,8 +111,10 @@ func (s *auditService) GetUserActivities(ctx context.Context, userID uuid.UUID, 
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, activities, 5*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache user activities")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, activities, 5*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache user activities")
+		}
 	}
 
 	s.logger.Debug().

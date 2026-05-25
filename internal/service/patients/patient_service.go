@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -22,6 +23,10 @@ type patientService struct {
 	notificationRepo repository.NotificationRepository
 	cache            cache.Service
 	logger           *zerolog.Logger
+}
+
+func (s *patientService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
 }
 
 // NewPatientService creates a new patient service
@@ -120,9 +125,11 @@ func (s *patientService) GetPatientProfile(ctx context.Context, userID uuid.UUID
 	// Try cache first
 	cacheKey := fmt.Sprintf("patient:profile:%s", userID.String())
 	var profile patients.PatientProfile
-	if err := s.cache.Get(ctx, cacheKey, &profile); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("Patient profile retrieved from cache")
-		return profile, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &profile); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("Patient profile retrieved from cache")
+			return profile, nil
+		}
 	}
 
 	// Fetch from database
@@ -137,8 +144,10 @@ func (s *patientService) GetPatientProfile(ctx context.Context, userID uuid.UUID
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, profile, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient profile")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, profile, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient profile")
+		}
 	}
 
 	return profile, nil
@@ -157,9 +166,11 @@ func (s *patientService) GetPatientProfileByID(ctx context.Context, id uuid.UUID
 	// Try cache first
 	cacheKey := fmt.Sprintf("patient:by_id:%s", id.String())
 	var profile patients.PatientProfile
-	if err := s.cache.Get(ctx, cacheKey, &profile); err == nil {
-		s.logger.Debug().Str("patient_id", id.String()).Msg("Patient profile retrieved from cache")
-		return profile, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &profile); err == nil {
+			s.logger.Debug().Str("patient_id", id.String()).Msg("Patient profile retrieved from cache")
+			return profile, nil
+		}
 	}
 
 	// Fetch from database
@@ -174,8 +185,10 @@ func (s *patientService) GetPatientProfileByID(ctx context.Context, id uuid.UUID
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, profile, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient profile")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, profile, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient profile")
+		}
 	}
 
 	return profile, nil
@@ -335,9 +348,8 @@ func (s *patientService) SearchPatients(ctx context.Context, params patients.Adv
 		params.Offset = 0
 	}
 
-	// Generate cache key based on search parameters
 	cacheKey := s.generateSearchCacheKey(params)
-	if cacheKey != "" {
+	if cacheKey != "" && s.cacheAvailable() {
 		var cachedResults []patients.PatientProfile
 		if err := s.cache.Get(ctx, cacheKey, &cachedResults); err == nil {
 			s.logger.Debug().Msg("Search results retrieved from cache")
@@ -345,12 +357,31 @@ func (s *patientService) SearchPatients(ctx context.Context, params patients.Adv
 		}
 	}
 
-	// For now, return empty slice -  this would query the database
-	// We would need to add a SearchPatients method to the repository
-	results := []patients.PatientProfile{}
+	allProfiles, err := s.loadAllPatientProfiles(ctx, 200)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to load patient profiles for advanced search")
+		return nil, domain.NewAppError(err, "Failed to search patients", 500)
+	}
 
-	// Cache the results if we have a cache key
-	if cacheKey != "" && len(results) > 0 {
+	filtered := make([]patients.PatientProfile, 0, len(allProfiles))
+	for _, profile := range allProfiles {
+		if s.matchesAdvancedSearch(profile, params) {
+			filtered = append(filtered, profile)
+		}
+	}
+
+	startIndex := params.Offset
+	if startIndex > len(filtered) {
+		startIndex = len(filtered)
+	}
+	endIndex := startIndex + params.Limit
+	if endIndex > len(filtered) {
+		endIndex = len(filtered)
+	}
+
+	results := filtered[startIndex:endIndex]
+
+	if cacheKey != "" && s.cacheAvailable() {
 		if err := s.cache.Set(ctx, cacheKey, results, 5*time.Minute); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to cache search results")
 		}
@@ -372,25 +403,62 @@ func (s *patientService) GetDemographicsSummary(ctx context.Context) (patients.P
 	// Try cache first
 	cacheKey := "patient:demographics:summary"
 	var summary patients.PatientDemographicsSummary
-	if err := s.cache.Get(ctx, cacheKey, &summary); err == nil {
-		s.logger.Debug().Msg("Demographics summary retrieved from cache")
-		return summary, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &summary); err == nil {
+			s.logger.Debug().Msg("Demographics summary retrieved from cache")
+			return summary, nil
+		}
 	}
 
-	// For now, return empty summary -  this would calculate statistics
+	allProfiles, err := s.loadAllPatientProfiles(ctx, 200)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to load patient profiles for demographics summary")
+		return patients.PatientDemographicsSummary{}, domain.NewAppError(err, "Failed to get demographics summary", 500)
+	}
+
+	provinces := make(map[string]struct{})
+	cities := make(map[string]struct{})
+	var ageTotal float64
+	var ageCount int64
+
 	summary = patients.PatientDemographicsSummary{
-		TotalPatients:        0,
-		ProvincesCovered:     0,
-		CitiesCovered:        0,
-		WithMedicalAid:       0,
-		RequiringInterpreter: 0,
-		MarketingOptIn:       0,
-		AverageAge:           0.0,
+		TotalPatients: int64(len(allProfiles)),
+	}
+
+	now := time.Now()
+	for _, profile := range allProfiles {
+		if profile.Province != nil && strings.TrimSpace(*profile.Province) != "" {
+			provinces[strings.ToLower(strings.TrimSpace(*profile.Province))] = struct{}{}
+		}
+		if profile.City != nil && strings.TrimSpace(*profile.City) != "" {
+			cities[strings.ToLower(strings.TrimSpace(*profile.City))] = struct{}{}
+		}
+		if profile.HasMedicalAid {
+			summary.WithMedicalAid++
+		}
+		if profile.RequiresInterpreter {
+			summary.RequiringInterpreter++
+		}
+		if profile.AcceptsMarketingEmails {
+			summary.MarketingOptIn++
+		}
+		if profile.DateOfBirth != nil {
+			ageTotal += float64(calculateAge(*profile.DateOfBirth, now))
+			ageCount++
+		}
+	}
+
+	summary.ProvincesCovered = int64(len(provinces))
+	summary.CitiesCovered = int64(len(cities))
+	if ageCount > 0 {
+		summary.AverageAge = math.Round((ageTotal/float64(ageCount))*100) / 100
 	}
 
 	// Cache the summary
-	if err := s.cache.Set(ctx, cacheKey, summary, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache demographics summary")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, summary, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache demographics summary")
+		}
 	}
 
 	return summary, nil
@@ -423,6 +491,10 @@ func (s *patientService) validatePatientProfile(profile patients.PatientProfile)
 
 // Helper methods
 func (s *patientService) invalidatePatientCache(ctx context.Context, userID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("patient:profile:%s", userID.String()),
 		fmt.Sprintf("patient:by_id:*"), // Would need pattern matching
@@ -441,6 +513,86 @@ func (s *patientService) generateSearchCacheKey(params patients.AdvancedSearchPa
 	// Generate a unique cache key based on search parameters
 	//  this would create a hash of all parameters
 	return ""
+}
+
+func (s *patientService) loadAllPatientProfiles(ctx context.Context, batchSize int) ([]patients.PatientProfile, error) {
+	if batchSize <= 0 {
+		batchSize = 200
+	}
+
+	var (
+		offset   int
+		profiles []patients.PatientProfile
+	)
+
+	for {
+		batch, err := s.patientRepo.ListPatientProfiles(ctx, batchSize, offset)
+		if err != nil {
+			return nil, err
+		}
+		profiles = append(profiles, batch...)
+		if len(batch) < batchSize {
+			break
+		}
+		offset += batchSize
+	}
+
+	return profiles, nil
+}
+
+func (s *patientService) matchesAdvancedSearch(profile patients.PatientProfile, params patients.AdvancedSearchParams) bool {
+	if params.Query != nil && strings.TrimSpace(*params.Query) != "" {
+		query := strings.ToLower(strings.TrimSpace(*params.Query))
+		first := strings.ToLower(profile.FirstName)
+		last := strings.ToLower(profile.LastName)
+		preferred := strings.ToLower(strings.TrimSpace(stringValue(profile.PreferredName)))
+		if !strings.Contains(first, query) && !strings.Contains(last, query) && !strings.Contains(preferred, query) {
+			return false
+		}
+	}
+	if params.Province != nil && !strings.EqualFold(strings.TrimSpace(stringValue(profile.Province)), strings.TrimSpace(*params.Province)) {
+		return false
+	}
+	if params.City != nil && !strings.EqualFold(strings.TrimSpace(stringValue(profile.City)), strings.TrimSpace(*params.City)) {
+		return false
+	}
+	if params.HasMedicalAid != nil && profile.HasMedicalAid != *params.HasMedicalAid {
+		return false
+	}
+	if params.Gender != nil && !strings.EqualFold(strings.TrimSpace(stringValue(profile.Gender)), strings.TrimSpace(*params.Gender)) {
+		return false
+	}
+	if params.CommunicationMethod != nil && !strings.EqualFold(strings.TrimSpace(profile.PreferredCommunicationMethod), strings.TrimSpace(*params.CommunicationMethod)) {
+		return false
+	}
+	if params.EmploymentStatus != nil && !strings.EqualFold(strings.TrimSpace(stringValue(profile.EmploymentStatus)), strings.TrimSpace(*params.EmploymentStatus)) {
+		return false
+	}
+	if params.MedicalAidProvider != nil && !strings.EqualFold(strings.TrimSpace(stringValue(profile.MedicalAidProvider)), strings.TrimSpace(*params.MedicalAidProvider)) {
+		return false
+	}
+	if params.RequiresInterpreter != nil && profile.RequiresInterpreter != *params.RequiresInterpreter {
+		return false
+	}
+	if params.AcceptsMarketingEmails != nil && profile.AcceptsMarketingEmails != *params.AcceptsMarketingEmails {
+		return false
+	}
+	return true
+}
+
+func calculateAge(dob, now time.Time) int {
+	age := now.Year() - dob.Year()
+	if now.Month() < dob.Month() || (now.Month() == dob.Month() && now.Day() < dob.Day()) {
+		age--
+	}
+	return age
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func maskNationalID(nationalID string) string {

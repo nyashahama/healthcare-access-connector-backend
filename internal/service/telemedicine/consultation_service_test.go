@@ -197,6 +197,204 @@ type mockProviderAvailabilityRepository struct {
 	setMaxConcurrentFunc              func(ctx context.Context, staffID uuid.UUID, max int) error
 }
 
+type mockConsultationMessagesRepository struct {
+	insertMessageFunc             func(ctx context.Context, msg telemedicine.ConsultationMessage) (telemedicine.ConsultationMessage, error)
+	softDeleteMessageFunc         func(ctx context.Context, id uuid.UUID) error
+	getMessageByIDFunc            func(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationMessage, error)
+	getConsultationMessagesFunc   func(ctx context.Context, consultationID uuid.UUID, limit, offset int) ([]telemedicine.ConsultationMessage, error)
+	getMessagesAfterCursorFunc    func(ctx context.Context, consultationID uuid.UUID, cursor time.Time) ([]telemedicine.MessageAfterCursor, error)
+	getLastMessageFunc            func(ctx context.Context, consultationID uuid.UUID) (telemedicine.LastMessagePreview, error)
+	markMessageReadFunc           func(ctx context.Context, id uuid.UUID) error
+	markAllProviderMessagesReadFunc func(ctx context.Context, consultationID uuid.UUID) error
+	markAllPatientMessagesReadFunc  func(ctx context.Context, consultationID uuid.UUID) error
+	countUnreadMessagesFunc       func(ctx context.Context, consultationID uuid.UUID, senderRole telemedicine.SenderRole) (telemedicine.UnreadCount, error)
+	insertSystemEventFunc         func(ctx context.Context, consultationID uuid.UUID, systemUserID uuid.UUID, label string, metadata map[string]interface{}) (telemedicine.ConsultationMessage, error)
+	getSystemEventsFunc           func(ctx context.Context, consultationID uuid.UUID) ([]telemedicine.SystemEvent, error)
+	getConsultationAttachmentsFunc func(ctx context.Context, consultationID uuid.UUID) ([]telemedicine.AttachmentEntry, error)
+}
+
+type mockConsultationNotesRepository struct {
+	createNoteFunc              func(ctx context.Context, consultationID uuid.UUID, authoredByStaffID uuid.UUID) (telemedicine.ConsultationNote, error)
+	updateNoteFunc              func(ctx context.Context, id uuid.UUID, update telemedicine.ConsultationNote) (telemedicine.ConsultationNote, error)
+	finaliseNoteFunc            func(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationNote, error)
+	finaliseNoteByConsultationFunc func(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNote, error)
+	getNoteByIDFunc             func(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationNote, error)
+	getNoteByConsultationIDFunc func(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNote, error)
+	getNoteWithProviderInfoFunc func(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNoteWithProviderInfo, error)
+	getProviderNoteHistoryFunc  func(ctx context.Context, staffID uuid.UUID, limit, offset int) ([]telemedicine.ProviderNoteHistoryEntry, error)
+	getPatientNoteHistoryFunc   func(ctx context.Context, patientID uuid.UUID) ([]telemedicine.PatientNoteHistoryEntry, error)
+	noteExistsForConsultationFunc func(ctx context.Context, consultationID uuid.UUID) (bool, error)
+	isNoteFinalisedFunc         func(ctx context.Context, consultationID uuid.UUID) (bool, error)
+}
+
+func (m *mockConsultationNotesRepository) CreateNote(ctx context.Context, consultationID uuid.UUID, authoredByStaffID uuid.UUID) (telemedicine.ConsultationNote, error) {
+	if m.createNoteFunc != nil {
+		return m.createNoteFunc(ctx, consultationID, authoredByStaffID)
+	}
+	return telemedicine.ConsultationNote{}, nil
+}
+
+func (m *mockConsultationNotesRepository) UpdateNote(ctx context.Context, id uuid.UUID, update telemedicine.ConsultationNote) (telemedicine.ConsultationNote, error) {
+	if m.updateNoteFunc != nil {
+		return m.updateNoteFunc(ctx, id, update)
+	}
+	return telemedicine.ConsultationNote{}, nil
+}
+
+func (m *mockConsultationNotesRepository) FinaliseNote(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationNote, error) {
+	if m.finaliseNoteFunc != nil {
+		return m.finaliseNoteFunc(ctx, id)
+	}
+	return telemedicine.ConsultationNote{}, nil
+}
+
+func (m *mockConsultationNotesRepository) FinaliseNoteByConsultation(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNote, error) {
+	if m.finaliseNoteByConsultationFunc != nil {
+		return m.finaliseNoteByConsultationFunc(ctx, consultationID)
+	}
+	return telemedicine.ConsultationNote{}, nil
+}
+
+func (m *mockConsultationNotesRepository) GetNoteByID(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationNote, error) {
+	if m.getNoteByIDFunc != nil {
+		return m.getNoteByIDFunc(ctx, id)
+	}
+	return telemedicine.ConsultationNote{}, domain.ErrNotFound
+}
+
+func (m *mockConsultationNotesRepository) GetNoteByConsultationID(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNote, error) {
+	if m.getNoteByConsultationIDFunc != nil {
+		return m.getNoteByConsultationIDFunc(ctx, consultationID)
+	}
+	return telemedicine.ConsultationNote{}, domain.ErrNotFound
+}
+
+func (m *mockConsultationNotesRepository) GetNoteWithProviderInfo(ctx context.Context, consultationID uuid.UUID) (telemedicine.ConsultationNoteWithProviderInfo, error) {
+	if m.getNoteWithProviderInfoFunc != nil {
+		return m.getNoteWithProviderInfoFunc(ctx, consultationID)
+	}
+	return telemedicine.ConsultationNoteWithProviderInfo{}, domain.ErrNotFound
+}
+
+func (m *mockConsultationNotesRepository) GetProviderNoteHistory(ctx context.Context, staffID uuid.UUID, limit, offset int) ([]telemedicine.ProviderNoteHistoryEntry, error) {
+	if m.getProviderNoteHistoryFunc != nil {
+		return m.getProviderNoteHistoryFunc(ctx, staffID, limit, offset)
+	}
+	return nil, nil
+}
+
+func (m *mockConsultationNotesRepository) GetPatientNoteHistory(ctx context.Context, patientID uuid.UUID) ([]telemedicine.PatientNoteHistoryEntry, error) {
+	if m.getPatientNoteHistoryFunc != nil {
+		return m.getPatientNoteHistoryFunc(ctx, patientID)
+	}
+	return nil, nil
+}
+
+func (m *mockConsultationNotesRepository) NoteExistsForConsultation(ctx context.Context, consultationID uuid.UUID) (bool, error) {
+	if m.noteExistsForConsultationFunc != nil {
+		return m.noteExistsForConsultationFunc(ctx, consultationID)
+	}
+	return false, nil
+}
+
+func (m *mockConsultationNotesRepository) IsNoteFinalised(ctx context.Context, consultationID uuid.UUID) (bool, error) {
+	if m.isNoteFinalisedFunc != nil {
+		return m.isNoteFinalisedFunc(ctx, consultationID)
+	}
+	return false, nil
+}
+
+func (m *mockConsultationMessagesRepository) InsertMessage(ctx context.Context, msg telemedicine.ConsultationMessage) (telemedicine.ConsultationMessage, error) {
+	if m.insertMessageFunc != nil {
+		return m.insertMessageFunc(ctx, msg)
+	}
+	return msg, nil
+}
+
+func (m *mockConsultationMessagesRepository) SoftDeleteMessage(ctx context.Context, id uuid.UUID) error {
+	if m.softDeleteMessageFunc != nil {
+		return m.softDeleteMessageFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockConsultationMessagesRepository) GetMessageByID(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationMessage, error) {
+	if m.getMessageByIDFunc != nil {
+		return m.getMessageByIDFunc(ctx, id)
+	}
+	return telemedicine.ConsultationMessage{}, domain.ErrNotFound
+}
+
+func (m *mockConsultationMessagesRepository) GetConsultationMessages(ctx context.Context, consultationID uuid.UUID, limit, offset int) ([]telemedicine.ConsultationMessage, error) {
+	if m.getConsultationMessagesFunc != nil {
+		return m.getConsultationMessagesFunc(ctx, consultationID, limit, offset)
+	}
+	return nil, nil
+}
+
+func (m *mockConsultationMessagesRepository) GetMessagesAfterCursor(ctx context.Context, consultationID uuid.UUID, cursor time.Time) ([]telemedicine.MessageAfterCursor, error) {
+	if m.getMessagesAfterCursorFunc != nil {
+		return m.getMessagesAfterCursorFunc(ctx, consultationID, cursor)
+	}
+	return nil, nil
+}
+
+func (m *mockConsultationMessagesRepository) GetLastMessage(ctx context.Context, consultationID uuid.UUID) (telemedicine.LastMessagePreview, error) {
+	if m.getLastMessageFunc != nil {
+		return m.getLastMessageFunc(ctx, consultationID)
+	}
+	return telemedicine.LastMessagePreview{}, domain.ErrNotFound
+}
+
+func (m *mockConsultationMessagesRepository) MarkMessageRead(ctx context.Context, id uuid.UUID) error {
+	if m.markMessageReadFunc != nil {
+		return m.markMessageReadFunc(ctx, id)
+	}
+	return nil
+}
+
+func (m *mockConsultationMessagesRepository) MarkAllProviderMessagesRead(ctx context.Context, consultationID uuid.UUID) error {
+	if m.markAllProviderMessagesReadFunc != nil {
+		return m.markAllProviderMessagesReadFunc(ctx, consultationID)
+	}
+	return nil
+}
+
+func (m *mockConsultationMessagesRepository) MarkAllPatientMessagesRead(ctx context.Context, consultationID uuid.UUID) error {
+	if m.markAllPatientMessagesReadFunc != nil {
+		return m.markAllPatientMessagesReadFunc(ctx, consultationID)
+	}
+	return nil
+}
+
+func (m *mockConsultationMessagesRepository) CountUnreadMessages(ctx context.Context, consultationID uuid.UUID, senderRole telemedicine.SenderRole) (telemedicine.UnreadCount, error) {
+	if m.countUnreadMessagesFunc != nil {
+		return m.countUnreadMessagesFunc(ctx, consultationID, senderRole)
+	}
+	return telemedicine.UnreadCount{}, nil
+}
+
+func (m *mockConsultationMessagesRepository) InsertSystemEvent(ctx context.Context, consultationID uuid.UUID, systemUserID uuid.UUID, label string, metadata map[string]interface{}) (telemedicine.ConsultationMessage, error) {
+	if m.insertSystemEventFunc != nil {
+		return m.insertSystemEventFunc(ctx, consultationID, systemUserID, label, metadata)
+	}
+	return telemedicine.ConsultationMessage{}, nil
+}
+
+func (m *mockConsultationMessagesRepository) GetSystemEvents(ctx context.Context, consultationID uuid.UUID) ([]telemedicine.SystemEvent, error) {
+	if m.getSystemEventsFunc != nil {
+		return m.getSystemEventsFunc(ctx, consultationID)
+	}
+	return nil, nil
+}
+
+func (m *mockConsultationMessagesRepository) GetConsultationAttachments(ctx context.Context, consultationID uuid.UUID) ([]telemedicine.AttachmentEntry, error) {
+	if m.getConsultationAttachmentsFunc != nil {
+		return m.getConsultationAttachmentsFunc(ctx, consultationID)
+	}
+	return nil, nil
+}
+
 func (m *mockProviderAvailabilityRepository) UpsertAvailability(ctx context.Context, staffID uuid.UUID) (telemedicine.ProviderAvailability, error) {
 	if m.upsertAvailabilityFunc != nil {
 		return m.upsertAvailabilityFunc(ctx, staffID)
@@ -357,17 +555,46 @@ func (m *mockSymptomCheckerRepository) CountSessionsByOutcome(ctx context.Contex
 	return nil, nil
 }
 
-type mockCacheService struct{}
+type mockCacheService struct {
+	deletedKeys []string
+	store       map[string]interface{}
+}
 
 func (m *mockCacheService) Get(ctx context.Context, key string, dest interface{}) error {
-	return cache.ErrCacheMiss
+	if m.store == nil {
+		return cache.ErrCacheMiss
+	}
+	value, ok := m.store[key]
+	if !ok {
+		return cache.ErrCacheMiss
+	}
+
+	switch target := dest.(type) {
+	case *[]string:
+		typed, ok := value.([]string)
+		if !ok {
+			return cache.ErrCacheMiss
+		}
+		*target = append((*target)[:0], typed...)
+		return nil
+	default:
+		return cache.ErrCacheMiss
+	}
 }
 
 func (m *mockCacheService) Set(ctx context.Context, key string, value interface{}, ttl time.Duration) error {
+	if m.store == nil {
+		m.store = make(map[string]interface{})
+	}
+	m.store[key] = value
 	return nil
 }
 
 func (m *mockCacheService) Delete(ctx context.Context, key string) error {
+	m.deletedKeys = append(m.deletedKeys, key)
+	if m.store != nil {
+		delete(m.store, key)
+	}
 	return nil
 }
 
@@ -431,6 +658,51 @@ func newProviderAvailabilityServiceWithMocks(t *testing.T) (*providerAvailabilit
 		cache:             &mockCacheService{},
 		logger:            &logger,
 	}, mockAvailabilityRepo
+}
+
+func newConsultationMessagesServiceWithMocks(t *testing.T) (*consultationMessagesService, *mockConsultationMessagesRepository, *mockConsultationRepository, *mockCacheService) {
+	t.Helper()
+	logger := zerolog.New(io.Discard)
+	mockMessagesRepo := &mockConsultationMessagesRepository{}
+	mockConsultationRepo := &mockConsultationRepository{}
+	cacheSvc := &mockCacheService{}
+
+	return &consultationMessagesService{
+		messagesRepo:     mockMessagesRepo,
+		consultationRepo: mockConsultationRepo,
+		cache:            cacheSvc,
+		logger:           &logger,
+	}, mockMessagesRepo, mockConsultationRepo, cacheSvc
+}
+
+func newConsultationNotesServiceWithMocks(t *testing.T) (*consultationNotesService, *mockConsultationNotesRepository, *mockConsultationRepository, *mockCacheService) {
+	t.Helper()
+	logger := zerolog.New(io.Discard)
+	mockNotesRepo := &mockConsultationNotesRepository{}
+	mockConsultationRepo := &mockConsultationRepository{}
+	cacheSvc := &mockCacheService{}
+
+	return &consultationNotesService{
+		notesRepo:        mockNotesRepo,
+		consultationRepo: mockConsultationRepo,
+		cache:            cacheSvc,
+		logger:           &logger,
+	}, mockNotesRepo, mockConsultationRepo, cacheSvc
+}
+
+func newSymptomCheckerServiceWithMocks(t *testing.T) (*symptomCheckerService, *mockSymptomCheckerRepository, *mockCacheService) {
+	t.Helper()
+	logger := zerolog.New(io.Discard)
+	mockSessionRepo := &mockSymptomCheckerRepository{}
+	cacheSvc := &mockCacheService{}
+
+	return &symptomCheckerService{
+		sessionRepo: mockSessionRepo,
+		patientRepo: nil,
+		aiClient:    nil,
+		cache:       cacheSvc,
+		logger:      &logger,
+	}, mockSessionRepo, cacheSvc
 }
 
 func TestConsultationService_RequestConsultation(t *testing.T) {
@@ -612,6 +884,85 @@ func TestConsultationService_AcceptConsultation(t *testing.T) {
 		assert.Equal(t, telemedicine.ConsultationStatusAccepted, result.Status)
 	})
 
+	t.Run("invalidates provider active cache after accept", func(t *testing.T) {
+		svc, mockConsultationRepo, mockAvailabilityRepo, _ := newConsultationServiceWithMocks(t)
+
+		consultationID := uuid.New()
+		patientID := uuid.New()
+		providerStaffID := uuid.New()
+		clinicID := uuid.New()
+		cacheSvc := &mockCacheService{}
+		svc.cache = cacheSvc
+
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{
+				ID:       id,
+				PatientID: patientID,
+				Status:   telemedicine.ConsultationStatusPendingAcceptance,
+			}, nil
+		}
+		mockAvailabilityRepo.incrementActiveConsultationsFunc = func(ctx context.Context, staffID uuid.UUID) (telemedicine.ProviderAvailability, error) {
+			return telemedicine.ProviderAvailability{StaffID: staffID}, nil
+		}
+		mockConsultationRepo.acceptConsultationFunc = func(ctx context.Context, id uuid.UUID, providerID uuid.UUID, cID uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{
+				ID:             id,
+				PatientID:      patientID,
+				Status:         telemedicine.ConsultationStatusAccepted,
+				ProviderStaffID: &providerID,
+				ClinicID:       &cID,
+			}, nil
+		}
+
+		_, err := svc.AcceptConsultation(context.Background(), consultationID, providerStaffID, clinicID)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, providerActiveConsultationsCacheKey(providerStaffID))
+	})
+
+	t.Run("invalidates registered patient consultation history caches", func(t *testing.T) {
+		svc, mockConsultationRepo, mockAvailabilityRepo, _ := newConsultationServiceWithMocks(t)
+
+		consultationID := uuid.New()
+		patientID := uuid.New()
+		providerStaffID := uuid.New()
+		clinicID := uuid.New()
+		cacheSvc := &mockCacheService{
+			store: map[string]interface{}{
+				patientConsultationIndexKey(patientID): []string{
+					patientConsultationsCacheKey(patientID, 20),
+					patientConsultationsCacheKey(patientID, 50),
+				},
+			},
+		}
+		svc.cache = cacheSvc
+
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{
+				ID:        id,
+				PatientID: patientID,
+				Status:    telemedicine.ConsultationStatusPendingAcceptance,
+			}, nil
+		}
+		mockAvailabilityRepo.incrementActiveConsultationsFunc = func(ctx context.Context, staffID uuid.UUID) (telemedicine.ProviderAvailability, error) {
+			return telemedicine.ProviderAvailability{StaffID: staffID}, nil
+		}
+		mockConsultationRepo.acceptConsultationFunc = func(ctx context.Context, id uuid.UUID, providerID uuid.UUID, cID uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{
+				ID:              id,
+				PatientID:       patientID,
+				Status:          telemedicine.ConsultationStatusAccepted,
+				ProviderStaffID: &providerID,
+				ClinicID:        &cID,
+			}, nil
+		}
+
+		_, err := svc.AcceptConsultation(context.Background(), consultationID, providerStaffID, clinicID)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, patientConsultationsCacheKey(patientID, 20))
+		assert.Contains(t, cacheSvc.deletedKeys, patientConsultationsCacheKey(patientID, 50))
+		assert.Contains(t, cacheSvc.deletedKeys, patientConsultationIndexKey(patientID))
+	})
+
 	t.Run("consultation not found", func(t *testing.T) {
 		svc, _, _, _ := newConsultationServiceWithMocks(t)
 
@@ -776,6 +1127,41 @@ func TestConsultationService_CompleteConsultation(t *testing.T) {
 		assert.Equal(t, telemedicine.ConsultationStatusCompleted, result.Status)
 	})
 
+	t.Run("invalidates provider active cache after completion", func(t *testing.T) {
+		svc, mockConsultationRepo, mockAvailabilityRepo, _ := newConsultationServiceWithMocks(t)
+
+		consultationID := uuid.New()
+		patientID := uuid.New()
+		providerStaffID := uuid.New()
+		endedBy := uuid.New()
+		cacheSvc := &mockCacheService{}
+		svc.cache = cacheSvc
+
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{
+				ID:             id,
+				PatientID:      patientID,
+				Status:         telemedicine.ConsultationStatusInProgress,
+				ProviderStaffID: &providerStaffID,
+			}, nil
+		}
+		mockConsultationRepo.completeConsultationFunc = func(ctx context.Context, id uuid.UUID, endedBy uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{
+				ID:             id,
+				PatientID:      patientID,
+				Status:         telemedicine.ConsultationStatusCompleted,
+				ProviderStaffID: &providerStaffID,
+			}, nil
+		}
+		mockAvailabilityRepo.decrementActiveConsultationsFunc = func(ctx context.Context, staffID uuid.UUID) error {
+			return nil
+		}
+
+		_, err := svc.CompleteConsultation(context.Background(), consultationID, endedBy)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, providerActiveConsultationsCacheKey(providerStaffID))
+	})
+
 	t.Run("consultation not found", func(t *testing.T) {
 		svc, _, _, _ := newConsultationServiceWithMocks(t)
 
@@ -825,6 +1211,75 @@ func TestConsultationService_CompleteConsultation(t *testing.T) {
 		_, err := svc.CompleteConsultation(context.Background(), uuid.New(), uuid.New())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "must be in_progress")
+	})
+}
+
+func TestConsultationService_UpdatePaymentStatus(t *testing.T) {
+	t.Run("invalidates patient and provider caches", func(t *testing.T) {
+		svc, mockConsultationRepo, _, _ := newConsultationServiceWithMocks(t)
+
+		consultationID := uuid.New()
+		patientID := uuid.New()
+		providerStaffID := uuid.New()
+		cacheSvc := &mockCacheService{
+			store: map[string]interface{}{
+				patientConsultationIndexKey(patientID): []string{
+					patientConsultationsCacheKey(patientID, 20),
+					patientConsultationsCacheKey(patientID, 50),
+				},
+			},
+		}
+		svc.cache = cacheSvc
+
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{
+				ID:              id,
+				PatientID:       patientID,
+				ProviderStaffID: &providerStaffID,
+			}, nil
+		}
+		mockConsultationRepo.updatePaymentStatusFunc = func(ctx context.Context, id uuid.UUID, status telemedicine.PaymentStatus, reference *string) error {
+			return nil
+		}
+
+		err := svc.UpdatePaymentStatus(context.Background(), consultationID, telemedicine.PaymentStatusPaid, nil)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, patientConsultationsCacheKey(patientID, 20))
+		assert.Contains(t, cacheSvc.deletedKeys, patientConsultationsCacheKey(patientID, 50))
+		assert.Contains(t, cacheSvc.deletedKeys, providerActiveConsultationsCacheKey(providerStaffID))
+	})
+}
+
+func TestConsultationService_UpdateConsultationChannel(t *testing.T) {
+	t.Run("invalidates waiting room and patient history caches", func(t *testing.T) {
+		svc, mockConsultationRepo, _, _ := newConsultationServiceWithMocks(t)
+
+		consultationID := uuid.New()
+		patientID := uuid.New()
+		cacheSvc := &mockCacheService{
+			store: map[string]interface{}{
+				patientConsultationIndexKey(patientID): []string{
+					patientConsultationsCacheKey(patientID, 20),
+				},
+			},
+		}
+		svc.cache = cacheSvc
+
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{
+				ID:        id,
+				PatientID: patientID,
+				Status:    telemedicine.ConsultationStatusPendingAcceptance,
+			}, nil
+		}
+		mockConsultationRepo.updateConsultationChannelFunc = func(ctx context.Context, id uuid.UUID, channel telemedicine.ConsultationChannel) error {
+			return nil
+		}
+
+		err := svc.UpdateConsultationChannel(context.Background(), consultationID, telemedicine.ChannelVideo)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, "consultation:waiting_room")
+		assert.Contains(t, cacheSvc.deletedKeys, patientConsultationsCacheKey(patientID, 20))
 	})
 }
 
@@ -996,6 +1451,37 @@ func TestProviderAvailabilityService_GoOnline(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "staff_id is required")
 	})
+
+	t.Run("invalidates registered filtered availability caches", func(t *testing.T) {
+		svc, mockAvailRepo := newProviderAvailabilityServiceWithMocks(t)
+
+		staffID := uuid.New()
+		cacheSvc := &mockCacheService{
+			store: map[string]interface{}{
+				availableProvidersRegistryKey(): []string{
+					availableProvidersCacheKey(nil),
+					availableProvidersCacheKey(&staffID),
+				},
+				availableProvidersBySpecRegistryKey(): []string{
+					availableProvidersBySpecCacheKey("gp"),
+				},
+			},
+		}
+		svc.cache = cacheSvc
+
+		mockAvailRepo.upsertAvailabilityFunc = func(ctx context.Context, sID uuid.UUID) (telemedicine.ProviderAvailability, error) {
+			return telemedicine.ProviderAvailability{StaffID: sID}, nil
+		}
+		mockAvailRepo.goOnlineFunc = func(ctx context.Context, sID uuid.UUID) (telemedicine.ProviderAvailability, error) {
+			return telemedicine.ProviderAvailability{StaffID: sID, IsOnline: true}, nil
+		}
+
+		_, err := svc.GoOnline(context.Background(), staffID)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, availableProvidersRegistryKey())
+		assert.Contains(t, cacheSvc.deletedKeys, availableProvidersBySpecRegistryKey())
+		assert.Contains(t, cacheSvc.deletedKeys, availableProvidersBySpecCacheKey("gp"))
+	})
 }
 
 func TestProviderAvailabilityService_GoOffline(t *testing.T) {
@@ -1047,7 +1533,224 @@ func TestProviderAvailabilityService_GoOffline(t *testing.T) {
 	})
 }
 
+func TestConsultationMessagesService_SendMessage(t *testing.T) {
+	t.Run("invalidates unread cache for sender role", func(t *testing.T) {
+		svc, mockMessagesRepo, mockConsultationRepo, cacheSvc := newConsultationMessagesServiceWithMocks(t)
+
+		consultationID := uuid.New()
+		senderID := uuid.New()
+		content := "hello"
+
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{ID: id, Status: telemedicine.ConsultationStatusAccepted}, nil
+		}
+		mockMessagesRepo.insertMessageFunc = func(ctx context.Context, msg telemedicine.ConsultationMessage) (telemedicine.ConsultationMessage, error) {
+			return telemedicine.ConsultationMessage{
+				ID:             uuid.New(),
+				ConsultationID: msg.ConsultationID,
+				SenderUserID:   msg.SenderUserID,
+				SenderRole:     msg.SenderRole,
+				MessageType:    msg.MessageType,
+				Content:        msg.Content,
+			}, nil
+		}
+
+		_, err := svc.SendMessage(context.Background(), telemedicine.ConsultationMessage{
+			ConsultationID: consultationID,
+			SenderUserID:   senderID,
+			SenderRole:     telemedicine.SenderRolePatient,
+			MessageType:    telemedicine.MessageTypeText,
+			Content:        &content,
+		})
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, unreadCountCacheKey(consultationID, telemedicine.SenderRolePatient))
+	})
+
+	t.Run("invalidates registered thread cache keys across limits", func(t *testing.T) {
+		svc, mockMessagesRepo, mockConsultationRepo, cacheSvc := newConsultationMessagesServiceWithMocks(t)
+
+		consultationID := uuid.New()
+		senderID := uuid.New()
+		content := "hello"
+		cacheSvc.store = map[string]interface{}{
+			messageThreadIndexKey(consultationID): []string{
+				messageThreadCacheKey(consultationID, 20),
+				messageThreadCacheKey(consultationID, 50),
+			},
+		}
+
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{ID: id, Status: telemedicine.ConsultationStatusAccepted}, nil
+		}
+		mockMessagesRepo.insertMessageFunc = func(ctx context.Context, msg telemedicine.ConsultationMessage) (telemedicine.ConsultationMessage, error) {
+			return telemedicine.ConsultationMessage{
+				ID:             uuid.New(),
+				ConsultationID: msg.ConsultationID,
+				SenderUserID:   msg.SenderUserID,
+				SenderRole:     msg.SenderRole,
+				MessageType:    msg.MessageType,
+				Content:        msg.Content,
+			}, nil
+		}
+
+		_, err := svc.SendMessage(context.Background(), telemedicine.ConsultationMessage{
+			ConsultationID: consultationID,
+			SenderUserID:   senderID,
+			SenderRole:     telemedicine.SenderRolePatient,
+			MessageType:    telemedicine.MessageTypeText,
+			Content:        &content,
+		})
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, messageThreadCacheKey(consultationID, 20))
+		assert.Contains(t, cacheSvc.deletedKeys, messageThreadCacheKey(consultationID, 50))
+		assert.Contains(t, cacheSvc.deletedKeys, messageThreadIndexKey(consultationID))
+	})
+}
+
+func TestConsultationMessagesService_DeleteMessage(t *testing.T) {
+	t.Run("invalidates unread cache for deleted sender role", func(t *testing.T) {
+		svc, mockMessagesRepo, _, cacheSvc := newConsultationMessagesServiceWithMocks(t)
+
+		messageID := uuid.New()
+		consultationID := uuid.New()
+		senderID := uuid.New()
+
+		mockMessagesRepo.getMessageByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationMessage, error) {
+			return telemedicine.ConsultationMessage{
+				ID:             id,
+				ConsultationID: consultationID,
+				SenderUserID:   senderID,
+				SenderRole:     telemedicine.SenderRoleProvider,
+				MessageType:    telemedicine.MessageTypeText,
+			}, nil
+		}
+		mockMessagesRepo.softDeleteMessageFunc = func(ctx context.Context, id uuid.UUID) error {
+			return nil
+		}
+
+		err := svc.DeleteMessage(context.Background(), messageID, senderID)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, unreadCountCacheKey(consultationID, telemedicine.SenderRoleProvider))
+	})
+}
+
+func TestConsultationMessagesService_MarkMessageRead(t *testing.T) {
+	t.Run("invalidates unread cache for message sender role", func(t *testing.T) {
+		svc, mockMessagesRepo, _, cacheSvc := newConsultationMessagesServiceWithMocks(t)
+
+		messageID := uuid.New()
+		consultationID := uuid.New()
+
+		mockMessagesRepo.getMessageByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationMessage, error) {
+			return telemedicine.ConsultationMessage{
+				ID:             id,
+				ConsultationID: consultationID,
+				SenderRole:     telemedicine.SenderRoleProvider,
+			}, nil
+		}
+		mockMessagesRepo.markMessageReadFunc = func(ctx context.Context, id uuid.UUID) error {
+			return nil
+		}
+
+		err := svc.MarkMessageRead(context.Background(), messageID)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, unreadCountCacheKey(consultationID, telemedicine.SenderRoleProvider))
+	})
+}
+
+func TestConsultationNotesService_CreateNote(t *testing.T) {
+	t.Run("invalidates patient note history cache", func(t *testing.T) {
+		svc, mockNotesRepo, mockConsultationRepo, cacheSvc := newConsultationNotesServiceWithMocks(t)
+
+		consultationID := uuid.New()
+		patientID := uuid.New()
+		staffID := uuid.New()
+
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{ID: id, PatientID: patientID, Status: telemedicine.ConsultationStatusAccepted}, nil
+		}
+		mockNotesRepo.noteExistsForConsultationFunc = func(ctx context.Context, id uuid.UUID) (bool, error) {
+			return false, nil
+		}
+		mockNotesRepo.createNoteFunc = func(ctx context.Context, cID uuid.UUID, authoredByStaffID uuid.UUID) (telemedicine.ConsultationNote, error) {
+			return telemedicine.ConsultationNote{ID: uuid.New(), ConsultationID: cID, AuthoredByStaffID: authoredByStaffID}, nil
+		}
+
+		_, err := svc.CreateNote(context.Background(), consultationID, staffID)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, patientNoteHistoryCacheKey(patientID))
+	})
+}
+
+func TestConsultationNotesService_FinaliseNote(t *testing.T) {
+	t.Run("invalidates registered provider history caches and patient history", func(t *testing.T) {
+		svc, mockNotesRepo, mockConsultationRepo, cacheSvc := newConsultationNotesServiceWithMocks(t)
+
+		noteID := uuid.New()
+		consultationID := uuid.New()
+		patientID := uuid.New()
+		staffID := uuid.New()
+		cacheSvc.store = map[string]interface{}{
+			providerNoteHistoryIndexKey(staffID): []string{
+				providerNoteHistoryCacheKey(staffID, 20),
+				providerNoteHistoryCacheKey(staffID, 50),
+			},
+		}
+
+		mockNotesRepo.getNoteByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationNote, error) {
+			return telemedicine.ConsultationNote{ID: id, ConsultationID: consultationID, AuthoredByStaffID: staffID}, nil
+		}
+		mockNotesRepo.finaliseNoteFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationNote, error) {
+			return telemedicine.ConsultationNote{ID: id, ConsultationID: consultationID, AuthoredByStaffID: staffID, IsFinalised: true}, nil
+		}
+		mockConsultationRepo.getConsultationByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error) {
+			return telemedicine.Consultation{ID: id, PatientID: patientID}, nil
+		}
+
+		_, err := svc.FinaliseNote(context.Background(), noteID, staffID)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, providerNoteHistoryCacheKey(staffID, 20))
+		assert.Contains(t, cacheSvc.deletedKeys, providerNoteHistoryCacheKey(staffID, 50))
+		assert.Contains(t, cacheSvc.deletedKeys, providerNoteHistoryIndexKey(staffID))
+		assert.Contains(t, cacheSvc.deletedKeys, patientNoteHistoryCacheKey(patientID))
+	})
+}
+
+func TestSymptomCheckerService_MarkSessionConverted(t *testing.T) {
+	t.Run("invalidates registered patient session history caches", func(t *testing.T) {
+		svc, mockSessionRepo, cacheSvc := newSymptomCheckerServiceWithMocks(t)
+
+		sessionID := uuid.New()
+		patientID := uuid.New()
+		cacheSvc.store = map[string]interface{}{
+			patientSessionIndexKey(patientID): []string{
+				patientSessionsCacheKey(patientID, 20),
+				patientSessionsCacheKey(patientID, 50),
+			},
+		}
+
+		mockSessionRepo.getSessionByIDFunc = func(ctx context.Context, id uuid.UUID) (telemedicine.SymptomCheckerSession, error) {
+			return telemedicine.SymptomCheckerSession{
+				ID:        id,
+				PatientID: patientID,
+				Status:    telemedicine.StatusCompleted,
+			}, nil
+		}
+		mockSessionRepo.markSessionConvertedFunc = func(ctx context.Context, id uuid.UUID) error {
+			return nil
+		}
+
+		err := svc.MarkSessionConverted(context.Background(), sessionID)
+		require.NoError(t, err)
+		assert.Contains(t, cacheSvc.deletedKeys, patientSessionsCacheKey(patientID, 20))
+		assert.Contains(t, cacheSvc.deletedKeys, patientSessionsCacheKey(patientID, 50))
+		assert.Contains(t, cacheSvc.deletedKeys, patientSessionIndexKey(patientID))
+	})
+}
+
 var _ repository.ConsultationRepository = (*mockConsultationRepository)(nil)
+var _ repository.ConsultationNotesRepository = (*mockConsultationNotesRepository)(nil)
+var _ repository.ConsultationMessagesRepository = (*mockConsultationMessagesRepository)(nil)
 var _ repository.ProviderAvailabilityRepository = (*mockProviderAvailabilityRepository)(nil)
 var _ repository.SymptomCheckerRepository = (*mockSymptomCheckerRepository)(nil)
 var _ cache.Service = (*mockCacheService)(nil)

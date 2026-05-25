@@ -18,12 +18,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func stringPtr(value string) *string {
+	return &value
+}
+
 type mockPatientProfileRepository struct {
 	createFunc           func(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error)
 	getByUserIDFunc     func(ctx context.Context, userID uuid.UUID) (patients.PatientProfile, error)
 	getByIDFunc         func(ctx context.Context, id uuid.UUID) (patients.PatientProfile, error)
 	getByNationalIDFunc func(ctx context.Context, nationalID string) (patients.PatientProfile, error)
 	updateFunc          func(ctx context.Context, profile patients.PatientProfile) error
+	listFunc            func(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error)
+	searchFunc          func(ctx context.Context, query string, limit, offset int) ([]patients.PatientProfile, error)
 }
 
 func (m *mockPatientProfileRepository) CreatePatientProfile(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error) {
@@ -70,10 +76,16 @@ func (m *mockPatientProfileRepository) DeletePatientProfileByUserID(ctx context.
 }
 
 func (m *mockPatientProfileRepository) ListPatientProfiles(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error) {
+	if m.listFunc != nil {
+		return m.listFunc(ctx, limit, offset)
+	}
 	return nil, nil
 }
 
 func (m *mockPatientProfileRepository) SearchPatientProfiles(ctx context.Context, query string, limit, offset int) ([]patients.PatientProfile, error) {
+	if m.searchFunc != nil {
+		return m.searchFunc(ctx, query, limit, offset)
+	}
 	return nil, nil
 }
 
@@ -371,6 +383,227 @@ func TestPatientService_CreateProfile(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "National ID already registered")
 	})
+}
+
+func TestPatientServiceGetPatientProfileWithoutCache(t *testing.T) {
+	logger := zerolog.New(io.Discard)
+	userID := uuid.New()
+	expected := patients.PatientProfile{
+		ID:        uuid.New(),
+		UserID:    userID,
+		FirstName: "Jane",
+		LastName:  "Doe",
+	}
+
+	svc := &patientService{
+		patientRepo: &mockPatientProfileRepository{
+			getByUserIDFunc: func(ctx context.Context, got uuid.UUID) (patients.PatientProfile, error) {
+				require.Equal(t, userID, got)
+				return expected, nil
+			},
+		},
+		userRepo:         &mockUserRepositoryForPatient{},
+		notificationRepo: &mockNotificationRepositoryForPatient{},
+		cache:            nil,
+		logger:           &logger,
+	}
+
+	result, err := svc.GetPatientProfile(context.Background(), userID)
+	require.NoError(t, err)
+	require.Equal(t, expected.ID, result.ID)
+}
+
+func TestPatientServiceGetPatientProfileByIDWithoutCache(t *testing.T) {
+	logger := zerolog.New(io.Discard)
+	patientID := uuid.New()
+	expected := patients.PatientProfile{
+		ID:        patientID,
+		UserID:    uuid.New(),
+		FirstName: "John",
+		LastName:  "Smith",
+	}
+
+	svc := &patientService{
+		patientRepo: &mockPatientProfileRepository{
+			getByIDFunc: func(ctx context.Context, got uuid.UUID) (patients.PatientProfile, error) {
+				require.Equal(t, patientID, got)
+				return expected, nil
+			},
+		},
+		userRepo:         &mockUserRepositoryForPatient{},
+		notificationRepo: &mockNotificationRepositoryForPatient{},
+		cache:            nil,
+		logger:           &logger,
+	}
+
+	result, err := svc.GetPatientProfileByID(context.Background(), patientID)
+	require.NoError(t, err)
+	require.Equal(t, expected.ID, result.ID)
+}
+
+func TestPatientServiceCreateProfileWithoutCache(t *testing.T) {
+	logger := zerolog.New(io.Discard)
+	userID := uuid.New()
+	dob := time.Date(1992, 6, 10, 0, 0, 0, 0, time.UTC)
+
+	svc := &patientService{
+		patientRepo: &mockPatientProfileRepository{
+			createFunc: func(ctx context.Context, profile patients.PatientProfile) (patients.PatientProfile, error) {
+				require.Equal(t, userID, profile.UserID)
+				require.NotEqual(t, uuid.Nil, profile.ID)
+				return profile, nil
+			},
+		},
+		userRepo: &mockUserRepositoryForPatient{
+			updateProfileCompletionFunc: func(ctx context.Context, id uuid.UUID, percentage int) error {
+				require.Equal(t, userID, id)
+				require.Equal(t, 60, percentage)
+				return nil
+			},
+		},
+		notificationRepo: &mockNotificationRepositoryForPatient{},
+		cache:            nil,
+		logger:           &logger,
+	}
+
+	profile := patients.PatientProfile{
+		UserID:      userID,
+		FirstName:   "Alice",
+		LastName:    "Jones",
+		DateOfBirth: &dob,
+	}
+
+	result, err := svc.CreatePatientProfile(context.Background(), profile)
+	require.NoError(t, err)
+	require.Equal(t, userID, result.UserID)
+	require.Equal(t, "Alice", result.FirstName)
+}
+
+func TestPatientServiceGetDemographicsSummaryWithoutCache(t *testing.T) {
+	logger := zerolog.New(io.Discard)
+
+	svc := &patientService{
+		patientRepo:      &mockPatientProfileRepository{},
+		userRepo:         &mockUserRepositoryForPatient{},
+		notificationRepo: &mockNotificationRepositoryForPatient{},
+		cache:            nil,
+		logger:           &logger,
+	}
+
+	result, err := svc.GetDemographicsSummary(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, int64(0), result.TotalPatients)
+}
+
+func TestPatientServiceSearchPatientsAppliesAdvancedFilters(t *testing.T) {
+	logger := zerolog.New(io.Discard)
+	query := "doe"
+	province := "Gauteng"
+	hasMedicalAid := true
+	requiresInterpreter := false
+
+	svc := &patientService{
+		patientRepo: &mockPatientProfileRepository{
+			listFunc: func(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error) {
+				if offset > 0 {
+					return []patients.PatientProfile{}, nil
+				}
+				return []patients.PatientProfile{
+					{
+						ID:                  uuid.New(),
+						UserID:              uuid.New(),
+						FirstName:           "Jane",
+						LastName:            "Doe",
+						Province:            stringPtr("Gauteng"),
+						HasMedicalAid:       true,
+						RequiresInterpreter: false,
+					},
+					{
+						ID:                  uuid.New(),
+						UserID:              uuid.New(),
+						FirstName:           "John",
+						LastName:            "Smith",
+						Province:            stringPtr("Western Cape"),
+						HasMedicalAid:       false,
+						RequiresInterpreter: true,
+					},
+				}, nil
+			},
+		},
+		userRepo:         &mockUserRepositoryForPatient{},
+		notificationRepo: &mockNotificationRepositoryForPatient{},
+		cache:            nil,
+		logger:           &logger,
+	}
+
+	results, err := svc.SearchPatients(context.Background(), patients.AdvancedSearchParams{
+		Query:               &query,
+		Province:            &province,
+		HasMedicalAid:       &hasMedicalAid,
+		RequiresInterpreter: &requiresInterpreter,
+		Limit:               10,
+		Offset:              0,
+	})
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, "Jane", results[0].FirstName)
+}
+
+func TestPatientServiceGetDemographicsSummaryAggregatesProfiles(t *testing.T) {
+	logger := zerolog.New(io.Discard)
+	now := time.Now()
+	dob1 := now.AddDate(-30, 0, 0)
+	dob2 := now.AddDate(-20, 0, 0)
+
+	svc := &patientService{
+		patientRepo: &mockPatientProfileRepository{
+			listFunc: func(ctx context.Context, limit, offset int) ([]patients.PatientProfile, error) {
+				if offset > 0 {
+					return []patients.PatientProfile{}, nil
+				}
+				return []patients.PatientProfile{
+					{
+						ID:                     uuid.New(),
+						UserID:                 uuid.New(),
+						FirstName:              "Jane",
+						LastName:               "Doe",
+						Province:               stringPtr("Gauteng"),
+						City:                   stringPtr("Johannesburg"),
+						HasMedicalAid:          true,
+						RequiresInterpreter:    false,
+						AcceptsMarketingEmails: true,
+						DateOfBirth:            &dob1,
+					},
+					{
+						ID:                     uuid.New(),
+						UserID:                 uuid.New(),
+						FirstName:              "John",
+						LastName:               "Smith",
+						Province:               stringPtr("Western Cape"),
+						City:                   stringPtr("Cape Town"),
+						HasMedicalAid:          false,
+						RequiresInterpreter:    true,
+						AcceptsMarketingEmails: false,
+						DateOfBirth:            &dob2,
+					},
+				}, nil
+			},
+		},
+		userRepo:         &mockUserRepositoryForPatient{},
+		notificationRepo: &mockNotificationRepositoryForPatient{},
+		cache:            nil,
+		logger:           &logger,
+	}
+
+	summary, err := svc.GetDemographicsSummary(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, int64(2), summary.TotalPatients)
+	require.Equal(t, int64(2), summary.ProvincesCovered)
+	require.Equal(t, int64(2), summary.CitiesCovered)
+	require.Equal(t, int64(1), summary.WithMedicalAid)
+	require.Equal(t, int64(1), summary.RequiringInterpreter)
+	require.Equal(t, int64(1), summary.MarketingOptIn)
+	require.Equal(t, 25.0, summary.AverageAge)
 }
 
 func TestPatientService_GetProfile(t *testing.T) {

@@ -66,9 +66,11 @@ type memoryLimiterState struct {
 }
 
 type redisRateLimiter struct {
-	client *redis.Client
-	rps    float64
-	burst  int
+	client   *redis.Client
+	rps      float64
+	burst    int
+	fallback rateLimiter
+	evalFunc func(ctx context.Context, key string, nowMs int64) (int64, error)
 }
 
 // extractClientIP returns the client IP from trusted proxy headers or RemoteAddr.
@@ -153,9 +155,10 @@ func newRedisRateLimiterFromEnv(rps float64, burst int) (*redisRateLimiter, erro
 	}
 
 	return &redisRateLimiter{
-		client: client,
-		rps:    rps,
-		burst:  burst,
+		client:   client,
+		rps:      rps,
+		burst:    burst,
+		fallback: newInMemoryRateLimiter(rps, burst),
 	}, nil
 }
 
@@ -189,7 +192,22 @@ func (rls *memoryRateLimiter) cleanup(stale time.Duration) {
 func (r *redisRateLimiter) Allow(ctx context.Context, key string) bool {
 	nowMs := time.Now().UnixNano() / int64(time.Millisecond)
 	key = "ratelimit:" + key
-	allowed, err := r.client.Eval(
+	allowed, err := r.eval(ctx, key, nowMs)
+	if err != nil {
+		if r.fallback != nil {
+			return r.fallback.Allow(ctx, key)
+		}
+		return true
+	}
+	return allowed == 1
+}
+
+func (r *redisRateLimiter) eval(ctx context.Context, key string, nowMs int64) (int64, error) {
+	if r.evalFunc != nil {
+		return r.evalFunc(ctx, key, nowMs)
+	}
+
+	return r.client.Eval(
 		ctx,
 		redisRateLimitScript,
 		[]string{key},
@@ -198,8 +216,4 @@ func (r *redisRateLimiter) Allow(ctx context.Context, key string) bool {
 		nowMs,
 		redisRateLimiterTTL.Milliseconds(),
 	).Int64()
-	if err != nil {
-		return false
-	}
-	return allowed == 1
 }

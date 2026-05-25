@@ -21,6 +21,7 @@ const (
 	noteCacheTTL                = 5 * time.Minute
 	providerNoteHistoryCacheTTL = 3 * time.Minute
 	patientNoteHistoryCacheTTL  = 3 * time.Minute
+	noteHistoryIndexTTL         = 5 * time.Minute
 )
 
 type consultationNotesService struct {
@@ -94,6 +95,7 @@ func (s *consultationNotesService) CreateNote(ctx context.Context, consultationI
 	}
 
 	s.setNoteCache(ctx, note)
+	s.invalidatePatientNoteHistoryCache(ctx, consultation.PatientID)
 	s.logger.Info().Str("note_id", note.ID.String()).Str("consultation_id", consultationID.String()).Msg("Consultation note created")
 	return note, nil
 }
@@ -128,6 +130,7 @@ func (s *consultationNotesService) UpdateNote(ctx context.Context, id uuid.UUID,
 	}
 
 	s.setNoteCache(ctx, updated)
+	s.invalidatePatientHistoryByConsultation(ctx, existing.ConsultationID)
 	return updated, nil
 }
 
@@ -156,6 +159,7 @@ func (s *consultationNotesService) FinaliseNote(ctx context.Context, id uuid.UUI
 
 	s.setNoteCache(ctx, finalised)
 	s.invalidateProviderNoteHistoryCache(ctx, requestingStaffID)
+	s.invalidatePatientHistoryByConsultation(ctx, existing.ConsultationID)
 	s.logger.Info().Str("note_id", id.String()).Msg("Consultation note finalised")
 	return finalised, nil
 }
@@ -179,6 +183,8 @@ func (s *consultationNotesService) FinaliseNoteByConsultation(ctx context.Contex
 	}
 
 	s.setNoteCache(ctx, finalised)
+	s.invalidateProviderNoteHistoryCache(ctx, finalised.AuthoredByStaffID)
+	s.invalidatePatientHistoryByConsultation(ctx, consultationID)
 	return finalised, nil
 }
 
@@ -258,6 +264,8 @@ func (s *consultationNotesService) GetProviderNoteHistory(ctx context.Context, s
 		cacheKey := providerNoteHistoryCacheKey(staffID, limit)
 		if err := s.cache.Set(ctx, cacheKey, results, providerNoteHistoryCacheTTL); err != nil {
 			s.logger.Warn().Err(err).Msg("Failed to cache provider note history")
+		} else {
+			s.registerProviderNoteHistoryCacheKey(ctx, staffID, cacheKey)
 		}
 	}
 
@@ -305,10 +313,56 @@ func (s *consultationNotesService) invalidateProviderNoteHistoryCache(ctx contex
 	if s.cache == nil || !s.cache.IsAvailable() {
 		return
 	}
-	key := providerNoteHistoryCacheKey(staffID, 20)
-	if err := s.cache.Delete(ctx, key); err != nil {
-		s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate provider note history cache")
+	keys := append(s.collectProviderNoteHistoryCacheKeys(ctx, staffID), providerNoteHistoryCacheKey(staffID, 20), providerNoteHistoryIndexKey(staffID))
+	for _, key := range uniqueNoteCacheKeys(keys) {
+		if err := s.cache.Delete(ctx, key); err != nil {
+			s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate provider note history cache")
+		}
 	}
+}
+
+func (s *consultationNotesService) invalidatePatientNoteHistoryCache(ctx context.Context, patientID uuid.UUID) {
+	if s.cache == nil || !s.cache.IsAvailable() || patientID == uuid.Nil {
+		return
+	}
+	key := patientNoteHistoryCacheKey(patientID)
+	if err := s.cache.Delete(ctx, key); err != nil {
+		s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate patient note history cache")
+	}
+}
+
+func (s *consultationNotesService) invalidatePatientHistoryByConsultation(ctx context.Context, consultationID uuid.UUID) {
+	if consultationID == uuid.Nil {
+		return
+	}
+	consultation, err := s.consultationRepo.GetConsultationByID(ctx, consultationID)
+	if err != nil {
+		s.logger.Warn().Err(err).Str("consultation_id", consultationID.String()).Msg("Failed to resolve consultation for patient note history invalidation")
+		return
+	}
+	s.invalidatePatientNoteHistoryCache(ctx, consultation.PatientID)
+}
+
+func (s *consultationNotesService) registerProviderNoteHistoryCacheKey(ctx context.Context, staffID uuid.UUID, cacheKey string) {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return
+	}
+	keys := s.collectProviderNoteHistoryCacheKeys(ctx, staffID)
+	keys = append(keys, cacheKey)
+	if err := s.cache.Set(ctx, providerNoteHistoryIndexKey(staffID), uniqueNoteCacheKeys(keys), noteHistoryIndexTTL); err != nil {
+		s.logger.Warn().Err(err).Str("staff_id", staffID.String()).Msg("Failed to update provider note history cache index")
+	}
+}
+
+func (s *consultationNotesService) collectProviderNoteHistoryCacheKeys(ctx context.Context, staffID uuid.UUID) []string {
+	if s.cache == nil || !s.cache.IsAvailable() {
+		return nil
+	}
+	var keys []string
+	if err := s.cache.Get(ctx, providerNoteHistoryIndexKey(staffID), &keys); err != nil {
+		return nil
+	}
+	return keys
 }
 
 // ─── Cache key builders ───────────────────────────────────────────────────────
@@ -323,4 +377,24 @@ func providerNoteHistoryCacheKey(staffID uuid.UUID, limit int) string {
 
 func patientNoteHistoryCacheKey(patientID uuid.UUID) string {
 	return fmt.Sprintf("notes:patient:%s", patientID.String())
+}
+
+func providerNoteHistoryIndexKey(staffID uuid.UUID) string {
+	return fmt.Sprintf("notes:provider:index:%s", staffID.String())
+}
+
+func uniqueNoteCacheKeys(keys []string) []string {
+	seen := make(map[string]struct{}, len(keys))
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, key)
+	}
+	return result
 }

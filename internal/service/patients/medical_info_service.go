@@ -22,6 +22,10 @@ type medicalInfoService struct {
 	logger          *zerolog.Logger
 }
 
+func (s *medicalInfoService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewMedicalInfoService creates a new medical info service
 func NewMedicalInfoService(
 	medicalInfoRepo repository.PatientMedicalInfoRepository,
@@ -109,9 +113,11 @@ func (s *medicalInfoService) GetMedicalInfoByID(ctx context.Context, id uuid.UUI
 	// Try cache first
 	cacheKey := fmt.Sprintf("medical_info:%s", id.String())
 	var info patients.PatientMedicalInfo
-	if err := s.cache.Get(ctx, cacheKey, &info); err == nil {
-		s.logger.Debug().Str("medical_info_id", id.String()).Msg("Medical info retrieved from cache")
-		return info, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &info); err == nil {
+			s.logger.Debug().Str("medical_info_id", id.String()).Msg("Medical info retrieved from cache")
+			return info, nil
+		}
 	}
 
 	// Fetch from database
@@ -126,8 +132,10 @@ func (s *medicalInfoService) GetMedicalInfoByID(ctx context.Context, id uuid.UUI
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, info, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache medical info")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, info, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache medical info")
+		}
 	}
 
 	return info, nil
@@ -157,9 +165,11 @@ func (s *medicalInfoService) GetMedicalInfoByPatientID(ctx context.Context, pati
 	// Try cache first
 	cacheKey := fmt.Sprintf("medical_info:patient:%s", patientID.String())
 	var info patients.PatientMedicalInfo
-	if err := s.cache.Get(ctx, cacheKey, &info); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Medical info retrieved from cache")
-		return info, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &info); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Medical info retrieved from cache")
+			return info, nil
+		}
 	}
 
 	// Fetch from database
@@ -174,8 +184,10 @@ func (s *medicalInfoService) GetMedicalInfoByPatientID(ctx context.Context, pati
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, info, 30*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache medical info")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, info, 30*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache medical info")
+		}
 	}
 
 	return info, nil
@@ -304,8 +316,10 @@ func (s *medicalInfoService) invalidateMedicalInfoCache(ctx context.Context, pat
 	}
 
 	for _, key := range cacheKeys {
-		if err := s.cache.Delete(ctx, key); err != nil {
-			s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate medical info cache")
+		if s.cacheAvailable() {
+			if err := s.cache.Delete(ctx, key); err != nil {
+				s.logger.Warn().Err(err).Str("key", key).Msg("Failed to invalidate medical info cache")
+			}
 		}
 	}
 }

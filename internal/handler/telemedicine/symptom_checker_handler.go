@@ -323,6 +323,10 @@ func (h *SymptomCheckerHandler) GetSessionWithPatientContext(w http.ResponseWrit
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
+	if _, ok := h.requireRole(ctx, w, "provider_staff", "doctor", "clinic_admin", "system_admin"); !ok {
+		return
+	}
+
 	sessionID, err := parseUUIDParam(r, "id")
 	if err != nil {
 		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
@@ -347,6 +351,10 @@ func (h *SymptomCheckerHandler) GetSessionWithPatientContext(w http.ResponseWrit
 func (h *SymptomCheckerHandler) GetSessionsByTriageLevel(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
+
+	if _, ok := h.requireRole(ctx, w, "system_admin"); !ok {
+		return
+	}
 
 	triageLevelStr := r.URL.Query().Get("triage_level")
 	fromStr := r.URL.Query().Get("from")
@@ -423,6 +431,10 @@ func (h *SymptomCheckerHandler) GetSessionsByTriageLevel(w http.ResponseWriter, 
 func (h *SymptomCheckerHandler) CountSessionsByOutcome(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
+
+	if _, ok := h.requireRole(ctx, w, "system_admin"); !ok {
+		return
+	}
 
 	fromStr := r.URL.Query().Get("from")
 	toStr := r.URL.Query().Get("to")
@@ -507,4 +519,25 @@ func (h *SymptomCheckerHandler) resolvePatientID(ctx context.Context, w http.Res
 	}
 
 	return patient.ID, claims.UserID, true
+}
+
+func (h *SymptomCheckerHandler) requireRole(ctx context.Context, w http.ResponseWriter, allowedRoles ...string) (*service.TokenClaims, bool) {
+	claims, found := middleware.GetUserFromContext(ctx)
+	if !found {
+		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+			Error: "User not authenticated",
+		})
+		return nil, false
+	}
+
+	for _, role := range allowedRoles {
+		if claims.Role == role {
+			return claims, true
+		}
+	}
+
+	handler.RespondJSON(w, http.StatusForbidden, sc_dto.ErrorResponse{
+		Error: "Access denied",
+	})
+	return nil, false
 }

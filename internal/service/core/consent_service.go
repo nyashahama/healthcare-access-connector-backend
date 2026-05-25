@@ -23,6 +23,10 @@ type consentService struct {
 	logger      *zerolog.Logger
 }
 
+func (s *consentService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewConsentService creates a new consent service
 func NewConsentService(
 	consentRepo repository.ConsentRepository,
@@ -53,9 +57,11 @@ func (s *consentService) GetPrivacyConsent(ctx context.Context, userID uuid.UUID
 	// Try cache first
 	cacheKey := fmt.Sprintf("consent:privacy:%s", userID.String())
 	var consent core.PrivacyConsent
-	if err := s.cache.Get(ctx, cacheKey, &consent); err == nil {
-		s.logger.Debug().Str("user_id", userID.String()).Msg("Privacy consent retrieved from cache")
-		return consent, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &consent); err == nil {
+			s.logger.Debug().Str("user_id", userID.String()).Msg("Privacy consent retrieved from cache")
+			return consent, nil
+		}
 	}
 
 	// Fetch from database
@@ -70,8 +76,10 @@ func (s *consentService) GetPrivacyConsent(ctx context.Context, userID uuid.UUID
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, consent, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache privacy consent")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, consent, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache privacy consent")
+		}
 	}
 
 	return consent, nil
@@ -107,8 +115,10 @@ func (s *consentService) CreatePrivacyConsent(ctx context.Context, consent core.
 
 	// Cache the result
 	cacheKey := fmt.Sprintf("consent:privacy:%s", consent.UserID.String())
-	if err := s.cache.Set(ctx, cacheKey, createdConsent, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache privacy consent")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, createdConsent, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache privacy consent")
+		}
 	}
 
 	// Log consent creation
@@ -190,8 +200,10 @@ func (s *consentService) createDefaultPrivacyConsent(ctx context.Context, userID
 
 	// Cache the result
 	cacheKey := fmt.Sprintf("consent:privacy:%s", userID.String())
-	if err := s.cache.Set(ctx, cacheKey, createdConsent, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache default privacy consent")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, createdConsent, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache default privacy consent")
+		}
 	}
 
 	s.logger.Info().
@@ -216,6 +228,10 @@ func (s *consentService) validatePrivacyConsent(consent core.PrivacyConsent) err
 }
 
 func (s *consentService) invalidateConsentCache(ctx context.Context, userID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKey := fmt.Sprintf("consent:privacy:%s", userID.String())
 	if err := s.cache.Delete(ctx, cacheKey); err != nil {
 		s.logger.Warn().Err(err).Str("key", cacheKey).Msg("Failed to invalidate consent cache")

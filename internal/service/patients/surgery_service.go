@@ -22,6 +22,10 @@ type surgeryService struct {
 	logger      *zerolog.Logger
 }
 
+func (s *surgeryService) cacheAvailable() bool {
+	return s != nil && s.cache != nil && s.cache.IsAvailable()
+}
+
 // NewSurgeryService creates a new surgery service
 func NewSurgeryService(
 	surgeryRepo repository.PatientSurgeryRepository,
@@ -115,9 +119,11 @@ func (s *surgeryService) GetPatientSurgeries(ctx context.Context, patientID uuid
 	// Try cache first
 	cacheKey := fmt.Sprintf("patient:surgeries:%s", patientID.String())
 	var surgeries []patients.PatientSurgery
-	if err := s.cache.Get(ctx, cacheKey, &surgeries); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient surgeries retrieved from cache")
-		return surgeries, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &surgeries); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Patient surgeries retrieved from cache")
+			return surgeries, nil
+		}
 	}
 
 	// Fetch from database
@@ -128,8 +134,10 @@ func (s *surgeryService) GetPatientSurgeries(ctx context.Context, patientID uuid
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, surgeries, 15*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache patient surgeries")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, surgeries, 15*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache patient surgeries")
+		}
 	}
 
 	s.logger.Debug().
@@ -164,9 +172,11 @@ func (s *surgeryService) GetRecentSurgeries(ctx context.Context, patientID uuid.
 	// Try cache first
 	cacheKey := fmt.Sprintf("patient:recent_surgeries:%s", patientID.String())
 	var surgeries []patients.PatientSurgery
-	if err := s.cache.Get(ctx, cacheKey, &surgeries); err == nil {
-		s.logger.Debug().Str("patient_id", patientID.String()).Msg("Recent surgeries retrieved from cache")
-		return surgeries, nil
+	if s.cacheAvailable() {
+		if err := s.cache.Get(ctx, cacheKey, &surgeries); err == nil {
+			s.logger.Debug().Str("patient_id", patientID.String()).Msg("Recent surgeries retrieved from cache")
+			return surgeries, nil
+		}
 	}
 
 	// Fetch from database
@@ -177,8 +187,10 @@ func (s *surgeryService) GetRecentSurgeries(ctx context.Context, patientID uuid.
 	}
 
 	// Cache the result
-	if err := s.cache.Set(ctx, cacheKey, surgeries, 10*time.Minute); err != nil {
-		s.logger.Warn().Err(err).Msg("Failed to cache recent surgeries")
+	if s.cacheAvailable() {
+		if err := s.cache.Set(ctx, cacheKey, surgeries, 10*time.Minute); err != nil {
+			s.logger.Warn().Err(err).Msg("Failed to cache recent surgeries")
+		}
 	}
 
 	s.logger.Debug().
@@ -313,6 +325,10 @@ func (s *surgeryService) validatePatientSurgery(surgery patients.PatientSurgery)
 
 // Helper methods
 func (s *surgeryService) invalidateSurgeryCache(ctx context.Context, patientID uuid.UUID) {
+	if !s.cacheAvailable() {
+		return
+	}
+
 	cacheKeys := []string{
 		fmt.Sprintf("patient:surgeries:%s", patientID.String()),
 		fmt.Sprintf("patient:recent_surgeries:%s", patientID.String()),

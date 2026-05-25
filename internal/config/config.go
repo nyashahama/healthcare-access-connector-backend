@@ -19,9 +19,13 @@ type Config struct {
 	DBURL string
 
 	// Authentication
-	JWTSecret  string
-	JWTExpiry  time.Duration
-	SMSEnabled bool
+	JWTSecret         string
+	JWTExpiry         time.Duration
+	SMSEnabled        bool
+	SMSProvider       string
+	TwilioAccountSID  string
+	TwilioAuthToken   string
+	TwilioFromNumber  string
 
 	// Server
 	Port           string
@@ -114,6 +118,10 @@ func Load() (*Config, error) {
 		RateLimitBurst: getEnvAsInt("RATE_LIMIT_BURST", 20),
 		JWTExpiry:      getEnvAsDuration("JWT_EXPIRY_HOURS", 24*time.Hour),
 		SMSEnabled:     getEnvAsBool("SMS_ENABLED", false),
+		SMSProvider:    strings.ToLower(strings.TrimSpace(getEnv("SMS_PROVIDER", ""))),
+		TwilioAccountSID: strings.TrimSpace(getEnv("TWILIO_ACCOUNT_SID", "")),
+		TwilioAuthToken:  strings.TrimSpace(getEnv("TWILIO_AUTH_TOKEN", "")),
+		TwilioFromNumber: strings.TrimSpace(getEnv("TWILIO_FROM_NUMBER", "")),
 		RedisURL:       getEnv("REDIS_URL", "redis://localhost:6379"),
 		NatsURL:        getEnv("NATS_URL", "nats://localhost:4222"),
 		CacheTTL:       getEnvAsDuration("CACHE_TTL_MINUTES", 5*time.Minute),
@@ -216,6 +224,29 @@ func (c *Config) Validate() error {
 
 	if c.JWTExpiry < time.Minute {
 		errors = append(errors, "JWT_EXPIRY_HOURS must be at least 1 minute")
+	}
+
+	if c.SMSEnabled {
+		if c.SMSProvider == "" {
+			errors = append(errors, "SMS_PROVIDER is required when SMS_ENABLED=true")
+		}
+
+		switch c.SMSProvider {
+		case "twilio":
+			if c.TwilioAccountSID == "" {
+				errors = append(errors, "TWILIO_ACCOUNT_SID is required when SMS_PROVIDER=twilio")
+			}
+			if c.TwilioAuthToken == "" {
+				errors = append(errors, "TWILIO_AUTH_TOKEN is required when SMS_PROVIDER=twilio")
+			}
+			if c.TwilioFromNumber == "" {
+				errors = append(errors, "TWILIO_FROM_NUMBER is required when SMS_PROVIDER=twilio")
+			}
+		case "":
+			// handled above
+		default:
+			errors = append(errors, "SMS_PROVIDER must be one of: twilio")
+		}
 	}
 
 	if c.RateLimitRPS < 1 {
