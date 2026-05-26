@@ -26,7 +26,9 @@ func Recovery(logger *zerolog.Logger) func(next http.Handler) http.Handler {
 					// Return 500 error to client
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusInternalServerError)
-					fmt.Fprintf(w, `{"error": "Internal server error"}`)
+					if _, err := fmt.Fprintf(w, `{"error": "Internal server error"}`); err != nil {
+						logger.Error().Err(err).Msg("failed to write recovery response")
+					}
 				}
 			}()
 

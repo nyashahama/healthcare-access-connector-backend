@@ -39,7 +39,9 @@ func New(cfg *emailtypes.Config, logger *zerolog.Logger) (*Provider, error) {
 			logger.Warn().Err(err).Msg("Failed to connect to SMTP server")
 			available = false
 		} else {
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				logger.Warn().Err(err).Msg("Failed to close SMTP test connection")
+			}
 		}
 	}
 
@@ -85,7 +87,7 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 	// Build message body
 	var body strings.Builder
 	for k, v := range headers {
-		body.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
+		_, _ = fmt.Fprintf(&body, "%s: %s\r\n", k, v)
 	}
 
 	if msg.HTMLBody != "" {
@@ -152,7 +154,9 @@ func (p *Provider) HealthCheck(ctx context.Context) error {
 			p.available = false
 			return fmt.Errorf("SMTP health check failed: %w", err)
 		}
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			p.logger.Warn().Err(err).Msg("Failed to close SMTP health-check connection")
+		}
 	}
 
 	return nil

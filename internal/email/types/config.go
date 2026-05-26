@@ -82,7 +82,7 @@ func (c *Config) GetFromAddress(emailType EmailTemplate) string {
 			return c.NoReplyAddress
 		}
 	}
-	
+
 	// Default to main from address
 	return c.FromAddress
 }
@@ -157,7 +157,7 @@ func (c *Config) Validate() error {
 		}
 	case "resend":
 		if c.ResendAPIKey == "" {
-			return fmt.Errorf("Resend API key is required")
+			return fmt.Errorf("resend API key is required")
 		}
 	default:
 		return fmt.Errorf("invalid email provider: %s (must be 'ses', 'smtp', or 'resend')", c.Provider)

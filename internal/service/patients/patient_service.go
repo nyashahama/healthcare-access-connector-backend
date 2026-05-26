@@ -497,7 +497,7 @@ func (s *patientService) invalidatePatientCache(ctx context.Context, userID uuid
 
 	cacheKeys := []string{
 		fmt.Sprintf("patient:profile:%s", userID.String()),
-		fmt.Sprintf("patient:by_id:*"), // Would need pattern matching
+		"patient:by_id:*", // Would need pattern matching
 		fmt.Sprintf("user:profile:%s", userID.String()),
 		"patient:demographics:summary",
 	}

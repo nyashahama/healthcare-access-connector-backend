@@ -1035,7 +1035,7 @@ func (s *staffService) invalidateStaffCache(ctx context.Context, staffID, clinic
 
 	cacheKeys := []string{
 		fmt.Sprintf("staff:%s", staffID.String()),
-		fmt.Sprintf("staff:user:*"), // Need user ID to be more specific
+		"staff:user:*", // Need user ID to be more specific
 		fmt.Sprintf("staff:clinic:%s:*", clinicID.String()),
 	}
 

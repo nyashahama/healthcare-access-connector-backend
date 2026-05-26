@@ -151,11 +151,11 @@ func TestClinicHandler_CreateClinic(t *testing.T) {
 
 		userID := uuid.New()
 		clinic := providers.Clinic{
-			ID:             uuid.New(),
-			ClinicName:     "Test Clinic",
-			ClinicType:     "public_health_clinic",
+			ID:              uuid.New(),
+			ClinicName:      "Test Clinic",
+			ClinicType:      "public_health_clinic",
 			PhysicalAddress: "123 Test St",
-			Country:        "Kenya",
+			Country:         "Kenya",
 		}
 
 		mockService.On("RegisterClinic", mock.Anything, mock.Anything, userID, userID).Return(clinic, nil).Once()
@@ -233,11 +233,11 @@ func TestClinicHandler_GetClinic(t *testing.T) {
 
 		clinicID := uuid.New()
 		clinic := providers.Clinic{
-			ID:               clinicID,
-			ClinicName:       "Test Clinic",
-			ClinicType:       "public_health_clinic",
-			PhysicalAddress:  "123 Test St",
-			Country:          "Kenya",
+			ID:              clinicID,
+			ClinicName:      "Test Clinic",
+			ClinicType:      "public_health_clinic",
+			PhysicalAddress: "123 Test St",
+			Country:         "Kenya",
 		}
 
 		mockService.On("GetClinicByID", mock.Anything, clinicID).Return(clinic, nil).Once()
@@ -283,12 +283,12 @@ func TestClinicHandler_GetMyClinic(t *testing.T) {
 
 		userID := uuid.New()
 		clinic := providers.Clinic{
-			ID:               uuid.New(),
-			ClinicName:       "My Clinic",
-			ClinicType:       "private_clinic",
-			PhysicalAddress:  "456 Main St",
-			Country:          "Kenya",
-			OwnerUserID:      &userID,
+			ID:              uuid.New(),
+			ClinicName:      "My Clinic",
+			ClinicType:      "private_clinic",
+			PhysicalAddress: "456 Main St",
+			Country:         "Kenya",
+			OwnerUserID:     &userID,
 		}
 
 		mockService.On("GetClinicByUserID", mock.Anything, userID).Return(&clinic, nil).Once()
@@ -304,7 +304,8 @@ func TestClinicHandler_GetMyClinic(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
 		assert.NotNil(t, response["clinic"])
 
 		mockService.AssertExpectations(t)
@@ -339,18 +340,18 @@ func TestClinicHandler_UpdateClinic(t *testing.T) {
 
 		clinicID := uuid.New()
 		existingClinic := providers.Clinic{
-			ID:               clinicID,
-			ClinicName:       "Old Name",
-			ClinicType:       "public_health_clinic",
-			PhysicalAddress:  "123 Test St",
-			Country:          "Kenya",
+			ID:              clinicID,
+			ClinicName:      "Old Name",
+			ClinicType:      "public_health_clinic",
+			PhysicalAddress: "123 Test St",
+			Country:         "Kenya",
 		}
 		updatedClinic := providers.Clinic{
-			ID:               clinicID,
-			ClinicName:       "New Name",
-			ClinicType:       "public_health_clinic",
-			PhysicalAddress:  "123 Test St",
-			Country:          "Kenya",
+			ID:              clinicID,
+			ClinicName:      "New Name",
+			ClinicType:      "public_health_clinic",
+			PhysicalAddress: "123 Test St",
+			Country:         "Kenya",
 		}
 
 		mockService.On("GetClinicByID", mock.Anything, clinicID).Return(existingClinic, nil).Once()
@@ -451,7 +452,8 @@ func TestClinicHandler_ListClinics(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
 		assert.Equal(t, 2, int(response["count"].(float64)))
 		assert.NotNil(t, response["clinics"])
 
@@ -472,7 +474,8 @@ func TestClinicHandler_ListClinics(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
 		assert.Equal(t, 0, int(response["count"].(float64)))
 		assert.NotNil(t, response["clinics"])
 

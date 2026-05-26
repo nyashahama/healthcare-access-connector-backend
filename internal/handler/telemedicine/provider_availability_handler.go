@@ -9,8 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
-	pa_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
-	sc_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
+	telemeddto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
@@ -79,7 +78,7 @@ func (h *ProviderAvailabilityHandler) GetAvailableProviders(w http.ResponseWrite
 	if raw := r.URL.Query().Get("clinic_id"); raw != "" {
 		parsed, err := uuid.Parse(raw)
 		if err != nil {
-			handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
+			handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{
 				Error: "Invalid clinic_id format",
 			})
 			return
@@ -93,12 +92,12 @@ func (h *ProviderAvailabilityHandler) GetAvailableProviders(w http.ResponseWrite
 		return
 	}
 
-	items := make([]pa_dto.AvailableProviderResponse, len(providers))
+	items := make([]telemeddto.AvailableProviderResponse, len(providers))
 	for i, p := range providers {
-		items[i] = pa_dto.ToAvailableProviderResponse(p)
+		items[i] = telemeddto.ToAvailableProviderResponse(p)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, pa_dto.AvailableProvidersResponse{
+	handler.RespondJSON(w, http.StatusOK, telemeddto.AvailableProvidersResponse{
 		Providers: items,
 		Count:     len(items),
 	})
@@ -125,12 +124,12 @@ func (h *ProviderAvailabilityHandler) GetAvailableProvidersBySpecialization(w ht
 		return
 	}
 
-	items := make([]pa_dto.AvailableProviderBySpecializationResponse, len(providers))
+	items := make([]telemeddto.AvailableProviderBySpecializationResponse, len(providers))
 	for i, p := range providers {
-		items[i] = pa_dto.ToAvailableProviderBySpecializationResponse(p)
+		items[i] = telemeddto.ToAvailableProviderBySpecializationResponse(p)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, pa_dto.AvailableProvidersBySpecializationResponse{
+	handler.RespondJSON(w, http.StatusOK, telemeddto.AvailableProvidersBySpecializationResponse{
 		Providers: items,
 		Count:     len(items),
 	})
@@ -155,7 +154,7 @@ func (h *ProviderAvailabilityHandler) GoOnline(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, pa_dto.ToProviderAvailabilityResponse(avail))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToProviderAvailabilityResponse(avail))
 }
 
 // GoOffline handles PUT /providers/me/offline.
@@ -191,9 +190,9 @@ func (h *ProviderAvailabilityHandler) SetAccepting(w http.ResponseWriter, r *htt
 		return
 	}
 
-	var req pa_dto.UpsertAvailabilityRequest
+	var req telemeddto.UpsertAvailabilityRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid request body"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid request body"})
 		return
 	}
 
@@ -215,7 +214,7 @@ func (h *ProviderAvailabilityHandler) SetAccepting(w http.ResponseWriter, r *htt
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, pa_dto.ToProviderAvailabilityResponse(avail))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToProviderAvailabilityResponse(avail))
 }
 
 // UpdateStatus handles PUT /providers/me/status.
@@ -230,9 +229,9 @@ func (h *ProviderAvailabilityHandler) UpdateStatus(w http.ResponseWriter, r *htt
 		return
 	}
 
-	var req pa_dto.UpdateAvailabilityStatusRequest
+	var req telemeddto.UpdateAvailabilityStatusRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid request body"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid request body"})
 		return
 	}
 
@@ -332,7 +331,7 @@ func (h *ProviderAvailabilityHandler) GetMyAvailability(w http.ResponseWriter, r
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, pa_dto.ToProviderAvailabilityResponse(avail))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToProviderAvailabilityResponse(avail))
 }
 
 // ─── Admin / background job handlers ──────────────────────────────────────────
@@ -380,7 +379,7 @@ func (h *ProviderAvailabilityHandler) SetStaleProvidersOffline(w http.ResponseWr
 func (h *ProviderAvailabilityHandler) resolveStaffID(ctx context.Context, w http.ResponseWriter) (staffID uuid.UUID, clinicID uuid.UUID, ok bool) {
 	claims, found := middleware.GetUserFromContext(ctx)
 	if !found {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{
 			Error: "User not authenticated",
 		})
 		return uuid.Nil, uuid.Nil, false
@@ -388,7 +387,7 @@ func (h *ProviderAvailabilityHandler) resolveStaffID(ctx context.Context, w http
 
 	staff, err := h.staffService.GetStaffByUserID(ctx, claims.UserID)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{
 			Error: "No staff profile found for authenticated user",
 		})
 		return uuid.Nil, uuid.Nil, false

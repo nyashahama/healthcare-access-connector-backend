@@ -377,7 +377,9 @@ func TestPatientHandler_SearchPatients(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+			t.Fatalf("unmarshal response: %v", err)
+		}
 		assert.Equal(t, 2, int(response["count"].(float64)))
 		assert.NotNil(t, response["patients"])
 
@@ -400,7 +402,9 @@ func TestPatientHandler_SearchPatients(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+			t.Fatalf("unmarshal response: %v", err)
+		}
 		assert.Equal(t, 0, int(response["count"].(float64)))
 		assert.NotNil(t, response["patients"])
 
@@ -423,7 +427,9 @@ func TestPatientHandler_SearchPatients(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+		if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+			t.Fatalf("unmarshal response: %v", err)
+		}
 		assert.Equal(t, 0, int(response["count"].(float64)))
 
 		mockService.AssertExpectations(t)
