@@ -133,9 +133,17 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 		Version:   version.Version + " (" + version.Commit + ")",
 	}
 
+	payload, err := json.Marshal(response)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(response)
+	if _, err := w.Write(payload); err != nil {
+		return
+	}
 }
 
 // Readiness checks if the service is ready to accept requests

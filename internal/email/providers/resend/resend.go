@@ -59,7 +59,7 @@ func New(cfg *emailtypes.Config, logger *zerolog.Logger) (*Provider, error) {
 	}
 
 	if cfg.ResendAPIKey == "" {
-		return nil, fmt.Errorf("Resend API key is required")
+		return nil, fmt.Errorf("resend API key is required")
 	}
 
 	client := &http.Client{
@@ -168,7 +168,11 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 			Msg("Failed to send email via Resend")
 		return fmt.Errorf("%w: %v", emailtypes.ErrSendFailed, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			p.logger.Error().Err(err).Msg("Failed to close Resend response body")
+		}
+	}()
 
 	// Read response
 	body, err := io.ReadAll(resp.Body)
@@ -263,9 +267,13 @@ func (p *Provider) HealthCheck(ctx context.Context) error {
 	resp, err := p.client.Do(req)
 	if err != nil {
 		p.available = false
-		return fmt.Errorf("Resend health check failed: %w", err)
+		return fmt.Errorf("resend health check failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			p.logger.Error().Err(err).Msg("Failed to close Resend health check response body")
+		}
+	}()
 
 	if resp.StatusCode == 401 {
 		p.available = false
@@ -274,7 +282,7 @@ func (p *Provider) HealthCheck(ctx context.Context) error {
 
 	if resp.StatusCode != 200 {
 		p.available = false
-		return fmt.Errorf("Resend health check failed with status: %d", resp.StatusCode)
+		return fmt.Errorf("resend health check failed with status: %d", resp.StatusCode)
 	}
 
 	return nil

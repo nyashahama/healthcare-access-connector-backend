@@ -15,9 +15,20 @@ import (
 // respondJSON sends a JSON response
 func RespondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
+	if data == nil {
+		w.WriteHeader(status)
+		return
+	}
+
+	payload, err := json.Marshal(data)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(status)
-	if data != nil {
-		json.NewEncoder(w).Encode(data)
+	if _, err := w.Write(payload); err != nil {
+		return
 	}
 }
 

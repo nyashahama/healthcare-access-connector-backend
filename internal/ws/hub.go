@@ -249,7 +249,9 @@ func (h *Hub) IsAvailable() bool { return true }
 func (c *client) readPump(h *Hub) {
 	defer func() {
 		h.unregister <- c
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			h.logger.Warn().Err(err).Msg("failed to close websocket connection (read pump)")
+		}
 	}()
 
 	c.conn.SetReadLimit(h.cfg.MaxMessageBytes)
@@ -325,7 +327,9 @@ func (c *client) writePump(cfg *Config) {
 	ticker := time.NewTicker(cfg.PingInterval)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			c.hub.logger.Warn().Err(err).Msg("failed to close websocket connection (write pump)")
+		}
 	}()
 
 	for {

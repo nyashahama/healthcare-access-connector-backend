@@ -109,8 +109,8 @@ func TestClient_SummarizeSymptoms(t *testing.T) {
 
 		req := SymptomSummaryRequest{
 			RawSymptoms: "headache and fever",
-			Duration:   "2 days",
-			Severity:   "moderate",
+			Duration:    "2 days",
+			Severity:    "moderate",
 		}
 
 		resp, err := client.SummarizeSymptoms(context.Background(), req)
@@ -134,7 +134,10 @@ func TestClient_SummarizeSymptoms(t *testing.T) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			err := json.NewEncoder(w).Encode(response)
+			if err != nil {
+				t.Fatalf("encode response: %v", err)
+			}
 		}))
 		defer server.Close()
 
@@ -161,16 +164,16 @@ func TestClient_SummarizeSymptoms(t *testing.T) {
 
 func newTestClient(cfg *Config, logger *zerolog.Logger, testURL string) Client {
 	return &testAIClient{
-		cfg:    cfg,
-		logger: logger,
+		cfg:     cfg,
+		logger:  logger,
 		testURL: testURL,
 	}
 }
 
 type testAIClient struct {
-	cfg     *Config
-	logger  *zerolog.Logger
-	testURL string
+	cfg       *Config
+	logger    *zerolog.Logger
+	testURL   string
 	available bool
 }
 
@@ -223,7 +226,9 @@ func (c *testAIClient) testCall(ctx context.Context, body chatRequest) (string, 
 	if err != nil {
 		return "", fmt.Errorf("ai: %w: %v", ErrAIUnavailable, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	respBytes, _ := io.ReadAll(resp.Body)
 
@@ -326,7 +331,7 @@ func TestBuildSymptomPrompt(t *testing.T) {
 	t.Run("symptoms with duration", func(t *testing.T) {
 		req := SymptomSummaryRequest{
 			RawSymptoms: "cough",
-			Duration:   "3 days",
+			Duration:    "3 days",
 		}
 
 		prompt := buildSymptomPrompt(req)
@@ -337,7 +342,7 @@ func TestBuildSymptomPrompt(t *testing.T) {
 	t.Run("symptoms with severity", func(t *testing.T) {
 		req := SymptomSummaryRequest{
 			RawSymptoms: "fever",
-			Severity:   "high",
+			Severity:    "high",
 		}
 
 		prompt := buildSymptomPrompt(req)
@@ -347,9 +352,9 @@ func TestBuildSymptomPrompt(t *testing.T) {
 
 	t.Run("symptoms with patient info", func(t *testing.T) {
 		req := SymptomSummaryRequest{
-			RawSymptoms:     "chest pain",
-			PatientAge:      45,
-			PatientGender:  "male",
+			RawSymptoms:   "chest pain",
+			PatientAge:    45,
+			PatientGender: "male",
 		}
 
 		prompt := buildSymptomPrompt(req)
