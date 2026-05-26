@@ -8,12 +8,11 @@ jobs:
   fast-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-          token: ""
-          persist-credentials: false
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
       - name: Setup Go
         run: |
           GO_VERSION="1.24.0"
@@ -49,12 +48,11 @@ jobs:
   integration-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-          token: ""
-          persist-credentials: false
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
       - name: Setup Go
         run: |
           GO_VERSION="1.24.0"
@@ -69,12 +67,11 @@ jobs:
   generated-code-drift:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-          token: ""
-          persist-credentials: false
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
       - name: Setup Go
         run: |
           GO_VERSION="1.24.0"
@@ -98,12 +95,11 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-          token: ""
-          persist-credentials: false
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
       - name: Build Docker image
         run: |
           docker build \
@@ -133,12 +129,11 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
-          token: ""
-          persist-credentials: false
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
       - name: Setup Go
         run: |
           GO_VERSION="1.24.0"
