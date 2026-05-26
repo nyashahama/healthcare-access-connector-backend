@@ -137,7 +137,8 @@ func (h *ConsultationHandler) GetConsultationByID(w http.ResponseWriter, r *http
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	if _, ok := middleware.GetUserFromContext(ctx); !ok {
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
 		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
 			Error: "User not authenticated",
 		})
@@ -150,12 +151,9 @@ func (h *ConsultationHandler) GetConsultationByID(w http.ResponseWriter, r *http
 		return
 	}
 
-	consultation, err := h.consultationService.GetConsultationByID(ctx, consultationID)
+	consultation, err := h.consultationService.GetConsultationByIDForActor(ctx, consultationID, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
-		return
-	}
-	if !h.authorizeConsultationActor(ctx, w, consultation) {
 		return
 	}
 
@@ -168,7 +166,8 @@ func (h *ConsultationHandler) GetConsultationWithDetails(w http.ResponseWriter, 
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	if _, ok := middleware.GetUserFromContext(ctx); !ok {
+	claims, ok := middleware.GetUserFromContext(ctx)
+	if !ok {
 		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
 			Error: "User not authenticated",
 		})
@@ -181,16 +180,7 @@ func (h *ConsultationHandler) GetConsultationWithDetails(w http.ResponseWriter, 
 		return
 	}
 
-	consultation, err := h.consultationService.GetConsultationByID(ctx, consultationID)
-	if err != nil {
-		handler.RespondError(w, h.logger, err)
-		return
-	}
-	if !h.authorizeConsultationActor(ctx, w, consultation) {
-		return
-	}
-
-	result, err := h.consultationService.GetConsultationWithDetails(ctx, consultationID)
+	result, err := h.consultationService.GetConsultationWithDetailsForActor(ctx, consultationID, claims.UserID)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return

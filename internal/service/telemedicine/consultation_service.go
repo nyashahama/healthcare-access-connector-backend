@@ -29,6 +29,8 @@ type consultationService struct {
 	consultationRepo repository.ConsultationRepository
 	availabilityRepo repository.ProviderAvailabilityRepository
 	sessionRepo      repository.SymptomCheckerRepository
+	patientRepo      repository.PatientProfileRepository
+	staffRepo        repository.StaffRepository
 	cache            cache.Service
 	logger           *zerolog.Logger
 }
@@ -38,6 +40,8 @@ func NewConsultationService(
 	consultationRepo repository.ConsultationRepository,
 	availabilityRepo repository.ProviderAvailabilityRepository,
 	sessionRepo repository.SymptomCheckerRepository,
+	patientRepo repository.PatientProfileRepository,
+	staffRepo repository.StaffRepository,
 	cache cache.Service,
 	logger *zerolog.Logger,
 ) service.ConsultationService {
@@ -45,6 +49,8 @@ func NewConsultationService(
 		consultationRepo: consultationRepo,
 		availabilityRepo: availabilityRepo,
 		sessionRepo:      sessionRepo,
+		patientRepo:      patientRepo,
+		staffRepo:        staffRepo,
 		cache:            cache,
 		logger:           logger,
 	}
@@ -152,6 +158,25 @@ func (s *consultationService) GetConsultationByID(ctx context.Context, id uuid.U
 	return c, nil
 }
 
+// GetConsultationByIDForActor returns consultation details only when the caller is the owning
+// patient or the assigned provider staff for that consultation.
+func (s *consultationService) GetConsultationByIDForActor(
+	ctx context.Context,
+	id uuid.UUID,
+	actingUserID uuid.UUID,
+) (telemedicine.Consultation, error) {
+	consultation, err := s.GetConsultationByID(ctx, id)
+	if err != nil {
+		return telemedicine.Consultation{}, err
+	}
+
+	if err := s.authorizeConsultationActor(ctx, consultation, actingUserID); err != nil {
+		return telemedicine.Consultation{}, err
+	}
+
+	return consultation, nil
+}
+
 // GetConsultationWithDetails returns the hydrated consultation view for the chat screen.
 func (s *consultationService) GetConsultationWithDetails(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationWithDetails, error) {
 	result, err := s.consultationRepo.GetConsultationWithDetails(ctx, id)
@@ -163,6 +188,58 @@ func (s *consultationService) GetConsultationWithDetails(ctx context.Context, id
 		return telemedicine.ConsultationWithDetails{}, domain.NewAppError(err, "failed to retrieve consultation details", 500)
 	}
 	return result, nil
+}
+
+// GetConsultationWithDetailsForActor returns consultation details only when the caller is the owning
+// patient or the assigned provider staff for that consultation.
+func (s *consultationService) GetConsultationWithDetailsForActor(
+	ctx context.Context,
+	id uuid.UUID,
+	actingUserID uuid.UUID,
+) (telemedicine.ConsultationWithDetails, error) {
+	_, err := s.GetConsultationByIDForActor(ctx, id, actingUserID)
+	if err != nil {
+		return telemedicine.ConsultationWithDetails{}, err
+	}
+
+	result, err := s.consultationRepo.GetConsultationWithDetails(ctx, id)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return telemedicine.ConsultationWithDetails{}, domain.NewAppError(err, "consultation not found", 404)
+		}
+		s.logger.Error().Err(err).Str("consultation_id", id.String()).Msg("Failed to get consultation with details")
+		return telemedicine.ConsultationWithDetails{}, domain.NewAppError(err, "failed to retrieve consultation details", 500)
+	}
+
+	return result, nil
+}
+
+func (s *consultationService) authorizeConsultationActor(ctx context.Context, consultation telemedicine.Consultation, actingUserID uuid.UUID) error {
+	if actingUserID == uuid.Nil {
+		return domain.NewAppError(domain.ErrForbidden, "Missing acting user id", 403)
+	}
+
+	if s.patientRepo != nil {
+		patient, err := s.patientRepo.GetPatientProfileByUserID(ctx, actingUserID)
+		if err == nil && patient.ID == consultation.PatientID {
+			return nil
+		}
+		if err != nil && !errors.Is(err, domain.ErrPatientNotFound) {
+			s.logger.Warn().Err(err).Str("user_id", actingUserID.String()).Msg("Failed patient profile lookup while authorizing consultation")
+		}
+	}
+
+	if s.staffRepo != nil {
+		staff, err := s.staffRepo.GetStaffByUserID(ctx, actingUserID)
+		if err == nil && consultation.ProviderStaffID != nil && staff.ID == *consultation.ProviderStaffID {
+			return nil
+		}
+		if err != nil && !errors.Is(err, domain.ErrStaffNotFound) {
+			s.logger.Warn().Err(err).Str("user_id", actingUserID.String()).Msg("Failed staff lookup while authorizing consultation")
+		}
+	}
+
+	return domain.NewAppError(domain.ErrForbidden, "You are not authorized to access this consultation", 403)
 }
 
 // GetPatientConsultations returns paginated consultation history for a patient.
