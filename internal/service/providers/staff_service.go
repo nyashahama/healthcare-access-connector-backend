@@ -209,7 +209,12 @@ func (s *staffService) CreateStaffInvitation(ctx context.Context, invitation pro
 
 	// Generate invitation token if not provided
 	if invitation.InvitationToken == "" {
-		invitation.InvitationToken = s.generateInvitationToken()
+		invitationToken, err := s.generateInvitationToken()
+		if err != nil {
+			s.logger.Error().Err(err).Str("clinic_id", invitation.ClinicID.String()).Msg("Failed to generate staff invitation token")
+			return providers.ClinicStaff{}, domain.NewAppError(domain.ErrInternal, "Failed to generate invitation token", 500)
+		}
+		invitation.InvitationToken = invitationToken
 	}
 
 	// Set invitation expiry if not provided (7 days default)
@@ -1058,7 +1063,7 @@ func (s *staffService) logStaffActivity(ctx context.Context, activityType string
 
 	// Log activity asynchronously
 	go func() {
-		activityCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		activityCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 
 		if err := s.auditRepo.LogUserActivity(activityCtx, activity); err != nil {
@@ -1094,8 +1099,10 @@ func (s *staffService) compareStaffChanges(oldStaff, newStaff providers.ClinicSt
 }
 
 // Helper function to generate secure invitation token
-func (s *staffService) generateInvitationToken() string {
+func (s *staffService) generateInvitationToken() (string, error) {
 	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.URLEncoding.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }
