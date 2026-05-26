@@ -303,6 +303,8 @@ func New(cfg *config.Config) (*App, error) {
 		consultationRepo,
 		providerAvailabilityRepo,
 		symptomCheckerRepo,
+		patientRepo,
+		staffRepo,
 		cacheService,
 		logger,
 	)

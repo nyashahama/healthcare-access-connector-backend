@@ -346,7 +346,9 @@ type SymptomCheckerService interface {
 type ConsultationService interface {
 	RequestConsultation(ctx context.Context, c telemedicine.Consultation) (telemedicine.Consultation, error)
 	GetConsultationByID(ctx context.Context, id uuid.UUID) (telemedicine.Consultation, error)
+	GetConsultationByIDForActor(ctx context.Context, id uuid.UUID, actingUserID uuid.UUID) (telemedicine.Consultation, error)
 	GetConsultationWithDetails(ctx context.Context, id uuid.UUID) (telemedicine.ConsultationWithDetails, error)
+	GetConsultationWithDetailsForActor(ctx context.Context, id uuid.UUID, actingUserID uuid.UUID) (telemedicine.ConsultationWithDetails, error)
 	GetPatientConsultations(ctx context.Context, patientID uuid.UUID, limit, offset int) ([]telemedicine.PatientConsultationSummary, error)
 	GetPatientActiveConsultation(ctx context.Context, patientID uuid.UUID) (telemedicine.ActiveConsultationCheck, error)
 	CancelConsultation(ctx context.Context, id uuid.UUID, cancelledBy uuid.UUID) (telemedicine.Consultation, error)
