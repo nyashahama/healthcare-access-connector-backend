@@ -302,9 +302,10 @@ func (s *otpService) VerifyOTP(ctx context.Context, identifier, otp string) (str
 	}
 
 	// Generate password reset token
-	resetToken := s.generateSecureToken()
-	if resetToken == "" {
-		return "", core.User{}, domain.NewAppError(nil, "Failed to generate reset token", 500)
+	resetToken, err := s.generateSecureToken()
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to generate password reset token")
+		return "", core.User{}, domain.NewAppError(err, "Failed to generate reset token", 500)
 	}
 	tokenExpires := time.Now().Add(1 * time.Hour)
 
@@ -387,14 +388,14 @@ func (s *otpService) generateNumericOTP(length int) (string, error) {
 	return string(b), nil
 }
 
-func (s *otpService) generateSecureToken() string {
+func (s *otpService) generateSecureToken() (string, error) {
 	b := make([]byte, 32)
 	n, err := rand.Read(b)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("failed to read random bytes: %w", err)
 	}
 	if n != len(b) {
-		return ""
+		return "", fmt.Errorf("unexpected random byte count: got %d, want %d", n, len(b))
 	}
-	return base64.URLEncoding.EncodeToString(b)
+	return base64.URLEncoding.EncodeToString(b), nil
 }

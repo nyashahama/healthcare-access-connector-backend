@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -101,7 +102,13 @@ func (h *StaffHandler) InviteStaff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Generate invitation token and expiry
-	token := generateSecureToken()
+	token, err := generateSecureToken()
+	if err != nil {
+		handler.RespondJSON(w, http.StatusInternalServerError, providers.ErrorResponse{
+			Error: "Failed to generate invitation token",
+		})
+		return
+	}
 	expiresAt := time.Now().Add(7 * 24 * time.Hour) // 7 days
 
 	// Create staff invitation
@@ -114,7 +121,7 @@ func (h *StaffHandler) InviteStaff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Send invitation email asynchronously
-	go h.sendInvitationEmail(staff, req.WorkEmail, token)
+	go h.sendInvitationEmail(ctx, staff, req.WorkEmail, token)
 
 	response := map[string]interface{}{
 		"message":            "Staff invitation sent successfully",
@@ -385,7 +392,7 @@ func (h *StaffHandler) ResendInvitation(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Send new invitation email
-	go h.sendInvitationEmail(staff, *staff.WorkEmail, newToken)
+	go h.sendInvitationEmail(ctx, staff, *staff.WorkEmail, newToken)
 
 	handler.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"message":            "Invitation resent successfully",
@@ -739,25 +746,25 @@ func (h *StaffHandler) CheckStaffExists(w http.ResponseWriter, r *http.Request) 
 
 // Helper functions
 
-func generateSecureToken() string {
+func generateSecureToken() (string, error) {
 	b := make([]byte, 32)
 	n, err := rand.Read(b)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("failed to read random bytes: %w", err)
 	}
 	if n != len(b) {
-		return ""
+		return "", fmt.Errorf("unexpected random byte count: got %d, want %d", n, len(b))
 	}
-	return base64.URLEncoding.EncodeToString(b)
+	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-func (h *StaffHandler) sendInvitationEmail(staff dproviders.ClinicStaff, email, token string) {
+func (h *StaffHandler) sendInvitationEmail(ctx context.Context, staff dproviders.ClinicStaff, email, token string) {
 	if h.emailService == nil {
 		h.logger.Warn().Str("staff_id", staff.ID.String()).Msg("email service unavailable, cannot send staff invitation")
 		return
 	}
 
-	ctx := context.Background()
+	ctx = context.WithoutCancel(ctx)
 	clinicName := ""
 
 	invitationDetails, err := h.staffService.GetStaffInvitationByToken(ctx, token)
