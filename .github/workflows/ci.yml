@@ -8,10 +8,27 @@ jobs:
   fast-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
+      - name: Setup Go
+        run: |
+          GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          if [ -z "$GO_VERSION" ]; then
+            GO_VERSION="1.24.0"
+          fi
+          if [[ "$GO_VERSION" != *.*.* ]]; then
+            GO_VERSION="${GO_VERSION}.0"
+          fi
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/go/bin"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "GOBIN=$HOME/go/bin" >> "$GITHUB_ENV"
       - run: go mod download
       - run: go mod verify
       - run: go build ./...
@@ -25,14 +42,12 @@ jobs:
             BASE_REF="main"
           fi
           if [ "$BASE_REF" = "main" ] || [ "$BASE_REF" = "develop" ]; then
-            git fetch --depth=1 origin "$BASE_REF"
+            git fetch --depth=1 origin "refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
             golangci-lint run --timeout 10m --new-from-rev="origin/$BASE_REF" ./...
           else
             golangci-lint run --timeout 10m ./...
           fi
       - name: Security check
-        env:
-          GOTOOLCHAIN: go1.25.10
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
@@ -40,10 +55,27 @@ jobs:
   integration-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
+      - name: Setup Go
+        run: |
+          GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          if [ -z "$GO_VERSION" ]; then
+            GO_VERSION="1.24.0"
+          fi
+          if [[ "$GO_VERSION" != *.*.* ]]; then
+            GO_VERSION="${GO_VERSION}.0"
+          fi
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/go/bin"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "GOBIN=$HOME/go/bin" >> "$GITHUB_ENV"
       - run: go mod download
       - name: Run integration tests
         run: go test -tags=integration ./tests/integration
@@ -51,10 +83,27 @@ jobs:
   generated-code-drift:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
+      - name: Setup Go
+        run: |
+          GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          if [ -z "$GO_VERSION" ]; then
+            GO_VERSION="1.24.0"
+          fi
+          if [[ "$GO_VERSION" != *.*.* ]]; then
+            GO_VERSION="${GO_VERSION}.0"
+          fi
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/go/bin"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "GOBIN=$HOME/go/bin" >> "$GITHUB_ENV"
       - run: go mod download
       - name: Check sqlc drift
         run: |
@@ -71,7 +120,11 @@ jobs:
   docker-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
       - name: Build Docker image
         run: |
           docker build \
@@ -101,10 +154,27 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Checkout source
+        run: |
+          REPO="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}"
+          REF="${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}"
+          git clone --depth 1 --branch "$REF" "https://github.com/$REPO.git" .
+      - name: Setup Go
+        run: |
+          GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          if [ -z "$GO_VERSION" ]; then
+            GO_VERSION="1.24.0"
+          fi
+          if [[ "$GO_VERSION" != *.*.* ]]; then
+            GO_VERSION="${GO_VERSION}.0"
+          fi
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/go/bin"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "GOBIN=$HOME/go/bin" >> "$GITHUB_ENV"
       - name: Install migrate
         run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
       - name: Validate migrations
