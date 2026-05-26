@@ -12,6 +12,8 @@ jobs:
         with:
           repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          token: ""
+          persist-credentials: false
       - name: Setup Go
         run: |
           GO_VERSION="1.24.0"
@@ -51,6 +53,8 @@ jobs:
         with:
           repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          token: ""
+          persist-credentials: false
       - name: Setup Go
         run: |
           GO_VERSION="1.24.0"
@@ -69,6 +73,8 @@ jobs:
         with:
           repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          token: ""
+          persist-credentials: false
       - name: Setup Go
         run: |
           GO_VERSION="1.24.0"
@@ -96,6 +102,8 @@ jobs:
         with:
           repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          token: ""
+          persist-credentials: false
       - name: Build Docker image
         run: |
           docker build \
@@ -129,6 +137,8 @@ jobs:
         with:
           repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+          token: ""
+          persist-credentials: false
       - name: Setup Go
         run: |
           GO_VERSION="1.24.0"
