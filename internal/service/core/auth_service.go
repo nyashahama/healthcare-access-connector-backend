@@ -430,7 +430,7 @@ func (s *authService) Login(ctx context.Context, identifier, password, ipAddress
 
 	// Update last login asynchronously
 	go func(userID uuid.UUID) {
-		updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		updateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 
 		if err := s.authRepo.UpdateLastLogin(updateCtx, userID); err != nil {
@@ -441,7 +441,7 @@ func (s *authService) Login(ctx context.Context, identifier, password, ipAddress
 	// Send login alert asynchronously
 	if user.Email != nil && *user.Email != "" && s.emailService != nil && s.emailService.IsAvailable() {
 		go func(email string) {
-			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			emailCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 			defer cancel()
 
 			if err := s.emailService.SendLoginAlertEmail(emailCtx, email, "User", "Unknown", "Unknown"); err != nil {
@@ -667,7 +667,7 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 	// Send welcome email asynchronously
 	if user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
 		go func(email string) {
-			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			emailCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 			defer cancel()
 
 			username := "User"
@@ -716,10 +716,10 @@ func (s *authService) RequestPasswordReset(ctx context.Context, identifier strin
 	}
 
 	// Generate reset token
-	resetToken := s.generateSecureToken()
-	if resetToken == "" {
-		s.logger.Error().Msg("Failed to generate password reset token")
-		return domain.NewAppError(nil, "Failed to generate reset token", 500)
+	resetToken, err := s.generateSecureToken()
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to generate password reset token")
+		return domain.NewAppError(err, "Failed to generate reset token", 500)
 	}
 	tokenExpires := time.Now().Add(1 * time.Hour)
 
@@ -732,7 +732,7 @@ func (s *authService) RequestPasswordReset(ctx context.Context, identifier strin
 	// Send reset email asynchronously
 	if user.Email != nil && s.emailService != nil && s.emailService.IsAvailable() {
 		go func(email, token string) {
-			emailCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			emailCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 			defer cancel()
 
 			if err := s.emailService.SendPasswordResetEmail(emailCtx, email, token); err != nil {
@@ -832,10 +832,10 @@ func (s *authService) ResendVerificationEmail(ctx context.Context, email string)
 	}
 
 	// Generate new verification token
-	verificationToken := s.generateSecureToken()
-	if verificationToken == "" {
-		s.logger.Error().Msg("Failed to generate verification token")
-		return domain.NewAppError(nil, "Failed to generate verification token", 500)
+	verificationToken, err := s.generateSecureToken()
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to generate verification token")
+		return domain.NewAppError(err, "Failed to generate verification token", 500)
 	}
 	tokenExpires := time.Now().Add(24 * time.Hour)
 
@@ -1165,10 +1165,10 @@ func (s *authService) handlePostRegistration(ctx context.Context, user core.User
 
 	// Send verification email if email provided
 	if email != "" && s.emailService != nil && s.emailService.IsAvailable() {
-		verificationToken := s.generateSecureToken()
-		if verificationToken == "" {
-			s.logger.Error().Msg("Failed to generate verification token during registration")
-			return fmt.Errorf("generate verification token: failed")
+		verificationToken, err := s.generateSecureToken()
+		if err != nil {
+			s.logger.Error().Err(err).Msg("Failed to generate verification token during registration")
+			return fmt.Errorf("generate verification token: %w", err)
 		}
 		tokenExpires := time.Now().Add(24 * time.Hour)
 
@@ -1212,7 +1212,7 @@ func (s *authService) generateToken(user core.User, expiresAt time.Time) (string
 	return signedToken, nil
 }
 
-func (s *authService) generateSecureToken() string {
+func (s *authService) generateSecureToken() (string, error) {
 	raw := s.tokenPool.Get()
 	var b []byte
 
@@ -1229,10 +1229,13 @@ func (s *authService) generateSecureToken() string {
 	}
 
 	n, err := rand.Read(b)
-	if err != nil || n != len(b) {
-		return ""
+	if err != nil {
+		return "", fmt.Errorf("failed to read random bytes: %w", err)
 	}
-	return base64.URLEncoding.EncodeToString(b)
+	if n != len(b) {
+		return "", fmt.Errorf("unexpected random byte count: got %d, want %d", n, len(b))
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }
 
 // Rate limiting helpers
