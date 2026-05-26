@@ -158,7 +158,8 @@ func NewAuthService(
 		loginAttempts:    make(map[string]loginAttempt),
 		tokenPool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, 32)
+				buf := make([]byte, 32)
+				return &buf
 			},
 		},
 	}
@@ -1212,8 +1213,20 @@ func (s *authService) generateToken(user core.User, expiresAt time.Time) (string
 }
 
 func (s *authService) generateSecureToken() string {
-	b := s.tokenPool.Get().([]byte)
-	defer s.tokenPool.Put(b) //nolint:staticcheck // avoid allocation from copying interface values
+	raw := s.tokenPool.Get()
+	var b []byte
+
+	switch buf := raw.(type) {
+	case *([]byte):
+		b = *buf
+		defer s.tokenPool.Put(buf)
+	case []byte:
+		b = buf
+		defer s.tokenPool.Put(&buf)
+	default:
+		b = make([]byte, 32)
+		defer s.tokenPool.Put(&b)
+	}
 
 	n, err := rand.Read(b)
 	if err != nil || n != len(b) {

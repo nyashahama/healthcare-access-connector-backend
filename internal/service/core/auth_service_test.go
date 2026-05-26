@@ -448,7 +448,8 @@ func newAuthServiceForTest(t *testing.T, maxAttempts int, lockout time.Duration)
 		loginLockout:     lockout,
 		tokenPool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, 32)
+				buf := make([]byte, 32)
+				return &buf
 			},
 		},
 	}
@@ -476,7 +477,8 @@ func newAuthServiceWithMocks(t *testing.T, maxAttempts int, lockout time.Duratio
 		loginLockout:     lockout,
 		tokenPool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, 32)
+				buf := make([]byte, 32)
+				return &buf
 			},
 		},
 	}, mockAuthRepo, mockUserRepo, mockSessionSvc
