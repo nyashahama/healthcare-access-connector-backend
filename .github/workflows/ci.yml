@@ -32,7 +32,7 @@ jobs:
           fi
       - name: Security check
         env:
-          GOTOOLCHAIN: go1.25.10
+          GOTOOLCHAIN: go1.24.0
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
