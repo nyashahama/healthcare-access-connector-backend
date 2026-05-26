@@ -17,7 +17,7 @@ jobs:
         run: |
           GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
           if [ -z "$GO_VERSION" ]; then
-            GO_VERSION="1.25.0"
+            GO_VERSION="1.25.10"
           fi
           if [[ "$GO_VERSION" != *.*.* ]]; then
             GO_VERSION="${GO_VERSION}.0"
