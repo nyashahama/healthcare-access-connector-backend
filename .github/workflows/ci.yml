@@ -9,9 +9,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+      - name: Setup Go
+        run: |
+          GO_VERSION="1.24.0"
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
       - run: go mod download
       - run: go mod verify
       - run: go build ./...
@@ -32,7 +39,7 @@ jobs:
           fi
       - name: Security check
         env:
-          GOTOOLCHAIN: go1.25.10
+          GOTOOLCHAIN: go1.24.0
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
@@ -41,9 +48,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+      - name: Setup Go
+        run: |
+          GO_VERSION="1.24.0"
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
       - run: go mod download
       - name: Run integration tests
         run: go test -tags=integration ./tests/integration
@@ -52,9 +66,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+      - name: Setup Go
+        run: |
+          GO_VERSION="1.24.0"
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
       - run: go mod download
       - name: Check sqlc drift
         run: |
@@ -72,6 +93,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
       - name: Build Docker image
         run: |
           docker build \
@@ -102,9 +126,16 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          repository: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+      - name: Setup Go
+        run: |
+          GO_VERSION="1.24.0"
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
       - name: Install migrate
         run: go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
       - name: Validate migrations
