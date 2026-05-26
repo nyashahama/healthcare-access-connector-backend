@@ -19,20 +19,21 @@ type Config struct {
 	DBURL string
 
 	// Authentication
-	JWTSecret         string
-	JWTExpiry         time.Duration
-	SMSEnabled        bool
-	SMSProvider       string
-	TwilioAccountSID  string
-	TwilioAuthToken   string
-	TwilioFromNumber  string
+	JWTSecret        string
+	JWTExpiry        time.Duration
+	SMSEnabled       bool
+	SMSProvider      string
+	TwilioAccountSID string
+	TwilioAuthToken  string
+	TwilioFromNumber string
 
 	// Server
-	Port           string
-	LogLevel       string
-	Timeout        time.Duration
-	Environment    string
-	AllowedOrigins []string
+	Port              string
+	LogLevel          string
+	Timeout           time.Duration
+	Environment       string
+	AllowedOrigins    []string
+	TrustProxyHeaders bool
 
 	// Rate Limiting
 	RateLimitRPS   int
@@ -108,23 +109,24 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		// Core Configuration
-		DBURL:          getEnv("DB_URL", ""),
-		JWTSecret:      getEnv("JWT_SECRET", ""),
-		Port:           getEnv("PORT", "8080"),
-		LogLevel:       getEnv("LOG_LEVEL", "info"),
-		Environment:    getEnv("ENVIRONMENT", "development"),
-		Timeout:        getEnvAsDuration("TIMEOUT_SECONDS", 30*time.Second),
-		RateLimitRPS:   getEnvAsInt("RATE_LIMIT_RPS", 10),
-		RateLimitBurst: getEnvAsInt("RATE_LIMIT_BURST", 20),
-		JWTExpiry:      getEnvAsDuration("JWT_EXPIRY_HOURS", 24*time.Hour),
-		SMSEnabled:     getEnvAsBool("SMS_ENABLED", false),
-		SMSProvider:    strings.ToLower(strings.TrimSpace(getEnv("SMS_PROVIDER", ""))),
-		TwilioAccountSID: strings.TrimSpace(getEnv("TWILIO_ACCOUNT_SID", "")),
-		TwilioAuthToken:  strings.TrimSpace(getEnv("TWILIO_AUTH_TOKEN", "")),
-		TwilioFromNumber: strings.TrimSpace(getEnv("TWILIO_FROM_NUMBER", "")),
-		RedisURL:       getEnv("REDIS_URL", "redis://localhost:6379"),
-		NatsURL:        getEnv("NATS_URL", "nats://localhost:4222"),
-		CacheTTL:       getEnvAsDuration("CACHE_TTL_MINUTES", 5*time.Minute),
+		DBURL:             getEnv("DB_URL", ""),
+		JWTSecret:         getEnv("JWT_SECRET", ""),
+		Port:              getEnv("PORT", "8080"),
+		LogLevel:          getEnv("LOG_LEVEL", "info"),
+		Environment:       getEnv("ENVIRONMENT", "development"),
+		TrustProxyHeaders: getEnvAsBool("TRUST_PROXY_HEADERS", false),
+		Timeout:           getEnvAsDuration("TIMEOUT_SECONDS", 30*time.Second),
+		RateLimitRPS:      getEnvAsInt("RATE_LIMIT_RPS", 10),
+		RateLimitBurst:    getEnvAsInt("RATE_LIMIT_BURST", 20),
+		JWTExpiry:         getEnvAsDuration("JWT_EXPIRY_HOURS", 24*time.Hour),
+		SMSEnabled:        getEnvAsBool("SMS_ENABLED", false),
+		SMSProvider:       strings.ToLower(strings.TrimSpace(getEnv("SMS_PROVIDER", ""))),
+		TwilioAccountSID:  strings.TrimSpace(getEnv("TWILIO_ACCOUNT_SID", "")),
+		TwilioAuthToken:   strings.TrimSpace(getEnv("TWILIO_AUTH_TOKEN", "")),
+		TwilioFromNumber:  strings.TrimSpace(getEnv("TWILIO_FROM_NUMBER", "")),
+		RedisURL:          getEnv("REDIS_URL", "redis://localhost:6379"),
+		NatsURL:           getEnv("NATS_URL", "nats://localhost:4222"),
+		CacheTTL:          getEnvAsDuration("CACHE_TTL_MINUTES", 5*time.Minute),
 
 		// Email Configuration (canonical names)
 		EmailProvider:    getEnv("EMAIL_PROVIDER", ""),

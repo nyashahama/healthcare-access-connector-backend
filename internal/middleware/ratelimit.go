@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -73,9 +74,17 @@ type redisRateLimiter struct {
 	evalFunc func(ctx context.Context, key string, nowMs int64) (int64, error)
 }
 
-// extractClientIP returns the client IP from trusted proxy headers or RemoteAddr.
-// In production this should be paired with a trusted-proxy allow-list.
-func extractClientIP(r *http.Request) string {
+// ClientIP resolves the client IP for rate limiting.
+func ClientIP(r *http.Request, trustProxyHeaders bool) string {
+	ip := r.RemoteAddr
+	if parsedIP, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		ip = parsedIP
+	}
+
+	if !trustProxyHeaders {
+		return ip
+	}
+
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		// Take the first IP in the chain (closest to the client)
 		if idx := strings.Index(xff, ","); idx != -1 {
@@ -86,12 +95,12 @@ func extractClientIP(r *http.Request) string {
 	if xri := r.Header.Get("X-Real-Ip"); xri != "" {
 		return strings.TrimSpace(xri)
 	}
-	return r.RemoteAddr
+	return ip
 }
 
 // RateLimiter creates an IP-based rate limiter.
 // rps = requests per second, burst = max burst size.
-func RateLimiter(rps int, burst int) func(next http.Handler) http.Handler {
+func RateLimiter(rps int, burst int, trustProxyHeaders bool) func(next http.Handler) http.Handler {
 	if rps <= 0 {
 		rps = 1
 	}
@@ -107,7 +116,7 @@ func RateLimiter(rps int, burst int) func(next http.Handler) http.Handler {
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := extractClientIP(r)
+			ip := ClientIP(r, trustProxyHeaders)
 			if !limiter.Allow(r.Context(), ip) {
 				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 				return

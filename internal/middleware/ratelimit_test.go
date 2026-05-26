@@ -12,7 +12,7 @@ import (
 )
 
 func TestRateLimiterAllowsRequestsUnderLimit(t *testing.T) {
-	handler := RateLimiter(10, 10)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RateLimiter(10, 10, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -26,7 +26,7 @@ func TestRateLimiterAllowsRequestsUnderLimit(t *testing.T) {
 }
 
 func TestRateLimiterBlocksExcessRequests(t *testing.T) {
-	handler := RateLimiter(1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RateLimiter(1, 1, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -45,8 +45,8 @@ func TestRateLimiterBlocksExcessRequests(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, rr2.Code)
 }
 
-func TestRateLimiterUsesXForwardedFor(t *testing.T) {
-	handler := RateLimiter(1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func TestRateLimiterUsesXForwardedForWhenTrustEnabled(t *testing.T) {
+	handler := RateLimiter(1, 1, true)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -66,8 +66,29 @@ func TestRateLimiterUsesXForwardedFor(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests, rr2.Code)
 }
 
+func TestRateLimiterUsesRemoteAddrWhenTrustDisabled(t *testing.T) {
+	handler := RateLimiter(1, 1, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Same RemoteAddr should be rate-limited even with spoofed X-Forwarded-For.
+	req1 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req1.RemoteAddr = "10.0.0.1:1234"
+	req1.Header.Set("X-Forwarded-For", "203.0.113.1")
+	rr1 := httptest.NewRecorder()
+	handler.ServeHTTP(rr1, req1)
+	assert.Equal(t, http.StatusOK, rr1.Code)
+
+	req2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	req2.RemoteAddr = "10.0.0.1:1234"
+	req2.Header.Set("X-Forwarded-For", "203.0.113.2")
+	rr2 := httptest.NewRecorder()
+	handler.ServeHTTP(rr2, req2)
+	assert.Equal(t, http.StatusTooManyRequests, rr2.Code)
+}
+
 func TestRateLimiterIsolatesDifferentIPs(t *testing.T) {
-	handler := RateLimiter(1, 1)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RateLimiter(1, 1, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -87,7 +108,7 @@ func TestRateLimiterIsolatesDifferentIPs(t *testing.T) {
 func TestRateLimiterCleanupRemovesStaleClients(t *testing.T) {
 	// We can't easily test the background cleanup ticker, but we can verify
 	// that the limiter still functions after a short period.
-	handler := RateLimiter(100, 100)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := RateLimiter(100, 100, false)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

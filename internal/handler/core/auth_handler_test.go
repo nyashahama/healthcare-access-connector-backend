@@ -204,7 +204,7 @@ func (m *MockUserService) GetUserProfile(ctx context.Context, userID uuid.UUID) 
 
 func newTestHandler(authSvc *MockAuthService, userSvc *MockUserService) *AuthHandler {
 	logger := zerolog.New(nil)
-	return NewAuthHandler(authSvc, userSvc, &logger, 5*time.Second)
+	return NewAuthHandler(authSvc, userSvc, &logger, 5*time.Second, false)
 }
 
 func newTestRequest(method, path string, body []byte) *http.Request {

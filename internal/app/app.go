@@ -376,7 +376,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	// ── Handlers ──────────────────────────────────────────────────────────────
 
-	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
+	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout, cfg.TrustProxyHeaders)
 	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
 	otpHandler := handlercore.NewOTPHandler(otpService, logger, cfg.Timeout)
 	auditHandler := handlercore.NewAuditHandler(auditService, logger, cfg.Timeout)
