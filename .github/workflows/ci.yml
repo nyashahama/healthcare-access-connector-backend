@@ -41,7 +41,7 @@ jobs:
           if [ -z "$BASE_REF" ]; then
             BASE_REF="main"
           fi
-        if [ "$BASE_REF" = "main" ] || [ "$BASE_REF" = "develop" ]; then
+          if [ "$BASE_REF" = "main" ] || [ "$BASE_REF" = "develop" ]; then
             git fetch --depth=1 origin "refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
             golangci-lint run --timeout 10m --new-from-rev="origin/$BASE_REF" ./...
           else
