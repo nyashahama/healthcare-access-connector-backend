@@ -132,14 +132,6 @@ func setupTestClinicHandler(mockService *MockClinicService) *ClinicHandler {
 	return NewClinicHandler(mockService, &logger, 0)
 }
 
-func createTestClaims() *service.TokenClaims {
-	return &service.TokenClaims{
-		UserID: uuid.New(),
-		Email:  "test@example.com",
-		Role:   "provider",
-	}
-}
-
 func addUserToContext(ctx context.Context, claims *service.TokenClaims) context.Context {
 	return context.WithValue(ctx, middleware.UserContextKey, claims)
 }
