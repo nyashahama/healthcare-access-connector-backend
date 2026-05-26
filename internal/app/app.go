@@ -19,19 +19,19 @@ import (
 	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
 	handlerappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/appointments"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
+	handlerforum "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/forum"
 	handlerpatients "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	handlerproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
-	handlerforum "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	repoadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/admin"
 	repoappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/appointments"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
+	repoforum "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/forum"
 	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
 	repoproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/providers"
 	reposms "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/sms"
 	repotele "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/telemedicine"
-	repoforum "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	serviceadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/service/admin"
 	serviceappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/service/appointments"
@@ -381,7 +381,7 @@ func New(cfg *config.Config) (*App, error) {
 	consentHandler := handlercore.NewConsentHandler(consentService, logger, cfg.Timeout)
 	notificationHandler := handlercore.NewNotificationHandler(notificationService, logger, cfg.Timeout)
 	sessionHandler := handlercore.NewSessionHandler(sessionService, logger, cfg.Timeout)
-	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService, aiClient, wsHub)
+	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService, aiClient, wsHub, logger)
 
 	patientHandler := handlerpatients.NewPatientHandler(patientService, logger, cfg.Timeout)
 	allergyHandler := handlerpatients.NewAllergyHandler(allergyService, logger, cfg.Timeout)
