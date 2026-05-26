@@ -1,6 +1,7 @@
 package app
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -22,4 +23,16 @@ func TestNewPoolConfigAppliesConfiguredLimits(t *testing.T) {
 	require.Equal(t, int32(3), poolCfg.MinConns)
 	require.Equal(t, time.Hour, poolCfg.MaxConnLifetime)
 	require.Equal(t, 5*time.Minute, poolCfg.MaxConnIdleTime)
+}
+
+func TestNewPoolConfigRejectsOversizedConnectionLimits(t *testing.T) {
+	cfg := &config.Config{
+		DBMaxConns:        math.MaxInt32 + 1,
+		DBMinConns:        1,
+		DBMaxConnLifetime: time.Hour,
+		DBMaxConnIdleTime: 5 * time.Minute,
+	}
+
+	_, err := newPoolConfig("postgresql://postgres:replace_me@localhost:5432/app_db?sslmode=disable", cfg)
+	require.ErrorContains(t, err, "DB_MAX_CONNS must be between 0 and")
 }

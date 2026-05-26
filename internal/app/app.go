@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -543,12 +544,27 @@ func newPoolConfig(dbURL string, cfg *config.Config) (*pgxpool.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	poolCfg.MaxConns = int32(cfg.DBMaxConns)
-	poolCfg.MinConns = int32(cfg.DBMinConns)
+	maxConns, err := safeInt32("DB_MAX_CONNS", cfg.DBMaxConns)
+	if err != nil {
+		return nil, err
+	}
+	minConns, err := safeInt32("DB_MIN_CONNS", cfg.DBMinConns)
+	if err != nil {
+		return nil, err
+	}
+	poolCfg.MaxConns = maxConns
+	poolCfg.MinConns = minConns
 	poolCfg.MaxConnLifetime = cfg.DBMaxConnLifetime
 	poolCfg.MaxConnIdleTime = cfg.DBMaxConnIdleTime
 	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 	return poolCfg, nil
+}
+
+func safeInt32(label string, value int) (int32, error) {
+	if value < 0 || value > math.MaxInt32 {
+		return 0, fmt.Errorf("%s must be between 0 and %d", label, math.MaxInt32)
+	}
+	return int32(value), nil
 }
 
 // initDatabase initializes the database connection pool
