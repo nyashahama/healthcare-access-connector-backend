@@ -36,6 +36,7 @@ jobs:
       - run: go test ./...
       - name: Lint changed files
         run: |
+          export GOTOOLCHAIN=go1.25.10
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
           BASE_REF="${GITHUB_BASE_REF:-main}"
           if [ -z "$BASE_REF" ]; then
@@ -49,6 +50,7 @@ jobs:
           fi
       - name: Security check
         run: |
+          export GOTOOLCHAIN=go1.25.10
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
