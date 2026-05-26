@@ -17,7 +17,7 @@ jobs:
         run: |
           GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
           if [ -z "$GO_VERSION" ]; then
-            GO_VERSION="1.24.0"
+            GO_VERSION="1.25.0"
           fi
           if [[ "$GO_VERSION" != *.*.* ]]; then
             GO_VERSION="${GO_VERSION}.0"
@@ -36,7 +36,14 @@ jobs:
       - run: go test ./...
       - name: Lint changed files
         run: |
-          export GOTOOLCHAIN="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          if [ -z "$GO_VERSION" ]; then
+            GO_VERSION="1.25.0"
+          fi
+          if [[ "$GO_VERSION" != *.*.* ]]; then
+            GO_VERSION="${GO_VERSION}.0"
+          fi
+          export GOTOOLCHAIN="go${GO_VERSION}"
           go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
           BASE_REF="${GITHUB_BASE_REF:-main}"
           if [ -z "$BASE_REF" ]; then
@@ -50,7 +57,14 @@ jobs:
           fi
       - name: Security check
         run: |
-          export GOTOOLCHAIN="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          if [ -z "$GO_VERSION" ]; then
+            GO_VERSION="1.25.0"
+          fi
+          if [[ "$GO_VERSION" != *.*.* ]]; then
+            GO_VERSION="${GO_VERSION}.0"
+          fi
+          export GOTOOLCHAIN="go${GO_VERSION}"
           go install golang.org/x/vuln/cmd/govulncheck@latest
           govulncheck ./...
 
@@ -66,7 +80,7 @@ jobs:
         run: |
           GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
           if [ -z "$GO_VERSION" ]; then
-            GO_VERSION="1.24.0"
+            GO_VERSION="1.25.0"
           fi
           if [[ "$GO_VERSION" != *.*.* ]]; then
             GO_VERSION="${GO_VERSION}.0"
@@ -94,7 +108,7 @@ jobs:
         run: |
           GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
           if [ -z "$GO_VERSION" ]; then
-            GO_VERSION="1.24.0"
+            GO_VERSION="1.25.0"
           fi
           if [[ "$GO_VERSION" != *.*.* ]]; then
             GO_VERSION="${GO_VERSION}.0"
@@ -165,7 +179,7 @@ jobs:
         run: |
           GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
           if [ -z "$GO_VERSION" ]; then
-            GO_VERSION="1.24.0"
+            GO_VERSION="1.25.0"
           fi
           if [[ "$GO_VERSION" != *.*.* ]]; then
             GO_VERSION="${GO_VERSION}.0"
