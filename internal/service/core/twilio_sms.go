@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type otpSMSSender interface {
@@ -88,7 +90,9 @@ func (s *twilioOTPSender) SendOTP(ctx context.Context, phoneNumber, otp string) 
 		return nil, fmt.Errorf("send twilio request: %w", err)
 	}
 	defer func() {
-		_ = resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			log.Warn().Err(err).Str("phone", phoneNumber).Msg("failed to close twilio response body")
+		}
 	}()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))

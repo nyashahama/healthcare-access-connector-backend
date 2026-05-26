@@ -3,6 +3,8 @@
 package pgutils
 
 import (
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/docker/distribution/uuid"
@@ -343,7 +345,10 @@ func NumericToFloat64(n pgtype.Numeric) float64 {
 	if !n.Valid {
 		return 0
 	}
-	f, _ := n.Float64Value()
+	f, err := n.Float64Value()
+	if err != nil {
+		return 0
+	}
 	return f.Float64
 }
 
@@ -352,14 +357,23 @@ func NumericToPtr(n pgtype.Numeric) *float64 {
 	if !n.Valid {
 		return nil
 	}
-	f, _ := n.Float64Value()
+	f, err := n.Float64Value()
+	if err != nil {
+		return nil
+	}
 	return &f.Float64
 }
 
 // NumericFrom creates pgtype.Numeric from float64
 func NumericFrom(f float64) pgtype.Numeric {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return pgtype.Numeric{Valid: false}
+	}
+
 	var n pgtype.Numeric
-	_ = n.Scan(f)
+	if err := n.Scan(strconv.FormatFloat(f, 'f', -1, 64)); err != nil {
+		return pgtype.Numeric{Valid: false}
+	}
 	return n
 }
 
@@ -368,7 +382,13 @@ func NumericFromPtr(f *float64) pgtype.Numeric {
 	if f == nil {
 		return pgtype.Numeric{Valid: false}
 	}
+	if math.IsNaN(*f) || math.IsInf(*f, 0) {
+		return pgtype.Numeric{Valid: false}
+	}
+
 	var n pgtype.Numeric
-	_ = n.Scan(*f)
+	if err := n.Scan(strconv.FormatFloat(*f, 'f', -1, 64)); err != nil {
+		return pgtype.Numeric{Valid: false}
+	}
 	return n
 }

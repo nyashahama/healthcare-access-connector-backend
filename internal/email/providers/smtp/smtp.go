@@ -87,7 +87,9 @@ func (p *Provider) Send(ctx context.Context, msg *emailtypes.Message) error {
 	// Build message body
 	var body strings.Builder
 	for k, v := range headers {
-		_, _ = fmt.Fprintf(&body, "%s: %s\r\n", k, v)
+		if _, err := fmt.Fprintf(&body, "%s: %s\r\n", k, v); err != nil {
+			p.logger.Warn().Err(err).Str("header", k).Msg("failed to build email header")
+		}
 	}
 
 	if msg.HTMLBody != "" {
