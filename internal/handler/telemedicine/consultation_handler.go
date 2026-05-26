@@ -136,7 +136,6 @@ func (h *ConsultationHandler) GetConsultationByID(w http.ResponseWriter, r *http
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	if _, ok := middleware.GetUserFromContext(ctx); !ok {
 	claims, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{
@@ -166,7 +165,6 @@ func (h *ConsultationHandler) GetConsultationWithDetails(w http.ResponseWriter, 
 	ctx, cancel := context.WithTimeout(r.Context(), h.timeout)
 	defer cancel()
 
-	if _, ok := middleware.GetUserFromContext(ctx); !ok {
 	claims, ok := middleware.GetUserFromContext(ctx)
 	if !ok {
 		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{
