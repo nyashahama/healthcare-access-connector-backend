@@ -335,18 +335,6 @@ func (m *mockCacheServiceForAppointment) IsAvailable() bool {
 	return true
 }
 
-func newAppointmentServiceForTest(t *testing.T) *appointmentService {
-	t.Helper()
-	logger := zerolog.New(io.Discard)
-	return &appointmentService{
-		appointmentRepo: &mockAppointmentRepository{},
-		clinicRepo:      &mockClinicRepository{},
-		userRepo:        &mockUserRepositoryForAppointment{},
-		cache:           &mockCacheServiceForAppointment{},
-		logger:          &logger,
-	}
-}
-
 func newAppointmentServiceWithMocks(t *testing.T) (*appointmentService, *mockAppointmentRepository, *mockClinicRepository, *mockUserRepositoryForAppointment) {
 	t.Helper()
 	logger := zerolog.New(io.Discard)

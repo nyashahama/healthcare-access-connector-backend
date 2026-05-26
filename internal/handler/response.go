@@ -10,14 +10,28 @@ import (
 
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // respondJSON sends a JSON response
 func RespondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
+	if data == nil {
+		w.WriteHeader(status)
+		return
+	}
+
+	payload, err := json.Marshal(data)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to marshal response payload")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(status)
-	if data != nil {
-		json.NewEncoder(w).Encode(data)
+	if _, err := w.Write(payload); err != nil {
+		log.Error().Err(err).Int("status", status).Msg("failed to write JSON response")
+		return
 	}
 }
 

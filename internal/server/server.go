@@ -15,10 +15,10 @@ import (
 	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
 	handlerappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/appointments"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
+	handlerforum "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
-	handlerforum "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 
@@ -260,7 +260,7 @@ func (s *Server) setupRoutes() http.Handler {
 	wsRouter := chi.NewRouter()
 	wsRouter.Use(middleware.Recovery(s.logger))
 	wsRouter.Use(middleware.CORS(s.config.AllowedOrigins))
-	wsRouter.Use(middleware.RateLimiter(s.config.RateLimitRPS, s.config.RateLimitBurst))
+	wsRouter.Use(middleware.RateLimiter(s.config.RateLimitRPS, s.config.RateLimitBurst, s.config.TrustProxyHeaders))
 	// URL: /ws/consultations/{consultationId}
 	// JWT passed via Authorization: Bearer <token> header or ?token= query param.
 	wsRouter.Get("/ws/consultations/{consultationId}", s.wsHandler.ServeWS)
@@ -272,8 +272,10 @@ func (s *Server) setupRoutes() http.Handler {
 	r.Use(middleware.Logger(s.logger))
 	r.Use(middleware.CORS(s.config.AllowedOrigins))
 	r.Use(chimiddleware.RequestID)
-	r.Use(chimiddleware.RealIP)
-	r.Use(middleware.RateLimiter(s.config.RateLimitRPS, s.config.RateLimitBurst))
+	if s.config.TrustProxyHeaders {
+		r.Use(chimiddleware.RealIP)
+	}
+	r.Use(middleware.RateLimiter(s.config.RateLimitRPS, s.config.RateLimitBurst, s.config.TrustProxyHeaders))
 	r.Use(s.metricsMiddleware())
 
 	// ── Infrastructure endpoints ───────────────────────────────────────────────

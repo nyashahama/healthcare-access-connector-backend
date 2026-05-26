@@ -10,10 +10,25 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Checkout source
+        run: |
+          git clone --depth 1 --branch "${GITHUB_REF_NAME}" "https://github.com/${GITHUB_REPOSITORY}.git" .
+      - name: Setup Go
+        run: |
+          GO_VERSION="$(awk '/^go / { print $2; exit }' go.mod | tr -d '\r')"
+          if [ -z "$GO_VERSION" ]; then
+            GO_VERSION="1.25.10"
+          fi
+          if [[ "$GO_VERSION" != *.*.* ]]; then
+            GO_VERSION="${GO_VERSION}.0"
+          fi
+          curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/go/bin"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "GOBIN=$HOME/go/bin" >> "$GITHUB_ENV"
 
       - name: Extract metadata
         id: meta

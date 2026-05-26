@@ -19,13 +19,13 @@ import (
 )
 
 type mockClinicRepository struct {
-	createClinicFunc       func(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error)
+	createClinicFunc      func(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error)
 	getClinicByIDFunc     func(ctx context.Context, id uuid.UUID) (providers.Clinic, error)
-	updateClinicFunc       func(ctx context.Context, clinic providers.Clinic) error
-	deleteClinicFunc        func(ctx context.Context, id uuid.UUID) error
-	verifyClinicFunc     func(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error
-	getClinicByOwnerFunc func(ctx context.Context, ownerUserID uuid.UUID) (*providers.Clinic, error)
-	updateClinicOwnerFunc  func(ctx context.Context, clinicID, newOwnerUserID uuid.UUID) error
+	updateClinicFunc      func(ctx context.Context, clinic providers.Clinic) error
+	deleteClinicFunc      func(ctx context.Context, id uuid.UUID) error
+	verifyClinicFunc      func(ctx context.Context, id, verifiedBy uuid.UUID, notes string) error
+	getClinicByOwnerFunc  func(ctx context.Context, ownerUserID uuid.UUID) (*providers.Clinic, error)
+	updateClinicOwnerFunc func(ctx context.Context, clinicID, newOwnerUserID uuid.UUID) error
 }
 
 func (m *mockClinicRepository) CreateClinic(ctx context.Context, clinic providers.Clinic, createdBy, ownerUserID uuid.UUID) (providers.Clinic, error) {
@@ -181,8 +181,8 @@ func (m *mockUserRepository) GetUsersByIDs(ctx context.Context, ids []uuid.UUID)
 }
 
 type mockAuthRepository struct {
-	updateUserPrimaryClinicFunc      func(ctx context.Context, userID, clinicID uuid.UUID) error
-	updateUserOnboardingStepFunc      func(ctx context.Context, userID uuid.UUID, step string) error
+	updateUserPrimaryClinicFunc  func(ctx context.Context, userID, clinicID uuid.UUID) error
+	updateUserOnboardingStepFunc func(ctx context.Context, userID uuid.UUID, step string) error
 }
 
 func (m *mockAuthRepository) UpdateUserPrimaryClinic(ctx context.Context, userID, clinicID uuid.UUID) error {
@@ -402,20 +402,6 @@ func (m *mockCacheService) IsAvailable() bool {
 	return true
 }
 
-func newClinicServiceForTest(t *testing.T) *clinicService {
-	t.Helper()
-	logger := zerolog.New(io.Discard)
-	return &clinicService{
-		clinicRepo: &mockClinicRepository{},
-		auditRepo:  &mockAuditRepository{},
-		userRepo:   &mockUserRepository{},
-		authRepo:   &mockAuthRepository{},
-		staffRepo:  &mockStaffRepository{},
-		cache:      &mockCacheService{},
-		logger:     &logger,
-	}
-}
-
 func newClinicServiceWithMocks(t *testing.T) (*clinicService, *mockClinicRepository, *mockUserRepository, *mockAuthRepository) {
 	t.Helper()
 	logger := zerolog.New(io.Discard)
@@ -458,8 +444,8 @@ func TestClinicService_RegisterClinic(t *testing.T) {
 		}
 
 		clinic := providers.Clinic{
-			ClinicName:     "Test Clinic",
-			ClinicType:     "private",
+			ClinicName:      "Test Clinic",
+			ClinicType:      "private",
 			PhysicalAddress: "123 Test St",
 		}
 
@@ -517,7 +503,7 @@ func TestClinicService_RegisterClinic(t *testing.T) {
 
 		clinic := providers.Clinic{
 			ClinicName:      "Test Clinic",
-			ClinicType:     "private",
+			ClinicType:      "private",
 			PhysicalAddress: "123 Test St",
 		}
 
@@ -541,7 +527,7 @@ func TestClinicService_RegisterClinic(t *testing.T) {
 
 		clinic := providers.Clinic{
 			ClinicName:      "Test Clinic",
-			ClinicType:     "private",
+			ClinicType:      "private",
 			PhysicalAddress: "123 Test St",
 		}
 
@@ -572,7 +558,7 @@ func TestClinicService_RegisterClinic(t *testing.T) {
 
 		clinic := providers.Clinic{
 			ClinicName:      "Test Clinic",
-			ClinicType:     "private",
+			ClinicType:      "private",
 			PhysicalAddress: "123 Test St",
 		}
 
@@ -588,10 +574,10 @@ func TestClinicService_GetClinicByID(t *testing.T) {
 
 		clinicID := uuid.New()
 		expectedClinic := providers.Clinic{
-			ID:              clinicID,
-			ClinicName:      "Test Clinic",
-			ClinicType:      "private",
-			IsVerified:      true,
+			ID:         clinicID,
+			ClinicName: "Test Clinic",
+			ClinicType: "private",
+			IsVerified: true,
 		}
 
 		mockClinicRepo.getClinicByIDFunc = func(ctx context.Context, id uuid.UUID) (providers.Clinic, error) {
@@ -735,8 +721,8 @@ func TestClinicService_VerifyClinic(t *testing.T) {
 
 		mockClinicRepo.getClinicByIDFunc = func(ctx context.Context, id uuid.UUID) (providers.Clinic, error) {
 			return providers.Clinic{
-				ID:              clinicID,
-				ClinicName:      "Test Clinic",
+				ID:                 clinicID,
+				ClinicName:         "Test Clinic",
 				VerificationStatus: "pending",
 			}, nil
 		}
@@ -767,8 +753,8 @@ func TestClinicService_VerifyClinic(t *testing.T) {
 
 		mockClinicRepo.getClinicByIDFunc = func(ctx context.Context, id uuid.UUID) (providers.Clinic, error) {
 			return providers.Clinic{
-				ID:              clinicID,
-				ClinicName:      "Test Clinic",
+				ID:                 clinicID,
+				ClinicName:         "Test Clinic",
 				VerificationStatus: "pending",
 			}, nil
 		}

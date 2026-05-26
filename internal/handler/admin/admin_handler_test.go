@@ -234,7 +234,8 @@ func TestAdminHandler_CreateSystemAdmin(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.NoError(t, err)
 		assert.Contains(t, resp, "fields")
 		mockService.AssertExpectations(t)
 	})

@@ -9,8 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
-	cn_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
-	sc_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
+	telemeddto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/rs/zerolog"
@@ -80,7 +79,7 @@ func (h *ConsultationNotesHandler) CreateNote(w http.ResponseWriter, r *http.Req
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -95,7 +94,7 @@ func (h *ConsultationNotesHandler) CreateNote(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, cn_dto.ToConsultationNoteResponse(note))
+	handler.RespondJSON(w, http.StatusCreated, telemeddto.ToConsultationNoteResponse(note))
 }
 
 // UpdateNote handles PUT /consultations/{consultationId}/notes/{noteId}.
@@ -108,7 +107,7 @@ func (h *ConsultationNotesHandler) UpdateNote(w http.ResponseWriter, r *http.Req
 
 	noteID, err := parseUUIDParam(r, "noteId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid note ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid note ID"})
 		return
 	}
 
@@ -117,15 +116,15 @@ func (h *ConsultationNotesHandler) UpdateNote(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	var req cn_dto.UpdateNoteRequest
+	var req telemeddto.UpdateNoteRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid request body"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid request body"})
 		return
 	}
 
 	// Map UpdateNoteRequest fields onto a partial domain note.
 	// The service layer performs field-level merging against the existing record.
-	update := cn_dto.ToDomainNoteUpdate(req)
+	update := telemeddto.ToDomainNoteUpdate(req)
 
 	updated, err := h.notesService.UpdateNote(ctx, noteID, update, staffID)
 	if err != nil {
@@ -133,7 +132,7 @@ func (h *ConsultationNotesHandler) UpdateNote(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cn_dto.ToConsultationNoteResponse(updated))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToConsultationNoteResponse(updated))
 }
 
 // FinaliseNote handles PUT /consultations/{consultationId}/notes/{noteId}/finalise.
@@ -146,7 +145,7 @@ func (h *ConsultationNotesHandler) FinaliseNote(w http.ResponseWriter, r *http.R
 
 	noteID, err := parseUUIDParam(r, "noteId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid note ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid note ID"})
 		return
 	}
 
@@ -161,7 +160,7 @@ func (h *ConsultationNotesHandler) FinaliseNote(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cn_dto.ToConsultationNoteResponse(finalised))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToConsultationNoteResponse(finalised))
 }
 
 // FinaliseNoteByConsultation handles PUT /consultations/{consultationId}/notes/finalise.
@@ -174,7 +173,7 @@ func (h *ConsultationNotesHandler) FinaliseNoteByConsultation(w http.ResponseWri
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -184,7 +183,7 @@ func (h *ConsultationNotesHandler) FinaliseNoteByConsultation(w http.ResponseWri
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cn_dto.ToConsultationNoteResponse(finalised))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToConsultationNoteResponse(finalised))
 }
 
 // ─── Read handlers ─────────────────────────────────────────────────────────────
@@ -196,7 +195,7 @@ func (h *ConsultationNotesHandler) GetNoteByID(w http.ResponseWriter, r *http.Re
 
 	noteID, err := parseUUIDParam(r, "noteId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid note ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid note ID"})
 		return
 	}
 
@@ -206,7 +205,7 @@ func (h *ConsultationNotesHandler) GetNoteByID(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cn_dto.ToConsultationNoteResponse(note))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToConsultationNoteResponse(note))
 }
 
 // GetNoteByConsultationID handles GET /consultations/{consultationId}/notes.
@@ -217,7 +216,7 @@ func (h *ConsultationNotesHandler) GetNoteByConsultationID(w http.ResponseWriter
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -227,7 +226,7 @@ func (h *ConsultationNotesHandler) GetNoteByConsultationID(w http.ResponseWriter
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cn_dto.ToConsultationNoteResponse(note))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToConsultationNoteResponse(note))
 }
 
 // GetNoteWithProviderInfo handles GET /consultations/{consultationId}/notes/with-provider.
@@ -239,7 +238,7 @@ func (h *ConsultationNotesHandler) GetNoteWithProviderInfo(w http.ResponseWriter
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -249,7 +248,7 @@ func (h *ConsultationNotesHandler) GetNoteWithProviderInfo(w http.ResponseWriter
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cn_dto.ToConsultationNoteWithProviderInfoResponse(result))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToConsultationNoteWithProviderInfoResponse(result))
 }
 
 // ─── History handlers ─────────────────────────────────────────────────────────
@@ -275,12 +274,12 @@ func (h *ConsultationNotesHandler) GetProviderNoteHistory(w http.ResponseWriter,
 		return
 	}
 
-	items := make([]cn_dto.ProviderNoteHistoryEntryResponse, len(notes))
+	items := make([]telemeddto.ProviderNoteHistoryEntryResponse, len(notes))
 	for i, n := range notes {
-		items[i] = cn_dto.ToProviderNoteHistoryEntryResponse(n)
+		items[i] = telemeddto.ToProviderNoteHistoryEntryResponse(n)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cn_dto.ProviderNoteHistoryResponse{
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ProviderNoteHistoryResponse{
 		Notes:  items,
 		Count:  len(items),
 		Limit:  limit,
@@ -306,12 +305,12 @@ func (h *ConsultationNotesHandler) GetPatientNoteHistory(w http.ResponseWriter, 
 		return
 	}
 
-	items := make([]cn_dto.PatientNoteHistoryEntryResponse, len(notes))
+	items := make([]telemeddto.PatientNoteHistoryEntryResponse, len(notes))
 	for i, n := range notes {
-		items[i] = cn_dto.ToPatientNoteHistoryEntryResponse(n)
+		items[i] = telemeddto.ToPatientNoteHistoryEntryResponse(n)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cn_dto.PatientNoteHistoryResponse{
+	handler.RespondJSON(w, http.StatusOK, telemeddto.PatientNoteHistoryResponse{
 		Notes:  items,
 		Count:  len(items),
 		Limit:  0, // GetPatientNoteHistory returns all; no server-side pagination
@@ -326,7 +325,7 @@ func (h *ConsultationNotesHandler) GetPatientNoteHistory(w http.ResponseWriter, 
 func (h *ConsultationNotesHandler) resolvePatientID(ctx context.Context, w http.ResponseWriter) (patientID uuid.UUID, userID uuid.UUID, ok bool) {
 	claims, found := middleware.GetUserFromContext(ctx)
 	if !found {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{
 			Error: "User not authenticated",
 		})
 		return uuid.Nil, uuid.Nil, false
@@ -334,7 +333,7 @@ func (h *ConsultationNotesHandler) resolvePatientID(ctx context.Context, w http.
 
 	patient, err := h.patientService.GetPatientProfile(ctx, claims.UserID)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{
 			Error: "No patient profile found for authenticated user",
 		})
 		return uuid.Nil, uuid.Nil, false
@@ -348,7 +347,7 @@ func (h *ConsultationNotesHandler) resolvePatientID(ctx context.Context, w http.
 func (h *ConsultationNotesHandler) resolveStaffID(ctx context.Context, w http.ResponseWriter) (staffID uuid.UUID, clinicID uuid.UUID, ok bool) {
 	claims, found := middleware.GetUserFromContext(ctx)
 	if !found {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{
 			Error: "User not authenticated",
 		})
 		return uuid.Nil, uuid.Nil, false
@@ -356,7 +355,7 @@ func (h *ConsultationNotesHandler) resolveStaffID(ctx context.Context, w http.Re
 
 	staff, err := h.staffService.GetStaffByUserID(ctx, claims.UserID)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{
 			Error: "No staff profile found for authenticated user",
 		})
 		return uuid.Nil, uuid.Nil, false

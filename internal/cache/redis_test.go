@@ -173,7 +173,7 @@ func TestRedisCache_DefaultTTL(t *testing.T) {
 	ce, ok := entry.(cacheEntry)
 	require.True(t, ok)
 
-	ttl := ce.expiration.Sub(time.Now())
+	ttl := time.Until(ce.expiration)
 	assert.True(t, ttl > 4*time.Minute && ttl <= 5*time.Minute)
 }
 
@@ -223,11 +223,11 @@ func TestRedisCache_ConcurrentAccess(t *testing.T) {
 
 			switch i % 3 {
 			case 0:
-				cache.Set(ctx, key, "value", time.Hour)
+				_ = cache.Set(ctx, key, "value", time.Hour)
 			case 1:
-				cache.Get(ctx, key, new(string))
+				_ = cache.Get(ctx, key, new(string))
 			case 2:
-				cache.Exists(ctx, key)
+				_, _ = cache.Exists(ctx, key)
 			}
 		}(i)
 	}

@@ -4,6 +4,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"time"
 
@@ -19,19 +20,19 @@ import (
 	handleradmin "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/admin"
 	handlerappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/appointments"
 	handlercore "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/core"
+	handlerforum "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/forum"
 	handlerpatients "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/patients"
 	handlerproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/providers"
 	handlertele "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/telemedicine"
-	handlerforum "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	repoadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/admin"
 	repoappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/appointments"
 	repocore "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/core"
+	repoforum "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/forum"
 	repopatients "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/patients"
 	repoproviders "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/providers"
 	reposms "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/sms"
 	repotele "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/telemedicine"
-	repoforum "github.com/nyashahama/healthcare-access-connector-backend/internal/repository/forum"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/server"
 	serviceadmin "github.com/nyashahama/healthcare-access-connector-backend/internal/service/admin"
 	serviceappointments "github.com/nyashahama/healthcare-access-connector-backend/internal/service/appointments"
@@ -376,14 +377,14 @@ func New(cfg *config.Config) (*App, error) {
 
 	// ── Handlers ──────────────────────────────────────────────────────────────
 
-	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout)
+	authHandler := handlercore.NewAuthHandler(authService, userService, logger, cfg.Timeout, cfg.TrustProxyHeaders)
 	userHandler := handlercore.NewUserHandler(userService, logger, cfg.Timeout)
 	otpHandler := handlercore.NewOTPHandler(otpService, logger, cfg.Timeout)
 	auditHandler := handlercore.NewAuditHandler(auditService, logger, cfg.Timeout)
 	consentHandler := handlercore.NewConsentHandler(consentService, logger, cfg.Timeout)
 	notificationHandler := handlercore.NewNotificationHandler(notificationService, logger, cfg.Timeout)
 	sessionHandler := handlercore.NewSessionHandler(sessionService, logger, cfg.Timeout)
-	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService, aiClient, wsHub)
+	healthHandler := handler.NewHealthHandler(pool, cacheService, broker, emailService, aiClient, wsHub, logger)
 
 	patientHandler := handlerpatients.NewPatientHandler(patientService, logger, cfg.Timeout)
 	allergyHandler := handlerpatients.NewAllergyHandler(allergyService, logger, cfg.Timeout)
@@ -543,12 +544,27 @@ func newPoolConfig(dbURL string, cfg *config.Config) (*pgxpool.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	poolCfg.MaxConns = int32(cfg.DBMaxConns)
-	poolCfg.MinConns = int32(cfg.DBMinConns)
+	maxConns, err := safeInt32("DB_MAX_CONNS", cfg.DBMaxConns)
+	if err != nil {
+		return nil, err
+	}
+	minConns, err := safeInt32("DB_MIN_CONNS", cfg.DBMinConns)
+	if err != nil {
+		return nil, err
+	}
+	poolCfg.MaxConns = maxConns
+	poolCfg.MinConns = minConns
 	poolCfg.MaxConnLifetime = cfg.DBMaxConnLifetime
 	poolCfg.MaxConnIdleTime = cfg.DBMaxConnIdleTime
 	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 	return poolCfg, nil
+}
+
+func safeInt32(label string, value int) (int32, error) {
+	if value < 0 || value > math.MaxInt32 {
+		return 0, fmt.Errorf("%s must be between 0 and %d", label, math.MaxInt32)
+	}
+	return int32(value), nil
 }
 
 // initDatabase initializes the database connection pool

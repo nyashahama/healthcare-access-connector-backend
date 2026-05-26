@@ -166,7 +166,11 @@ func (c *aiClient) call(ctx context.Context, body chatRequest) (string, error) {
 		c.logger.Error().Err(err).Msg("AI: HTTP call failed")
 		return "", fmt.Errorf("ai: %w: %v", ErrAIUnavailable, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			c.logger.Error().Err(err).Msg("ai: failed to close response body")
+		}
+	}()
 
 	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {

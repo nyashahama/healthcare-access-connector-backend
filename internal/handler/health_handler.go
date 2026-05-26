@@ -13,11 +13,13 @@ import (
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/messaging"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/version"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/ws"
+	"github.com/rs/zerolog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type HealthHandler struct {
+	logger       *zerolog.Logger
 	pool         *pgxpool.Pool
 	cache        cache.Service
 	broker       messaging.Broker
@@ -41,8 +43,10 @@ func NewHealthHandler(
 	emailService email.Service,
 	aiClient ai.Client,
 	wsHub *ws.Hub,
+	logger *zerolog.Logger,
 ) *HealthHandler {
 	return &HealthHandler{
+		logger:       logger,
 		pool:         pool,
 		cache:        cache,
 		broker:       broker,
@@ -133,9 +137,23 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 		Version:   version.Version + " (" + version.Commit + ")",
 	}
 
+	payload, err := json.Marshal(response)
+	if err != nil {
+		if h.logger != nil {
+			h.logger.Error().Err(err).Msg("health handler failed to marshal response")
+		}
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(response)
+	if _, err := w.Write(payload); err != nil {
+		if h.logger != nil {
+			h.logger.Error().Err(err).Int("status", statusCode).Msg("health handler failed to write response payload")
+		}
+		return
+	}
 }
 
 // Readiness checks if the service is ready to accept requests

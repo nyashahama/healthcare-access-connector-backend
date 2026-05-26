@@ -434,8 +434,7 @@ func pgtypeUUIDToUUIDPtr(id pgtype.UUID) *uuid.UUID {
 		return nil
 	}
 
-	var u uuid.UUID
-	u = uuid.UUID(id.Bytes) // direct array copy
+	u := uuid.UUID(id.Bytes) // direct array copy
 	return &u
 }
 

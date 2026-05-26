@@ -19,13 +19,13 @@ import (
 func TestHub_NewHub(t *testing.T) {
 	t.Run("creates hub with default config", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:  1024,
-			WriteBufferSize: 1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -43,13 +43,13 @@ func TestHub_NewHub(t *testing.T) {
 func TestHub_Run(t *testing.T) {
 	t.Run("starts and stops gracefully", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -74,13 +74,13 @@ func TestHub_Run(t *testing.T) {
 
 	t.Run("registers and unregisters clients", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -99,13 +99,13 @@ func TestHub_Run(t *testing.T) {
 func TestHub_RoomSize(t *testing.T) {
 	t.Run("returns zero for empty room", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -120,13 +120,13 @@ func TestHub_RoomSize(t *testing.T) {
 func TestHub_Broadcast(t *testing.T) {
 	t.Run("broadcasts to room", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -148,13 +148,13 @@ func TestHub_Broadcast(t *testing.T) {
 func TestHub_IsAvailable(t *testing.T) {
 	t.Run("always available when hub is running", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -168,13 +168,13 @@ func TestHub_IsAvailable(t *testing.T) {
 func TestHub_ServeWS(t *testing.T) {
 	t.Run("upgrades HTTP connection", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -198,7 +198,9 @@ func TestHub_ServeWS(t *testing.T) {
 		if err != nil {
 			t.Skipf("WebSocket connection failed: %v", err)
 		}
-		defer conn.Close()
+		defer func() {
+			_ = conn.Close()
+		}()
 
 		time.Sleep(100 * time.Millisecond)
 		assert.True(t, hub.RoomSize("consultation-1") >= 1)
@@ -275,7 +277,7 @@ func TestMessagePayload_Validation(t *testing.T) {
 	t.Run("system event message", func(t *testing.T) {
 		payload := MessagePayload{
 			MessageType: MessageTypeSystemEvent,
-			Content:    "Patient joined the consultation",
+			Content:     "Patient joined the consultation",
 		}
 
 		data, err := json.Marshal(payload)
@@ -327,13 +329,13 @@ func TestPresencePayload_Validation(t *testing.T) {
 
 func TestHub_ConcurrentBroadcast(t *testing.T) {
 	cfg := &Config{
-		ReadBufferSize:   1024,
-		WriteBufferSize:  1024,
-		HandshakeTimeout: 5 * time.Second,
-		PongWait:         60 * time.Second,
-		PingInterval:    30 * time.Second,
-		WriteWait:       10 * time.Second,
-		MaxMessageBytes: 65536,
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		HandshakeTimeout:  5 * time.Second,
+		PongWait:          60 * time.Second,
+		PingInterval:      30 * time.Second,
+		WriteWait:         10 * time.Second,
+		MaxMessageBytes:   65536,
 		SendChannelBuffer: 256,
 	}
 
@@ -367,13 +369,13 @@ func TestHub_ConcurrentBroadcast(t *testing.T) {
 func TestHub_MessageHandler(t *testing.T) {
 	t.Run("handles nil message handler", func(t *testing.T) {
 		cfg := &Config{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
-			HandshakeTimeout: 5 * time.Second,
-			PongWait:         60 * time.Second,
-			PingInterval:    30 * time.Second,
-			WriteWait:       10 * time.Second,
-			MaxMessageBytes: 65536,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
+			HandshakeTimeout:  5 * time.Second,
+			PongWait:          60 * time.Second,
+			PingInterval:      30 * time.Second,
+			WriteWait:         10 * time.Second,
+			MaxMessageBytes:   65536,
 			SendChannelBuffer: 256,
 		}
 
@@ -383,7 +385,7 @@ func TestHub_MessageHandler(t *testing.T) {
 		assert.Nil(t, hub.MessageHandler)
 	})
 
-t.Run("calls message handler on message event", func(t *testing.T) {
+	t.Run("calls message handler on message event", func(t *testing.T) {
 		cfg := &Config{
 			ReadBufferSize:    1024,
 			WriteBufferSize:   1024,

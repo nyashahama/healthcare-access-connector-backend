@@ -3,9 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -23,6 +21,7 @@ type AuthHandler struct {
 	userService service.UserService
 	logger      *zerolog.Logger
 	timeout     time.Duration
+	trustProxy  bool
 }
 
 // NewAuthHandler creates a new authentication handler
@@ -31,12 +30,14 @@ func NewAuthHandler(
 	userService service.UserService,
 	logger *zerolog.Logger,
 	timeout time.Duration,
+	trustProxyHeaders bool,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 		userService: userService,
 		logger:      logger,
 		timeout:     timeout,
+		trustProxy:  trustProxyHeaders,
 	}
 }
 
@@ -121,7 +122,7 @@ func (h *AuthHandler) RegisterInvitedStaff(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Auto-login the user after successful registration
-	ipAddress := getIPAddress(r)
+	ipAddress := h.getIPAddress(r)
 	userAgent := r.UserAgent()
 
 	token, expiresAt, _, err := h.authService.Login(ctx, req.Email, req.Password, ipAddress, userAgent)
@@ -167,7 +168,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ipAddress := getIPAddress(r)
+	ipAddress := h.getIPAddress(r)
 	userAgent := r.UserAgent()
 
 	// Authenticate user
@@ -231,7 +232,7 @@ func (h *AuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ipAddress := getIPAddress(r)
+	ipAddress := h.getIPAddress(r)
 	userAgent := r.UserAgent()
 
 	// Refresh token
@@ -565,16 +566,11 @@ func extractToken(r *http.Request) string {
 	return ""
 }
 
-func getIPAddress(r *http.Request) string {
+func (h *AuthHandler) getIPAddress(r *http.Request) string {
 	// Check for X-Forwarded-For header (if behind proxy)
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		// Get the first IP in the chain
-		ips := strings.Split(forwarded, ",")
-		return strings.TrimSpace(ips[0])
+	if h.trustProxy {
+		return middleware.ClientIP(r, true)
 	}
 
-	// Fall back to RemoteAddr
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return ip
+	return middleware.ClientIP(r, false)
 }

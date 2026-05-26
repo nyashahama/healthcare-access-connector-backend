@@ -9,8 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/handler"
-	cm_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
-	sc_dto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
+	telemeddto "github.com/nyashahama/healthcare-access-connector-backend/internal/handler/dto/telemedicine"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/middleware"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/service"
 	"github.com/nyashahama/healthcare-access-connector-backend/internal/validator"
@@ -75,20 +74,20 @@ func (h *ConsultationMessagesHandler) SendMessage(w http.ResponseWriter, r *http
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
 	// Resolve sender identity from JWT.
 	claims, found := middleware.GetUserFromContext(ctx)
 	if !found {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{Error: "User not authenticated"})
+		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{Error: "User not authenticated"})
 		return
 	}
 
-	var req cm_dto.SendMessageRequest
+	var req telemeddto.SendMessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid request body"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid request body"})
 		return
 	}
 
@@ -136,14 +135,14 @@ func (h *ConsultationMessagesHandler) SendMessage(w http.ResponseWriter, r *http
 		return
 	}
 
-	msg := cm_dto.ToDomainMessage(consultationID, req)
+	msg := telemeddto.ToDomainMessage(consultationID, req)
 	created, err := h.messagesService.SendMessage(ctx, msg)
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, cm_dto.ToConsultationMessageResponse(created))
+	handler.RespondJSON(w, http.StatusCreated, telemeddto.ToConsultationMessageResponse(created))
 }
 
 // DeleteMessage handles DELETE /consultations/{consultationId}/messages/{messageId}.
@@ -154,13 +153,13 @@ func (h *ConsultationMessagesHandler) DeleteMessage(w http.ResponseWriter, r *ht
 
 	messageID, err := parseUUIDParam(r, "messageId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid message ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid message ID"})
 		return
 	}
 
 	claims, found := middleware.GetUserFromContext(ctx)
 	if !found {
-		handler.RespondJSON(w, http.StatusUnauthorized, sc_dto.ErrorResponse{Error: "User not authenticated"})
+		handler.RespondJSON(w, http.StatusUnauthorized, telemeddto.ErrorResponse{Error: "User not authenticated"})
 		return
 	}
 
@@ -183,13 +182,13 @@ func (h *ConsultationMessagesHandler) InsertSystemEvent(w http.ResponseWriter, r
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
-	var req cm_dto.InsertSystemEventRequest
+	var req telemeddto.InsertSystemEventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid request body"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid request body"})
 		return
 	}
 
@@ -209,7 +208,7 @@ func (h *ConsultationMessagesHandler) InsertSystemEvent(w http.ResponseWriter, r
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusCreated, cm_dto.ToConsultationMessageResponse(created))
+	handler.RespondJSON(w, http.StatusCreated, telemeddto.ToConsultationMessageResponse(created))
 }
 
 // ─── Read handlers ─────────────────────────────────────────────────────────────
@@ -223,7 +222,7 @@ func (h *ConsultationMessagesHandler) GetConsultationMessages(w http.ResponseWri
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -236,12 +235,12 @@ func (h *ConsultationMessagesHandler) GetConsultationMessages(w http.ResponseWri
 		return
 	}
 
-	items := make([]cm_dto.ConsultationMessageResponse, len(msgs))
+	items := make([]telemeddto.ConsultationMessageResponse, len(msgs))
 	for i, m := range msgs {
-		items[i] = cm_dto.ToConsultationMessageResponse(m)
+		items[i] = telemeddto.ToConsultationMessageResponse(m)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cm_dto.MessageThreadResponse{
+	handler.RespondJSON(w, http.StatusOK, telemeddto.MessageThreadResponse{
 		Messages: items,
 		Count:    len(items),
 		Limit:    limit,
@@ -258,13 +257,13 @@ func (h *ConsultationMessagesHandler) GetMessagesAfterCursor(w http.ResponseWrit
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
 	cursorStr := r.URL.Query().Get("cursor")
 	if cursorStr == "" {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{
 			Error: "cursor query parameter is required (RFC3339 format)",
 		})
 		return
@@ -272,7 +271,7 @@ func (h *ConsultationMessagesHandler) GetMessagesAfterCursor(w http.ResponseWrit
 
 	cursor, err := time.Parse(time.RFC3339, cursorStr)
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{
 			Error: "Invalid cursor format. Use RFC3339 (e.g. 2024-01-15T10:30:00Z)",
 		})
 		return
@@ -284,12 +283,12 @@ func (h *ConsultationMessagesHandler) GetMessagesAfterCursor(w http.ResponseWrit
 		return
 	}
 
-	items := make([]cm_dto.MessageAfterCursorResponse, len(msgs))
+	items := make([]telemeddto.MessageAfterCursorResponse, len(msgs))
 	for i, m := range msgs {
-		items[i] = cm_dto.ToMessageAfterCursorResponse(m)
+		items[i] = telemeddto.ToMessageAfterCursorResponse(m)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cm_dto.MessagesAfterCursorResponse{
+	handler.RespondJSON(w, http.StatusOK, telemeddto.MessagesAfterCursorResponse{
 		Messages: items,
 		Count:    len(items),
 	})
@@ -303,7 +302,7 @@ func (h *ConsultationMessagesHandler) GetLastMessage(w http.ResponseWriter, r *h
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -313,7 +312,7 @@ func (h *ConsultationMessagesHandler) GetLastMessage(w http.ResponseWriter, r *h
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cm_dto.ToLastMessagePreviewResponse(msg))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToLastMessagePreviewResponse(msg))
 }
 
 // GetConsultationAttachments handles GET /consultations/{consultationId}/messages/attachments.
@@ -324,7 +323,7 @@ func (h *ConsultationMessagesHandler) GetConsultationAttachments(w http.Response
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -334,12 +333,12 @@ func (h *ConsultationMessagesHandler) GetConsultationAttachments(w http.Response
 		return
 	}
 
-	items := make([]cm_dto.AttachmentEntryResponse, len(attachments))
+	items := make([]telemeddto.AttachmentEntryResponse, len(attachments))
 	for i, a := range attachments {
-		items[i] = cm_dto.ToAttachmentEntryResponse(a)
+		items[i] = telemeddto.ToAttachmentEntryResponse(a)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cm_dto.AttachmentsResponse{
+	handler.RespondJSON(w, http.StatusOK, telemeddto.AttachmentsResponse{
 		Attachments: items,
 		Count:       len(items),
 	})
@@ -353,7 +352,7 @@ func (h *ConsultationMessagesHandler) GetSystemEvents(w http.ResponseWriter, r *
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -363,12 +362,12 @@ func (h *ConsultationMessagesHandler) GetSystemEvents(w http.ResponseWriter, r *
 		return
 	}
 
-	items := make([]cm_dto.SystemEventResponse, len(events))
+	items := make([]telemeddto.SystemEventResponse, len(events))
 	for i, e := range events {
-		items[i] = cm_dto.ToSystemEventResponse(e)
+		items[i] = telemeddto.ToSystemEventResponse(e)
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cm_dto.SystemEventsResponse{
+	handler.RespondJSON(w, http.StatusOK, telemeddto.SystemEventsResponse{
 		Events: items,
 		Count:  len(items),
 	})
@@ -383,7 +382,7 @@ func (h *ConsultationMessagesHandler) MarkMessageRead(w http.ResponseWriter, r *
 
 	messageID, err := parseUUIDParam(r, "messageId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid message ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid message ID"})
 		return
 	}
 
@@ -405,7 +404,7 @@ func (h *ConsultationMessagesHandler) MarkAllProviderMessagesRead(w http.Respons
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -427,7 +426,7 @@ func (h *ConsultationMessagesHandler) MarkAllPatientMessagesRead(w http.Response
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -449,7 +448,7 @@ func (h *ConsultationMessagesHandler) CountUnreadMessages(w http.ResponseWriter,
 
 	consultationID, err := parseUUIDParam(r, "consultationId")
 	if err != nil {
-		handler.RespondJSON(w, http.StatusBadRequest, sc_dto.ErrorResponse{Error: "Invalid consultation ID"})
+		handler.RespondJSON(w, http.StatusBadRequest, telemeddto.ErrorResponse{Error: "Invalid consultation ID"})
 		return
 	}
 
@@ -467,11 +466,11 @@ func (h *ConsultationMessagesHandler) CountUnreadMessages(w http.ResponseWriter,
 		return
 	}
 
-	count, err := h.messagesService.CountUnreadMessages(ctx, consultationID, cm_dto.SenderRoleFromString(roleStr))
+	count, err := h.messagesService.CountUnreadMessages(ctx, consultationID, telemeddto.SenderRoleFromString(roleStr))
 	if err != nil {
 		handler.RespondError(w, h.logger, err)
 		return
 	}
 
-	handler.RespondJSON(w, http.StatusOK, cm_dto.ToUnreadCountResponse(count))
+	handler.RespondJSON(w, http.StatusOK, telemeddto.ToUnreadCountResponse(count))
 }

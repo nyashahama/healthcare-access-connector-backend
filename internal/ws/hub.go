@@ -249,13 +249,22 @@ func (h *Hub) IsAvailable() bool { return true }
 func (c *client) readPump(h *Hub) {
 	defer func() {
 		h.unregister <- c
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			h.logger.Warn().Err(err).Msg("failed to close websocket connection (read pump)")
+		}
 	}()
 
 	c.conn.SetReadLimit(h.cfg.MaxMessageBytes)
-	_ = c.conn.SetReadDeadline(time.Now().Add(h.cfg.PongWait))
+	if err := c.conn.SetReadDeadline(time.Now().Add(h.cfg.PongWait)); err != nil {
+		h.logger.Error().Err(err).Str("user_id", c.userID).Msg("failed to set websocket read deadline")
+		return
+	}
 	c.conn.SetPongHandler(func(string) error {
-		return c.conn.SetReadDeadline(time.Now().Add(h.cfg.PongWait))
+		if err := c.conn.SetReadDeadline(time.Now().Add(h.cfg.PongWait)); err != nil {
+			h.logger.Warn().Err(err).Str("user_id", c.userID).Msg("failed to refresh websocket read deadline on pong")
+			return err
+		}
+		return nil
 	})
 
 	for {
@@ -325,24 +334,36 @@ func (c *client) writePump(cfg *Config) {
 	ticker := time.NewTicker(cfg.PingInterval)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			c.hub.logger.Warn().Err(err).Msg("failed to close websocket connection (write pump)")
+		}
 	}()
 
 	for {
 		select {
 		case msg, ok := <-c.send:
-			_ = c.conn.SetWriteDeadline(time.Now().Add(cfg.WriteWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(cfg.WriteWait)); err != nil {
+				c.hub.logger.Warn().Err(err).Str("user_id", c.userID).Msg("failed to set websocket write deadline")
+				return
+			}
 			if !ok {
-				_ = c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+					c.hub.logger.Warn().Err(err).Str("user_id", c.userID).Msg("failed to send websocket close frame")
+				}
 				return
 			}
 			if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				c.hub.logger.Warn().Err(err).Str("user_id", c.userID).Msg("failed to write websocket message")
 				return
 			}
 
 		case <-ticker.C:
-			_ = c.conn.SetWriteDeadline(time.Now().Add(cfg.WriteWait))
+			if err := c.conn.SetWriteDeadline(time.Now().Add(cfg.WriteWait)); err != nil {
+				c.hub.logger.Warn().Err(err).Str("user_id", c.userID).Msg("failed to set websocket write deadline for ping")
+				return
+			}
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				c.hub.logger.Warn().Err(err).Str("user_id", c.userID).Msg("failed to write websocket ping")
 				return
 			}
 		}
@@ -350,11 +371,16 @@ func (c *client) writePump(cfg *Config) {
 }
 
 func (h *Hub) sendError(c *client, msg string) {
-	data, _ := json.Marshal(OutboundEvent{
+	data, err := json.Marshal(OutboundEvent{
 		Type:    EventError,
 		SentAt:  time.Now().UTC(),
 		Payload: map[string]string{"error": msg},
 	})
+	if err != nil {
+		h.logger.Error().Err(err).Str("user_id", c.userID).Msg("failed to marshal websocket error event")
+		return
+	}
+
 	select {
 	case c.send <- data:
 	default:
